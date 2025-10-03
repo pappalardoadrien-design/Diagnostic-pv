@@ -1,7 +1,24 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "diagpv-audit",
-  "compatibility_date": "2025-10-03",
+  "compatibility_date": "2025-10-03", 
   "pages_build_output_dir": "./dist",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  
+  // Configuration D1 Database pour audits EL
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "diagpv-audit-production",
+      "database_id": "dfa92296-cb50-4ce4-b135-009f530d6224"
+    }
+  ],
+  
+  // Configuration KV pour cache et sessions collaboratives
+  "kv_namespaces": [
+    {
+      "binding": "KV", 
+      "id": "caf313a4703c4eb0911cd4f2bf8cc028"
+    }
+  ]
 }
