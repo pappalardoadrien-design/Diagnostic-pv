@@ -80,12 +80,16 @@ class DiagPVApp {
     async createAudit(event) {
         event.preventDefault()
 
+        console.log('🚀 createAudit démarré')
+
         try {
             // Validation formulaire
             const projectName = document.getElementById('projectName').value.trim()
             const clientName = document.getElementById('clientName').value.trim()
             const location = document.getElementById('location').value.trim()
             const auditDate = document.getElementById('auditDate').value
+
+            console.log('📝 Données formulaire:', { projectName, clientName, location, auditDate })
 
             if (!projectName || !clientName || !location || !auditDate) {
                 this.showAlert('Tous les champs sont obligatoires', 'error')
@@ -96,6 +100,8 @@ class DiagPVApp {
             const stringCount = parseInt(document.getElementById('stringCount').value)
             const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
             const planFile = document.getElementById('planFile').files[0]
+
+            console.log('⚙️ Configuration:', { stringCount, modulesPerString, planFile: !!planFile })
 
             if (!planFile && (!stringCount || !modulesPerString)) {
                 this.showAlert('Configuration manuelle OU upload plan requis', 'error')
@@ -108,6 +114,8 @@ class DiagPVApp {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>CRÉATION EN COURS...'
             submitBtn.disabled = true
 
+            console.log('🔄 Bouton loading activé')
+
             // Création audit via API
             const auditData = {
                 projectName,
@@ -118,6 +126,8 @@ class DiagPVApp {
                 modulesPerString: modulesPerString || 0
             }
 
+            console.log('📡 Envoi requête API:', auditData)
+
             const response = await fetch('/api/audit/create', {
                 method: 'POST',
                 headers: {
@@ -126,7 +136,14 @@ class DiagPVApp {
                 body: JSON.stringify(auditData)
             })
 
+            console.log('📥 Réponse reçue, status:', response.status)
+
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`)
+            }
+
             const result = await response.json()
+            console.log('✅ Résultat parsé:', result)
 
             if (!result.success) {
                 throw new Error(result.message || 'Erreur création audit')
@@ -134,10 +151,13 @@ class DiagPVApp {
 
             // Upload plan si fourni
             if (planFile) {
+                console.log('📎 Upload plan démarré')
                 await this.uploadPlan(result.auditToken, planFile)
+                console.log('📎 Upload plan terminé')
             }
 
             // Sauvegarde local pour audits récents
+            console.log('💾 Sauvegarde audit récent')
             this.saveRecentAudit({
                 token: result.auditToken,
                 projectName,
@@ -148,19 +168,23 @@ class DiagPVApp {
             })
 
             // Redirection vers interface audit
+            console.log('🎯 Redirection vers:', result.auditUrl)
             this.showAlert('Audit créé avec succès ! Redirection...', 'success')
             setTimeout(() => {
                 window.location.href = result.auditUrl
             }, 1500)
 
         } catch (error) {
-            console.error('Erreur création audit:', error)
+            console.error('❌ Erreur création audit:', error)
             this.showAlert('Erreur: ' + error.message, 'error')
         } finally {
             // Reset bouton
+            console.log('🔄 Reset bouton')
             const submitBtn = event.target.querySelector('button[type="submit"]')
-            submitBtn.innerHTML = originalText
-            submitBtn.disabled = false
+            if (submitBtn) {
+                submitBtn.innerHTML = originalText || '<i class="fas fa-rocket mr-2"></i>CRÉER L\'AUDIT'
+                submitBtn.disabled = false
+            }
         }
     }
 
