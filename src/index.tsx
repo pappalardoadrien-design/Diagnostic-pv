@@ -653,6 +653,40 @@ app.get('/', (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
+        <style>
+        /* Styles critiques inline pour éviter l'écran noir */
+        body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .bg-black { background-color: #000 !important; }
+        .text-white { color: #fff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .rounded-lg { border-radius: 8px; }
+        .p-6 { padding: 24px; }
+        .mb-4 { margin-bottom: 16px; }
+        .font-bold { font-weight: bold; }
+        .text-2xl { font-size: 24px; }
+        .text-xl { font-size: 20px; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .space-x-4 > * + * { margin-left: 16px; }
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        @media (min-width: 768px) { .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .gap-6 { gap: 24px; }
+        .border-2 { border-width: 2px; }
+        .border { border-width: 1px; }
+        button, input { padding: 12px 16px; border: 2px solid #4b5563; border-radius: 8px; background: #000; color: #fff; font-weight: bold; }
+        button:hover { opacity: 0.8; }
+        .fa, .fas { font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        </style>
         <meta name="theme-color" content="#000000">
         <link rel="manifest" href="/manifest.json">
     </head>
@@ -834,6 +868,40 @@ app.get('/audit/:token', async (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
+        <style>
+        /* Styles critiques inline pour éviter l'écran noir */
+        body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .bg-black { background-color: #000 !important; }
+        .text-white { color: #fff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .rounded-lg { border-radius: 8px; }
+        .p-6 { padding: 24px; }
+        .mb-4 { margin-bottom: 16px; }
+        .font-bold { font-weight: bold; }
+        .text-2xl { font-size: 24px; }
+        .text-xl { font-size: 20px; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .space-x-4 > * + * { margin-left: 16px; }
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        @media (min-width: 768px) { .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .gap-6 { gap: 24px; }
+        .border-2 { border-width: 2px; }
+        .border { border-width: 1px; }
+        button, input { padding: 12px 16px; border: 2px solid #4b5563; border-radius: 8px; background: #000; color: #fff; font-weight: bold; }
+        button:hover { opacity: 0.8; }
+        .fa, .fas { font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        </style>
         <meta name="theme-color" content="#000000">
     </head>
     <body class="bg-black text-white min-h-screen font-bold overflow-x-auto" data-audit-token="${token}">
@@ -1155,6 +1223,40 @@ app.get('/dashboard', (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
+        <style>
+        /* Styles critiques inline pour éviter l'écran noir */
+        body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .bg-black { background-color: #000 !important; }
+        .text-white { color: #fff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .rounded-lg { border-radius: 8px; }
+        .p-6 { padding: 24px; }
+        .mb-4 { margin-bottom: 16px; }
+        .font-bold { font-weight: bold; }
+        .text-2xl { font-size: 24px; }
+        .text-xl { font-size: 20px; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .space-x-4 > * + * { margin-left: 16px; }
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        @media (min-width: 768px) { .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .gap-6 { gap: 24px; }
+        .border-2 { border-width: 2px; }
+        .border { border-width: 1px; }
+        button, input { padding: 12px 16px; border: 2px solid #4b5563; border-radius: 8px; background: #000; color: #fff; font-weight: bold; }
+        button:hover { opacity: 0.8; }
+        .fa, .fas { font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        </style>
         <meta name="theme-color" content="#000000">
     </head>
     <body class="bg-black text-white min-h-screen font-bold">
