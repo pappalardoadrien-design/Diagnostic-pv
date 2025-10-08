@@ -25,39 +25,164 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // API ROUTES - GESTION DES AUDITS
 // ============================================================================
 
+app.post('/api/audit/create-from-json', async (c) => {
+  const { env } = c
+  const { jsonConfig } = await c.req.json()
+  
+  if (!jsonConfig || !jsonConfig.diagpv_import_format) {
+    return c.json({ error: 'Configuration JSON invalide' }, 400)
+  }
+  
+  const config = jsonConfig.diagpv_import_format
+  const auditToken = crypto.randomUUID()
+  
+  // Création audit avec données JSON
+  await env.DB.prepare(`
+    INSERT INTO audits (
+      token, project_name, client_name, location, 
+      string_count, modules_per_string, total_modules,
+      created_at, status, json_config
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 'created', ?)
+  `).bind(
+    auditToken, config.project_name, config.client_name, config.location,
+    config.string_count, config.modules_per_string, config.total_modules,
+    JSON.stringify(jsonConfig)
+  ).run()
+  
+  // Génération modules avec positions détaillées si disponibles
+  if (jsonConfig.strings_configuration) {
+    for (const stringConfig of jsonConfig.strings_configuration) {
+      for (const moduleConfig of stringConfig.modules) {
+        // Nouvelle numérotation : S{string}-{position} au lieu de l'ancien module_id du JSON
+        const newModuleId = `S${stringConfig.string_number}-${moduleConfig.position_in_string}`
+        
+        await env.DB.prepare(`
+          INSERT INTO modules (
+            audit_token, module_id, string_number, position_in_string,
+            status, physical_row, physical_col, created_at
+          ) VALUES (?, ?, ?, ?, 'pending', ?, ?, datetime('now'))
+        `).bind(
+          auditToken, newModuleId, stringConfig.string_number, 
+          moduleConfig.position_in_string,
+          moduleConfig.physical_position?.row || null,
+          moduleConfig.physical_position?.col || null
+        ).run()
+      }
+    }
+  } else {
+    // Génération standard si pas de configuration détaillée
+    for (let s = 1; s <= config.string_count; s++) {
+      for (let m = 1; m <= config.modules_per_string; m++) {
+        // Nouvelle numérotation : S{string}-{position}
+        const moduleId = `S${s}-${m}`
+        
+        await env.DB.prepare(`
+          INSERT INTO modules (
+            audit_token, module_id, string_number, position_in_string,
+            status, created_at
+          ) VALUES (?, ?, ?, ?, 'pending', datetime('now'))
+        `).bind(auditToken, moduleId, s, m).run()
+      }
+    }
+  }
+  
+  return c.json({
+    success: true,
+    auditToken,
+    auditUrl: `/audit/${auditToken}`,
+    totalModules: config.total_modules,
+    message: 'Audit créé depuis configuration JSON'
+  })
+})
+
 // Créer un nouvel audit
 app.post('/api/audit/create', async (c) => {
   const { env } = c
-  const { projectName, clientName, location, stringCount, modulesPerString } = await c.req.json()
+  const requestData = await c.req.json()
+  const { projectName, clientName, location, configuration } = requestData
   
   // Génération token unique sécurisé
   const auditToken = crypto.randomUUID()
-  const totalModules = stringCount * modulesPerString
+  
+  let totalModules = 0
+  let stringCount = 0
+  let modulesPerString = 0
+  let configJson = null
+  
+  // Détermination du mode de configuration
+  if (configuration && configuration.mode === 'advanced') {
+    // Mode configuration avancée
+    totalModules = configuration.totalModules
+    stringCount = configuration.stringCount
+    modulesPerString = 0 // Variable en mode avancé
+    configJson = JSON.stringify(configuration)
+  } else if (configuration && configuration.mode === 'simple') {
+    // Mode simple (nouveau format)
+    totalModules = configuration.totalModules
+    stringCount = configuration.stringCount
+    modulesPerString = configuration.modulesPerString
+    configJson = JSON.stringify(configuration)
+  } else {
+    // Rétrocompatibilité - ancien format
+    const { stringCount: oldStringCount, modulesPerString: oldModulesPerString } = requestData
+    totalModules = (oldStringCount || 0) * (oldModulesPerString || 0)
+    stringCount = oldStringCount || 0
+    modulesPerString = oldModulesPerString || 0
+  }
   
   // Création structure audit en base D1
   const audit = await env.DB.prepare(`
     INSERT INTO audits (
       token, project_name, client_name, location, 
       string_count, modules_per_string, total_modules,
-      created_at, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 'created')
+      created_at, status, json_config
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), 'created', ?)
   `).bind(
     auditToken, projectName, clientName, location,
-    stringCount, modulesPerString, totalModules
+    stringCount, modulesPerString, totalModules, configJson
   ).run()
   
-  // Génération grille modules
-  for (let s = 1; s <= stringCount; s++) {
-    for (let m = 1; m <= modulesPerString; m++) {
-      const moduleNumber = ((s - 1) * modulesPerString) + m
-      const moduleId = `M${moduleNumber.toString().padStart(3, '0')}`
-      
-      await env.DB.prepare(`
-        INSERT INTO modules (
-          audit_token, module_id, string_number, position_in_string,
-          status, created_at
-        ) VALUES (?, ?, ?, ?, 'pending', datetime('now'))
-      `).bind(auditToken, moduleId, s, m).run()
+  // Génération modules selon le mode
+  if (configuration && configuration.mode === 'advanced' && configuration.strings) {
+    // Génération avancée avec configuration par string
+    for (const stringConfig of configuration.strings) {
+      if (stringConfig.moduleCount > 0) {
+        const stringNumber = stringConfig.mpptNumber || stringConfig.id
+        
+        for (let modulePos = 1; modulePos <= stringConfig.moduleCount; modulePos++) {
+          // Nouvelle numérotation : S{string}-{position}
+          const moduleId = `S${stringNumber}-${modulePos}`
+          
+          await env.DB.prepare(`
+            INSERT INTO modules (
+              audit_token, module_id, string_number, position_in_string,
+              status, created_at, physical_row, physical_col
+            ) VALUES (?, ?, ?, ?, 'pending', datetime('now'), ?, ?)
+          `).bind(
+            auditToken, 
+            moduleId, 
+            stringNumber, 
+            modulePos,
+            stringNumber, // row = MPPT number pour organisation visuelle
+            modulePos // col = position dans string
+          ).run()
+        }
+      }
+    }
+  } else {
+    // Génération simple (grille uniforme)
+    for (let s = 1; s <= stringCount; s++) {
+      for (let m = 1; m <= modulesPerString; m++) {
+        // Nouvelle numérotation : S{string}-{position}
+        const moduleId = `S${s}-${m}`
+        
+        await env.DB.prepare(`
+          INSERT INTO modules (
+            audit_token, module_id, string_number, position_in_string,
+            status, created_at
+          ) VALUES (?, ?, ?, ?, 'pending', datetime('now'))
+        `).bind(auditToken, moduleId, s, m).run()
+      }
     }
   }
   
@@ -66,8 +191,88 @@ app.post('/api/audit/create', async (c) => {
     auditToken,
     auditUrl: `/audit/${auditToken}`,
     totalModules,
+    configuration: configuration ? configuration.mode : 'legacy',
     message: 'Audit créé avec succès'
   })
+})
+
+// API Dashboard - Audits avec statistiques détaillées
+app.get('/api/dashboard/audits', async (c) => {
+  const { env } = c
+  
+  try {
+    // Récupération audits avec statistiques
+    const audits = await env.DB.prepare(`
+      SELECT 
+        a.token, a.project_name, a.client_name, a.location,
+        a.total_modules, a.string_count, a.status, a.created_at,
+        COUNT(m.id) as modules_created,
+        SUM(CASE WHEN m.status != 'pending' THEN 1 ELSE 0 END) as modules_completed,
+        SUM(CASE WHEN m.status = 'ok' THEN 1 ELSE 0 END) as modules_ok,
+        SUM(CASE WHEN m.status = 'inequality' THEN 1 ELSE 0 END) as modules_inequality,
+        SUM(CASE WHEN m.status = 'microcracks' THEN 1 ELSE 0 END) as modules_microcracks,
+        SUM(CASE WHEN m.status = 'dead' THEN 1 ELSE 0 END) as modules_dead,
+        SUM(CASE WHEN m.status = 'string_open' THEN 1 ELSE 0 END) as modules_string_open,
+        SUM(CASE WHEN m.status = 'not_connected' THEN 1 ELSE 0 END) as modules_not_connected
+      FROM audits a
+      LEFT JOIN modules m ON a.token = m.audit_token
+      GROUP BY a.token
+      ORDER BY a.created_at DESC
+    `).all()
+    
+    // Calcul statistiques globales
+    let totalAudits = 0
+    let activeAudits = 0
+    let totalModules = 0
+    let totalDefauts = 0
+    
+    const auditsWithStats = audits.results.map(audit => {
+      totalAudits++
+      if (audit.status === 'created' || audit.status === 'in_progress') {
+        activeAudits++
+      }
+      totalModules += audit.total_modules || 0
+      
+      const defauts = (audit.modules_inequality || 0) + 
+                     (audit.modules_microcracks || 0) + 
+                     (audit.modules_dead || 0) + 
+                     (audit.modules_string_open || 0) + 
+                     (audit.modules_not_connected || 0)
+      totalDefauts += defauts
+      
+      const progressionPct = audit.total_modules > 0 
+        ? Math.round(((audit.modules_completed || 0) / audit.total_modules) * 100)
+        : 0
+        
+      return {
+        ...audit,
+        defauts_total: defauts,
+        progression_pct: progressionPct,
+        created_at_formatted: new Date(audit.created_at).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit', 
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
+    })
+    
+    return c.json({ 
+      success: true,
+      audits: auditsWithStats,
+      stats: {
+        totalAudits,
+        activeAudits,
+        totalModules,
+        totalDefauts
+      },
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('Erreur récupération dashboard:', error)
+    return c.json({ error: 'Erreur récupération dashboard' }, 500)
+  }
 })
 
 // Récupérer les informations d'un audit
@@ -105,6 +310,86 @@ app.get('/api/audit/:token', async (c) => {
     modules: modules.results,
     progress
   })
+})
+
+// Modifier les informations d'un audit
+app.put('/api/audit/:token', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const { project_name, client_name, location } = await c.req.json()
+  
+  // Vérification que l'audit existe
+  const existingAudit = await env.DB.prepare(
+    'SELECT * FROM audits WHERE token = ?'
+  ).bind(token).first()
+  
+  if (!existingAudit) {
+    return c.json({ error: 'Audit non trouvé' }, 404)
+  }
+  
+  // Mise à jour avec validation des champs requis
+  if (!project_name || !client_name || !location) {
+    return c.json({ error: 'Nom projet, client et localisation requis' }, 400)
+  }
+  
+  await env.DB.prepare(`
+    UPDATE audits 
+    SET project_name = ?, client_name = ?, location = ?, updated_at = datetime('now')
+    WHERE token = ?
+  `).bind(project_name, client_name, location, token).run()
+  
+  return c.json({ 
+    success: true,
+    message: 'Audit mis à jour avec succès',
+    updated: { project_name, client_name, location }
+  })
+})
+
+// Supprimer un audit complet (avec tous ses modules)
+app.delete('/api/audit/:token', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  
+  try {
+    // Vérification que l'audit existe
+    const existingAudit = await env.DB.prepare(
+      'SELECT token, project_name FROM audits WHERE token = ?'
+    ).bind(token).first()
+    
+    if (!existingAudit) {
+      return c.json({ error: 'Audit non trouvé' }, 404)
+    }
+    
+    // Suppression des modules en cascade
+    await env.DB.prepare(`
+      DELETE FROM modules WHERE audit_token = ?
+    `).bind(token).run()
+    
+    // Suppression de l'audit
+    await env.DB.prepare(`
+      DELETE FROM audits WHERE token = ?
+    `).bind(token).run()
+    
+    // Nettoyage des données de session collaborative
+    const sessionKey = `audit_session:${token}`
+    await env.KV.delete(sessionKey)
+    
+    return c.json({ 
+      success: true,
+      message: `Audit "${existingAudit.project_name}" supprimé avec succès`,
+      deleted_audit: {
+        token: existingAudit.token,
+        project_name: existingAudit.project_name
+      }
+    })
+    
+  } catch (error) {
+    console.error('Erreur suppression audit:', error)
+    return c.json({ 
+      error: 'Erreur lors de la suppression de l\'audit',
+      details: error.message 
+    }, 500)
+  }
 })
 
 // Mettre à jour le statut d'un module
@@ -356,131 +641,6 @@ app.get('/api/audit/:token/report', async (c) => {
 // ============================================================================
 
 // Route debug test
-app.get('/debug-test', (c) => {
-  return c.html(`
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>Test DiagPV Debug</title>
-        <style>
-            body { 
-                font-family: Arial; 
-                padding: 20px; 
-                background: #000; 
-                color: #fff; 
-            }
-            .form-group { 
-                margin: 10px 0; 
-            }
-            input, button { 
-                padding: 10px; 
-                margin: 5px; 
-                font-size: 16px; 
-            }
-            button { 
-                background: #10b981; 
-                color: white; 
-                border: none; 
-                cursor: pointer; 
-            }
-            #result { 
-                margin-top: 20px; 
-                padding: 10px; 
-                border: 1px solid #333; 
-            }
-        </style>
-    </head>
-    <body>
-        <h1>🌙 Test DiagPV - Création Audit</h1>
-        
-        <form id="testForm">
-            <div class="form-group">
-                <label>Projet:</label>
-                <input type="text" id="projectName" value="Test-Debug-Direct" required>
-            </div>
-            <div class="form-group">
-                <label>Client:</label>
-                <input type="text" id="clientName" value="Client Test" required>
-            </div>
-            <div class="form-group">
-                <label>Location:</label>
-                <input type="text" id="location" value="Test Location" required>
-            </div>
-            <div class="form-group">
-                <label>Strings:</label>
-                <input type="number" id="stringCount" value="2" required>
-            </div>
-            <div class="form-group">
-                <label>Modules/String:</label>
-                <input type="number" id="modulesPerString" value="5" required>
-            </div>
-            <button type="submit">CRÉER AUDIT TEST</button>
-        </form>
-        
-        <div id="result"></div>
-        
-        <script>
-            document.getElementById('testForm').addEventListener('submit', async (e) => {
-                e.preventDefault()
-                
-                const resultDiv = document.getElementById('result')
-                resultDiv.innerHTML = '⏳ Création en cours...'
-                
-                console.log('🚀 Test création audit démarré')
-                
-                try {
-                    const auditData = {
-                        projectName: document.getElementById('projectName').value,
-                        clientName: document.getElementById('clientName').value,
-                        location: document.getElementById('location').value,
-                        auditDate: new Date().toISOString().split('T')[0],
-                        stringCount: parseInt(document.getElementById('stringCount').value),
-                        modulesPerString: parseInt(document.getElementById('modulesPerString').value)
-                    }
-                    
-                    console.log('📡 Données à envoyer:', auditData)
-                    
-                    const response = await fetch('/api/audit/create', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(auditData)
-                    })
-                    
-                    console.log('📥 Réponse status:', response.status)
-                    
-                    const result = await response.json()
-                    console.log('✅ Résultat:', result)
-                    
-                    if (result.success) {
-                        resultDiv.innerHTML = \`
-                            <h3>✅ SUCCÈS!</h3>
-                            <p><strong>Token:</strong> \${result.auditToken}</p>
-                            <p><strong>URL:</strong> <a href="\${result.auditUrl}" style="color: #10b981">\${result.auditUrl}</a></p>
-                            <p><strong>Modules:</strong> \${result.totalModules}</p>
-                            <button onclick="window.location.href='\${result.auditUrl}'" style="margin-top: 10px;">
-                                🎯 ALLER À L'AUDIT
-                            </button>
-                        \`
-                    } else {
-                        resultDiv.innerHTML = \`❌ Échec: \${result.message || 'Erreur inconnue'}\`
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Erreur:', error)
-                    resultDiv.innerHTML = \`❌ Erreur: \${error.message}\`
-                }
-            })
-            
-            console.log('🌙 DiagPV Debug Test initialisé')
-        </script>
-    </body>
-    </html>
-  `)
-})
-
 // Page d'accueil - Dashboard
 app.get('/', (c) => {
   return c.html(`
@@ -551,7 +711,9 @@ app.get('/', (c) => {
                             
                             <div class="mb-6">
                                 <h4 class="text-lg font-bold mb-3">Option A - Configuration manuelle :</h4>
-                                <div class="grid md:grid-cols-3 gap-4">
+                                
+                                <!-- Configuration simple (mode actuel) -->
+                                <div id="simpleConfig" class="grid md:grid-cols-3 gap-4 mb-4">
                                     <div>
                                         <label class="block text-sm font-bold mb-2">Nombre de strings :</label>
                                         <input type="number" id="stringCount" min="1" max="100" 
@@ -565,6 +727,40 @@ app.get('/', (c) => {
                                     <div>
                                         <label class="block text-sm font-bold mb-2">Total modules :</label>
                                         <div id="totalModules" class="bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg text-green-400 font-black">0</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Bouton pour configuration avancée -->
+                                <div class="text-center mb-4 space-x-3">
+                                    <button type="button" id="toggleAdvancedConfig" 
+                                            class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-bold text-sm">
+                                        <i class="fas fa-cog mr-2"></i>CONFIGURATION AVANCÉE (Strings différents)
+                                    </button>
+                                    <button type="button" id="loadExampleConfig" 
+                                            class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold text-sm">
+                                        <i class="fas fa-magic mr-2"></i>EXEMPLE MPPT (26+9×24)
+                                    </button>
+                                </div>
+                                
+                                <!-- Configuration avancée (masquée par défaut) -->
+                                <div id="advancedConfig" class="hidden bg-gray-700 rounded-lg p-4 border border-orange-400">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <h5 class="text-lg font-bold text-orange-400">Configuration par String/MPPT</h5>
+                                        <button type="button" id="addStringBtn" 
+                                                class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-bold">
+                                            <i class="fas fa-plus mr-1"></i>Ajouter String
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="stringsList" class="space-y-2 max-h-60 overflow-y-auto">
+                                        <!-- Strings dynamiques seront ajoutés ici -->
+                                    </div>
+                                    
+                                    <div class="mt-4 p-3 bg-gray-800 rounded border-l-4 border-green-400">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm font-bold">TOTAL CONFIGURATION :</span>
+                                            <span id="advancedTotal" class="text-green-400 font-black text-lg">0 modules</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -590,20 +786,35 @@ app.get('/', (c) => {
                     </form>
                 </div>
                 
-                <!-- Audits récents -->
-                <div class="mt-8 bg-gray-900 rounded-lg p-6 border border-gray-600">
-                    <h3 class="text-xl font-bold mb-4 flex items-center">
-                        <i class="fas fa-history mr-2 text-blue-400"></i>
-                        MES AUDITS RÉCENTS
-                    </h3>
-                    <div id="recentAudits" class="space-y-2">
-                        <p class="text-gray-400">Aucun audit récent trouvé</p>
+                <!-- Boutons d'accès -->
+                <div class="mt-8 grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-900 rounded-lg p-6 border border-gray-600">
+                        <h3 class="text-xl font-bold mb-4 flex items-center">
+                            <i class="fas fa-history mr-2 text-blue-400"></i>
+                            MES AUDITS RÉCENTS
+                        </h3>
+                        <div id="recentAudits" class="space-y-2 mb-4">
+                            <p class="text-gray-400">Aucun audit récent trouvé</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-900 rounded-lg p-6 border border-orange-400">
+                        <h3 class="text-xl font-bold mb-4 text-orange-400 flex items-center">
+                            <i class="fas fa-tachometer-alt mr-2"></i>
+                            TABLEAU DE BORD
+                        </h3>
+                        <p class="text-gray-300 mb-4">Gérez tous vos audits en cours avec mise à jour temps réel</p>
+                        <a href="/dashboard" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            ACCÉDER AU DASHBOARD
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
         
         <script src="/static/diagpv-app.js"></script>
+        <script src="/static/diagpv-json-importer.js"></script>
     </body>
     </html>
   `)
@@ -630,9 +841,17 @@ app.get('/audit/:token', async (c) => {
         <header class="sticky top-0 bg-black border-b-2 border-yellow-400 p-4 z-50">
             <div class="flex flex-wrap items-center justify-between">
                 <div class="flex items-center space-x-4">
+                    <a href="/" class="text-yellow-400 hover:text-yellow-300" title="Retour à l'accueil">
+                        <i class="fas fa-home text-2xl"></i>
+                    </a>
                     <i class="fas fa-moon text-2xl text-yellow-400"></i>
                     <div>
-                        <h1 id="projectTitle" class="text-xl font-black">Chargement...</h1>
+                        <div class="flex items-center space-x-2">
+                            <h1 id="projectTitle" class="text-xl font-black">Chargement...</h1>
+                            <button id="editAuditBtn" class="text-orange-400 hover:text-orange-300 p-1" title="Modifier l'audit">
+                                <i class="fas fa-edit text-lg"></i>
+                            </button>
+                        </div>
                         <div class="flex items-center space-x-4 text-sm">
                             <span>Progression: <span id="progress" class="text-green-400 font-black">0/0</span></span>
                             <span>Techniciens: <span id="technicians" class="text-blue-400">0/4</span></span>
@@ -642,6 +861,9 @@ app.get('/audit/:token', async (c) => {
                 </div>
                 
                 <div class="flex space-x-2">
+                    <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold flex items-center border-2 border-orange-400 shadow-lg" title="Accéder au tableau de bord - Vue d'ensemble audits">
+                        <i class="fas fa-tachometer-alt mr-2 text-lg"></i>TABLEAU DE BORD
+                    </a>
                     <button id="measureBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-chart-line mr-1"></i>MESURES
                     </button>
@@ -710,6 +932,44 @@ app.get('/audit/:token', async (c) => {
                         ANNULER
                     </button>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Modal édition audit -->
+        <div id="editAuditModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-orange-400 rounded-lg p-6 max-w-lg w-full">
+                <h3 class="text-xl font-black mb-4 text-center text-orange-400">
+                    <i class="fas fa-edit mr-2"></i>MODIFIER L'AUDIT
+                </h3>
+                
+                <form id="editAuditForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Nom du projet :</label>
+                        <input type="text" id="editProjectName" required 
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-orange-400 focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Client :</label>
+                        <input type="text" id="editClientName" required 
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-orange-400 focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Localisation :</label>
+                        <input type="text" id="editLocation" required 
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-orange-400 focus:outline-none">
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 py-3 rounded font-black">
+                            <i class="fas fa-save mr-2"></i>SAUVEGARDER
+                        </button>
+                        <button type="button" id="cancelEditBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                            ANNULER
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
         
@@ -882,5 +1142,133 @@ function getStatusLabel(status: string): string {
   }
   return labels[status] || status
 }
+
+// Route Dashboard - Tableau de bord audits en temps réel
+app.get('/dashboard', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard - DiagPV Audits</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/diagpv-styles.css" rel="stylesheet">
+        <meta name="theme-color" content="#000000">
+    </head>
+    <body class="bg-black text-white min-h-screen font-bold">
+        <!-- Header Dashboard -->
+        <header class="bg-gray-900 border-b-2 border-orange-400 p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-tachometer-alt text-3xl text-orange-400"></i>
+                    <div>
+                        <h1 class="text-2xl font-black">DASHBOARD AUDITS</h1>
+                        <p class="text-gray-300">Tableau de bord temps réel - DiagPV</p>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <a href="/" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-home mr-1"></i>ACCUEIL
+                    </a>
+                    <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-sync-alt mr-1"></i>ACTUALISER
+                    </button>
+                    <button id="autoRefreshBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-play mr-1"></i>AUTO (OFF)
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistiques globales -->
+        <div class="container mx-auto p-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-blue-900 rounded-lg p-4 text-center">
+                    <i class="fas fa-clipboard-list text-3xl text-blue-400 mb-2"></i>
+                    <div class="text-2xl font-black" id="totalAudits">0</div>
+                    <div class="text-sm text-gray-300">Audits Totaux</div>
+                </div>
+                
+                <div class="bg-green-900 rounded-lg p-4 text-center">
+                    <i class="fas fa-play text-3xl text-green-400 mb-2"></i>
+                    <div class="text-2xl font-black" id="activeAudits">0</div>
+                    <div class="text-sm text-gray-300">En Cours</div>
+                </div>
+                
+                <div class="bg-orange-900 rounded-lg p-4 text-center">
+                    <i class="fas fa-solar-panel text-3xl text-orange-400 mb-2"></i>
+                    <div class="text-2xl font-black" id="totalModules">0</div>
+                    <div class="text-sm text-gray-300">Modules Totaux</div>
+                </div>
+                
+                <div class="bg-red-900 rounded-lg p-4 text-center">
+                    <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-2"></i>
+                    <div class="text-2xl font-black" id="totalDefauts">0</div>
+                    <div class="text-sm text-gray-300">Défauts Détectés</div>
+                </div>
+            </div>
+
+            <!-- Dernière mise à jour -->
+            <div class="mb-6 text-center">
+                <span class="text-gray-400">Dernière mise à jour : </span>
+                <span id="lastUpdate" class="text-green-400 font-black">--:--:--</span>
+                <span id="autoStatus" class="ml-4 px-2 py-1 bg-gray-600 rounded text-xs">MANUEL</span>
+            </div>
+
+            <!-- Liste des audits -->
+            <div class="bg-gray-900 rounded-lg p-6 border border-gray-600">
+                <h2 class="text-xl font-black mb-4 flex items-center">
+                    <i class="fas fa-list mr-2 text-blue-400"></i>
+                    AUDITS EN COURS
+                </h2>
+                
+                <!-- Loading -->
+                <div id="loading" class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-3xl text-blue-400 mb-4"></i>
+                    <p class="text-gray-400">Chargement des audits...</p>
+                </div>
+                
+                <!-- Table audits -->
+                <div id="auditsContainer" class="hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-600">
+                                    <th class="text-left py-3 px-2 text-orange-400">Projet</th>
+                                    <th class="text-left py-3 px-2 text-orange-400">Client</th>
+                                    <th class="text-left py-3 px-2 text-orange-400">Localisation</th>
+                                    <th class="text-center py-3 px-2 text-orange-400">Modules</th>
+                                    <th class="text-center py-3 px-2 text-orange-400">Progression</th>
+                                    <th class="text-center py-3 px-2 text-orange-400">Défauts</th>
+                                    <th class="text-center py-3 px-2 text-orange-400">Statut</th>
+                                    <th class="text-center py-3 px-2 text-orange-400">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditsTable">
+                                <!-- Audits seront chargés ici -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Aucun audit -->
+                <div id="noAudits" class="hidden text-center py-8">
+                    <i class="fas fa-inbox text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-400 text-lg">Aucun audit trouvé</p>
+                    <a href="/" class="inline-block mt-4 bg-green-600 hover:bg-green-700 px-6 py-3 rounded font-bold">
+                        <i class="fas fa-plus mr-2"></i>CRÉER UN AUDIT
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <script src="/static/diagpv-dashboard.js"></script>
+    </body>
+    </html>
+  `)
+})
 
 export default app

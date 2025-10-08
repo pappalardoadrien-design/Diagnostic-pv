@@ -131,7 +131,7 @@ class DiagPVAudit {
                         data-module-id="${module.module_id}"
                         data-string="${module.string_number}"
                         title="${module.module_id} - ${this.getStatusLabel(module.status)}${module.comment ? ' - ' + module.comment : ''}">
-                    ${module.module_id.substring(1)}
+                    ${module.module_id.includes('-') ? module.module_id.split('-')[1] : module.module_id.substring(1)}
                 </button>
             `
         })
@@ -158,8 +158,13 @@ class DiagPVAudit {
         // Clic modules
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('module-btn')) {
-                const moduleId = e.target.dataset.moduleId
-                this.openModuleModal(moduleId)
+                const moduleId = e.target.getAttribute('data-module-id')
+                console.log('🎯 Module cliqué:', moduleId, 'Element:', e.target)
+                if (moduleId) {
+                    this.openModuleModal(moduleId)
+                } else {
+                    console.error('❌ Pas de module-id trouvé sur:', e.target)
+                }
             }
         })
 
@@ -170,6 +175,7 @@ class DiagPVAudit {
         document.getElementById('measureBtn').addEventListener('click', () => this.showMeasuresModal())
         document.getElementById('reportBtn').addEventListener('click', () => this.generateReport())
         document.getElementById('shareBtn').addEventListener('click', () => this.shareAudit())
+        document.getElementById('editAuditBtn').addEventListener('click', () => this.showEditAuditModal())
 
         // Raccourcis clavier tactile
         document.addEventListener('keydown', (e) => this.handleKeyboard(e))
@@ -179,8 +185,18 @@ class DiagPVAudit {
     }
 
     openModuleModal(moduleId) {
+        console.log('📝 Ouverture modal pour module:', moduleId)
+        
+        if (!moduleId) {
+            console.error('❌ Module ID manquant')
+            return
+        }
+        
         const module = this.modules.get(moduleId)
-        if (!module) return
+        if (!module) {
+            console.error('❌ Module non trouvé:', moduleId, 'Modules disponibles:', Array.from(this.modules.keys()).slice(0, 5))
+            return
+        }
 
         this.selectedModule = module
 
@@ -234,6 +250,44 @@ class DiagPVAudit {
             }
         })
 
+        // Configuration modal édition audit
+        this.setupEditModalEvents()
+    }
+
+    setupEditModalEvents() {
+        const editModal = document.getElementById('editAuditModal')
+        const editForm = document.getElementById('editAuditForm')
+        
+        // Soumission formulaire édition
+        editForm.addEventListener('submit', (e) => {
+            e.preventDefault()
+            
+            const formData = {
+                project_name: document.getElementById('editProjectName').value.trim(),
+                client_name: document.getElementById('editClientName').value.trim(),
+                location: document.getElementById('editLocation').value.trim()
+            }
+            
+            if (!formData.project_name || !formData.client_name || !formData.location) {
+                this.showAlert('Tous les champs sont requis', 'error')
+                return
+            }
+            
+            this.saveAuditChanges(formData)
+        })
+
+        // Annulation édition
+        document.getElementById('cancelEditBtn').addEventListener('click', () => {
+            this.closeEditAuditModal()
+        })
+
+        // Fermeture ESC ou clic extérieur  
+        editModal.addEventListener('click', (e) => {
+            if (e.target === editModal) {
+                this.closeEditAuditModal()
+            }
+        })
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
                 this.closeModal()
@@ -242,22 +296,38 @@ class DiagPVAudit {
     }
 
     async validateModuleStatus() {
+        console.log('🔍 Validation module - selectedModule:', this.selectedModule)
+        console.log('🔍 Validation module - selectedStatus:', this.selectedStatus)
+        
         if (!this.selectedModule || !this.selectedStatus) {
             this.showAlert('Veuillez sélectionner un statut', 'warning')
+            return
+        }
+
+        if (!this.selectedModule.module_id) {
+            console.error('❌ Module ID manquant dans selectedModule:', this.selectedModule)
+            this.showAlert('Erreur: Module ID manquant', 'error')
             return
         }
 
         try {
             const comment = document.getElementById('moduleComment').value.trim()
             
+            // Sauvegarde des données du module avant l'appel API (évite les références async perdues)
+            const moduleId = this.selectedModule.module_id
+            const selectedModule = { ...this.selectedModule } // copie de sécurité
+            const selectedStatus = this.selectedStatus
+            
+            console.log('📡 Mise à jour module:', moduleId, '→', selectedStatus)
+            
             // API update
             const updateData = {
-                status: this.selectedStatus,
+                status: selectedStatus,
                 comment: comment || null,
                 technicianId: this.technicianId
             }
 
-            const response = await fetch(`/api/audit/${this.auditToken}/module/${this.selectedModule.module_id}`, {
+            const response = await fetch(`/api/audit/${this.auditToken}/module/${moduleId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -270,16 +340,16 @@ class DiagPVAudit {
             }
 
             // Mise à jour locale immédiate
-            this.selectedModule.status = this.selectedStatus
-            this.selectedModule.comment = comment || null
-            this.selectedModule.technician_id = this.technicianId
-            this.selectedModule.updated_at = new Date().toISOString()
+            selectedModule.status = selectedStatus
+            selectedModule.comment = comment || null
+            selectedModule.technician_id = this.technicianId
+            selectedModule.updated_at = new Date().toISOString()
 
             // Mise à jour Map
-            this.modules.set(this.selectedModule.module_id, this.selectedModule)
+            this.modules.set(moduleId, selectedModule)
 
             // Mise à jour interface
-            this.updateModuleButton(this.selectedModule.module_id)
+            this.updateModuleButton(moduleId)
             this.updateProgress()
             this.renderStringNavigation()
 
@@ -287,9 +357,9 @@ class DiagPVAudit {
             this.saveOfflineData()
 
             this.closeModal()
-            this.showAlert(`Module ${this.selectedModule.module_id} mis à jour`, 'success')
+            this.showAlert(`Module ${moduleId} mis à jour`, 'success')
 
-            console.log('✅ Module mis à jour:', this.selectedModule.module_id, '→', this.selectedStatus)
+            console.log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
         } catch (error) {
             console.error('Erreur validation module:', error)
@@ -305,10 +375,24 @@ class DiagPVAudit {
     }
 
     updateModuleButton(moduleId) {
+        console.log('🔄 Mise à jour bouton module:', moduleId)
+        
+        if (!moduleId) {
+            console.error('❌ Module ID manquant pour mise à jour bouton')
+            return
+        }
+        
         const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
-        if (!btn) return
+        if (!btn) {
+            console.error('❌ Bouton module non trouvé:', moduleId)
+            return
+        }
 
         const module = this.modules.get(moduleId)
+        if (!module) {
+            console.error('❌ Module non trouvé dans Map:', moduleId)
+            return
+        }
         
         // Suppression anciennes classes statut
         btn.className = btn.className.replace(/module-\w+/g, '')
@@ -652,6 +736,61 @@ class DiagPVAudit {
                 alert.remove()
             }
         }, 4000)
+    }
+
+    // Affichage modal édition audit
+    showEditAuditModal() {
+        // Pré-remplissage avec données actuelles
+        document.getElementById('editProjectName').value = this.auditData.project_name || ''
+        document.getElementById('editClientName').value = this.auditData.client_name || ''
+        document.getElementById('editLocation').value = this.auditData.location || ''
+        
+        // Affichage modal
+        document.getElementById('editAuditModal').classList.remove('hidden')
+        
+        // Focus sur premier champ
+        document.getElementById('editProjectName').focus()
+    }
+
+    // Fermeture modal édition audit
+    closeEditAuditModal() {
+        document.getElementById('editAuditModal').classList.add('hidden')
+    }
+
+    // Sauvegarde modifications audit
+    async saveAuditChanges(formData) {
+        try {
+            const response = await fetch(`/api/audit/${this.auditToken}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+
+            if (!response.ok) {
+                throw new Error('Erreur sauvegarde audit')
+            }
+
+            const result = await response.json()
+            
+            // Mise à jour données locales
+            this.auditData.project_name = formData.project_name
+            this.auditData.client_name = formData.client_name
+            this.auditData.location = formData.location
+            
+            // Mise à jour affichage titre
+            document.getElementById('projectTitle').textContent = formData.project_name
+            
+            this.closeEditAuditModal()
+            this.showAlert('Audit modifié avec succès', 'success')
+            
+            console.log('✅ Audit modifié:', formData.project_name)
+            
+        } catch (error) {
+            console.error('Erreur modification audit:', error)
+            this.showAlert('Erreur lors de la modification', 'error')
+        }
     }
 
     // Cleanup lors fermeture

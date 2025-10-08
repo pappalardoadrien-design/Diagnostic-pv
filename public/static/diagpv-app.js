@@ -35,21 +35,195 @@ class DiagPVApp {
         // Soumission formulaire création audit
         form.addEventListener('submit', (e) => this.createAudit(e))
 
+        // Configuration avancée
+        const toggleAdvancedBtn = document.getElementById('toggleAdvancedConfig')
+        const addStringBtn = document.getElementById('addStringBtn')
+        const loadExampleBtn = document.getElementById('loadExampleConfig')
+
+        toggleAdvancedBtn.addEventListener('click', () => this.toggleAdvancedConfig())
+        addStringBtn.addEventListener('click', () => this.addStringConfig())
+        loadExampleBtn.addEventListener('click', () => this.loadExampleMPPTConfig())
+
+        // Initialisation avec une string par défaut en mode avancé
+        this.advancedStrings = []
+        this.isAdvancedMode = false
+
         // Raccourcis clavier
         document.addEventListener('keydown', (e) => this.handleKeyboard(e))
     }
 
     updateTotalModules() {
+        if (this.isAdvancedMode) {
+            // En mode avancé, calcul basé sur la configuration des strings
+            this.updateAdvancedTotal()
+        } else {
+            // Mode simple
+            const stringCount = parseInt(document.getElementById('stringCount').value) || 0
+            const modulesPerString = parseInt(document.getElementById('modulesPerString').value) || 0
+            const total = stringCount * modulesPerString
+            
+            document.getElementById('totalModules').textContent = total
+
+            // Validation limites
+            if (total > 20000) {
+                this.showAlert('Attention: Maximum 20 000 modules supportés', 'warning')
+            }
+        }
+    }
+
+    toggleAdvancedConfig() {
+        const simpleConfig = document.getElementById('simpleConfig')
+        const advancedConfig = document.getElementById('advancedConfig')
+        const toggleBtn = document.getElementById('toggleAdvancedConfig')
+
+        this.isAdvancedMode = !this.isAdvancedMode
+
+        if (this.isAdvancedMode) {
+            // Passer en mode avancé
+            simpleConfig.classList.add('hidden')
+            advancedConfig.classList.remove('hidden')
+            toggleBtn.innerHTML = '<i class="fas fa-arrow-left mr-2"></i>RETOUR CONFIGURATION SIMPLE'
+            toggleBtn.className = 'bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-bold text-sm'
+            
+            // Initialiser avec la configuration actuelle si elle existe
+            this.initializeAdvancedFromSimple()
+        } else {
+            // Retour mode simple
+            simpleConfig.classList.remove('hidden')
+            advancedConfig.classList.add('hidden')
+            toggleBtn.innerHTML = '<i class="fas fa-cog mr-2"></i>CONFIGURATION AVANCÉE (Strings différents)'
+            toggleBtn.className = 'bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-bold text-sm'
+        }
+
+        this.updateTotalModules()
+    }
+
+    initializeAdvancedFromSimple() {
         const stringCount = parseInt(document.getElementById('stringCount').value) || 0
         const modulesPerString = parseInt(document.getElementById('modulesPerString').value) || 0
-        const total = stringCount * modulesPerString
+
+        // Vider la configuration avancée actuelle
+        this.advancedStrings = []
         
-        document.getElementById('totalModules').textContent = total
+        // Si des valeurs existent en mode simple, les convertir
+        if (stringCount > 0 && modulesPerString > 0) {
+            for (let i = 1; i <= stringCount; i++) {
+                this.advancedStrings.push({
+                    id: i,
+                    mpptNumber: i,
+                    stringNumber: 1,
+                    moduleCount: modulesPerString
+                })
+            }
+        } else {
+            // Sinon, ajouter une string par défaut
+            this.addStringConfig()
+        }
+
+        this.renderAdvancedStrings()
+    }
+
+    addStringConfig() {
+        const newId = this.advancedStrings.length + 1
+        this.advancedStrings.push({
+            id: newId,
+            mpptNumber: newId,
+            stringNumber: 1,
+            moduleCount: 24 // Valeur par défaut basée sur votre exemple
+        })
+
+        this.renderAdvancedStrings()
+        this.updateAdvancedTotal()
+    }
+
+    removeStringConfig(stringId) {
+        this.advancedStrings = this.advancedStrings.filter(s => s.id !== stringId)
+        this.renderAdvancedStrings()
+        this.updateAdvancedTotal()
+    }
+
+    renderAdvancedStrings() {
+        const container = document.getElementById('stringsList')
+        
+        container.innerHTML = this.advancedStrings.map(string => `
+            <div class="flex items-center space-x-3 bg-gray-800 p-3 rounded border border-gray-600">
+                <div class="flex-1 grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold mb-1 text-gray-300">MPPT N°:</label>
+                        <input type="number" value="${string.mpptNumber}" min="1" max="100"
+                               class="w-full bg-black border border-gray-500 rounded px-2 py-1 text-sm focus:border-yellow-400 focus:outline-none"
+                               onchange="diagpvApp.updateStringConfig(${string.id}, 'mpptNumber', this.value)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold mb-1 text-gray-300">Chaîne N°:</label>
+                        <input type="number" value="${string.stringNumber}" min="1" max="10"
+                               class="w-full bg-black border border-gray-500 rounded px-2 py-1 text-sm focus:border-yellow-400 focus:outline-none"
+                               onchange="diagpvApp.updateStringConfig(${string.id}, 'stringNumber', this.value)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold mb-1 text-gray-300">Modules:</label>
+                        <input type="number" value="${string.moduleCount}" min="1" max="50"
+                               class="w-full bg-black border border-gray-500 rounded px-2 py-1 text-sm focus:border-yellow-400 focus:outline-none"
+                               onchange="diagpvApp.updateStringConfig(${string.id}, 'moduleCount', this.value)">
+                    </div>
+                </div>
+                <button type="button" 
+                        class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs font-bold"
+                        onclick="diagpvApp.removeStringConfig(${string.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('')
+    }
+
+    updateStringConfig(stringId, field, value) {
+        const string = this.advancedStrings.find(s => s.id === stringId)
+        if (string) {
+            string[field] = parseInt(value) || 0
+            this.updateAdvancedTotal()
+        }
+    }
+
+    updateAdvancedTotal() {
+        const total = this.advancedStrings.reduce((sum, string) => sum + string.moduleCount, 0)
+        const advancedTotalElement = document.getElementById('advancedTotal')
+        
+        if (advancedTotalElement) {
+            advancedTotalElement.textContent = `${total} modules (${this.advancedStrings.length} strings)`
+        }
 
         // Validation limites
         if (total > 20000) {
             this.showAlert('Attention: Maximum 20 000 modules supportés', 'warning')
         }
+    }
+
+    loadExampleMPPTConfig() {
+        // Configuration exemple basée sur les données fournies
+        // MPPT 1: 26 modules, MPPT 2-10: 24 modules chacun
+        this.advancedStrings = [
+            { id: 1, mpptNumber: 1, stringNumber: 1, moduleCount: 26 },
+            { id: 2, mpptNumber: 2, stringNumber: 1, moduleCount: 24 },
+            { id: 3, mpptNumber: 3, stringNumber: 1, moduleCount: 24 },
+            { id: 4, mpptNumber: 4, stringNumber: 1, moduleCount: 24 },
+            { id: 5, mpptNumber: 5, stringNumber: 1, moduleCount: 24 },
+            { id: 6, mpptNumber: 6, stringNumber: 1, moduleCount: 24 },
+            { id: 7, mpptNumber: 7, stringNumber: 1, moduleCount: 24 },
+            { id: 8, mpptNumber: 8, stringNumber: 1, moduleCount: 24 },
+            { id: 9, mpptNumber: 9, stringNumber: 1, moduleCount: 24 },
+            { id: 10, mpptNumber: 10, stringNumber: 1, moduleCount: 24 }
+        ]
+
+        // Passer en mode avancé si ce n'est pas déjà fait
+        if (!this.isAdvancedMode) {
+            this.toggleAdvancedConfig()
+        }
+
+        this.renderAdvancedStrings()
+        this.updateAdvancedTotal()
+
+        const total = this.advancedStrings.reduce((sum, s) => sum + s.moduleCount, 0)
+        this.showAlert(`Configuration exemple chargée : ${total} modules (MPPT1: 26, MPPT2-10: 24 chacun)`, 'success')
     }
 
     handlePlanUpload(event) {
@@ -82,6 +256,10 @@ class DiagPVApp {
 
         console.log('🚀 createAudit démarré')
 
+        // Déclaration variables en dehors du try pour accès dans finally
+        let submitBtn = null
+        let originalText = null
+
         try {
             // Validation formulaire
             const projectName = document.getElementById('projectName').value.trim()
@@ -97,20 +275,55 @@ class DiagPVApp {
             }
 
             // Configuration ou plan
-            const stringCount = parseInt(document.getElementById('stringCount').value)
-            const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
             const planFile = document.getElementById('planFile').files[0]
+            let configurationData = null
+            let totalModules = 0
 
-            console.log('⚙️ Configuration:', { stringCount, modulesPerString, planFile: !!planFile })
+            if (this.isAdvancedMode) {
+                // Mode configuration avancée
+                if (this.advancedStrings.length === 0) {
+                    this.showAlert('Aucune string configurée en mode avancé', 'error')
+                    return
+                }
 
-            if (!planFile && (!stringCount || !modulesPerString)) {
-                this.showAlert('Configuration manuelle OU upload plan requis', 'error')
+                configurationData = {
+                    mode: 'advanced',
+                    strings: this.advancedStrings,
+                    totalModules: this.advancedStrings.reduce((sum, s) => sum + s.moduleCount, 0),
+                    stringCount: this.advancedStrings.length
+                }
+                totalModules = configurationData.totalModules
+
+                console.log('⚙️ Configuration avancée:', configurationData)
+            } else {
+                // Mode simple
+                const stringCount = parseInt(document.getElementById('stringCount').value)
+                const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
+
+                if (!planFile && (!stringCount || !modulesPerString)) {
+                    this.showAlert('Configuration manuelle OU upload plan requis', 'error')
+                    return
+                }
+
+                configurationData = {
+                    mode: 'simple',
+                    stringCount: stringCount || 0,
+                    modulesPerString: modulesPerString || 0,
+                    totalModules: (stringCount || 0) * (modulesPerString || 0)
+                }
+                totalModules = configurationData.totalModules
+
+                console.log('⚙️ Configuration simple:', configurationData)
+            }
+
+            if (!planFile && totalModules === 0) {
+                this.showAlert('Configuration requise (modules > 0)', 'error')
                 return
             }
 
             // Affichage loading
-            const submitBtn = event.target.querySelector('button[type="submit"]')
-            const originalText = submitBtn.innerHTML
+            submitBtn = event.target.querySelector('button[type="submit"]')
+            originalText = submitBtn.innerHTML
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>CRÉATION EN COURS...'
             submitBtn.disabled = true
 
@@ -122,8 +335,7 @@ class DiagPVApp {
                 clientName, 
                 location,
                 auditDate,
-                stringCount: stringCount || 0,
-                modulesPerString: modulesPerString || 0
+                configuration: configurationData
             }
 
             console.log('📡 Envoi requête API:', auditData)
@@ -180,7 +392,9 @@ class DiagPVApp {
         } finally {
             // Reset bouton
             console.log('🔄 Reset bouton')
-            const submitBtn = event.target.querySelector('button[type="submit"]')
+            if (!submitBtn) {
+                submitBtn = event.target.querySelector('button[type="submit"]')
+            }
             if (submitBtn) {
                 submitBtn.innerHTML = originalText || '<i class="fas fa-rocket mr-2"></i>CRÉER L\'AUDIT'
                 submitBtn.disabled = false
@@ -218,7 +432,46 @@ class DiagPVApp {
         this.loadRecentAudits()
     }
 
-    loadRecentAudits() {
+    async loadRecentAudits() {
+        const container = document.getElementById('recentAudits')
+        
+        try {
+            // Récupération depuis l'API
+            const response = await fetch('/api/dashboard/audits')
+            const data = await response.json()
+            
+            if (data.success && data.audits && data.audits.length > 0) {
+                container.innerHTML = data.audits.map(audit => `
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-600 hover:border-yellow-400 cursor-pointer transition-colors"
+                         onclick="window.location.href='/audit/${audit.token}'">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-lg">${audit.project_name}</h4>
+                                <p class="text-gray-300">${audit.client_name} - ${audit.location}</p>
+                                <p class="text-sm text-blue-400">
+                                    <i class="fas fa-solar-panel mr-1"></i>
+                                    ${audit.total_modules} modules (${audit.string_count} strings)
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-400">${new Date(audit.created_at).toLocaleDateString('fr-FR')}</p>
+                                <span class="inline-block px-2 py-1 rounded text-xs ${audit.status === 'created' ? 'bg-green-600' : 'bg-orange-600'}">${audit.status}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')
+            } else {
+                // Fallback vers localStorage si API échoue
+                this.loadRecentAuditsFromStorage()
+            }
+        } catch (error) {
+            console.error('Erreur chargement audits:', error)
+            // Fallback vers localStorage en cas d'erreur
+            this.loadRecentAuditsFromStorage()
+        }
+    }
+    
+    loadRecentAuditsFromStorage() {
         const recent = JSON.parse(localStorage.getItem('diagpv_recent_audits') || '[]')
         const container = document.getElementById('recentAudits')
 
