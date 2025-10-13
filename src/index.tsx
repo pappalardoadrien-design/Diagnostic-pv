@@ -1620,18 +1620,54 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         <meta charset="UTF-8">
         <title>Rapport Audit EL - ${audit.project_name}</title>
         <style>
-            body { font-family: Arial; margin: 20px; }
+            body { font-family: Arial; margin: 20px; color: #000; }
             .header { text-align: center; border-bottom: 2px solid #000; padding: 20px; }
             .section { margin: 20px 0; page-break-inside: avoid; }
             .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .module-grid { display: grid; grid-template-columns: repeat(20, 30px); gap: 2px; }
-            .module { width: 28px; height: 20px; border: 1px solid #000; text-align: center; font-size: 8px; }
-            .ok { background: #22c55e; }
-            .inequality { background: #eab308; }
-            .microcracks { background: #f97316; }
-            .dead { background: #ef4444; }
-            .string_open { background: #3b82f6; }
-            .not_connected { background: #6b7280; }
+            .module { width: 28px; height: 20px; border: 1px solid #000; text-align: center; font-size: 8px; color: white; font-weight: bold; }
+            .ok { background-color: #22c55e !important; }
+            .inequality { background-color: #eab308 !important; }
+            .microcracks { background-color: #f97316 !important; }
+            .dead { background-color: #ef4444 !important; }
+            .string_open { background-color: #3b82f6 !important; }
+            .not_connected { background-color: #6b7280 !important; }
+            .pending { background-color: #e5e7eb !important; color: #000; }
+            
+            /* Styles spécifiques pour impression */
+            @media print {
+                body { 
+                    margin: 15px; 
+                    font-size: 12px;
+                    -webkit-print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+                .module { 
+                    -webkit-print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .ok { background-color: #22c55e !important; -webkit-print-color-adjust: exact !important; }
+                .inequality { background-color: #eab308 !important; -webkit-print-color-adjust: exact !important; }
+                .microcracks { background-color: #f97316 !important; -webkit-print-color-adjust: exact !important; }
+                .dead { background-color: #ef4444 !important; -webkit-print-color-adjust: exact !important; }
+                .string_open { background-color: #3b82f6 !important; -webkit-print-color-adjust: exact !important; }
+                .not_connected { background-color: #6b7280 !important; -webkit-print-color-adjust: exact !important; }
+                .pending { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact !important; }
+                
+                /* Forcer les couleurs même en mode économie d'encre */
+                * { 
+                    -webkit-print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+            }
+            
+            /* Styles pour PDF */
+            @page {
+                size: A4;
+                margin: 1cm;
+            }
         </style>
     </head>
     <body>
@@ -1665,6 +1701,35 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         
         <div class="section">
             <h3>CARTOGRAPHIE MODULES</h3>
+            
+            <!-- Légende des couleurs -->
+            <div style="margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px;">
+                <div style="display: flex; align-items: center;">
+                    <div class="module ok" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    OK
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div class="module inequality" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    Inégalité
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div class="module microcracks" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    Microfissures
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div class="module dead" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    HS
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div class="module string_open" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    String ouvert
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div class="module not_connected" style="width: 20px; height: 15px; margin-right: 5px;"></div>
+                    Non raccordé
+                </div>
+            </div>
+            
             <div class="module-grid">
                 ${modules.map(module => 
                   `<div class="module ${module.status}" title="${module.module_id}">
@@ -1749,7 +1814,64 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
             <p>Token audit : ${audit.token}</p>
             ${measurements.length > 0 ? `<p>Mesures PVserv : ${measurements.length} intégrées</p>` : ''}
         </div>
+        
+        <div style="margin-top: 30px; padding: 15px; border: 2px solid #f97316; background: #fef3c7; border-radius: 8px;">
+            <h4 style="color: #92400e; margin: 0 0 10px 0;">📋 INSTRUCTIONS IMPRESSION COULEURS</h4>
+            <p style="font-size: 12px; margin: 5px 0; color: #92400e;">
+                <strong>Pour imprimer les couleurs des modules :</strong>
+            </p>
+            <p style="font-size: 11px; margin: 3px 0 3px 15px; color: #92400e;">
+                • <strong>Chrome/Edge :</strong> Ctrl+P → Plus de paramètres → ✅ Graphiques d'arrière-plan
+            </p>
+            <p style="font-size: 11px; margin: 3px 0 3px 15px; color: #92400e;">
+                • <strong>Firefox :</strong> Ctrl+P → Plus de paramètres → ✅ Imprimer les arrière-plans
+            </p>
+            <p style="font-size: 11px; margin: 3px 0 3px 15px; color: #92400e;">
+                • <strong>Safari :</strong> Cmd+P → Safari → ✅ Imprimer les arrière-plans
+            </p>
+        </div>
+        
     </body>
+    <script>
+        // Optimisation automatique pour impression des couleurs
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎨 Optimisation couleurs rapport activée');
+            
+            // Force l'affichage des couleurs pour tous les modules
+            const modules = document.querySelectorAll('.module');
+            modules.forEach(module => {
+                // Propriétés CSS pour forcer l'impression couleurs
+                module.style.webkitPrintColorAdjust = 'exact';
+                module.style.colorAdjust = 'exact';
+                module.style.printColorAdjust = 'exact';
+            });
+            
+            // Optimisation avant impression
+            window.addEventListener('beforeprint', function() {
+                console.log('🖨️ Impression détectée - force des couleurs');
+                
+                // Force chaque couleur individuellement
+                document.querySelectorAll('.module.ok').forEach(el => {
+                    el.style.setProperty('background-color', '#22c55e', 'important');
+                });
+                document.querySelectorAll('.module.inequality').forEach(el => {
+                    el.style.setProperty('background-color', '#eab308', 'important');
+                });
+                document.querySelectorAll('.module.microcracks').forEach(el => {
+                    el.style.setProperty('background-color', '#f97316', 'important');
+                });
+                document.querySelectorAll('.module.dead').forEach(el => {
+                    el.style.setProperty('background-color', '#ef4444', 'important');
+                });
+                document.querySelectorAll('.module.string_open').forEach(el => {
+                    el.style.setProperty('background-color', '#3b82f6', 'important');
+                });
+                document.querySelectorAll('.module.not_connected').forEach(el => {
+                    el.style.setProperty('background-color', '#6b7280', 'important');
+                });
+            });
+        });
+    </script>
     </html>
   `
 }
