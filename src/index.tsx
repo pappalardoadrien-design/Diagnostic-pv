@@ -2077,49 +2077,4 @@ app.get('/dashboard', (c) => {
   `)
 })
 
-// API Création d'un audit principal
-app.post('/api/audit/create', async (c) => {
-  const { env } = c
-  const { token, project_name, client_name, location, string_count, modules_per_string } = await c.req.json()
-  
-  // Validation entrée
-  if (!token || !project_name || !client_name || !location) {
-    return c.json({ error: 'Données requises manquantes' }, 400)
-  }
-  
-  const totalModules = (string_count || 1) * (modules_per_string || 1)
-  
-  try {
-    const stmt = env.DB.prepare(`
-      INSERT OR REPLACE INTO audits 
-      (token, project_name, client_name, location, string_count, modules_per_string, total_modules)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `)
-    
-    const result = await stmt.bind(
-      token.trim(),
-      project_name.trim(),
-      client_name.trim(),
-      location.trim(),
-      string_count || 1,
-      modules_per_string || 1,
-      totalModules
-    ).run()
-    
-    return c.json({ 
-      success: true,
-      token,
-      totalModules,
-      message: 'Audit créé avec succès'
-    })
-    
-  } catch (error) {
-    console.error('Erreur création audit:', error)
-    return c.json({ 
-      error: 'Erreur lors de la création de l\'audit',
-      details: error.message 
-    }, 500)
-  }
-})
-
 export default app
