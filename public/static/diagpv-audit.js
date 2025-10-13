@@ -1009,147 +1009,127 @@ class DiagPVAudit {
 
         try {
             console.log('🔄 Mise à jour en lot:', {
-                modules: modulesToUpdate,
+                total: modulesToUpdate.length,
                 status: this.bulkActionStatus,
                 comment: comment
             })
 
-            // Appel API pour mise à jour en lot
-            const response = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    modules: modulesToUpdate,
-                    status: this.bulkActionStatus,
-                    comment: comment,
-                    technician_id: this.technicianId
-                })
-            })
-
-            if (!response.ok) {
-                throw new Error('Erreur lors de la mise à jour')
+            // Afficher progress pour gros lots
+            if (modulesToUpdate.length > 100) {
+                this.showAlert(`🔄 Traitement de ${modulesToUpdate.length} modules par lots de 100...`, 'info')
             }
 
-            const result = await response.json()
-            console.log('✅ Réponse API bulk-update:', result)
+            // Division en lots de 100 modules maximum
+            const batchSize = 100
+            const batches = []
+            for (let i = 0; i < modulesToUpdate.length; i += batchSize) {
+                batches.push(modulesToUpdate.slice(i, i + batchSize))
+            }
 
-            // Vérification si des modules ont été effectivement mis à jour
-            if (result.success && result.updated > 0) {
-                // Mise à jour locale des modules
-                modulesToUpdate.forEach(moduleId => {
-                    const module = this.modules.get(moduleId)
-                    if (module) {
+            console.log(`📦 ${batches.length} lot(s) à traiter (${modulesToUpdate.length} modules total)`)
+
+            // Traitement séquentiel des lots
+            let totalUpdated = 0
+            let totalNotFound = 0
+            let hasErrors = false
+
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i]
+                console.log(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
+
+                try {
+                    // Appel API pour ce lot
+                    const response = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            modules: batch,
+                            status: this.bulkActionStatus,
+                            comment: comment,
+                            technician_id: this.technicianId
+                        })
+                    })
+
+                    if (!response.ok) {
+                        throw new Error(`Erreur lot ${i + 1}: ${response.statusText}`)
+                    }
+
+                    const result = await response.json()
+                    console.log(`✅ Lot ${i + 1} traité:`, result)
+
+                    // Accumulation des résultats
+                    totalUpdated += result.updated || 0
+                    totalNotFound += result.notFound || 0
+
+                    // Mise à jour locale des modules de ce lot
+                    batch.forEach(moduleId => {
+                        let module = this.modules.get(moduleId)
+                        if (!module) {
+                            // Créer le module en local s'il n'existe pas
+                            module = {
+                                module_id: moduleId,
+                                status: 'pending',
+                                comment: null,
+                                technician_id: this.technicianId,
+                                updated_at: new Date().toISOString()
+                            }
+                            this.modules.set(moduleId, module)
+                        }
+                        
+                        // Mettre à jour le statut
                         module.status = this.bulkActionStatus
                         if (comment) {
                             module.comment = comment
                         }
                         module.updated_at = new Date().toISOString()
                         module.technician_id = this.technicianId
-                    }
-                })
-
-                // Re-rendu interface
-                this.renderModulesGrid()
-                this.updateProgress()
-
-                // Sortie mode sélection après succès
-                this.exitMultiSelectMode()
-                this.closeBulkModal()
-
-                this.showAlert(`✅ ${result.updated} modules mis à jour avec succès !`, 'success')
-            } else if (result.success && result.updated === 0) {
-                // Aucun module trouvé dans la base - créer les modules d'abord
-                console.log('⚠️ Aucun module trouvé, création automatique...')
-                await this.createMissingModules(modulesToUpdate)
-                
-                // Relancer la mise à jour après création
-                const retryResponse = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        modules: modulesToUpdate,
-                        status: this.bulkActionStatus,
-                        comment: comment,
-                        technician_id: this.technicianId
                     })
-                })
 
-                if (retryResponse.ok) {
-                    const retryResult = await retryResponse.json()
-                    if (retryResult.success && retryResult.updated > 0) {
-                        // Mise à jour locale après création
-                        modulesToUpdate.forEach(moduleId => {
-                            const module = this.modules.get(moduleId)
-                            if (module) {
-                                module.status = this.bulkActionStatus
-                                if (comment) {
-                                    module.comment = comment
-                                }
-                                module.updated_at = new Date().toISOString()
-                                module.technician_id = this.technicianId
-                            }
-                        })
-
+                    // Mise à jour interface progressive pour les gros lots
+                    if (batches.length > 3) {
                         this.renderModulesGrid()
                         this.updateProgress()
-                        this.exitMultiSelectMode()
-                        this.closeBulkModal()
-
-                        this.showAlert(`✅ ${retryResult.updated} modules créés et mis à jour !`, 'success')
-                    } else {
-                        throw new Error('Échec création/mise à jour des modules')
                     }
-                } else {
-                    throw new Error('Erreur lors de la création des modules')
+
+                } catch (error) {
+                    console.error(`❌ Erreur lot ${i + 1}:`, error)
+                    hasErrors = true
+                    // On continue avec les autres lots
                 }
+            }
+
+            console.log(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
+
+            // Re-rendu final de l'interface
+            this.renderModulesGrid()
+            this.updateProgress()
+            this.exitMultiSelectMode()
+            this.closeBulkModal()
+
+            // Message de résultat final
+            if (hasErrors) {
+                this.showAlert(`⚠️ ${modulesToUpdate.length} modules traités avec quelques erreurs (voir console)`, 'warning')
+            } else if (totalUpdated > 0 && totalNotFound > 0) {
+                this.showAlert(`✅ ${totalUpdated} modules sauvés serveur, ${totalNotFound} modules locaux`, 'success')
+            } else if (totalUpdated > 0) {
+                this.showAlert(`✅ ${totalUpdated} modules mis à jour avec succès !`, 'success')
             } else {
-                throw new Error(result.message || 'Erreur de mise à jour inconnue')
+                this.showAlert(`⚠️ ${modulesToUpdate.length} modules mis à jour localement (audit non synchronisé)`, 'warning')
             }
 
         } catch (error) {
-            console.error('❌ Erreur mise à jour en lot:', error)
-            this.showAlert('Erreur lors de la mise à jour: ' + error.message, 'error')
+            console.error('❌ Erreur globale mise à jour en lot:', error)
+            this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
+            
+            // Fermeture modal en cas d'erreur critique
+            this.exitMultiSelectMode()
+            this.closeBulkModal()
         }
     }
 
-    // Création automatique des modules manquants
-    async createMissingModules(moduleIds) {
-        try {
-            for (const moduleId of moduleIds) {
-                const response = await fetch(`/api/audit/${this.auditToken}/module`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        module_id: moduleId,
-                        status: 'pending',
-                        technician_id: this.technicianId
-                    })
-                })
 
-                if (response.ok) {
-                    const result = await response.json()
-                    // Ajouter le module à la Map locale
-                    this.modules.set(moduleId, {
-                        module_id: moduleId,
-                        status: 'pending',
-                        comment: null,
-                        technician_id: this.technicianId,
-                        updated_at: new Date().toISOString()
-                    })
-                }
-            }
-            console.log(`✅ ${moduleIds.length} modules créés`)
-        } catch (error) {
-            console.error('❌ Erreur création modules:', error)
-            throw error
-        }
-    }
 }
 
 // Initialisation audit au chargement DOM
