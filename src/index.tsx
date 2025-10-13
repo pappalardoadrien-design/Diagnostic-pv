@@ -654,7 +654,115 @@ app.get('/', (c) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
         <style>
-        /* Styles critiques inline pour éviter l'écran noir */
+        /* Styles critiques inline pour éviter l'écran noir - VERSION RENFORCÉE */
+        * { box-sizing: border-box; }
+        html, body { 
+            background: #000000 !important; 
+            color: #ffffff !important; 
+            min-height: 100vh !important;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+            font-weight: bold !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.5 !important;
+        }
+        
+        /* Container et layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px !important; }
+        .grid { display: grid !important; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+        .gap-6 { gap: 24px !important; }
+        .flex { display: flex !important; }
+        .items-center { align-items: center !important; }
+        .justify-center { justify-content: center !important; }
+        .space-x-4 > * + * { margin-left: 16px !important; }
+        .mb-4 { margin-bottom: 16px !important; }
+        .mb-6 { margin-bottom: 24px !important; }
+        .mb-8 { margin-bottom: 32px !important; }
+        .p-6 { padding: 24px !important; }
+        .p-4 { padding: 16px !important; }
+        .px-4 { padding-left: 16px !important; padding-right: 16px !important; }
+        .py-3 { padding-top: 12px !important; padding-bottom: 12px !important; }
+        .text-center { text-align: center !important; }
+        
+        /* Couleurs de fond */
+        .bg-black { background-color: #000000 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .bg-green-600 { background-color: #16a34a !important; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-purple-600 { background-color: #9333ea !important; }
+        
+        /* Couleurs de texte */
+        .text-white { color: #ffffff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        
+        /* Bordures */
+        .border { border-width: 1px !important; border-style: solid !important; }
+        .border-2 { border-width: 2px !important; border-style: solid !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .border-gray-600 { border-color: #4b5563 !important; }
+        .rounded-lg { border-radius: 8px !important; }
+        
+        /* Tailles de police */
+        .text-xl { font-size: 20px !important; }
+        .text-2xl { font-size: 24px !important; }
+        .text-3xl { font-size: 30px !important; }
+        .text-4xl { font-size: 36px !important; }
+        .font-bold { font-weight: bold !important; }
+        .font-black { font-weight: 900 !important; }
+        
+        /* Éléments interactifs */
+        button, input, select, textarea {
+            padding: 12px 16px !important;
+            border: 2px solid #4b5563 !important;
+            border-radius: 8px !important;
+            background: #000000 !important;
+            color: #ffffff !important;
+            font-weight: bold !important;
+            font-family: inherit !important;
+            cursor: pointer !important;
+        }
+        
+        button:hover {
+            opacity: 0.8 !important;
+            transform: translateY(-1px) !important;
+            transition: all 0.2s !important;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none !important;
+            border-color: #facc15 !important;
+            box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2) !important;
+        }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        }
+        
+        /* Icônes FontAwesome */
+        .fa, .fas { font-family: "Font Awesome 6 Free" !important; font-weight: 900 !important; }
+        
+        /* Classes utilitaires supplémentaires */
+        .inline-flex { display: inline-flex !important; }
+        .w-full { width: 100% !important; }
+        .mr-2 { margin-right: 8px !important; }
+        .mr-4 { margin-right: 16px !important; }
+        .hidden { display: none !important; }
+        
+        /* Animation de chargement */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }
@@ -691,6 +799,10 @@ app.get('/', (c) => {
         <link rel="manifest" href="/manifest.json">
     </head>
     <body class="bg-black text-white min-h-screen font-bold">
+        <!-- Message de debug visible -->
+        <div id="debug-status" style="position: fixed; top: 10px; right: 10px; background: #16a34a; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 9999;">
+            CSS CHARGÉ ✅ - DOM: <span id="dom-status">En attente...</span>
+        </div>
         <div class="container mx-auto p-6">
             <!-- En-tête DiagPV -->
             <header class="mb-8 text-center">
@@ -847,6 +959,24 @@ app.get('/', (c) => {
             </div>
         </div>
         
+        <script>
+        // Debug: Confirmer que le DOM et JavaScript se chargent
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugStatus = document.getElementById('dom-status');
+            if (debugStatus) {
+                debugStatus.textContent = 'OK ✅';
+                debugStatus.parentElement.style.background = '#16a34a';
+            }
+            
+            // Masquer le debug après 10 secondes
+            setTimeout(function() {
+                const debug = document.getElementById('debug-status');
+                if (debug) debug.style.display = 'none';
+            }, 10000);
+            
+            console.log('🔥 DIAGPV DEBUG: Page complètement chargée à', new Date().toLocaleTimeString());
+        });
+        </script>
         <script src="/static/diagpv-app.js"></script>
         <script src="/static/diagpv-json-importer.js"></script>
     </body>
@@ -869,7 +999,115 @@ app.get('/audit/:token', async (c) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
         <style>
-        /* Styles critiques inline pour éviter l'écran noir */
+        /* Styles critiques inline pour éviter l'écran noir - VERSION RENFORCÉE */
+        * { box-sizing: border-box; }
+        html, body { 
+            background: #000000 !important; 
+            color: #ffffff !important; 
+            min-height: 100vh !important;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+            font-weight: bold !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.5 !important;
+        }
+        
+        /* Container et layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px !important; }
+        .grid { display: grid !important; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+        .gap-6 { gap: 24px !important; }
+        .flex { display: flex !important; }
+        .items-center { align-items: center !important; }
+        .justify-center { justify-content: center !important; }
+        .space-x-4 > * + * { margin-left: 16px !important; }
+        .mb-4 { margin-bottom: 16px !important; }
+        .mb-6 { margin-bottom: 24px !important; }
+        .mb-8 { margin-bottom: 32px !important; }
+        .p-6 { padding: 24px !important; }
+        .p-4 { padding: 16px !important; }
+        .px-4 { padding-left: 16px !important; padding-right: 16px !important; }
+        .py-3 { padding-top: 12px !important; padding-bottom: 12px !important; }
+        .text-center { text-align: center !important; }
+        
+        /* Couleurs de fond */
+        .bg-black { background-color: #000000 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .bg-green-600 { background-color: #16a34a !important; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-purple-600 { background-color: #9333ea !important; }
+        
+        /* Couleurs de texte */
+        .text-white { color: #ffffff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        
+        /* Bordures */
+        .border { border-width: 1px !important; border-style: solid !important; }
+        .border-2 { border-width: 2px !important; border-style: solid !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .border-gray-600 { border-color: #4b5563 !important; }
+        .rounded-lg { border-radius: 8px !important; }
+        
+        /* Tailles de police */
+        .text-xl { font-size: 20px !important; }
+        .text-2xl { font-size: 24px !important; }
+        .text-3xl { font-size: 30px !important; }
+        .text-4xl { font-size: 36px !important; }
+        .font-bold { font-weight: bold !important; }
+        .font-black { font-weight: 900 !important; }
+        
+        /* Éléments interactifs */
+        button, input, select, textarea {
+            padding: 12px 16px !important;
+            border: 2px solid #4b5563 !important;
+            border-radius: 8px !important;
+            background: #000000 !important;
+            color: #ffffff !important;
+            font-weight: bold !important;
+            font-family: inherit !important;
+            cursor: pointer !important;
+        }
+        
+        button:hover {
+            opacity: 0.8 !important;
+            transform: translateY(-1px) !important;
+            transition: all 0.2s !important;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none !important;
+            border-color: #facc15 !important;
+            box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2) !important;
+        }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        }
+        
+        /* Icônes FontAwesome */
+        .fa, .fas { font-family: "Font Awesome 6 Free" !important; font-weight: 900 !important; }
+        
+        /* Classes utilitaires supplémentaires */
+        .inline-flex { display: inline-flex !important; }
+        .w-full { width: 100% !important; }
+        .mr-2 { margin-right: 8px !important; }
+        .mr-4 { margin-right: 16px !important; }
+        .hidden { display: none !important; }
+        
+        /* Animation de chargement */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }
@@ -1224,7 +1462,115 @@ app.get('/dashboard', (c) => {
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
         <style>
-        /* Styles critiques inline pour éviter l'écran noir */
+        /* Styles critiques inline pour éviter l'écran noir - VERSION RENFORCÉE */
+        * { box-sizing: border-box; }
+        html, body { 
+            background: #000000 !important; 
+            color: #ffffff !important; 
+            min-height: 100vh !important;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+            font-weight: bold !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.5 !important;
+        }
+        
+        /* Container et layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px !important; }
+        .grid { display: grid !important; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+        .gap-6 { gap: 24px !important; }
+        .flex { display: flex !important; }
+        .items-center { align-items: center !important; }
+        .justify-center { justify-content: center !important; }
+        .space-x-4 > * + * { margin-left: 16px !important; }
+        .mb-4 { margin-bottom: 16px !important; }
+        .mb-6 { margin-bottom: 24px !important; }
+        .mb-8 { margin-bottom: 32px !important; }
+        .p-6 { padding: 24px !important; }
+        .p-4 { padding: 16px !important; }
+        .px-4 { padding-left: 16px !important; padding-right: 16px !important; }
+        .py-3 { padding-top: 12px !important; padding-bottom: 12px !important; }
+        .text-center { text-align: center !important; }
+        
+        /* Couleurs de fond */
+        .bg-black { background-color: #000000 !important; }
+        .bg-gray-900 { background-color: #111827 !important; }
+        .bg-orange-600 { background-color: #ea580c !important; }
+        .bg-green-600 { background-color: #16a34a !important; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-purple-600 { background-color: #9333ea !important; }
+        
+        /* Couleurs de texte */
+        .text-white { color: #ffffff !important; }
+        .text-yellow-400 { color: #facc15 !important; }
+        .text-orange-400 { color: #fb923c !important; }
+        .text-green-400 { color: #4ade80 !important; }
+        .text-blue-400 { color: #60a5fa !important; }
+        .text-gray-300 { color: #d1d5db !important; }
+        .text-gray-400 { color: #9ca3af !important; }
+        
+        /* Bordures */
+        .border { border-width: 1px !important; border-style: solid !important; }
+        .border-2 { border-width: 2px !important; border-style: solid !important; }
+        .border-yellow-400 { border-color: #facc15 !important; }
+        .border-orange-400 { border-color: #fb923c !important; }
+        .border-gray-600 { border-color: #4b5563 !important; }
+        .rounded-lg { border-radius: 8px !important; }
+        
+        /* Tailles de police */
+        .text-xl { font-size: 20px !important; }
+        .text-2xl { font-size: 24px !important; }
+        .text-3xl { font-size: 30px !important; }
+        .text-4xl { font-size: 36px !important; }
+        .font-bold { font-weight: bold !important; }
+        .font-black { font-weight: 900 !important; }
+        
+        /* Éléments interactifs */
+        button, input, select, textarea {
+            padding: 12px 16px !important;
+            border: 2px solid #4b5563 !important;
+            border-radius: 8px !important;
+            background: #000000 !important;
+            color: #ffffff !important;
+            font-weight: bold !important;
+            font-family: inherit !important;
+            cursor: pointer !important;
+        }
+        
+        button:hover {
+            opacity: 0.8 !important;
+            transform: translateY(-1px) !important;
+            transition: all 0.2s !important;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none !important;
+            border-color: #facc15 !important;
+            box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2) !important;
+        }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        }
+        
+        /* Icônes FontAwesome */
+        .fa, .fas { font-family: "Font Awesome 6 Free" !important; font-weight: 900 !important; }
+        
+        /* Classes utilitaires supplémentaires */
+        .inline-flex { display: inline-flex !important; }
+        .w-full { width: 100% !important; }
+        .mr-2 { margin-right: 8px !important; }
+        .mr-4 { margin-right: 16px !important; }
+        .hidden { display: none !important; }
+        
+        /* Animation de chargement */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }
