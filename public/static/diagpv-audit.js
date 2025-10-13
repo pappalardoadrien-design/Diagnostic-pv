@@ -1085,6 +1085,9 @@ class DiagPVAudit {
                         }
                         module.updated_at = new Date().toISOString()
                         module.technician_id = this.technicianId
+                        
+                        // Mise à jour visuelle immédiate du module
+                        this.updateModuleButton(moduleId)
                     })
 
                     // Mise à jour interface progressive pour les gros lots
@@ -1102,9 +1105,22 @@ class DiagPVAudit {
 
             console.log(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
 
-            // Re-rendu final de l'interface
+            // Re-rendu final de l'interface  
+            console.log('🎨 Re-rendu final interface après multi-sélection')
             this.renderModulesGrid()
             this.updateProgress()
+            
+            // Vérification finale des couleurs
+            setTimeout(() => {
+                modulesToUpdate.forEach(moduleId => {
+                    const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
+                    const module = this.modules.get(moduleId)
+                    if (btn && module) {
+                        console.log(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
+                    }
+                })
+            }, 100)
+            
             this.exitMultiSelectMode()
             this.closeBulkModal()
 
