@@ -427,6 +427,65 @@ app.post('/api/audit/:token/module/:moduleId', async (c) => {
   return c.json({ success: true })
 })
 
+// API Création d'un module individuel
+app.post('/api/audit/:token/module', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const { module_id, status, comment, technician_id } = await c.req.json()
+  
+  // Validation entrée
+  if (!module_id) {
+    return c.json({ error: 'Module ID requis' }, 400)
+  }
+  
+  // Parsing du module_id format "S{string}-{position}"
+  const moduleIdMatch = module_id.trim().match(/^S(\d+)-(\d+)$/)
+  if (!moduleIdMatch) {
+    return c.json({ error: 'Format module_id invalide. Attendu: S{string}-{position} (ex: S1-5)' }, 400)
+  }
+  
+  const stringNumber = parseInt(moduleIdMatch[1])
+  const positionInString = parseInt(moduleIdMatch[2])
+  
+  const validStatuses = ['pending', 'ok', 'inequality', 'microcracks', 'dead', 'string_open', 'not_connected']
+  if (!validStatuses.includes(status || 'pending')) {
+    return c.json({ error: 'Statut invalide' }, 400)
+  }
+  
+  try {
+    const stmt = env.DB.prepare(`
+      INSERT OR REPLACE INTO modules 
+      (audit_token, module_id, string_number, position_in_string, status, comment, technician_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `)
+    
+    const result = await stmt.bind(
+      token,
+      module_id.trim(),
+      stringNumber,
+      positionInString,
+      status || 'pending',
+      comment || null,
+      technician_id || null
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      moduleId: module_id,
+      stringNumber,
+      positionInString,
+      message: 'Module créé avec succès'
+    })
+    
+  } catch (error) {
+    console.error('Erreur création module:', error)
+    return c.json({ 
+      error: 'Erreur lors de la création du module',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // API Mise à jour en lot des modules - Sélection multiple pour audit terrain rapide
 app.post('/api/audit/:token/bulk-update', async (c) => {
   const { env } = c
@@ -463,6 +522,22 @@ app.post('/api/audit/:token/bulk-update', async (c) => {
         continue // Skip invalid module IDs
       }
       
+      // Vérification que le module existe avant mise à jour
+      const moduleExists = await env.DB.prepare(
+        'SELECT COUNT(*) as count FROM modules WHERE audit_token = ? AND module_id = ?'
+      ).bind(token, moduleId.trim()).first()
+      
+      if (!moduleExists || moduleExists.count === 0) {
+        // Module n'existe pas, on le marque comme non trouvé
+        results.push({
+          moduleId: moduleId.trim(),
+          success: true,
+          changes: 0,
+          created: false
+        })
+        continue
+      }
+      
       const result = await stmt.bind(
         status, 
         comment || null, 
@@ -474,7 +549,8 @@ app.post('/api/audit/:token/bulk-update', async (c) => {
       results.push({
         moduleId: moduleId.trim(),
         success: result.success,
-        changes: result.changes
+        changes: result.changes,
+        created: false
       })
     }
     
@@ -495,13 +571,19 @@ app.post('/api/audit/:token/bulk-update', async (c) => {
     })
     
     const successCount = results.filter(r => r.success && r.changes > 0).length
+    const notFoundCount = results.filter(r => r.success && r.changes === 0).length
     
     return c.json({ 
       success: true,
       updated: successCount,
+      notFound: notFoundCount,
       total: modules.length,
       results,
-      message: `${successCount} modules mis à jour avec succès`
+      message: successCount > 0 
+        ? `${successCount} modules mis à jour avec succès`
+        : notFoundCount > 0 
+        ? `${notFoundCount} modules non trouvés - création automatique requise`
+        : 'Aucun module traité'
     })
     
   } catch (error) {
@@ -1993,6 +2075,51 @@ app.get('/dashboard', (c) => {
     </body>
     </html>
   `)
+})
+
+// API Création d'un audit principal
+app.post('/api/audit/create', async (c) => {
+  const { env } = c
+  const { token, project_name, client_name, location, string_count, modules_per_string } = await c.req.json()
+  
+  // Validation entrée
+  if (!token || !project_name || !client_name || !location) {
+    return c.json({ error: 'Données requises manquantes' }, 400)
+  }
+  
+  const totalModules = (string_count || 1) * (modules_per_string || 1)
+  
+  try {
+    const stmt = env.DB.prepare(`
+      INSERT OR REPLACE INTO audits 
+      (token, project_name, client_name, location, string_count, modules_per_string, total_modules)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+    
+    const result = await stmt.bind(
+      token.trim(),
+      project_name.trim(),
+      client_name.trim(),
+      location.trim(),
+      string_count || 1,
+      modules_per_string || 1,
+      totalModules
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      token,
+      totalModules,
+      message: 'Audit créé avec succès'
+    })
+    
+  } catch (error) {
+    console.error('Erreur création audit:', error)
+    return c.json({ 
+      error: 'Erreur lors de la création de l\'audit',
+      details: error.message 
+    }, 500)
+  }
 })
 
 export default app

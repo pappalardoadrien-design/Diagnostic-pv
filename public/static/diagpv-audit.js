@@ -1033,34 +1033,121 @@ class DiagPVAudit {
             }
 
             const result = await response.json()
-            console.log('✅ Mise à jour en lot réussie:', result)
+            console.log('✅ Réponse API bulk-update:', result)
 
-            // Mise à jour locale des modules
-            modulesToUpdate.forEach(moduleId => {
-                const module = this.modules.get(moduleId)
-                if (module) {
-                    module.status = this.bulkActionStatus
-                    if (comment) {
-                        module.comment = comment
+            // Vérification si des modules ont été effectivement mis à jour
+            if (result.success && result.updated > 0) {
+                // Mise à jour locale des modules
+                modulesToUpdate.forEach(moduleId => {
+                    const module = this.modules.get(moduleId)
+                    if (module) {
+                        module.status = this.bulkActionStatus
+                        if (comment) {
+                            module.comment = comment
+                        }
+                        module.updated_at = new Date().toISOString()
+                        module.technician_id = this.technicianId
                     }
-                    module.updated_at = new Date().toISOString()
-                    module.technician_id = this.technicianId
+                })
+
+                // Re-rendu interface
+                this.renderModulesGrid()
+                this.updateProgress()
+
+                // Sortie mode sélection après succès
+                this.exitMultiSelectMode()
+                this.closeBulkModal()
+
+                this.showAlert(`✅ ${result.updated} modules mis à jour avec succès !`, 'success')
+            } else if (result.success && result.updated === 0) {
+                // Aucun module trouvé dans la base - créer les modules d'abord
+                console.log('⚠️ Aucun module trouvé, création automatique...')
+                await this.createMissingModules(modulesToUpdate)
+                
+                // Relancer la mise à jour après création
+                const retryResponse = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        modules: modulesToUpdate,
+                        status: this.bulkActionStatus,
+                        comment: comment,
+                        technician_id: this.technicianId
+                    })
+                })
+
+                if (retryResponse.ok) {
+                    const retryResult = await retryResponse.json()
+                    if (retryResult.success && retryResult.updated > 0) {
+                        // Mise à jour locale après création
+                        modulesToUpdate.forEach(moduleId => {
+                            const module = this.modules.get(moduleId)
+                            if (module) {
+                                module.status = this.bulkActionStatus
+                                if (comment) {
+                                    module.comment = comment
+                                }
+                                module.updated_at = new Date().toISOString()
+                                module.technician_id = this.technicianId
+                            }
+                        })
+
+                        this.renderModulesGrid()
+                        this.updateProgress()
+                        this.exitMultiSelectMode()
+                        this.closeBulkModal()
+
+                        this.showAlert(`✅ ${retryResult.updated} modules créés et mis à jour !`, 'success')
+                    } else {
+                        throw new Error('Échec création/mise à jour des modules')
+                    }
+                } else {
+                    throw new Error('Erreur lors de la création des modules')
                 }
-            })
-
-            // Re-rendu interface
-            this.renderModulesGrid()
-            this.updateProgress()
-
-            // Sortie mode sélection après succès
-            this.exitMultiSelectMode()
-            this.closeBulkModal()
-
-            this.showAlert(`✅ ${modulesToUpdate.length} modules mis à jour avec succès !`, 'success')
+            } else {
+                throw new Error(result.message || 'Erreur de mise à jour inconnue')
+            }
 
         } catch (error) {
             console.error('❌ Erreur mise à jour en lot:', error)
             this.showAlert('Erreur lors de la mise à jour: ' + error.message, 'error')
+        }
+    }
+
+    // Création automatique des modules manquants
+    async createMissingModules(moduleIds) {
+        try {
+            for (const moduleId of moduleIds) {
+                const response = await fetch(`/api/audit/${this.auditToken}/module`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        module_id: moduleId,
+                        status: 'pending',
+                        technician_id: this.technicianId
+                    })
+                })
+
+                if (response.ok) {
+                    const result = await response.json()
+                    // Ajouter le module à la Map locale
+                    this.modules.set(moduleId, {
+                        module_id: moduleId,
+                        status: 'pending',
+                        comment: null,
+                        technician_id: this.technicianId,
+                        updated_at: new Date().toISOString()
+                    })
+                }
+            }
+            console.log(`✅ ${moduleIds.length} modules créés`)
+        } catch (error) {
+            console.error('❌ Erreur création modules:', error)
+            throw error
         }
     }
 }
