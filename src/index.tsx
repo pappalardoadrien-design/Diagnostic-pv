@@ -799,10 +799,7 @@ app.get('/', (c) => {
         <link rel="manifest" href="/manifest.json">
     </head>
     <body class="bg-black text-white min-h-screen font-bold">
-        <!-- Message de debug visible -->
-        <div id="debug-status" style="position: fixed; top: 10px; right: 10px; background: #16a34a; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 9999;">
-            CSS CHARGÉ ✅ - DOM: <span id="dom-status">En attente...</span>
-        </div>
+
         <div class="container mx-auto p-6">
             <!-- En-tête DiagPV -->
             <header class="mb-8 text-center">
@@ -959,24 +956,7 @@ app.get('/', (c) => {
             </div>
         </div>
         
-        <script>
-        // Debug: Confirmer que le DOM et JavaScript se chargent
-        document.addEventListener('DOMContentLoaded', function() {
-            const debugStatus = document.getElementById('dom-status');
-            if (debugStatus) {
-                debugStatus.textContent = 'OK ✅';
-                debugStatus.parentElement.style.background = '#16a34a';
-            }
-            
-            // Masquer le debug après 10 secondes
-            setTimeout(function() {
-                const debug = document.getElementById('debug-status');
-                if (debug) debug.style.display = 'none';
-            }, 10000);
-            
-            console.log('🔥 DIAGPV DEBUG: Page complètement chargée à', new Date().toLocaleTimeString());
-        });
-        </script>
+
         <script src="/static/diagpv-app.js"></script>
         <script src="/static/diagpv-json-importer.js"></script>
     </body>

@@ -44,23 +44,13 @@ class DiagPVDashboard {
         try {
             console.log('🔄 Chargement dashboard...')
             
-            // Vérification éléments DOM
-            const loadingEl = document.getElementById('loading')
-            const auditsContainerEl = document.getElementById('auditsContainer')
-            const noAuditsEl = document.getElementById('noAudits')
-            
-            console.log('✓ Éléments DOM:', { loading: !!loadingEl, auditsContainer: !!auditsContainerEl, noAudits: !!noAuditsEl })
-            
             // Affichage loading
-            if (loadingEl) loadingEl.classList.remove('hidden')
-            if (auditsContainerEl) auditsContainerEl.classList.add('hidden')
-            if (noAuditsEl) noAuditsEl.classList.add('hidden')
+            document.getElementById('loading').classList.remove('hidden')
+            document.getElementById('auditsContainer').classList.add('hidden')
+            document.getElementById('noAudits').classList.add('hidden')
 
-            console.log('🌐 Appel API /api/dashboard/audits...')
             const response = await fetch('/api/dashboard/audits')
-            console.log('📡 Réponse API reçue:', response.status, response.statusText)
             const data = await response.json()
-            console.log('📊 Données API:', data)
 
             if (data.success) {
                 this.updateStatistics(data.stats)
@@ -77,8 +67,7 @@ class DiagPVDashboard {
             console.error('Erreur dashboard:', error)
             this.showError('Erreur de chargement: ' + error.message)
         } finally {
-            const loadingEl = document.getElementById('loading')
-            if (loadingEl) loadingEl.classList.add('hidden')
+            document.getElementById('loading').classList.add('hidden')
         }
     }
 
