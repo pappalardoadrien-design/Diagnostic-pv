@@ -427,6 +427,92 @@ app.post('/api/audit/:token/module/:moduleId', async (c) => {
   return c.json({ success: true })
 })
 
+// API Mise à jour en lot des modules - Sélection multiple pour audit terrain rapide
+app.post('/api/audit/:token/bulk-update', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const { modules, status, comment, technician_id } = await c.req.json()
+  
+  // Validation entrée
+  if (!modules || !Array.isArray(modules) || modules.length === 0) {
+    return c.json({ error: 'Liste de modules requise' }, 400)
+  }
+  
+  if (modules.length > 100) {
+    return c.json({ error: 'Maximum 100 modules par lot' }, 400)
+  }
+  
+  // Validation des statuts autorisés
+  const validStatuses = ['ok', 'inequality', 'microcracks', 'dead', 'string_open', 'not_connected']
+  if (!validStatuses.includes(status)) {
+    return c.json({ error: 'Statut invalide' }, 400)
+  }
+  
+  try {
+    // Préparation requête batch pour performance optimale
+    const stmt = env.DB.prepare(`
+      UPDATE modules 
+      SET status = ?, comment = ?, technician_id = ?, updated_at = datetime('now')
+      WHERE audit_token = ? AND module_id = ?
+    `)
+    
+    // Exécution batch transaction pour atomicité
+    const results = []
+    for (const moduleId of modules) {
+      if (typeof moduleId !== 'string' || !moduleId.trim()) {
+        continue // Skip invalid module IDs
+      }
+      
+      const result = await stmt.bind(
+        status, 
+        comment || null, 
+        technician_id || null, 
+        token, 
+        moduleId.trim()
+      ).run()
+      
+      results.push({
+        moduleId: moduleId.trim(),
+        success: result.success,
+        changes: result.changes
+      })
+    }
+    
+    // Mise à jour session collaborative pour synchronisation temps réel
+    const sessionKey = `audit_session:${token}`
+    const sessionData = {
+      lastUpdate: Date.now(),
+      bulkUpdate: {
+        modules,
+        status,
+        count: results.filter(r => r.success).length
+      },
+      technicianId: technician_id
+    }
+    
+    await env.KV.put(sessionKey, JSON.stringify(sessionData), {
+      expirationTtl: 3600 // 1 heure
+    })
+    
+    const successCount = results.filter(r => r.success && r.changes > 0).length
+    
+    return c.json({ 
+      success: true,
+      updated: successCount,
+      total: modules.length,
+      results,
+      message: `${successCount} modules mis à jour avec succès`
+    })
+    
+  } catch (error) {
+    console.error('Erreur bulk update:', error)
+    return c.json({ 
+      error: 'Erreur lors de la mise à jour en lot',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // Endpoint WebSocket simulation pour temps réel (via Server-Sent Events)
 app.get('/api/audit/:token/stream', async (c) => {
   const token = c.req.param('token')
@@ -763,6 +849,47 @@ app.get('/', (c) => {
             50% { opacity: 0.5; }
         }
         .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
+        
+        /* Styles sélection multiple */
+        .module-btn.multi-select-mode {
+            position: relative !important;
+            transition: all 0.2s ease !important;
+        }
+        .module-btn.multi-select-mode:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5) !important;
+        }
+        .module-btn.selected-for-bulk {
+            border: 3px solid #facc15 !important;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.8) !important;
+            transform: scale(1.02) !important;
+        }
+        .module-btn.selected-for-bulk::after {
+            content: "✓" !important;
+            position: absolute !important;
+            top: -5px !important;
+            right: -5px !important;
+            background: #facc15 !important;
+            color: #000 !important;
+            width: 20px !important;
+            height: 20px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+        }
+        #multiSelectToggleBtn.active {
+            background-color: #facc15 !important;
+            color: #000000 !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.6) !important;
+        }
+        .bulk-action-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+        }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }
@@ -1088,6 +1215,47 @@ app.get('/audit/:token', async (c) => {
             50% { opacity: 0.5; }
         }
         .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
+        
+        /* Styles sélection multiple */
+        .module-btn.multi-select-mode {
+            position: relative !important;
+            transition: all 0.2s ease !important;
+        }
+        .module-btn.multi-select-mode:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5) !important;
+        }
+        .module-btn.selected-for-bulk {
+            border: 3px solid #facc15 !important;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.8) !important;
+            transform: scale(1.02) !important;
+        }
+        .module-btn.selected-for-bulk::after {
+            content: "✓" !important;
+            position: absolute !important;
+            top: -5px !important;
+            right: -5px !important;
+            background: #facc15 !important;
+            color: #000 !important;
+            width: 20px !important;
+            height: 20px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+        }
+        #multiSelectToggleBtn.active {
+            background-color: #facc15 !important;
+            color: #000000 !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.6) !important;
+        }
+        .bulk-action-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+        }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }
@@ -1146,10 +1314,13 @@ app.get('/audit/:token', async (c) => {
                     </div>
                 </div>
                 
-                <div class="flex space-x-2">
+                <div class="flex space-x-2 flex-wrap">
                     <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold flex items-center border-2 border-orange-400 shadow-lg" title="Accéder au tableau de bord - Vue d'ensemble audits">
                         <i class="fas fa-tachometer-alt mr-2 text-lg"></i>TABLEAU DE BORD
                     </a>
+                    <button id="multiSelectToggleBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold border-2 border-yellow-400" title="Activer la sélection multiple pour gagner du temps sur les modules défectueux">
+                        <i class="fas fa-check-square mr-1"></i>SÉLECTION MULTIPLE
+                    </button>
                     <button id="measureBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-chart-line mr-1"></i>MESURES
                     </button>
@@ -1172,6 +1343,52 @@ app.get('/audit/:token', async (c) => {
         
         <!-- Zone principale audit -->
         <main class="p-4">
+            <!-- Barre d'outils sélection multiple -->
+            <div id="multiSelectToolbar" class="hidden bg-orange-900 border-2 border-orange-400 rounded-lg p-4 mb-4 sticky top-20 z-40">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4">
+                        <button id="exitMultiSelectBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold text-sm" title="Quitter le mode sélection">
+                            <i class="fas fa-times mr-1"></i>QUITTER
+                        </button>
+                        <button id="selectAllBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold text-sm" title="Sélectionner tous les modules visibles">
+                            <i class="fas fa-check-double mr-1"></i>TOUT
+                        </button>
+                        <button id="clearSelectionBtn" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded font-bold text-sm" title="Désélectionner tout">
+                            <i class="fas fa-times-circle mr-1"></i>AUCUN
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm">Sélectionnés:</span>
+                        <span id="selectedCount" class="bg-black px-3 py-1 rounded font-black text-yellow-400">0</span>
+                    </div>
+                </div>
+                
+                <!-- Actions de lot -->
+                <div class="mt-4 pt-4 border-t border-orange-400">
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+                        <button class="bulk-action-btn bg-green-600 hover:bg-green-700 p-2 rounded font-bold text-sm" data-status="ok" title="Marquer comme OK">
+                            🟢 OK
+                        </button>
+                        <button class="bulk-action-btn bg-yellow-600 hover:bg-yellow-700 p-2 rounded font-bold text-sm" data-status="inequality" title="Marquer comme inégalité">
+                            🟡 Inégalité
+                        </button>
+                        <button class="bulk-action-btn bg-orange-600 hover:bg-orange-700 p-2 rounded font-bold text-sm" data-status="microcracks" title="Marquer comme microfissures">
+                            🟠 Fissures
+                        </button>
+                        <button class="bulk-action-btn bg-red-600 hover:bg-red-700 p-2 rounded font-bold text-sm" data-status="dead" title="Marquer comme HS">
+                            🔴 HS
+                        </button>
+                        <button class="bulk-action-btn bg-blue-600 hover:bg-blue-700 p-2 rounded font-bold text-sm" data-status="string_open" title="Marquer comme string ouvert">
+                            🔵 String
+                        </button>
+                        <button class="bulk-action-btn bg-gray-600 hover:bg-gray-700 p-2 rounded font-bold text-sm" data-status="not_connected" title="Marquer comme non raccordé">
+                            ⚫ Non raccordé
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <div id="auditContent">
                 <!-- Contenu dynamique de l'audit -->
             </div>
@@ -1256,6 +1473,44 @@ app.get('/audit/:token', async (c) => {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+        
+        <!-- Modal confirmation sélection multiple -->
+        <div id="bulkActionModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-lg w-full">
+                <h3 class="text-xl font-black mb-4 text-center text-yellow-400">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>CONFIRMATION SÉLECTION MULTIPLE
+                </h3>
+                
+                <div class="bg-gray-800 border border-orange-400 rounded p-4 mb-4">
+                    <p class="text-center mb-2">Vous allez modifier <span id="bulkCount" class="text-yellow-400 font-black">0</span> modules :</p>
+                    <div id="bulkModulesList" class="text-sm text-gray-300 max-h-32 overflow-y-auto">
+                        <!-- Liste des modules sélectionnés -->
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 border border-green-400 rounded p-4 mb-4">
+                    <p class="text-center">
+                        Nouveau statut : <span id="bulkNewStatus" class="font-black text-green-400">OK</span>
+                    </p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-2">Commentaire pour tous (optionnel) :</label>
+                    <input type="text" id="bulkComment" 
+                           class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-yellow-400 focus:outline-none"
+                           placeholder="Ex: Modules cassés lors passage EL...">
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button id="confirmBulkBtn" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded font-black">
+                        <i class="fas fa-check mr-2"></i>CONFIRMER
+                    </button>
+                    <button id="cancelBulkBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                        ANNULER
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -1551,6 +1806,47 @@ app.get('/dashboard', (c) => {
             50% { opacity: 0.5; }
         }
         .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
+        
+        /* Styles sélection multiple */
+        .module-btn.multi-select-mode {
+            position: relative !important;
+            transition: all 0.2s ease !important;
+        }
+        .module-btn.multi-select-mode:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5) !important;
+        }
+        .module-btn.selected-for-bulk {
+            border: 3px solid #facc15 !important;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.8) !important;
+            transform: scale(1.02) !important;
+        }
+        .module-btn.selected-for-bulk::after {
+            content: "✓" !important;
+            position: absolute !important;
+            top: -5px !important;
+            right: -5px !important;
+            background: #facc15 !important;
+            color: #000 !important;
+            width: 20px !important;
+            height: 20px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+        }
+        #multiSelectToggleBtn.active {
+            background-color: #facc15 !important;
+            color: #000000 !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.6) !important;
+        }
+        .bulk-action-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+        }
         body { background: #000 !important; color: #fff !important; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; font-weight: bold; }
         .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
         .bg-black { background-color: #000 !important; }

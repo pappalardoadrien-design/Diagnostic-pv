@@ -12,6 +12,11 @@ class DiagPVAudit {
         this.selectedModule = null
         this.offlineQueue = []
         
+        // Propriétés sélection multiple
+        this.multiSelectMode = false
+        this.selectedModules = new Set()
+        this.bulkActionStatus = null
+        
         this.init()
     }
 
@@ -159,9 +164,14 @@ class DiagPVAudit {
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('module-btn')) {
                 const moduleId = e.target.getAttribute('data-module-id')
-                console.log('🎯 Module cliqué:', moduleId, 'Element:', e.target)
+                console.log('🎯 Module cliqué:', moduleId, 'Mode:', this.multiSelectMode ? 'Sélection' : 'Normal')
+                
                 if (moduleId) {
-                    this.openModuleModal(moduleId)
+                    if (this.multiSelectMode) {
+                        this.toggleModuleSelection(moduleId, e.target)
+                    } else {
+                        this.openModuleModal(moduleId)
+                    }
                 } else {
                     console.error('❌ Pas de module-id trouvé sur:', e.target)
                 }
@@ -176,6 +186,9 @@ class DiagPVAudit {
         document.getElementById('reportBtn').addEventListener('click', () => this.generateReport())
         document.getElementById('shareBtn').addEventListener('click', () => this.shareAudit())
         document.getElementById('editAuditBtn').addEventListener('click', () => this.showEditAuditModal())
+
+        // Sélection multiple
+        this.setupMultiSelectEvents()
 
         // Raccourcis clavier tactile
         document.addEventListener('keydown', (e) => this.handleKeyboard(e))
@@ -799,6 +812,256 @@ class DiagPVAudit {
             this.eventSource.close()
         }
         this.saveOfflineData()
+    }
+
+    // ============================================================================
+    // SÉLECTION MULTIPLE POUR AUDIT TERRAIN RAPIDE
+    // ============================================================================
+
+    setupMultiSelectEvents() {
+        // Bouton activation/désactivation mode sélection
+        document.getElementById('multiSelectToggleBtn').addEventListener('click', () => {
+            this.toggleMultiSelectMode()
+        })
+
+        // Barre d'outils sélection
+        document.getElementById('exitMultiSelectBtn').addEventListener('click', () => {
+            this.exitMultiSelectMode()
+        })
+
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            this.selectAllVisibleModules()
+        })
+
+        document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+            this.clearSelection()
+        })
+
+        // Actions de lot
+        document.querySelectorAll('.bulk-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const status = e.target.getAttribute('data-status')
+                this.showBulkActionModal(status)
+            })
+        })
+
+        // Modal confirmation lot
+        document.getElementById('confirmBulkBtn').addEventListener('click', () => {
+            this.executeBulkAction()
+        })
+
+        document.getElementById('cancelBulkBtn').addEventListener('click', () => {
+            this.closeBulkModal()
+        })
+
+        // Fermeture modal si clic extérieur
+        document.getElementById('bulkActionModal').addEventListener('click', (e) => {
+            if (e.target.id === 'bulkActionModal') {
+                this.closeBulkModal()
+            }
+        })
+    }
+
+    toggleMultiSelectMode() {
+        this.multiSelectMode = !this.multiSelectMode
+        console.log('🔄 Mode sélection multiple:', this.multiSelectMode ? 'ACTIVÉ' : 'DÉSACTIVÉ')
+
+        const toggleBtn = document.getElementById('multiSelectToggleBtn')
+        const toolbar = document.getElementById('multiSelectToolbar')
+
+        if (this.multiSelectMode) {
+            // Activer mode sélection
+            toggleBtn.classList.add('active')
+            toggleBtn.innerHTML = '<i class="fas fa-times mr-1"></i>QUITTER SÉLECTION'
+            toolbar.classList.remove('hidden')
+            
+            // Ajouter classe aux modules
+            document.querySelectorAll('.module-btn').forEach(btn => {
+                btn.classList.add('multi-select-mode')
+            })
+            
+            this.showAlert('Mode sélection multiple activé ! Cliquez sur les modules à modifier ensemble.', 'success')
+        } else {
+            this.exitMultiSelectMode()
+        }
+    }
+
+    exitMultiSelectMode() {
+        this.multiSelectMode = false
+        this.clearSelection()
+
+        const toggleBtn = document.getElementById('multiSelectToggleBtn')
+        const toolbar = document.getElementById('multiSelectToolbar')
+
+        toggleBtn.classList.remove('active')
+        toggleBtn.innerHTML = '<i class="fas fa-check-square mr-1"></i>SÉLECTION MULTIPLE'
+        toolbar.classList.add('hidden')
+
+        // Retirer classes des modules
+        document.querySelectorAll('.module-btn').forEach(btn => {
+            btn.classList.remove('multi-select-mode', 'selected-for-bulk')
+        })
+
+        console.log('✅ Mode sélection multiple désactivé')
+    }
+
+    toggleModuleSelection(moduleId, element) {
+        if (this.selectedModules.has(moduleId)) {
+            // Désélectionner
+            this.selectedModules.delete(moduleId)
+            element.classList.remove('selected-for-bulk')
+            console.log('➖ Module désélectionné:', moduleId)
+        } else {
+            // Sélectionner
+            this.selectedModules.add(moduleId)
+            element.classList.add('selected-for-bulk')
+            console.log('➕ Module sélectionné:', moduleId)
+        }
+
+        this.updateSelectionCount()
+    }
+
+    selectAllVisibleModules() {
+        const visibleModules = document.querySelectorAll('.module-btn:not(.hidden)')
+        let addedCount = 0
+
+        visibleModules.forEach(btn => {
+            const moduleId = btn.getAttribute('data-module-id')
+            if (moduleId && !this.selectedModules.has(moduleId)) {
+                this.selectedModules.add(moduleId)
+                btn.classList.add('selected-for-bulk')
+                addedCount++
+            }
+        })
+
+        this.updateSelectionCount()
+        this.showAlert(`${addedCount} modules sélectionnés`, 'success')
+        console.log('✅ Tous les modules visibles sélectionnés:', addedCount)
+    }
+
+    clearSelection() {
+        this.selectedModules.clear()
+        document.querySelectorAll('.module-btn.selected-for-bulk').forEach(btn => {
+            btn.classList.remove('selected-for-bulk')
+        })
+        this.updateSelectionCount()
+        console.log('🗑️ Sélection effacée')
+    }
+
+    updateSelectionCount() {
+        const count = this.selectedModules.size
+        document.getElementById('selectedCount').textContent = count
+        
+        // Activer/désactiver boutons d'action selon sélection
+        const actionBtns = document.querySelectorAll('.bulk-action-btn')
+        actionBtns.forEach(btn => {
+            btn.disabled = count === 0
+            btn.style.opacity = count === 0 ? '0.5' : '1'
+        })
+    }
+
+    showBulkActionModal(status) {
+        if (this.selectedModules.size === 0) {
+            this.showAlert('Aucun module sélectionné', 'warning')
+            return
+        }
+
+        this.bulkActionStatus = status
+        const statusLabels = {
+            'ok': '🟢 OK',
+            'inequality': '🟡 Inégalité', 
+            'microcracks': '🟠 Microfissures',
+            'dead': '🔴 Hors Service',
+            'string_open': '🔵 String ouvert',
+            'not_connected': '⚫ Non raccordé'
+        }
+
+        // Mise à jour modal
+        document.getElementById('bulkCount').textContent = this.selectedModules.size
+        document.getElementById('bulkNewStatus').textContent = statusLabels[status] || status
+        
+        // Liste modules sélectionnés
+        const modulesList = document.getElementById('bulkModulesList')
+        const modulesArray = Array.from(this.selectedModules).sort()
+        modulesList.innerHTML = modulesArray.map(moduleId => 
+            `<span class="inline-block bg-gray-700 px-2 py-1 rounded mr-1 mb-1">${moduleId}</span>`
+        ).join('')
+
+        // Reset commentaire
+        document.getElementById('bulkComment').value = ''
+
+        // Afficher modal
+        document.getElementById('bulkActionModal').classList.remove('hidden')
+    }
+
+    closeBulkModal() {
+        document.getElementById('bulkActionModal').classList.add('hidden')
+        this.bulkActionStatus = null
+    }
+
+    async executeBulkAction() {
+        if (!this.bulkActionStatus || this.selectedModules.size === 0) {
+            return
+        }
+
+        const comment = document.getElementById('bulkComment').value.trim()
+        const modulesToUpdate = Array.from(this.selectedModules)
+
+        try {
+            console.log('🔄 Mise à jour en lot:', {
+                modules: modulesToUpdate,
+                status: this.bulkActionStatus,
+                comment: comment
+            })
+
+            // Appel API pour mise à jour en lot
+            const response = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    modules: modulesToUpdate,
+                    status: this.bulkActionStatus,
+                    comment: comment,
+                    technician_id: this.technicianId
+                })
+            })
+
+            if (!response.ok) {
+                throw new Error('Erreur lors de la mise à jour')
+            }
+
+            const result = await response.json()
+            console.log('✅ Mise à jour en lot réussie:', result)
+
+            // Mise à jour locale des modules
+            modulesToUpdate.forEach(moduleId => {
+                const module = this.modules.get(moduleId)
+                if (module) {
+                    module.status = this.bulkActionStatus
+                    if (comment) {
+                        module.comment = comment
+                    }
+                    module.updated_at = new Date().toISOString()
+                    module.technician_id = this.technicianId
+                }
+            })
+
+            // Re-rendu interface
+            this.renderModulesGrid()
+            this.updateProgress()
+
+            // Sortie mode sélection après succès
+            this.exitMultiSelectMode()
+            this.closeBulkModal()
+
+            this.showAlert(`✅ ${modulesToUpdate.length} modules mis à jour avec succès !`, 'success')
+
+        } catch (error) {
+            console.error('❌ Erreur mise à jour en lot:', error)
+            this.showAlert('Erreur lors de la mise à jour: ' + error.message, 'error')
+        }
     }
 }
 
