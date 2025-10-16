@@ -1,3 +1,8 @@
+// Configuration logging production
+const DEBUG = localStorage.getItem("diagpv_debug") === "true"
+const log = (...args) => DEBUG && log(...args)
+const error = (...args) => error(...args)
+
 // DiagPV - Importeur JSON pour cartographies de sites
 // Permet d'importer des configurations complexes depuis fichiers JSON
 
@@ -72,10 +77,10 @@ class DiagPVJsonImporter {
             document.getElementById('jsonFileName').textContent = `✅ ${file.name}`
             this.showAlert('Configuration JSON importée avec succès !', 'success')
 
-            console.log('📋 Configuration JSON importée:', config)
+            log('📋 Configuration JSON importée:', config)
 
         } catch (error) {
-            console.error('Erreur import JSON:', error)
+            error('Erreur import JSON:', error)
             this.showAlert('Erreur lecture JSON: ' + error.message, 'error')
         }
     }
@@ -214,7 +219,7 @@ class DiagPVJsonImporter {
         if (window.diagpvApp && window.diagpvApp.showAlert) {
             window.diagpvApp.showAlert(message, type)
         } else {
-            console.log(`[${type.toUpperCase()}] ${message}`)
+            log(`[${type.toUpperCase()}] ${message}`)
             alert(message)
         }
     }
@@ -257,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attendre que l'app principale soit chargée
     setTimeout(() => {
         window.diagpvJsonImporter = new DiagPVJsonImporter()
-        console.log('📋 DiagPV JSON Importer initialisé')
+        log('📋 DiagPV JSON Importer initialisé')
     }, 1000)
 })
 

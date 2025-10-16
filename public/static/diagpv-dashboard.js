@@ -1,3 +1,8 @@
+// Configuration logging production
+const DEBUG = localStorage.getItem("diagpv_debug") === "true"
+const log = (...args) => DEBUG && log(...args)
+const error = (...args) => error(...args)
+
 // DiagPV Dashboard - Tableau de bord audits temps réel
 // Interface de gestion globale des audits avec mise à jour automatique
 
@@ -13,7 +18,7 @@ class DiagPVDashboard {
     }
 
     init() {
-        console.log('📊 DiagPV Dashboard initialisé')
+        log('📊 DiagPV Dashboard initialisé')
         
         // Mise à jour horloge temps réel
         this.updateClock()
@@ -42,7 +47,7 @@ class DiagPVDashboard {
 
     async loadDashboard() {
         try {
-            console.log('🔄 Chargement dashboard...')
+            log('🔄 Chargement dashboard...')
             
             // Affichage loading
             document.getElementById('loading').classList.remove('hidden')
@@ -58,13 +63,13 @@ class DiagPVDashboard {
                 this.lastUpdate = new Date(data.timestamp)
                 this.updateLastUpdateDisplay()
                 
-                console.log('✅ Dashboard chargé:', data.audits.length, 'audits')
+                log('✅ Dashboard chargé:', data.audits.length, 'audits')
             } else {
                 throw new Error(data.error || 'Erreur chargement')
             }
 
         } catch (error) {
-            console.error('Erreur dashboard:', error)
+            error('Erreur dashboard:', error)
             this.showError('Erreur de chargement: ' + error.message)
         } finally {
             document.getElementById('loading').classList.add('hidden')
@@ -212,7 +217,7 @@ class DiagPVDashboard {
                 this.loadDashboard()
             }, 10000)
             
-            console.log('🔄 Auto-refresh activé (10s)')
+            log('🔄 Auto-refresh activé (10s)')
         } else {
             btn.innerHTML = '<i class="fas fa-play mr-1"></i>AUTO (OFF)'
             btn.className = 'bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold'
@@ -224,7 +229,7 @@ class DiagPVDashboard {
                 this.refreshInterval = null
             }
             
-            console.log('⏸️ Auto-refresh désactivé')
+            log('⏸️ Auto-refresh désactivé')
         }
     }
 
@@ -278,7 +283,7 @@ class DiagPVDashboard {
         }
 
         try {
-            console.log(`🗑️ Suppression audit: ${projectName} (${token})`)
+            log(`🗑️ Suppression audit: ${projectName} (${token})`)
             
             const response = await fetch(`/api/audit/${token}`, {
                 method: 'DELETE',
@@ -295,13 +300,13 @@ class DiagPVDashboard {
                 // Actualisation immédiate du dashboard
                 await this.loadDashboard()
                 
-                console.log('✅ Audit supprimé:', result.deleted_audit)
+                log('✅ Audit supprimé:', result.deleted_audit)
             } else {
                 throw new Error(result.error || 'Erreur suppression')
             }
             
         } catch (error) {
-            console.error('❌ Erreur suppression audit:', error)
+            error('❌ Erreur suppression audit:', error)
             alert(`❌ ERREUR SUPPRESSION\n\n${error.message}\n\nL'audit n'a pas pu être supprimé.`)
         }
     }
@@ -321,7 +326,7 @@ class DiagPVDashboard {
 
 // Initialisation dashboard
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('📊 DiagPV Dashboard - Initialisation')
+    log('📊 DiagPV Dashboard - Initialisation')
     window.dashboard = new DiagPVDashboard()
 })
 

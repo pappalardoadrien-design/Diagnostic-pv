@@ -1,117 +1,64 @@
--- Données de test pour DiagPV Audit EL
--- Insertion d'un audit de démonstration
+-- Base de test épurée DiagPV Audit EL  
+-- Audit de démonstration professionnel
 
+-- Audit principal de démonstration
 INSERT OR IGNORE INTO audits (
   token, project_name, client_name, location, 
   string_count, modules_per_string, total_modules,
-  created_at, status
+  created_at, status, json_config
 ) VALUES (
-  'demo-audit-2024-test',
-  'ARKOLIA-BONNAUD-DEMO',
-  'Arkolia Energies',
-  'Bonnaud Solar Park',
+  'DEMO_FORMATION_DIAGPV',
+  'Installation Démo DiagPV',
+  'Formation DiagPV',
+  'Site Formation - Toiture Sud',
   4,
-  20,
-  80,
+  6,
+  24,
   datetime('now'),
-  'in_progress'
+  'created',
+  '{"mode":"simple","stringCount":4,"modulesPerString":6}'
 );
 
--- Insertion modules de test avec différents statuts
-INSERT OR IGNORE INTO modules (audit_token, module_id, string_number, position_in_string, status, comment) VALUES
--- String 1
-('demo-audit-2024-test', 'M001', 1, 1, 'ok', NULL),
-('demo-audit-2024-test', 'M002', 1, 2, 'ok', NULL),
-('demo-audit-2024-test', 'M003', 1, 3, 'inequality', 'Légère inégalité EL'),
-('demo-audit-2024-test', 'M004', 1, 4, 'ok', NULL),
-('demo-audit-2024-test', 'M005', 1, 5, 'microcracks', 'Microfissures visibles'),
-('demo-audit-2024-test', 'M006', 1, 6, 'ok', NULL),
-('demo-audit-2024-test', 'M007', 1, 7, 'ok', NULL),
-('demo-audit-2024-test', 'M008', 1, 8, 'dead', 'Module complètement HS'),
-('demo-audit-2024-test', 'M009', 1, 9, 'ok', NULL),
-('demo-audit-2024-test', 'M010', 1, 10, 'ok', NULL),
-('demo-audit-2024-test', 'M011', 1, 11, 'ok', NULL),
-('demo-audit-2024-test', 'M012', 1, 12, 'ok', NULL),
-('demo-audit-2024-test', 'M013', 1, 13, 'ok', NULL),
-('demo-audit-2024-test', 'M014', 1, 14, 'ok', NULL),
-('demo-audit-2024-test', 'M015', 1, 15, 'ok', NULL),
-('demo-audit-2024-test', 'M016', 1, 16, 'ok', NULL),
-('demo-audit-2024-test', 'M017', 1, 17, 'ok', NULL),
-('demo-audit-2024-test', 'M018', 1, 18, 'ok', NULL),
-('demo-audit-2024-test', 'M019', 1, 19, 'ok', NULL),
-('demo-audit-2024-test', 'M020', 1, 20, 'ok', NULL),
+-- Modules avec positions physiques et résultats représentatifs
+-- String 1 (Row 1): Majorité OK + 1 microfissure
+INSERT OR IGNORE INTO modules (audit_token, module_id, string_number, position_in_string, physical_row, physical_col, status, comment, created_at) VALUES
+('DEMO_FORMATION_DIAGPV', 'S1-1', 1, 1, 1, 0, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S1-2', 1, 2, 1, 1, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S1-3', 1, 3, 1, 2, 'microcracks', 'Microfissures visibles EL', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S1-4', 1, 4, 1, 3, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S1-5', 1, 5, 1, 4, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S1-6', 1, 6, 1, 5, 'ok', 'Conforme', datetime('now')),
 
--- String 2
-('demo-audit-2024-test', 'M021', 2, 1, 'ok', NULL),
-('demo-audit-2024-test', 'M022', 2, 2, 'inequality', 'Cellules inégales'),
-('demo-audit-2024-test', 'M023', 2, 3, 'ok', NULL),
-('demo-audit-2024-test', 'M024', 2, 4, 'ok', NULL),
-('demo-audit-2024-test', 'M025', 2, 5, 'ok', NULL),
-('demo-audit-2024-test', 'M026', 2, 6, 'string_open', 'String ouvert détecté'),
-('demo-audit-2024-test', 'M027', 2, 7, 'ok', NULL),
-('demo-audit-2024-test', 'M028', 2, 8, 'ok', NULL),
-('demo-audit-2024-test', 'M029', 2, 9, 'ok', NULL),
-('demo-audit-2024-test', 'M030', 2, 10, 'ok', NULL),
-('demo-audit-2024-test', 'M031', 2, 11, 'ok', NULL),
-('demo-audit-2024-test', 'M032', 2, 12, 'ok', NULL),
-('demo-audit-2024-test', 'M033', 2, 13, 'ok', NULL),
-('demo-audit-2024-test', 'M034', 2, 14, 'ok', NULL),
-('demo-audit-2024-test', 'M035', 2, 15, 'ok', NULL),
-('demo-audit-2024-test', 'M036', 2, 16, 'ok', NULL),
-('demo-audit-2024-test', 'M037', 2, 17, 'ok', NULL),
-('demo-audit-2024-test', 'M038', 2, 18, 'ok', NULL),
-('demo-audit-2024-test', 'M039', 2, 19, 'ok', NULL),
-('demo-audit-2024-test', 'M040', 2, 20, 'ok', NULL),
+-- String 2 (Row 2): Majorité OK + 1 inégalité  
+('DEMO_FORMATION_DIAGPV', 'S2-1', 2, 1, 2, 0, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S2-2', 2, 2, 2, 1, 'inequality', 'Inégalité de luminescence', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S2-3', 2, 3, 2, 2, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S2-4', 2, 4, 2, 3, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S2-5', 2, 5, 2, 4, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S2-6', 2, 6, 2, 5, 'ok', 'Conforme', datetime('now')),
 
--- String 3
-('demo-audit-2024-test', 'M041', 3, 1, 'ok', NULL),
-('demo-audit-2024-test', 'M042', 3, 2, 'ok', NULL),
-('demo-audit-2024-test', 'M043', 3, 3, 'ok', NULL),
-('demo-audit-2024-test', 'M044', 3, 4, 'ok', NULL),
-('demo-audit-2024-test', 'M045', 3, 5, 'ok', NULL),
-('demo-audit-2024-test', 'M046', 3, 6, 'ok', NULL),
-('demo-audit-2024-test', 'M047', 3, 7, 'not_connected', 'Non raccordé'),
-('demo-audit-2024-test', 'M048', 3, 8, 'ok', NULL),
-('demo-audit-2024-test', 'M049', 3, 9, 'ok', NULL),
-('demo-audit-2024-test', 'M050', 3, 10, 'ok', NULL),
-('demo-audit-2024-test', 'M051', 3, 11, 'ok', NULL),
-('demo-audit-2024-test', 'M052', 3, 12, 'ok', NULL),
-('demo-audit-2024-test', 'M053', 3, 13, 'ok', NULL),
-('demo-audit-2024-test', 'M054', 3, 14, 'ok', NULL),
-('demo-audit-2024-test', 'M055', 3, 15, 'ok', NULL),
-('demo-audit-2024-test', 'M056', 3, 16, 'ok', NULL),
-('demo-audit-2024-test', 'M057', 3, 17, 'ok', NULL),
-('demo-audit-2024-test', 'M058', 3, 18, 'ok', NULL),
-('demo-audit-2024-test', 'M059', 3, 19, 'ok', NULL),
-('demo-audit-2024-test', 'M060', 3, 20, 'ok', NULL),
+-- String 3 (Row 3): Majorité OK + 1 microfissure + 1 module HS
+('DEMO_FORMATION_DIAGPV', 'S3-1', 3, 1, 3, 0, 'microcracks', 'Microfissures visibles EL', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S3-2', 3, 2, 3, 1, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S3-3', 3, 3, 3, 2, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S3-4', 3, 4, 3, 3, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S3-5', 3, 5, 3, 4, 'dead', 'Module hors service - pas de luminescence', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S3-6', 3, 6, 3, 5, 'ok', 'Conforme', datetime('now')),
 
--- String 4
-('demo-audit-2024-test', 'M061', 4, 1, 'ok', NULL),
-('demo-audit-2024-test', 'M062', 4, 2, 'ok', NULL),
-('demo-audit-2024-test', 'M063', 4, 3, 'ok', NULL),
-('demo-audit-2024-test', 'M064', 4, 4, 'ok', NULL),
-('demo-audit-2024-test', 'M065', 4, 5, 'ok', NULL),
-('demo-audit-2024-test', 'M066', 4, 6, 'ok', NULL),
-('demo-audit-2024-test', 'M067', 4, 7, 'ok', NULL),
-('demo-audit-2024-test', 'M068', 4, 8, 'ok', NULL),
-('demo-audit-2024-test', 'M069', 4, 9, 'ok', NULL),
-('demo-audit-2024-test', 'M070', 4, 10, 'ok', NULL),
-('demo-audit-2024-test', 'M071', 4, 11, 'ok', NULL),
-('demo-audit-2024-test', 'M072', 4, 12, 'ok', NULL),
-('demo-audit-2024-test', 'M073', 4, 13, 'ok', NULL),
-('demo-audit-2024-test', 'M074', 4, 14, 'ok', NULL),
-('demo-audit-2024-test', 'M075', 4, 15, 'ok', NULL),
-('demo-audit-2024-test', 'M076', 4, 16, 'ok', NULL),
-('demo-audit-2024-test', 'M077', 4, 17, 'ok', NULL),
-('demo-audit-2024-test', 'M078', 4, 18, 'ok', NULL),
-('demo-audit-2024-test', 'M079', 4, 19, 'ok', NULL),
-('demo-audit-2024-test', 'M080', 4, 20, 'pending', NULL);
+-- String 4 (Row 4): Majorité OK + 1 microfissure
+('DEMO_FORMATION_DIAGPV', 'S4-1', 4, 1, 4, 0, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S4-2', 4, 2, 4, 1, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S4-3', 4, 3, 4, 2, 'microcracks', 'Microfissures visibles EL', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S4-4', 4, 4, 4, 3, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S4-5', 4, 5, 4, 4, 'ok', 'Conforme', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 'S4-6', 4, 6, 4, 5, 'ok', 'Conforme', datetime('now'));
 
--- Données PVserv de test
+-- Données PVserv de test représentatives
 INSERT OR IGNORE INTO pvserv_measurements (
   audit_token, string_number, module_number, 
-  ff, rds, uf, measurement_type, iv_curve_data
+  ff, rds, uf, measurement_type, iv_curve_data, created_at
 ) VALUES 
-('demo-audit-2024-test', 1, 1, 0.957, 17.20, 772, 'bright', '212 0.00 339 0.00'),
-('demo-audit-2024-test', 1, 2, 0.943, 18.45, 768, 'bright', '215 0.00 341 0.00'),
-('demo-audit-2024-test', 2, 1, 0.951, 17.89, 770, 'bright', '213 0.00 340 0.00');
+('DEMO_FORMATION_DIAGPV', 1, 1, 0.957, 17.20, 772, 'bright', '212 0.00 339 0.00', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 1, 2, 0.943, 18.45, 768, 'bright', '215 0.00 341 0.00', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 2, 1, 0.951, 17.89, 770, 'bright', '213 0.00 340 0.00', datetime('now')),
+('DEMO_FORMATION_DIAGPV', 3, 5, 0.000, 0.00, 0, 'dark', 'MODULE_HS', datetime('now'));

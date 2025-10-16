@@ -1,6 +1,11 @@
 // DiagPV Audit EL - JavaScript principal interface création
 // Optimisé pour usage terrain nocturne + tablette tactile
 
+// Configuration logging production
+const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
+const log = (...args) => DEBUG && log(...args)
+const error = (...args) => error(...args)
+
 class DiagPVApp {
     constructor() {
         this.init()
@@ -16,7 +21,7 @@ class DiagPVApp {
         // Calcul automatique total modules
         this.updateTotalModules()
         
-        console.log('DiagPV App initialisée')
+        log('DiagPV App initialisée')
     }
 
     setupEventListeners() {
@@ -248,13 +253,13 @@ class DiagPVApp {
         // Affichage nom fichier
         document.getElementById('planFileName').textContent = `✅ ${file.name}`
         
-        console.log('Plan uploadé:', file.name, 'Taille:', (file.size / 1024 / 1024).toFixed(1) + 'MB')
+        log('Plan uploadé:', file.name, 'Taille:', (file.size / 1024 / 1024).toFixed(1) + 'MB')
     }
 
     async createAudit(event) {
         event.preventDefault()
 
-        console.log('🚀 createAudit démarré')
+        log('🚀 createAudit démarré')
 
         // Déclaration variables en dehors du try pour accès dans finally
         let submitBtn = null
@@ -267,7 +272,7 @@ class DiagPVApp {
             const location = document.getElementById('location').value.trim()
             const auditDate = document.getElementById('auditDate').value
 
-            console.log('📝 Données formulaire:', { projectName, clientName, location, auditDate })
+            log('📝 Données formulaire:', { projectName, clientName, location, auditDate })
 
             if (!projectName || !clientName || !location || !auditDate) {
                 this.showAlert('Tous les champs sont obligatoires', 'error')
@@ -294,7 +299,7 @@ class DiagPVApp {
                 }
                 totalModules = configurationData.totalModules
 
-                console.log('⚙️ Configuration avancée:', configurationData)
+                log('⚙️ Configuration avancée:', configurationData)
             } else {
                 // Mode simple
                 const stringCount = parseInt(document.getElementById('stringCount').value)
@@ -313,7 +318,7 @@ class DiagPVApp {
                 }
                 totalModules = configurationData.totalModules
 
-                console.log('⚙️ Configuration simple:', configurationData)
+                log('⚙️ Configuration simple:', configurationData)
             }
 
             if (!planFile && totalModules === 0) {
@@ -327,7 +332,7 @@ class DiagPVApp {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>CRÉATION EN COURS...'
             submitBtn.disabled = true
 
-            console.log('🔄 Bouton loading activé')
+            log('🔄 Bouton loading activé')
 
             // Création audit via API
             const auditData = {
@@ -338,7 +343,7 @@ class DiagPVApp {
                 configuration: configurationData
             }
 
-            console.log('📡 Envoi requête API:', auditData)
+            log('📡 Envoi requête API:', auditData)
 
             const response = await fetch('/api/audit/create', {
                 method: 'POST',
@@ -348,14 +353,14 @@ class DiagPVApp {
                 body: JSON.stringify(auditData)
             })
 
-            console.log('📥 Réponse reçue, status:', response.status)
+            log('📥 Réponse reçue, status:', response.status)
 
             if (!response.ok) {
                 throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`)
             }
 
             const result = await response.json()
-            console.log('✅ Résultat parsé:', result)
+            log('✅ Résultat parsé:', result)
 
             if (!result.success) {
                 throw new Error(result.message || 'Erreur création audit')
@@ -363,13 +368,13 @@ class DiagPVApp {
 
             // Upload plan si fourni
             if (planFile) {
-                console.log('📎 Upload plan démarré')
+                log('📎 Upload plan démarré')
                 await this.uploadPlan(result.auditToken, planFile)
-                console.log('📎 Upload plan terminé')
+                log('📎 Upload plan terminé')
             }
 
             // Sauvegarde local pour audits récents
-            console.log('💾 Sauvegarde audit récent')
+            log('💾 Sauvegarde audit récent')
             this.saveRecentAudit({
                 token: result.auditToken,
                 projectName,
@@ -380,18 +385,18 @@ class DiagPVApp {
             })
 
             // Redirection vers interface audit
-            console.log('🎯 Redirection vers:', result.auditUrl)
+            log('🎯 Redirection vers:', result.auditUrl)
             this.showAlert('Audit créé avec succès ! Redirection...', 'success')
             setTimeout(() => {
                 window.location.href = result.auditUrl
             }, 1500)
 
         } catch (error) {
-            console.error('❌ Erreur création audit:', error)
+            error('❌ Erreur création audit:', error)
             this.showAlert('Erreur: ' + error.message, 'error')
         } finally {
             // Reset bouton
-            console.log('🔄 Reset bouton')
+            log('🔄 Reset bouton')
             if (!submitBtn) {
                 submitBtn = event.target.querySelector('button[type="submit"]')
             }
@@ -416,7 +421,7 @@ class DiagPVApp {
             throw new Error('Erreur upload plan: ' + result.error)
         }
 
-        console.log('Plan uploadé avec succès:', result.planUrl)
+        log('Plan uploadé avec succès:', result.planUrl)
     }
 
     saveRecentAudit(auditData) {
@@ -465,7 +470,7 @@ class DiagPVApp {
                 this.loadRecentAuditsFromStorage()
             }
         } catch (error) {
-            console.error('Erreur chargement audits:', error)
+            error('Erreur chargement audits:', error)
             // Fallback vers localStorage en cas d'erreur
             this.loadRecentAuditsFromStorage()
         }
@@ -578,26 +583,26 @@ class DiagPVApp {
 
 // Initialisation app au chargement DOM
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🌙 DiagPV Audit EL - Interface Nocturne Initialisée')
+    log('🌙 DiagPV Audit EL - Interface Nocturne Initialisée')
     window.diagpvApp = new DiagPVApp()
 })
 
 // Gestion offline/online
 window.addEventListener('online', () => {
-    console.log('✅ Connexion réseau restaurée')
+    log('✅ Connexion réseau restaurée')
     diagpvApp.showAlert('Connexion réseau restaurée', 'success')
 })
 
 window.addEventListener('offline', () => {
-    console.log('⚠️ Mode offline activé') 
+    log('⚠️ Mode offline activé') 
     diagpvApp.showAlert('Mode offline - Les données seront synchronisées à la reconnexion', 'warning')
 })
 
 // Service Worker pour PWA
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
-        .then(registration => console.log('SW registered:', registration))
-        .catch(error => console.log('SW registration failed:', error))
+        .then(registration => log('SW registered:', registration))
+        .catch(error => log('SW registration failed:', error))
 }
 
 // Export pour usage externe

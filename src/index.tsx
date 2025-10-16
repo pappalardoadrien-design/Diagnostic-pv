@@ -101,6 +101,13 @@ app.post('/api/audit/create', async (c) => {
   const requestData = await c.req.json()
   const { projectName, clientName, location, configuration } = requestData
   
+  // Validation des paramètres requis
+  if (!projectName || !clientName || !location) {
+    return c.json({ 
+      error: 'Paramètres manquants: projectName, clientName et location sont requis'
+    }, 400)
+  }
+  
   // Génération token unique sécurisé
   const auditToken = crypto.randomUUID()
   
@@ -118,9 +125,9 @@ app.post('/api/audit/create', async (c) => {
     configJson = JSON.stringify(configuration)
   } else if (configuration && configuration.mode === 'simple') {
     // Mode simple (nouveau format)
-    totalModules = configuration.totalModules
     stringCount = configuration.stringCount
     modulesPerString = configuration.modulesPerString
+    totalModules = configuration.totalModules || (stringCount * modulesPerString)
     configJson = JSON.stringify(configuration)
   } else {
     // Rétrocompatibilité - ancien format
@@ -163,25 +170,30 @@ app.post('/api/audit/create', async (c) => {
             moduleId, 
             stringNumber, 
             modulePos,
-            stringNumber, // row = MPPT number pour organisation visuelle
-            modulePos // col = position dans string
+            stringConfig.physicalRow || stringNumber, // Rangée physique en toiture
+            (stringConfig.physicalCol || 0) + modulePos - 1 // Position horizontale en toiture
           ).run()
         }
       }
     }
   } else {
-    // Génération simple (grille uniforme)
+    // Génération simple (grille uniforme avec positions physiques)
     for (let s = 1; s <= stringCount; s++) {
       for (let m = 1; m <= modulesPerString; m++) {
         // Nouvelle numérotation : S{string}-{position}
         const moduleId = `S${s}-${m}`
         
+        // Position physique pour calepinage cohérent
+        // Convention PV française : strings horizontaux, row=string, col=position
+        const physicalRow = s  // Rangée = numéro string (bas vers haut)
+        const physicalCol = m - 1  // Colonne = position - 1 (commence à 0)
+        
         await env.DB.prepare(`
           INSERT INTO modules (
             audit_token, module_id, string_number, position_in_string,
-            status, created_at
-          ) VALUES (?, ?, ?, ?, 'pending', datetime('now'))
-        `).bind(auditToken, moduleId, s, m).run()
+            status, created_at, physical_row, physical_col
+          ) VALUES (?, ?, ?, ?, 'pending', datetime('now'), ?, ?)
+        `).bind(auditToken, moduleId, s, m, physicalRow, physicalCol).run()
       }
     }
   }
@@ -808,8 +820,7 @@ app.get('/api/audit/:token/report', async (c) => {
 // INTERFACE FRONTEND
 // ============================================================================
 
-// Route debug test
-// Page d'accueil - Dashboard
+// Page d'accueil - Dashboard DiagPV
 app.get('/', (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -1603,6 +1614,124 @@ app.get('/audit/:token', async (c) => {
   `)
 })
 
+// Fonction génération grille modules physique
+function generatePhysicalModulesGrid(modules: any[]) {
+  if (!modules || modules.length === 0) {
+    return '<p>Aucun module trouvé</p>'
+  }
+
+  // Tri des modules par position physique
+  const sortedModules = modules.sort((a, b) => {
+    // Tri par rangée (row) d'abord, puis par colonne (col)
+    if (a.physical_row !== b.physical_row) {
+      return (a.physical_row || 0) - (b.physical_row || 0)
+    }
+    return (a.physical_col || 0) - (b.physical_col || 0)
+  })
+
+  // Déterminer dimensions de la grille
+  const maxRow = Math.max(...sortedModules.map(m => m.physical_row || 0))
+  const maxCol = Math.max(...sortedModules.map(m => m.physical_col || 0))
+  const minRow = Math.min(...sortedModules.map(m => m.physical_row || 0))
+  const minCol = Math.min(...sortedModules.map(m => m.physical_col || 0))
+
+  // Créer une grille vide
+  const grid = []
+  for (let row = maxRow; row >= minRow; row--) { // De haut en bas (inversion visuelle)
+    const gridRow = []
+    for (let col = minCol; col <= maxCol; col++) {
+      gridRow.push(null)
+    }
+    grid.push(gridRow)
+  }
+
+  // Placer les modules dans la grille
+  sortedModules.forEach(module => {
+    const row = module.physical_row || 0
+    const col = module.physical_col || 0
+    const gridRowIndex = maxRow - row  // Inversion pour affichage correct
+    const gridColIndex = col - minCol
+    
+    if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
+      grid[gridRowIndex][gridColIndex] = module
+    }
+  })
+
+  // Génération HTML de la grille
+  let html = `
+    <div class="physical-modules-grid" style="
+      display: grid; 
+      grid-template-columns: repeat(${maxCol - minCol + 1}, 32px);
+      gap: 3px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 2px dashed #cbd5e1;
+      justify-content: center;
+      max-width: fit-content;
+      margin: 0 auto;
+    ">
+  `
+
+  grid.forEach((row, rowIndex) => {
+    row.forEach((module, colIndex) => {
+      if (module) {
+        html += `
+          <div class="module ${module.status}" title="${module.module_id} (Rang ${module.physical_row}, Col ${module.physical_col})">
+            ${module.module_id.includes('-') ? module.module_id.split('-')[1] : module.module_id.substring(1)}
+          </div>
+        `
+      } else {
+        // Cellule vide pour maintenir l'alignement
+        html += `<div class="module-empty" style="width: 30px; height: 24px;"></div>`
+      }
+    })
+  })
+
+  html += '</div>'
+  
+  // Ajouter une vue par string aussi pour référence
+  html += '<div style="margin-top: 30px;">'
+  html += '<h4 style="color: #374151; margin-bottom: 15px;">📋 Vue par String (référence)</h4>'
+  
+  // Grouper par string
+  const modulesByString = {}
+  sortedModules.forEach(module => {
+    const stringNum = module.string_number
+    if (!modulesByString[stringNum]) {
+      modulesByString[stringNum] = []
+    }
+    modulesByString[stringNum].push(module)
+  })
+
+  Object.keys(modulesByString).sort((a, b) => parseInt(a) - parseInt(b)).forEach(stringNum => {
+    const stringModules = modulesByString[stringNum].sort((a, b) => a.position_in_string - b.position_in_string)
+    
+    html += `
+      <div style="margin-bottom: 15px;">
+        <div style="font-weight: 600; margin-bottom: 5px; color: #1f2937;">
+          String ${stringNum} (${stringModules.length} modules)
+        </div>
+        <div style="display: flex; gap: 3px; flex-wrap: wrap;">
+    `
+    
+    stringModules.forEach(module => {
+      html += `
+        <div class="module ${module.status}" style="width: 28px; height: 20px; font-size: 8px;" 
+             title="${module.module_id}">
+          ${module.position_in_string}
+        </div>
+      `
+    })
+    
+    html += '</div></div>'
+  })
+  
+  html += '</div>'
+  
+  return html
+}
+
 // Fonction génération HTML rapport
 async function generateReportHTML(audit: any, modules: any[], stats: any, measurements: any[] = []) {
   const date = new Date().toLocaleDateString('fr-FR')
@@ -2072,13 +2201,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     </div>
                 </div>
                 
-                <div class="module-grid">
-                    ${modules.map(module => 
-                      `<div class="module ${module.status}" title="${module.module_id}">
-                         ${module.module_id.substring(1)}
-                       </div>`
-                    ).join('')}
-                </div>
+                ${generatePhysicalModulesGrid(modules)}
                 
             </div>
         </div>
@@ -2197,7 +2320,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
     <script>
         // Optimisation automatique pour impression des couleurs
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🎨 Optimisation couleurs rapport activée');
+            // Optimisation couleurs rapport activée
             
             // Force l'affichage des couleurs pour tous les modules
             const modules = document.querySelectorAll('.module');
@@ -2210,7 +2333,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
             
             // Optimisation avant impression
             window.addEventListener('beforeprint', function() {
-                console.log('🖨️ Impression détectée - force des couleurs');
+                // Impression détectée - force des couleurs
                 
                 // Force chaque couleur individuellement
                 document.querySelectorAll('.module.ok').forEach(el => {

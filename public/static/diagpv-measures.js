@@ -1,3 +1,8 @@
+// Configuration logging production
+const DEBUG = localStorage.getItem("diagpv_debug") === "true"
+const log = (...args) => DEBUG && log(...args)
+const error = (...args) => error(...args)
+
 // DiagPV - Interface mesures PVserv
 // Upload et visualisation mesures électriques
 
@@ -129,7 +134,7 @@ class DiagPVMeasures {
                 }
             }
         } catch (error) {
-            console.log('Aucune mesure existante trouvée')
+            log('Aucune mesure existante trouvée')
         }
     }
 
@@ -190,7 +195,7 @@ class DiagPVMeasures {
             this.displayResults(results)
             
         } catch (error) {
-            console.error('Erreur traitement fichier:', error)
+            error('Erreur traitement fichier:', error)
             this.showAlert('Erreur traitement fichier: ' + error.message, 'error')
         }
     }
@@ -375,7 +380,7 @@ class DiagPVMeasures {
             this.showAlert('Mesures sauvegardées avec succès', 'success')
             
         } catch (error) {
-            console.error('Erreur sauvegarde mesures:', error)
+            error('Erreur sauvegarde mesures:', error)
             this.showAlert('Erreur sauvegarde: ' + error.message, 'error')
         }
     }
@@ -444,7 +449,7 @@ class DiagPVMeasures {
         if (window.diagpvAudit && window.diagpvAudit.showAlert) {
             window.diagpvAudit.showAlert(message, type)
         } else {
-            console.log(`[${type.toUpperCase()}] ${message}`)
+            log(`[${type.toUpperCase()}] ${message}`)
             alert(message)
         }
     }
@@ -455,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const auditToken = document.body.dataset.auditToken
     if (auditToken) {
         window.diagpvMeasures = new DiagPVMeasures(auditToken)
-        console.log('📊 DiagPV Measures Interface Initialized')
+        log('📊 DiagPV Measures Interface Initialized')
     }
 })
 

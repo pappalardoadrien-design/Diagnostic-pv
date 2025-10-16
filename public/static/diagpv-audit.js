@@ -1,6 +1,11 @@
 // DiagPV Audit EL - Interface audit terrain nocturne
 // Collaboration temps réel + diagnostic modules optimisé tablette tactile
 
+// Configuration logging production
+const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
+const log = (...args) => DEBUG && log(...args)
+const error = (...args) => error(...args) // Toujours afficher les erreurs
+
 class DiagPVAudit {
     constructor() {
         this.auditToken = document.body.dataset.auditToken
@@ -17,11 +22,14 @@ class DiagPVAudit {
         this.selectedModules = new Set()
         this.bulkActionStatus = null
         
+        // Propriétés affichage
+        this.viewMode = 'string' // 'string' ou 'physical'
+        
         this.init()
     }
 
     async init() {
-        console.log('🌙 DiagPV Audit Terrain - Token:', this.auditToken)
+        log('🌙 DiagPV Audit Terrain - Token:', this.auditToken)
         
         try {
             await this.loadAuditData()
@@ -30,7 +38,7 @@ class DiagPVAudit {
             this.setupRealtimeSync()
             this.setupOfflineSupport()
         } catch (error) {
-            console.error('Erreur initialisation:', error)
+            error('Erreur initialisation:', error)
             this.showAlert('Erreur chargement audit: ' + error.message, 'error')
         }
     }
@@ -50,7 +58,7 @@ class DiagPVAudit {
             this.modules.set(module.module_id, module)
         })
 
-        console.log('✅ Audit chargé:', this.auditData.project_name, 'Modules:', this.modules.size)
+        log('✅ Audit chargé:', this.auditData.project_name, 'Modules:', this.modules.size)
     }
 
     setupInterface() {
@@ -90,14 +98,34 @@ class DiagPVAudit {
         const container = document.getElementById('auditContent')
         let gridHTML = ''
 
-        if (this.currentStringFilter === 'all') {
-            // Affichage toutes strings
-            for (let s = 1; s <= this.auditData.string_count; s++) {
-                gridHTML += this.renderStringContainer(s)
-            }
+        // Boutons de basculement vue
+        gridHTML += `
+            <div class="view-toggle-container mb-6">
+                <div class="flex gap-2 justify-center">
+                    <button id="stringViewBtn" class="view-toggle-btn ${this.viewMode !== 'physical' ? 'active' : ''}" 
+                            onclick="diagpvAudit.setViewMode('string')">
+                        <i class="fas fa-list mr-2"></i>Vue par String
+                    </button>
+                    <button id="physicalViewBtn" class="view-toggle-btn ${this.viewMode === 'physical' ? 'active' : ''}" 
+                            onclick="diagpvAudit.setViewMode('physical')">
+                        <i class="fas fa-th mr-2"></i>Vue Calepinage
+                    </button>
+                </div>
+            </div>
+        `
+
+        if (this.viewMode === 'physical') {
+            // Affichage vue physique
+            gridHTML += this.renderPhysicalGrid()
         } else {
-            // Affichage string spécifique
-            gridHTML = this.renderStringContainer(this.currentStringFilter)
+            // Affichage vue par string (existant)
+            if (this.currentStringFilter === 'all') {
+                for (let s = 1; s <= this.auditData.string_count; s++) {
+                    gridHTML += this.renderStringContainer(s)
+                }
+            } else {
+                gridHTML = this.renderStringContainer(this.currentStringFilter)
+            }
         }
 
         container.innerHTML = gridHTML
@@ -149,6 +177,98 @@ class DiagPVAudit {
         return html
     }
 
+    renderPhysicalGrid() {
+        const allModules = Array.from(this.modules.values())
+        
+        if (allModules.length === 0) return '<p>Aucun module trouvé</p>'
+
+        // Tri par position physique
+        const sortedModules = allModules.sort((a, b) => {
+            if (a.physical_row !== b.physical_row) {
+                return (a.physical_row || 0) - (b.physical_row || 0)
+            }
+            return (a.physical_col || 0) - (b.physical_col || 0)
+        })
+
+        // Déterminer dimensions grille
+        const maxRow = Math.max(...sortedModules.map(m => m.physical_row || 0))
+        const maxCol = Math.max(...sortedModules.map(m => m.physical_col || 0))
+        const minRow = Math.min(...sortedModules.map(m => m.physical_row || 0))
+        const minCol = Math.min(...sortedModules.map(m => m.physical_col || 0))
+
+        // Créer grille vide
+        const grid = []
+        for (let row = maxRow; row >= minRow; row--) {
+            const gridRow = []
+            for (let col = minCol; col <= maxCol; col++) {
+                gridRow.push(null)
+            }
+            grid.push(gridRow)
+        }
+
+        // Placer modules
+        sortedModules.forEach(module => {
+            const row = module.physical_row || 0
+            const col = module.physical_col || 0
+            const gridRowIndex = maxRow - row
+            const gridColIndex = col - minCol
+            
+            if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
+                grid[gridRowIndex][gridColIndex] = module
+            }
+        })
+
+        // Génération HTML
+        let html = `
+            <div class="physical-grid-container">
+                <div class="physical-grid-header">
+                    <h3><i class="fas fa-th mr-2"></i>Vue Calepinage Toiture</h3>
+                    <p class="text-sm text-gray-600">Représentation fidèle au plan physique</p>
+                </div>
+                <div class="physical-modules-grid" style="
+                    display: grid; 
+                    grid-template-columns: repeat(${maxCol - minCol + 1}, 50px);
+                    gap: 4px;
+                    padding: 20px;
+                    background: #f8fafc;
+                    border-radius: 12px;
+                    border: 2px dashed #cbd5e1;
+                    justify-content: center;
+                    max-width: fit-content;
+                    margin: 0 auto;
+                ">
+        `
+
+        grid.forEach((row, rowIndex) => {
+            row.forEach((module, colIndex) => {
+                if (module) {
+                    const statusClass = `module-${module.status}`
+                    const isSelected = this.selectedModules.has(module.module_id)
+                    html += `
+                        <button class="module-btn ${statusClass} ${isSelected ? 'selected' : ''} touch-optimized physical-module" 
+                                data-module-id="${module.module_id}"
+                                data-string="${module.string_number}"
+                                style="width: 46px; height: 36px; font-size: 10px;"
+                                title="String ${module.string_number} - ${module.module_id}${module.comment ? ' - ' + module.comment : ''}">
+                            ${module.module_id.includes('-') ? module.module_id.split('-')[1] : module.module_id.substring(1)}
+                        </button>
+                    `
+                } else {
+                    html += `<div class="module-empty" style="width: 46px; height: 36px;"></div>`
+                }
+            })
+        })
+
+        html += '</div></div>'
+        return html
+    }
+
+    setViewMode(mode) {
+        this.viewMode = mode
+        this.renderModulesGrid()
+        log('🔄 Mode d\'affichage changé:', mode)
+    }
+
     setupEventListeners() {
         // Navigation strings
         document.getElementById('stringNavigation').addEventListener('click', (e) => {
@@ -164,7 +284,7 @@ class DiagPVAudit {
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('module-btn')) {
                 const moduleId = e.target.getAttribute('data-module-id')
-                console.log('🎯 Module cliqué:', moduleId, 'Mode:', this.multiSelectMode ? 'Sélection' : 'Normal')
+                log('🎯 Module cliqué:', moduleId, 'Mode:', this.multiSelectMode ? 'Sélection' : 'Normal')
                 
                 if (moduleId) {
                     if (this.multiSelectMode) {
@@ -173,7 +293,7 @@ class DiagPVAudit {
                         this.openModuleModal(moduleId)
                     }
                 } else {
-                    console.error('❌ Pas de module-id trouvé sur:', e.target)
+                    error('❌ Pas de module-id trouvé sur:', e.target)
                 }
             }
         })
@@ -198,16 +318,16 @@ class DiagPVAudit {
     }
 
     openModuleModal(moduleId) {
-        console.log('📝 Ouverture modal pour module:', moduleId)
+        log('📝 Ouverture modal pour module:', moduleId)
         
         if (!moduleId) {
-            console.error('❌ Module ID manquant')
+            error('❌ Module ID manquant')
             return
         }
         
         const module = this.modules.get(moduleId)
         if (!module) {
-            console.error('❌ Module non trouvé:', moduleId, 'Modules disponibles:', Array.from(this.modules.keys()).slice(0, 5))
+            error('❌ Module non trouvé:', moduleId, 'Modules disponibles:', Array.from(this.modules.keys()).slice(0, 5))
             return
         }
 
@@ -309,8 +429,8 @@ class DiagPVAudit {
     }
 
     async validateModuleStatus() {
-        console.log('🔍 Validation module - selectedModule:', this.selectedModule)
-        console.log('🔍 Validation module - selectedStatus:', this.selectedStatus)
+        log('🔍 Validation module - selectedModule:', this.selectedModule)
+        log('🔍 Validation module - selectedStatus:', this.selectedStatus)
         
         if (!this.selectedModule || !this.selectedStatus) {
             this.showAlert('Veuillez sélectionner un statut', 'warning')
@@ -318,7 +438,7 @@ class DiagPVAudit {
         }
 
         if (!this.selectedModule.module_id) {
-            console.error('❌ Module ID manquant dans selectedModule:', this.selectedModule)
+            error('❌ Module ID manquant dans selectedModule:', this.selectedModule)
             this.showAlert('Erreur: Module ID manquant', 'error')
             return
         }
@@ -331,7 +451,7 @@ class DiagPVAudit {
             const selectedModule = { ...this.selectedModule } // copie de sécurité
             const selectedStatus = this.selectedStatus
             
-            console.log('📡 Mise à jour module:', moduleId, '→', selectedStatus)
+            log('📡 Mise à jour module:', moduleId, '→', selectedStatus)
             
             // API update
             const updateData = {
@@ -372,10 +492,10 @@ class DiagPVAudit {
             this.closeModal()
             this.showAlert(`Module ${moduleId} mis à jour`, 'success')
 
-            console.log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
+            log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
         } catch (error) {
-            console.error('Erreur validation module:', error)
+            error('Erreur validation module:', error)
             
             // Mode offline - queue pour sync ultérieure
             if (!navigator.onLine) {
@@ -388,22 +508,22 @@ class DiagPVAudit {
     }
 
     updateModuleButton(moduleId) {
-        console.log('🔄 Mise à jour bouton module:', moduleId)
+        log('🔄 Mise à jour bouton module:', moduleId)
         
         if (!moduleId) {
-            console.error('❌ Module ID manquant pour mise à jour bouton')
+            error('❌ Module ID manquant pour mise à jour bouton')
             return
         }
         
         const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
         if (!btn) {
-            console.error('❌ Bouton module non trouvé:', moduleId)
+            error('❌ Bouton module non trouvé:', moduleId)
             return
         }
 
         const module = this.modules.get(moduleId)
         if (!module) {
-            console.error('❌ Module non trouvé dans Map:', moduleId)
+            error('❌ Module non trouvé dans Map:', moduleId)
             return
         }
         
@@ -432,7 +552,7 @@ class DiagPVAudit {
 
         // Statistiques détaillées
         const stats = this.calculateStats()
-        console.log('📊 Progression:', stats)
+        log('📊 Progression:', stats)
     }
 
     calculateStats() {
@@ -462,12 +582,12 @@ class DiagPVAudit {
                         this.handleRealtimeUpdate(data)
                     }
                 } catch (error) {
-                    console.error('Erreur parsing SSE:', error)
+                    error('Erreur parsing SSE:', error)
                 }
             }
 
             this.eventSource.onerror = () => {
-                console.log('⚠️ Connexion temps réel interrompue')
+                log('⚠️ Connexion temps réel interrompue')
                 // Reconnexion automatique après 5s
                 setTimeout(() => this.setupRealtimeSync(), 5000)
             }
@@ -527,7 +647,7 @@ class DiagPVAudit {
         const data = localStorage.getItem(`diagpv_audit_${this.auditToken}`)
         if (data) {
             const parsed = JSON.parse(data)
-            console.log('📱 Données offline chargées:', parsed.lastSync)
+            log('📱 Données offline chargées:', parsed.lastSync)
         }
     }
 
@@ -537,13 +657,13 @@ class DiagPVAudit {
             moduleId: this.selectedModule.module_id,
             timestamp: Date.now()
         })
-        console.log('📤 Queued offline:', this.offlineQueue.length, 'updates')
+        log('📤 Queued offline:', this.offlineQueue.length, 'updates')
     }
 
     async syncOfflineQueue() {
         if (this.offlineQueue.length === 0) return
 
-        console.log('🔄 Sync offline queue:', this.offlineQueue.length, 'items')
+        log('🔄 Sync offline queue:', this.offlineQueue.length, 'items')
         
         for (const update of this.offlineQueue) {
             try {
@@ -553,7 +673,7 @@ class DiagPVAudit {
                     body: JSON.stringify(update)
                 })
             } catch (error) {
-                console.error('Erreur sync offline:', error)
+                error('Erreur sync offline:', error)
                 break
             }
         }
@@ -650,10 +770,10 @@ class DiagPVAudit {
             const reportUrl = `/api/audit/${this.auditToken}/report`
             window.open(reportUrl, '_blank')
             
-            console.log('📄 Rapport généré:', reportUrl)
+            log('📄 Rapport généré:', reportUrl)
             
         } catch (error) {
-            console.error('Erreur génération rapport:', error)
+            error('Erreur génération rapport:', error)
             this.showAlert('Erreur génération rapport', 'error')
         }
     }
@@ -798,10 +918,10 @@ class DiagPVAudit {
             this.closeEditAuditModal()
             this.showAlert('Audit modifié avec succès', 'success')
             
-            console.log('✅ Audit modifié:', formData.project_name)
+            log('✅ Audit modifié:', formData.project_name)
             
         } catch (error) {
-            console.error('Erreur modification audit:', error)
+            error('Erreur modification audit:', error)
             this.showAlert('Erreur lors de la modification', 'error')
         }
     }
@@ -864,7 +984,7 @@ class DiagPVAudit {
 
     toggleMultiSelectMode() {
         this.multiSelectMode = !this.multiSelectMode
-        console.log('🔄 Mode sélection multiple:', this.multiSelectMode ? 'ACTIVÉ' : 'DÉSACTIVÉ')
+        log('🔄 Mode sélection multiple:', this.multiSelectMode ? 'ACTIVÉ' : 'DÉSACTIVÉ')
 
         const toggleBtn = document.getElementById('multiSelectToggleBtn')
         const toolbar = document.getElementById('multiSelectToolbar')
@@ -902,7 +1022,7 @@ class DiagPVAudit {
             btn.classList.remove('multi-select-mode', 'selected-for-bulk')
         })
 
-        console.log('✅ Mode sélection multiple désactivé')
+        log('✅ Mode sélection multiple désactivé')
     }
 
     toggleModuleSelection(moduleId, element) {
@@ -910,12 +1030,12 @@ class DiagPVAudit {
             // Désélectionner
             this.selectedModules.delete(moduleId)
             element.classList.remove('selected-for-bulk')
-            console.log('➖ Module désélectionné:', moduleId)
+            log('➖ Module désélectionné:', moduleId)
         } else {
             // Sélectionner
             this.selectedModules.add(moduleId)
             element.classList.add('selected-for-bulk')
-            console.log('➕ Module sélectionné:', moduleId)
+            log('➕ Module sélectionné:', moduleId)
         }
 
         this.updateSelectionCount()
@@ -936,7 +1056,7 @@ class DiagPVAudit {
 
         this.updateSelectionCount()
         this.showAlert(`${addedCount} modules sélectionnés`, 'success')
-        console.log('✅ Tous les modules visibles sélectionnés:', addedCount)
+        log('✅ Tous les modules visibles sélectionnés:', addedCount)
     }
 
     clearSelection() {
@@ -945,7 +1065,7 @@ class DiagPVAudit {
             btn.classList.remove('selected-for-bulk')
         })
         this.updateSelectionCount()
-        console.log('🗑️ Sélection effacée')
+        log('🗑️ Sélection effacée')
     }
 
     updateSelectionCount() {
@@ -1008,7 +1128,7 @@ class DiagPVAudit {
         const modulesToUpdate = Array.from(this.selectedModules)
 
         try {
-            console.log('🔄 Mise à jour en lot:', {
+            log('🔄 Mise à jour en lot:', {
                 total: modulesToUpdate.length,
                 status: this.bulkActionStatus,
                 comment: comment
@@ -1026,7 +1146,7 @@ class DiagPVAudit {
                 batches.push(modulesToUpdate.slice(i, i + batchSize))
             }
 
-            console.log(`📦 ${batches.length} lot(s) à traiter (${modulesToUpdate.length} modules total)`)
+            log(`📦 ${batches.length} lot(s) à traiter (${modulesToUpdate.length} modules total)`)
 
             // Traitement séquentiel des lots
             let totalUpdated = 0
@@ -1035,7 +1155,7 @@ class DiagPVAudit {
 
             for (let i = 0; i < batches.length; i++) {
                 const batch = batches[i]
-                console.log(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
+                log(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
 
                 try {
                     // Appel API pour ce lot
@@ -1057,7 +1177,7 @@ class DiagPVAudit {
                     }
 
                     const result = await response.json()
-                    console.log(`✅ Lot ${i + 1} traité:`, result)
+                    log(`✅ Lot ${i + 1} traité:`, result)
 
                     // Accumulation des résultats
                     totalUpdated += result.updated || 0
@@ -1097,16 +1217,16 @@ class DiagPVAudit {
                     }
 
                 } catch (error) {
-                    console.error(`❌ Erreur lot ${i + 1}:`, error)
+                    error(`❌ Erreur lot ${i + 1}:`, error)
                     hasErrors = true
                     // On continue avec les autres lots
                 }
             }
 
-            console.log(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
+            log(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
 
             // Re-rendu final de l'interface  
-            console.log('🎨 Re-rendu final interface après multi-sélection')
+            log('🎨 Re-rendu final interface après multi-sélection')
             this.renderModulesGrid()
             this.updateProgress()
             
@@ -1116,7 +1236,7 @@ class DiagPVAudit {
                     const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
                     const module = this.modules.get(moduleId)
                     if (btn && module) {
-                        console.log(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
+                        log(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
                     }
                 })
             }, 100)
@@ -1136,7 +1256,7 @@ class DiagPVAudit {
             }
 
         } catch (error) {
-            console.error('❌ Erreur globale mise à jour en lot:', error)
+            error('❌ Erreur globale mise à jour en lot:', error)
             this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
             
             // Fermeture modal en cas d'erreur critique
@@ -1150,7 +1270,7 @@ class DiagPVAudit {
 
 // Initialisation audit au chargement DOM
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🌙 DiagPV Audit Terrain - Interface Nocturne Initialisée')
+    log('🌙 DiagPV Audit Terrain - Interface Nocturne Initialisée')
     window.diagpvAudit = new DiagPVAudit()
 })
 

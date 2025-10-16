@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intégration DiagPV Audit - Iframe</title>
+    <style>
+        /* Style conteneur iframe responsive */
+        .diagpv-container {
+            width: 100%;
+            height: 100vh;
+            border: none;
+            background: #000;
+        }
+        
+        .diagpv-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        /* Loader pendant chargement */
+        .diagpv-loader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #000;
+            color: #fbbf24;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+        }
+        
+        /* Responsive mobile */
+        @media (max-width: 768px) {
+            .diagpv-container {
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0;">
+    <div class="diagpv-container">
+        <div class="diagpv-loader" id="loader">
+            🌙 Chargement DiagPV Audit EL...
+        </div>
+        <iframe 
+            id="diagpvFrame"
+            class="diagpv-iframe" 
+            src="https://9b8a231d.diagpv-audit.pages.dev"
+            title="DiagPV Audit EL"
+            style="display: none;">
+        </iframe>
+    </div>
+
+    <script>
+        // Gestion du chargement
+        const iframe = document.getElementById('diagpvFrame');
+        const loader = document.getElementById('loader');
+        
+        iframe.onload = function() {
+            loader.style.display = 'none';
+            iframe.style.display = 'block';
+        };
+        
+        // Communication iframe si nécessaire
+        window.addEventListener('message', function(event) {
+            // Validation origine sécurisée
+            if (event.origin !== 'https://9b8a231d.diagpv-audit.pages.dev') {
+                return;
+            }
+            
+            // Traitement messages DiagPV
+            const data = event.data;
+            if (data.type === 'diagpv_audit_created') {
+                console.log('Nouvel audit créé:', data.auditToken);
+                // Intégration avec votre système
+            }
+        });
+    </script>
+</body>
+</html>

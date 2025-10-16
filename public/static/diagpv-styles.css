@@ -450,3 +450,167 @@ body {
     border-width: 4px;
   }
 }
+
+/* ========================================================================== */
+/* STYLES VUE CALEPINAGE PHYSIQUE - REPRÉSENTATION FIDÈLE TOITURE */
+/* ========================================================================== */
+
+/* Boutons basculement vue */
+.view-toggle-container {
+  background: rgba(0, 0, 0, 0.9);
+  padding: 15px;
+  border-radius: 12px;
+  border: 2px solid var(--diagpv-yellow);
+  margin-bottom: 20px;
+}
+
+.view-toggle-btn {
+  background: var(--diagpv-gray);
+  color: var(--diagpv-white);
+  border: 2px solid var(--diagpv-gray);
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 0 5px;
+}
+
+.view-toggle-btn.active {
+  background: var(--diagpv-yellow);
+  color: var(--diagpv-black);
+  border-color: var(--diagpv-yellow);
+}
+
+.view-toggle-btn:hover:not(.active) {
+  background: var(--diagpv-blue);
+  border-color: var(--diagpv-blue);
+}
+
+/* Container vue physique */
+.physical-grid-container {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 25px;
+  border-radius: 15px;
+  border: 2px solid var(--diagpv-blue);
+  margin-bottom: 30px;
+}
+
+.physical-grid-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.physical-grid-header h3 {
+  font-size: 22px;
+  font-weight: black;
+  color: var(--diagpv-blue);
+  margin: 0 0 8px 0;
+}
+
+.physical-grid-header p {
+  font-size: 14px;
+  color: var(--diagpv-gray);
+  margin: 0;
+}
+
+/* Modules physiques avec dimensions optimisées */
+.physical-module {
+  min-width: 46px !important;
+  min-height: 36px !important;
+  font-size: 10px !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+  position: relative;
+}
+
+.physical-module:hover {
+  border-color: var(--diagpv-yellow) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6) !important;
+  z-index: 10;
+}
+
+.physical-module.selected {
+  border: 3px solid var(--diagpv-purple) !important;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+}
+
+/* Cellules vides pour alignement grille */
+.module-empty {
+  background: transparent;
+  border: 1px dashed rgba(107, 114, 128, 0.3);
+  border-radius: 4px;
+  opacity: 0.3;
+}
+
+/* Responsive vue physique */
+@media (max-width: 768px) {
+  .physical-modules-grid {
+    grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)) !important;
+    gap: 3px !important;
+  }
+  
+  .physical-module {
+    min-width: 38px !important;
+    min-height: 30px !important;
+    font-size: 9px !important;
+  }
+  
+  .view-toggle-btn {
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+}
+
+/* Orientation paysage pour vue physique */
+@media (orientation: landscape) and (max-height: 600px) {
+  .physical-grid-container {
+    padding: 15px;
+  }
+  
+  .physical-grid-header {
+    margin-bottom: 15px;
+  }
+  
+  .physical-grid-header h3 {
+    font-size: 18px;
+  }
+}
+
+/* Animations spéciales vue physique */
+@keyframes highlight-physical {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); box-shadow: 0 0 15px var(--diagpv-yellow); }
+}
+
+.physical-module:active {
+  animation: highlight-physical 0.3s ease;
+}
+
+/* Légende calepinage */
+.physical-legend {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  border: 1px solid var(--diagpv-gray);
+}
+
+.physical-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--diagpv-white);
+}
+
+.physical-legend-color {
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--diagpv-white);
+}
