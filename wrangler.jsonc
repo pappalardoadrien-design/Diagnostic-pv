@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "diagnostic-hub",
+  "main": "src/index-fixed.tsx",
+  "compatibility_date": "2024-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "diagnostic-hub-production",
+      "database_id": "72be68d4-c5c5-4854-9ead-3bbcc131d199"
+    }
+  ]
+}
