@@ -1157,6 +1157,9 @@ app.get('/modules/electroluminescence', (c) => {
         <!-- Leaflet GeometryUtil pour calculs de superficie -->
         <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.1/src/leaflet.geometryutil.js"></script>
         
+        <!-- Rectangle orientable personnalisé pour toitures -->
+        <script src="/static/rotatable-rectangle.js"></script>
+        
         <style>
             :root { --el-purple: #8B5CF6; --diag-dark: #1F2937; --diag-green: #22C55E; }
             .bg-el-purple { background-color: var(--el-purple); }
@@ -1425,6 +1428,68 @@ app.get('/modules/electroluminescence', (c) => {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Choix Source Données + Config Strings -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-database text-purple-600 mr-2"></i>Configuration Centrale
+                    </h2>
+                    
+                    <!-- Sélecteur de source -->
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-medium text-gray-700">Source données :</label>
+                        <select id="dataSourceSelector" onchange="switchDataSource()" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="manual">Configuration Manuelle</option>
+                            <option value="audit">Charger depuis Audit EL</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Configuration Manuelle -->
+                <div id="manualConfigSection">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nombre de Strings</label>
+                            <input type="number" id="stringCount" value="4" min="1" max="50" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Modules par String</label>
+                            <input type="number" id="modulesPerString" value="24" min="1" max="100" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Boîtiers de Jonction</label>
+                            <input type="number" id="junctionBoxCount" value="2" min="1" max="20" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Total Modules</label>
+                            <input type="text" id="totalModulesCalc" value="96" readonly class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-bold text-green-600">
+                        </div>
+                    </div>
+                    
+                    <!-- Détails config strings -->
+                    <div id="stringConfigDetails" class="mt-4 p-4 bg-gray-50 rounded-lg text-sm">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                    
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="autoAssignStrings()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-magic mr-1"></i>Attribution Automatique
+                        </button>
+                        <button onclick="toggleStringVisualization()" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-eye mr-1"></i>Visualiser Strings
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Section Audit (affichée si source = audit) -->
+                <div id="auditDataInfo" class="hidden">
+                    <!-- Rempli dynamiquement par displayAuditDataSummary() -->
                 </div>
             </div>
 
@@ -2174,6 +2239,15 @@ app.get('/modules/electroluminescence', (c) => {
                 numberingType: 'alphanumeric',
                 installationMode: 'roof'
             },
+            stringConfig: {
+                stringCount: 4,
+                modulesPerString: 24,
+                junctionBoxCount: 2,
+                stringAssignments: [],
+                junctionBoxPositions: []
+            },
+            auditData: null, // Données chargées depuis module audit EL (optionnel)
+            dataSource: 'manual', // 'manual' ou 'audit'
             mapCenter: [43.296482, 5.369780], // Marseille par défaut
             mapZoom: 18
         };
@@ -2185,6 +2259,15 @@ app.get('/modules/electroluminescence', (c) => {
         function initDesigner() {
             if (document.getElementById('satelliteMap')) {
                 initSatelliteMap();
+            }
+            
+            // Initialiser config strings par défaut (mode manuel)
+            updateStringConfig();
+            
+            // Vérifier si données audit disponibles
+            const auditAvailable = localStorage.getItem('diagpv_audit_session');
+            if (auditAvailable) {
+                console.log('[INFO] Données audit détectées - disponibles en mode Audit');
             }
         }
         
@@ -2448,6 +2531,154 @@ app.get('/modules/electroluminescence', (c) => {
             moduleMarkers.push(marker);
         }
         
+        // NOUVELLES FONCTIONS : Rendu modules comme rectangles PV orientés
+        
+        // Effacer tous les rectangles modules
+        function clearModuleRectangles() {
+            moduleRectangles.forEach(rect => {
+                if (map && rect) {
+                    map.removeLayer(rect);
+                }
+            });
+            moduleRectangles = [];
+        }
+        
+        // Ajouter module comme rectangle PV orienté
+        /**
+         * Ajouter un rectangle module orienté sur la carte
+         * @param {number} lat - Latitude du centre
+         * @param {number} lng - Longitude du centre
+         * @param {number} angle - Angle rotation (0-360°)
+         * @param {number} length - Longueur module en mm
+         * @param {number} width - Largeur module en mm
+         * @param {number} index - Index du module (0-based)
+         * @param {object} moduleData - Données module depuis audit (optionnel)
+         */
+        function addOrientedModuleRectangle(lat, lng, angle, length, width, index, moduleData = null) {
+            // Si données audit disponibles, utiliser le vrai ID
+            let moduleId, stringNumber, positionInString, moduleStatus, moduleDefects;
+            
+            if (moduleData) {
+                // Utiliser données réelles depuis module audit
+                moduleId = moduleData.id;
+                stringNumber = moduleData.stringNumber;
+                positionInString = moduleData.position;
+                moduleStatus = moduleData.status || 'ok';
+                moduleDefects = moduleData.defects || [];
+            } else {
+                // Fallback: générer ID générique
+                moduleId = generateModuleId(index);
+                stringNumber = null;
+                positionInString = null;
+                moduleStatus = 'unknown';
+                moduleDefects = [];
+            }
+            
+            // Calculer 4 coins du rectangle module
+            const lengthM = length / 1000;
+            const widthM = width / 1000;
+            
+            const metersPerDegreeLat = 111320;
+            const metersPerDegreeLng = 111320 * Math.cos(lat * Math.PI / 180);
+            const angleRad = angle * Math.PI / 180;
+            
+            // Coins dans repère local
+            const corners = [
+                { x: -lengthM/2, y: -widthM/2 },  // SW
+                { x:  lengthM/2, y: -widthM/2 },  // SE
+                { x:  lengthM/2, y:  widthM/2 },  // NE
+                { x: -lengthM/2, y:  widthM/2 }   // NW
+            ];
+            
+            // Rotation et conversion lat/lng
+            const rotatedCorners = corners.map(corner => {
+                const xRot = corner.x * Math.cos(angleRad) - corner.y * Math.sin(angleRad);
+                const yRot = corner.x * Math.sin(angleRad) + corner.y * Math.cos(angleRad);
+                
+                return L.latLng(
+                    lat + yRot / metersPerDegreeLat,
+                    lng + xRot / metersPerDegreeLng
+                );
+            });
+            
+            // Couleur selon statut module
+            let borderColor, fillColor;
+            if (moduleStatus === 'defect' || moduleDefects.length > 0) {
+                borderColor = '#ef4444'; // Rouge si défaut
+                fillColor = '#fca5a5';
+            } else if (moduleStatus === 'ok') {
+                borderColor = '#10b981'; // Vert si OK
+                fillColor = '#86efac';
+            } else {
+                borderColor = '#3b82f6'; // Bleu par défaut
+                fillColor = '#60a5fa';
+            }
+            
+            // Créer rectangle comme polygon
+            const moduleRect = L.polygon(rotatedCorners, {
+                color: borderColor,
+                weight: 2,
+                fillColor: fillColor,
+                fillOpacity: 0.4,
+                className: 'module-pv-rectangle'
+            });
+            
+            // Ajouter label au centre
+            const label = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'module-label',
+                    html: '<div style="background: rgba(255,255,255,0.9); padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; color: #1f2937; border: 1px solid ' + borderColor + ';">' + moduleId + '</div>',
+                    iconSize: [40, 15],
+                    iconAnchor: [20, 7]
+                })
+            });
+            
+            // Popup informations
+            let popupContent = '<div class="text-center">' +
+                '<strong>Module ' + moduleId + '</strong><br>' +
+                '<small>Puissance: ' + layoutData.config.modulePower + 'Wc</small><br>' +
+                '<small>Angle: ' + Math.round(angle) + '°</small><br>' +
+                '<small>Dimensions: ' + length + '×' + width + 'mm</small>';
+            
+            if (stringNumber) {
+                popupContent += '<br><small class="text-blue-600"><strong>String ' + stringNumber + '</strong> - Position ' + positionInString + '</small>';
+            }
+            
+            if (moduleDefects.length > 0) {
+                popupContent += '<br><small class="text-red-600"><i class="fas fa-exclamation-triangle"></i> ' + moduleDefects.length + ' défaut(s)</small>';
+            } else if (moduleStatus === 'ok') {
+                popupContent += '<br><small class="text-green-600"><i class="fas fa-check-circle"></i> Conforme</small>';
+            }
+            
+            popupContent += '</div>';
+            
+            moduleRect.bindPopup(popupContent);
+            label.bindPopup(popupContent);
+            
+            // Ajouter à la carte
+            moduleRect.addTo(map);
+            label.addTo(map);
+            
+            // Stocker références
+            moduleRectangles.push(moduleRect);
+            moduleRectangles.push(label);
+            
+            // Stocker dans données layout
+            layoutData.modules.push({
+                id: moduleId,
+                lat: lat,
+                lng: lng,
+                angle: angle,
+                stringNumber: stringNumber,
+                positionInString: positionInString,
+                status: moduleStatus,
+                defects: moduleDefects,
+                timestamp: Date.now()
+            });
+        }
+        
+        // FIN NOUVELLES FONCTIONS
+        
         // Redessiner tous les marqueurs
         function redrawMarkers() {
             // Supprimer tous les marqueurs existants
@@ -2520,6 +2751,262 @@ app.get('/modules/electroluminescence', (c) => {
             alert('✅ Layout sauvegardé dans le système de backup multi-niveaux');
         }
         
+        // ===== FONCTIONS CONFIGURATION STRINGS (MODE MANUEL) =====
+        
+        // Mise à jour configuration strings
+        function updateStringConfig() {
+            const stringCount = parseInt(document.getElementById('stringCount').value) || 0;
+            const modulesPerString = parseInt(document.getElementById('modulesPerString').value) || 0;
+            const junctionBoxCount = parseInt(document.getElementById('junctionBoxCount').value) || 0;
+            
+            layoutData.stringConfig.stringCount = stringCount;
+            layoutData.stringConfig.modulesPerString = modulesPerString;
+            layoutData.stringConfig.junctionBoxCount = junctionBoxCount;
+            
+            const totalModules = stringCount * modulesPerString;
+            document.getElementById('totalModulesCalc').value = totalModules;
+            
+            generateStringConfigDetails();
+        }
+        
+        // Générer détails config strings
+        function generateStringConfigDetails() {
+            const config = layoutData.stringConfig;
+            const totalModules = config.stringCount * config.modulesPerString;
+            const modulesPerBox = Math.ceil(config.stringCount / config.junctionBoxCount);
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">';
+            html += '<div><span class="font-medium">Strings:</span> ' + config.stringCount + '</div>';
+            html += '<div><span class="font-medium">Modules/String:</span> ' + config.modulesPerString + '</div>';
+            html += '<div><span class="font-medium">Total Modules:</span> ' + totalModules + '</div>';
+            html += '<div><span class="font-medium">Boîtiers:</span> ' + config.junctionBoxCount + '</div>';
+            html += '<div><span class="font-medium">Strings/Boîtier:</span> ~' + modulesPerBox + '</div>';
+            html += '<div><span class="font-medium">Puissance:</span> ' + (totalModules * layoutData.config.modulePower / 1000).toFixed(1) + ' kWc</div>';
+            html += '</div>';
+            
+            document.getElementById('stringConfigDetails').innerHTML = html;
+        }
+        
+        // Attribution automatique strings
+        function autoAssignStrings() {
+            const config = layoutData.stringConfig;
+            layoutData.stringConfig.stringAssignments = [];
+            
+            for (let i = 0; i < config.stringCount; i++) {
+                const boxNumber = Math.floor(i / Math.ceil(config.stringCount / config.junctionBoxCount)) + 1;
+                layoutData.stringConfig.stringAssignments.push({
+                    stringNumber: i + 1,
+                    junctionBox: boxNumber
+                });
+            }
+            
+            showNotification('Attribution Réussie', config.stringCount + ' strings attribués à ' + config.junctionBoxCount + ' boîtiers', 'success');
+            generateStringConfigDetails();
+        }
+        
+        // Visualisation strings (couleurs)
+        let stringVisualizationActive = false;
+        function toggleStringVisualization() {
+            stringVisualizationActive = !stringVisualizationActive;
+            
+            if (stringVisualizationActive) {
+                applyStringColors();
+                showNotification('Visualisation Activée', 'Modules colorés par string', 'info');
+            } else {
+                restoreNormalColors();
+                showNotification('Visualisation Désactivée', 'Retour couleurs normales', 'info');
+            }
+        }
+        
+        function applyStringColors() {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+            
+            layoutData.modules.forEach((module, index) => {
+                const stringNumber = Math.floor(index / layoutData.stringConfig.modulesPerString);
+                const color = colors[stringNumber % colors.length];
+                
+                // Appliquer couleur (si rectangles existent)
+                if (moduleRectangles[index * 2]) {
+                    moduleRectangles[index * 2].setStyle({ color: color, fillColor: color });
+                }
+            });
+        }
+        
+        function restoreNormalColors() {
+            layoutData.modules.forEach((module, index) => {
+                if (moduleRectangles[index * 2]) {
+                    const isDefect = module.status === 'defect' || (module.defects && module.defects.length > 0);
+                    const color = isDefect ? '#ef4444' : '#3b82f6';
+                    const fillColor = isDefect ? '#fca5a5' : '#60a5fa';
+                    moduleRectangles[index * 2].setStyle({ color: color, fillColor: fillColor });
+                }
+            });
+        }
+        
+        // FIN FONCTIONS CONFIG STRINGS
+        
+        // ===== FONCTION CHANGEMENT SOURCE DONNÉES =====
+        
+        function switchDataSource() {
+            const source = document.getElementById('dataSourceSelector').value;
+            layoutData.dataSource = source;
+            
+            if (source === 'manual') {
+                // Mode manuel : afficher config strings
+                document.getElementById('manualConfigSection').classList.remove('hidden');
+                document.getElementById('auditDataInfo').classList.add('hidden');
+                updateStringConfig();
+            } else {
+                // Mode audit : charger données audit
+                document.getElementById('manualConfigSection').classList.add('hidden');
+                document.getElementById('auditDataInfo').classList.remove('hidden');
+                layoutData.auditData = loadAuditDataToDesigner();
+                displayAuditDataSummary();
+            }
+        }
+        
+        // FIN FONCTION CHANGEMENT SOURCE
+        
+        // ===== FONCTION CHARGEMENT DONNÉES DEPUIS MODULE AUDIT EL =====
+        
+        /**
+         * Charger les données du module Audit EL depuis LocalStorage
+         * Structure attendue dans diagpv_audit_session:
+         * {
+         *   project: { name, installationDate, address, ... },
+         *   strings: [
+         *     {
+         *       stringNumber: 1,
+         *       name: "STRING 1",
+         *       modulesCount: 24,
+         *       modules: [
+         *         { id: "S1-1", position: 1, status: "ok/defect", defects: [...], ... },
+         *         { id: "S1-2", position: 2, ... }
+         *       ]
+         *     },
+         *     { stringNumber: 2, name: "STRING 2", ... }
+         *   ],
+         *   totalModules: 240,
+         *   ...
+         * }
+         */
+        function loadAuditDataToDesigner() {
+            try {
+                // Récupérer données session audit EL
+                const auditSessionStr = localStorage.getItem('diagpv_audit_session');
+                if (!auditSessionStr) {
+                    console.log('⚠️ Pas de données audit trouvées dans LocalStorage');
+                    console.log('💡 Commencez par créer une session audit dans le module Audit EL');
+                    return null;
+                }
+                
+                const auditSession = JSON.parse(auditSessionStr);
+                console.log('✅ Données audit chargées:', auditSession);
+                
+                // Parser et extraire les données utiles pour le Designer
+                const designerData = {
+                    projectName: auditSession.project?.name || 'Projet sans nom',
+                    strings: [],
+                    totalModules: 0,
+                    totalStrings: 0
+                };
+                
+                // Extraire les strings et modules
+                if (auditSession.strings && Array.isArray(auditSession.strings)) {
+                    designerData.strings = auditSession.strings.map(string => ({
+                        stringNumber: string.stringNumber,
+                        name: string.name || 'STRING ' + string.stringNumber,
+                        modulesCount: string.modulesCount || 0,
+                        modules: (string.modules || []).map(module => ({
+                            id: module.id || 'S' + string.stringNumber + '-' + module.position,
+                            position: module.position,
+                            status: module.status || 'ok',
+                            defects: module.defects || [],
+                            coords: module.coords || null // Coordonnées GPS si déjà enregistrées
+                        }))
+                    }));
+                    
+                    designerData.totalStrings = designerData.strings.length;
+                    designerData.totalModules = designerData.strings.reduce(
+                        (sum, string) => sum + string.modules.length, 0
+                    );
+                }
+                
+                console.log('[DESIGNER] Data: ' + designerData.totalStrings + ' strings, ' + designerData.totalModules + ' modules');
+                
+                return designerData;
+                
+            } catch (error) {
+                console.error('❌ Erreur chargement données audit:', error);
+                console.error('Structure JSON invalide dans diagpv_audit_session');
+                return null;
+            }
+        }
+        
+        // Afficher résumé des données chargées
+        function displayAuditDataSummary() {
+            const auditData = layoutData.auditData;
+            if (!auditData) {
+                document.getElementById('auditDataInfo').innerHTML = 
+                    '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">' +
+                        '<div class="flex items-center gap-2 text-yellow-700">' +
+                            '<i class="fas fa-exclamation-triangle"></i>' +
+                            '<span class="font-medium">Aucune donnée audit trouvée</span>' +
+                        '</div>' +
+                        '<p class="text-sm text-yellow-600 mt-2">' +
+                            'Créez une session audit dans le module Audit EL pour charger les données ici.' +
+                        '</p>' +
+                    '</div>';
+                return;
+            }
+            
+            let stringsList = '';
+            auditData.strings.forEach(s => {
+                stringsList += '<div class="flex justify-between py-1 border-t border-gray-100">' +
+                    '<span class="font-medium">' + s.name + '</span>' +
+                    '<span class="text-gray-600">' + s.modules.length + ' modules</span>' +
+                    '</div>';
+            });
+            
+            document.getElementById('auditDataInfo').innerHTML = 
+                '<div class="bg-green-50 border border-green-200 rounded-lg p-4">' +
+                    '<div class="flex items-center justify-between">' +
+                        '<div class="flex items-center gap-2 text-green-700">' +
+                            '<i class="fas fa-check-circle"></i>' +
+                            '<span class="font-medium">Données audit chargées</span>' +
+                        '</div>' +
+                        '<button onclick="layoutData.auditData = loadAuditDataToDesigner(); displayAuditDataSummary();" ' +
+                                'class="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">' +
+                            '<i class="fas fa-sync-alt"></i> Recharger' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-3 gap-4 mt-3 text-sm">' +
+                        '<div>' +
+                            '<div class="text-gray-500">Projet</div>' +
+                            '<div class="font-medium text-gray-900">' + auditData.projectName + '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<div class="text-gray-500">Strings</div>' +
+                            '<div class="font-medium text-gray-900">' + auditData.totalStrings + '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<div class="text-gray-500">Modules</div>' +
+                            '<div class="font-medium text-gray-900">' + auditData.totalModules + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<details class="mt-3">' +
+                        '<summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-900">' +
+                            'Voir détails des strings' +
+                        '</summary>' +
+                        '<div class="mt-2 space-y-1 text-xs">' +
+                            stringsList +
+                        '</div>' +
+                    '</details>' +
+                '</div>';
+        }
+        
+        // FIN FONCTION CHARGEMENT
+        
         // Export de la carte (capture d'écran)
         function exportLayoutImage() {
             if (!map) return;
@@ -2584,6 +3071,8 @@ app.get('/modules/electroluminescence', (c) => {
         let calibrationPoints = [];
         let currentDrawingMode = null;
         let scaleFactorPixelsToMeters = 1;
+        let currentRotatableRectangle = null; // Rectangle orientable actuel
+        let moduleRectangles = []; // Liste des modules rendus comme rectangles
         
         // Initialisation des outils de dessin
         function initDrawingTools() {
@@ -2653,7 +3142,37 @@ app.get('/modules/electroluminescence', (c) => {
             const type = event.layerType;
             const layer = event.layer;
             
-            // Ajouter métadonnées selon mode actuel
+            // Si rectangle, convertir en rectangle orientable
+            if (type === 'rectangle' && window.RotatableRectangle) {
+                const bounds = layer.getBounds();
+                
+                // Créer rectangle orientable
+                const rotatableRect = new window.RotatableRectangle(map, bounds, 0);
+                currentRotatableRectangle = rotatableRect;
+                
+                // Ajouter métadonnées
+                rotatableRect.layer.options.drawingType = currentDrawingMode || 'zone';
+                rotatableRect.layer.options.createdAt = new Date().toISOString();
+                rotatableRect.layer.options.id = 'draw_' + Date.now();
+                rotatableRect.layer.options.isRotatable = true;
+                rotatableRect.layer.options.rotation = 0;
+                
+                // Ajouter au groupe
+                rotatableRect.addTo(drawnItems, map);
+                
+                // Calculer superficie
+                const area = calculatePolygonArea(rotatableRect.layer);
+                rotatableRect.layer.bindPopup(createDrawingPopup(rotatableRect.layer.options.drawingType, area, rotatableRect.layer.options.id));
+                
+                // Sauvegarder
+                saveDrawingData();
+                updateLayoutStats();
+                
+                showNotification('Rectangle Orientable', 'Utilisez le point central bleu pour faire pivoter le rectangle', 'success');
+                return;
+            }
+            
+            // Traitement standard pour autres types
             layer.options.drawingType = currentDrawingMode || 'zone';
             layer.options.createdAt = new Date().toISOString();
             layer.options.id = 'draw_' + Date.now();
@@ -2755,6 +3274,11 @@ app.get('/modules/electroluminescence', (c) => {
             const layer = findDrawingById(drawingId);
             if (!layer) return;
             
+            // Si rectangle orientable, mettre à jour référence
+            if (layer.options.isRotatable && currentRotatableRectangle) {
+                // currentRotatableRectangle déjà défini lors de la création
+            }
+            
             // Afficher panel informations zone
             const zoneInfo = document.getElementById('zoneInfo');
             const zoneDetails = document.getElementById('zoneDetails');
@@ -2763,12 +3287,13 @@ app.get('/modules/electroluminescence', (c) => {
                 const area = calculatePolygonArea(layer);
                 const estimatedModules = Math.floor(area / ((layoutData.config.moduleLength / 1000) * (layoutData.config.moduleWidth / 1000)));
                 
-                zoneDetails.innerHTML = \`
-                    <div><strong>Zone:</strong> \${drawingId}</div>
-                    <div><strong>Superficie:</strong> \${(area / 10000).toFixed(2)} ha</div>
-                    <div><strong>Modules estimés:</strong> ~\${estimatedModules}</div>
-                    <div><strong>Puissance:</strong> ~\${(estimatedModules * layoutData.config.modulePower / 1000).toFixed(1)} kWc</div>
-                \`;
+                const rotationInfo = layer.options.isRotatable ? '<div><strong>Rotation:</strong> ' + Math.round(layer.options.rotation || 0) + '° (utilisez handle bleu)</div>' : '';
+                
+                zoneDetails.innerHTML = '<div><strong>Zone:</strong> ' + drawingId + '</div>' +
+                    '<div><strong>Superficie:</strong> ' + (area / 10000).toFixed(2) + ' ha</div>' +
+                    '<div><strong>Modules estimés:</strong> ~' + estimatedModules + '</div>' +
+                    '<div><strong>Puissance:</strong> ~' + (estimatedModules * layoutData.config.modulePower / 1000).toFixed(1) + ' kWc</div>' +
+                    rotationInfo;
                 
                 zoneInfo.classList.remove('hidden');
                 
@@ -2783,6 +3308,100 @@ app.get('/modules/electroluminescence', (c) => {
             if (!selectedZone) return;
             
             const layer = selectedZone.layer;
+            
+            // NOUVEAU : Vérifier si zone avec rotation (rectangle orientable)
+            if (layer.options.isRotatable && currentRotatableRectangle) {
+                // Utiliser système de grille orientée
+                const modules = currentRotatableRectangle.getOrientedModuleGrid(
+                    layoutData.config.moduleLength,
+                    layoutData.config.moduleWidth,
+                    layoutData.config.spacing
+                );
+                
+                const totalModules = modules.length;
+                const totalPowerKwc = (totalModules * layoutData.config.modulePower / 1000).toFixed(1);
+                const rotationDeg = Math.round(currentRotatableRectangle.getRotation());
+                const confirmMsg = 'Placer ' + totalModules + ' modules orientés à ' + rotationDeg + '° ?\\n\\nPuissance: ' + totalPowerKwc + ' kWc';
+                
+                if (confirm(confirmMsg)) {
+                    // Effacer anciens rectangles modules ET données modules
+                    clearModuleRectangles();
+                    layoutData.modules = []; // Réinitialiser données modules
+                    
+                    // Créer rectangles PV orientés selon la source de données
+                    let globalModuleIndex = 0;
+                    
+                    if (layoutData.dataSource === 'audit' && layoutData.auditData && layoutData.auditData.strings) {
+                        // Mode AUDIT : utiliser les vrais modules depuis audit EL
+                        console.log('[PLACEMENT] Mode AUDIT - Donnees depuis audit EL');
+                        
+                        layoutData.auditData.strings.forEach(string => {
+                            string.modules.forEach(moduleAudit => {
+                                if (globalModuleIndex < modules.length) {
+                                    const gridPosition = modules[globalModuleIndex];
+                                    addOrientedModuleRectangle(
+                                        gridPosition.lat, 
+                                        gridPosition.lng, 
+                                        gridPosition.angle, 
+                                        gridPosition.length, 
+                                        gridPosition.width, 
+                                        globalModuleIndex,
+                                        {
+                                            id: moduleAudit.id,
+                                            stringNumber: string.stringNumber,
+                                            position: moduleAudit.position,
+                                            status: moduleAudit.status,
+                                            defects: moduleAudit.defects
+                                        }
+                                    );
+                                    globalModuleIndex++;
+                                }
+                            });
+                        });
+                        
+                        console.log('[OK] ' + globalModuleIndex + ' modules places depuis audit');
+                        showNotification('Modules Placés', globalModuleIndex + ' modules placés avec données audit', 'success');
+                        
+                    } else {
+                        // Mode MANUEL : placement avec configuration strings manuelle
+                        console.log('[PLACEMENT] Mode MANUEL - Config strings manuelle');
+                        
+                        modules.forEach((module, index) => {
+                            // Calculer attribution string depuis config manuelle
+                            const modulesPerString = layoutData.stringConfig.modulesPerString;
+                            const stringNumber = Math.floor(index / modulesPerString) + 1;
+                            const positionInString = (index % modulesPerString) + 1;
+                            
+                            addOrientedModuleRectangle(
+                                module.lat, 
+                                module.lng, 
+                                module.angle, 
+                                module.length, 
+                                module.width, 
+                                index,
+                                {
+                                    id: 'S' + stringNumber + '-' + positionInString,
+                                    stringNumber: stringNumber,
+                                    position: positionInString,
+                                    status: 'ok',
+                                    defects: []
+                                }
+                            );
+                        });
+                        
+                        console.log('[OK] ' + modules.length + ' modules places en mode manuel');
+                        showNotification('Modules Placés', totalModules + ' modules placés (config manuelle)', 'success');
+                    }
+                    
+                    closeZoneInfo();
+                    updateStats();
+                    saveLayoutToSystem();
+                    syncWithAuditData();
+                }
+                return;
+            }
+            
+            // ANCIEN SYSTÈME : Rectangle standard non-orienté
             const bounds = layer.getBounds();
             
             // Calculer grille de modules optimale
