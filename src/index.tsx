@@ -1431,6 +1431,73 @@ app.get('/modules/electroluminescence', (c) => {
                 </div>
             </div>
 
+            <!-- Configuration Strings & Boîtiers de Jonction -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-project-diagram text-green-600 mr-2"></i>Configuration Strings & Boîtiers
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nombre de Strings</label>
+                        <input type="number" id="stringCount" value="4" min="1" max="20" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <p class="text-xs text-gray-500 mt-1">Total strings installation</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Modules par String</label>
+                        <input type="number" id="modulesPerString" value="24" min="1" max="50" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <p class="text-xs text-gray-500 mt-1">Configuration standard</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nombre de Boîtiers</label>
+                        <input type="number" id="junctionBoxCount" value="2" min="1" max="10" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <p class="text-xs text-gray-500 mt-1">BJ installation</p>
+                    </div>
+                </div>
+                
+                <!-- Configuration détaillée strings -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-gray-700 text-sm">Attribution Strings</h3>
+                        <button onclick="autoAssignStrings()" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs">
+                            <i class="fas fa-magic mr-1"></i>Auto-Assigner
+                        </button>
+                    </div>
+                    
+                    <div id="stringConfigDetails" class="space-y-2 text-sm">
+                        <!-- Généré dynamiquement -->
+                    </div>
+                </div>
+                
+                <!-- Visualisation strings -->
+                <div class="mt-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-4 text-sm">
+                        <div class="flex items-center space-x-1">
+                            <div class="w-4 h-3 bg-blue-500"></div>
+                            <span>String 1</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-4 h-3 bg-green-500"></div>
+                            <span>String 2</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-4 h-3 bg-yellow-500"></div>
+                            <span>String 3</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-4 h-3 bg-red-500"></div>
+                            <span>String 4+</span>
+                        </div>
+                    </div>
+                    
+                    <button onclick="toggleStringVisualization()" class="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm">
+                        <i class="fas fa-eye mr-1"></i>Visualiser Strings
+                    </button>
+                </div>
+            </div>
+
             <!-- Canvas Designer -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between mb-4">
@@ -2177,6 +2244,13 @@ app.get('/modules/electroluminescence', (c) => {
                 numberingType: 'alphanumeric',
                 installationMode: 'roof'
             },
+            stringConfig: {
+                stringCount: 4,
+                modulesPerString: 24,
+                junctionBoxCount: 2,
+                stringAssignments: [], // Attribution modules aux strings
+                junctionBoxPositions: [] // Positions BJ sur carte
+            },
             mapCenter: [43.296482, 5.369780], // Marseille par défaut
             mapZoom: 18
         };
@@ -2189,6 +2263,9 @@ app.get('/modules/electroluminescence', (c) => {
             if (document.getElementById('satelliteMap')) {
                 initSatelliteMap();
             }
+            
+            // Initialiser affichage config strings
+            generateStringConfigDetails();
         }
         
         // Initialisation carte satellite
@@ -2513,12 +2590,18 @@ app.get('/modules/electroluminescence', (c) => {
                 })
             });
             
-            // Popup informations
+            // Calculer attribution string
+            const modulesPerString = layoutData.stringConfig.modulesPerString;
+            const stringNumber = Math.floor(index / modulesPerString) + 1;
+            const positionInString = (index % modulesPerString) + 1;
+            
+            // Popup informations avec string
             const popupContent = '<div class="text-center">' +
                 '<strong>Module ' + moduleId + '</strong><br>' +
                 '<small>Puissance: ' + layoutData.config.modulePower + 'Wc</small><br>' +
                 '<small>Angle: ' + Math.round(angle) + '°</small><br>' +
-                '<small>Dimensions: ' + length + '×' + width + 'mm</small>' +
+                '<small>Dimensions: ' + length + '×' + width + 'mm</small><br>' +
+                '<small class="text-green-600"><strong>String ' + stringNumber + '</strong> - Position ' + positionInString + '</small>' +
                 '</div>';
             
             moduleRect.bindPopup(popupContent);
@@ -2532,12 +2615,14 @@ app.get('/modules/electroluminescence', (c) => {
             moduleRectangles.push(moduleRect);
             moduleRectangles.push(label);
             
-            // Stocker dans données layout
+            // Stocker dans données layout avec attribution string
             layoutData.modules.push({
                 id: moduleId,
                 lat: lat,
                 lng: lng,
                 angle: angle,
+                stringNumber: stringNumber,
+                positionInString: positionInString,
                 hasDefect: false,
                 timestamp: Date.now()
             });
@@ -2616,6 +2701,167 @@ app.get('/modules/electroluminescence', (c) => {
             saveLayoutToSystem();
             alert('✅ Layout sauvegardé dans le système de backup multi-niveaux');
         }
+        
+        // ===== FONCTIONS CONFIGURATION STRINGS & BOÎTIERS =====
+        
+        // Mise à jour configuration strings
+        function updateStringConfig() {
+            layoutData.stringConfig.stringCount = parseInt(document.getElementById('stringCount').value) || 4;
+            layoutData.stringConfig.modulesPerString = parseInt(document.getElementById('modulesPerString').value) || 24;
+            layoutData.stringConfig.junctionBoxCount = parseInt(document.getElementById('junctionBoxCount').value) || 2;
+            
+            // Générer détails configuration
+            generateStringConfigDetails();
+            
+            // Sauvegarder
+            saveLayoutToSystem();
+            
+            showNotification('Configuration Strings', 'Configuration mise à jour: ' + layoutData.stringConfig.stringCount + ' strings × ' + layoutData.stringConfig.modulesPerString + ' modules', 'success');
+        }
+        
+        // Générer affichage détails configuration strings
+        function generateStringConfigDetails() {
+            const detailsDiv = document.getElementById('stringConfigDetails');
+            if (!detailsDiv) return;
+            
+            const stringCount = layoutData.stringConfig.stringCount;
+            const modulesPerString = layoutData.stringConfig.modulesPerString;
+            const totalModules = layoutData.modules.length;
+            
+            let html = '<div class="space-y-2">';
+            
+            for (let i = 0; i < stringCount; i++) {
+                const stringNum = i + 1;
+                const startModule = i * modulesPerString + 1;
+                const endModule = Math.min((i + 1) * modulesPerString, totalModules);
+                const actualModules = Math.max(0, endModule - startModule + 1);
+                
+                const colorClass = i === 0 ? 'bg-blue-500' : i === 1 ? 'bg-green-500' : i === 2 ? 'bg-yellow-500' : 'bg-red-500';
+                
+                html += '<div class="flex items-center justify-between p-2 border border-gray-200 rounded">';
+                html += '<div class="flex items-center space-x-2">';
+                html += '<div class="w-3 h-3 rounded ' + colorClass + '"></div>';
+                html += '<span class="font-medium">String ' + stringNum + '</span>';
+                html += '</div>';
+                html += '<span class="text-gray-600 text-xs">';
+                
+                if (totalModules > 0) {
+                    html += 'Modules ' + startModule + ' - ' + endModule + ' (' + actualModules + ' modules)';
+                } else {
+                    html += modulesPerString + ' modules prévus';
+                }
+                
+                html += '</span>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            // Résumé
+            html += '<div class="mt-3 p-2 bg-gray-50 rounded text-xs">';
+            html += '<strong>Résumé:</strong> ' + stringCount + ' strings × ' + modulesPerString + ' modules = ' + (stringCount * modulesPerString) + ' modules total';
+            html += '<br><strong>Actuellement placés:</strong> ' + totalModules + ' modules';
+            html += '</div>';
+            
+            detailsDiv.innerHTML = html;
+        }
+        
+        // Auto-attribution modules aux strings
+        function autoAssignStrings() {
+            const modulesPerString = layoutData.stringConfig.modulesPerString;
+            const totalModules = layoutData.modules.length;
+            
+            if (totalModules === 0) {
+                showNotification('Attribution Impossible', 'Aucun module placé sur la carte', 'warning');
+                return;
+            }
+            
+            // Effacer attributions existantes
+            layoutData.stringConfig.stringAssignments = [];
+            
+            // Attribuer chaque module à un string
+            layoutData.modules.forEach((module, index) => {
+                const stringNumber = Math.floor(index / modulesPerString) + 1;
+                const positionInString = (index % modulesPerString) + 1;
+                
+                module.stringNumber = stringNumber;
+                module.positionInString = positionInString;
+                
+                layoutData.stringConfig.stringAssignments.push({
+                    moduleId: module.id,
+                    stringNumber: stringNumber,
+                    position: positionInString
+                });
+            });
+            
+            // Mettre à jour affichage
+            generateStringConfigDetails();
+            saveLayoutToSystem();
+            
+            const stringCount = Math.ceil(totalModules / modulesPerString);
+            showNotification('Attribution Réussie', totalModules + ' modules attribués à ' + stringCount + ' strings', 'success');
+        }
+        
+        // Visualisation strings avec couleurs
+        function toggleStringVisualization() {
+            const visualizationActive = window.stringVisualizationActive || false;
+            
+            if (!visualizationActive) {
+                // Activer visualisation - changer couleurs modules selon string
+                applyStringColors();
+                window.stringVisualizationActive = true;
+                showNotification('Visualisation Strings', 'Couleurs appliquées par string', 'info');
+            } else {
+                // Désactiver visualisation - restaurer couleurs normales
+                restoreNormalColors();
+                window.stringVisualizationActive = false;
+                showNotification('Visualisation Désactivée', 'Couleurs normales restaurées', 'info');
+            }
+        }
+        
+        // Appliquer couleurs par string
+        function applyStringColors() {
+            const stringColors = {
+                1: '#3b82f6',  // Bleu
+                2: '#22c55e',  // Vert
+                3: '#eab308',  // Jaune
+                4: '#ef4444'   // Rouge
+            };
+            
+            // Redessiner tous les rectangles modules avec couleurs string
+            moduleRectangles.forEach((rect, index) => {
+                const moduleIndex = Math.floor(index / 2); // 2 layers par module (rectangle + label)
+                const module = layoutData.modules[moduleIndex];
+                
+                if (module && module.stringNumber) {
+                    const color = stringColors[module.stringNumber] || '#6b7280';
+                    
+                    // Mettre à jour couleur si c'est un rectangle (pas un label)
+                    if (rect instanceof L.Polygon) {
+                        rect.setStyle({
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.5
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Restaurer couleurs normales
+        function restoreNormalColors() {
+            moduleRectangles.forEach(rect => {
+                if (rect instanceof L.Polygon) {
+                    rect.setStyle({
+                        color: '#3b82f6',
+                        fillColor: '#60a5fa',
+                        fillOpacity: 0.4
+                    });
+                }
+            });
+        }
+        
+        // FIN FONCTIONS STRINGS
         
         // Export de la carte (capture d'écran)
         function exportLayoutImage() {
@@ -2945,8 +3191,9 @@ app.get('/modules/electroluminescence', (c) => {
                     
                     closeZoneInfo();
                     updateStats();
+                    generateStringConfigDetails(); // Mettre à jour config strings
                     saveLayoutToSystem();
-                    showNotification('Modules Placés', totalModules + ' modules orientés ajoutés', 'success');
+                    showNotification('Modules Placés', totalModules + ' modules orientés ajoutés avec attribution strings', 'success');
                     syncWithAuditData();
                 }
                 return;
@@ -2990,6 +3237,7 @@ app.get('/modules/electroluminescence', (c) => {
                 }
                 
                 closeZoneInfo();
+                generateStringConfigDetails(); // Mettre à jour config strings
                 showNotification('Modules Placés', totalModules + ' modules ajoutés à la zone', 'success');
                 syncWithAuditData();
             }
