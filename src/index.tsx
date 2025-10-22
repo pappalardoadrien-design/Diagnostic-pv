@@ -1431,9 +1431,66 @@ app.get('/modules/electroluminescence', (c) => {
                 </div>
             </div>
 
-            <!-- Données Audit EL Chargées -->
-            <div id="auditDataInfo" class="mb-6">
-                <!-- Rempli dynamiquement par displayAuditDataSummary() -->
+            <!-- Choix Source Données + Config Strings -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-database text-purple-600 mr-2"></i>Configuration Centrale
+                    </h2>
+                    
+                    <!-- Sélecteur de source -->
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-medium text-gray-700">Source données :</label>
+                        <select id="dataSourceSelector" onchange="switchDataSource()" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="manual">Configuration Manuelle</option>
+                            <option value="audit">Charger depuis Audit EL</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Configuration Manuelle -->
+                <div id="manualConfigSection">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nombre de Strings</label>
+                            <input type="number" id="stringCount" value="4" min="1" max="50" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Modules par String</label>
+                            <input type="number" id="modulesPerString" value="24" min="1" max="100" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Boîtiers de Jonction</label>
+                            <input type="number" id="junctionBoxCount" value="2" min="1" max="20" onchange="updateStringConfig()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Total Modules</label>
+                            <input type="text" id="totalModulesCalc" value="96" readonly class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-bold text-green-600">
+                        </div>
+                    </div>
+                    
+                    <!-- Détails config strings -->
+                    <div id="stringConfigDetails" class="mt-4 p-4 bg-gray-50 rounded-lg text-sm">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                    
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="autoAssignStrings()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-magic mr-1"></i>Attribution Automatique
+                        </button>
+                        <button onclick="toggleStringVisualization()" class="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-eye mr-1"></i>Visualiser Strings
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Section Audit (affichée si source = audit) -->
+                <div id="auditDataInfo" class="hidden">
+                    <!-- Rempli dynamiquement par displayAuditDataSummary() -->
+                </div>
             </div>
 
             <!-- Canvas Designer -->
@@ -2182,7 +2239,15 @@ app.get('/modules/electroluminescence', (c) => {
                 numberingType: 'alphanumeric',
                 installationMode: 'roof'
             },
-            auditData: null, // Données chargées depuis module audit EL
+            stringConfig: {
+                stringCount: 4,
+                modulesPerString: 24,
+                junctionBoxCount: 2,
+                stringAssignments: [],
+                junctionBoxPositions: []
+            },
+            auditData: null, // Données chargées depuis module audit EL (optionnel)
+            dataSource: 'manual', // 'manual' ou 'audit'
             mapCenter: [43.296482, 5.369780], // Marseille par défaut
             mapZoom: 18
         };
@@ -2196,13 +2261,13 @@ app.get('/modules/electroluminescence', (c) => {
                 initSatelliteMap();
             }
             
-            // Charger données depuis module Audit EL
-            layoutData.auditData = loadAuditDataToDesigner();
-            displayAuditDataSummary();
+            // Initialiser config strings par défaut (mode manuel)
+            updateStringConfig();
             
-            // Si données chargées, activer le mode placement
-            if (layoutData.auditData && layoutData.auditData.totalModules > 0) {
-                console.log('[OK] ' + layoutData.auditData.totalModules + ' modules prets pour placement sur carte');
+            // Vérifier si données audit disponibles
+            const auditAvailable = localStorage.getItem('diagpv_audit_session');
+            if (auditAvailable) {
+                console.log('[INFO] Données audit détectées - disponibles en mode Audit');
             }
         }
         
@@ -2686,6 +2751,122 @@ app.get('/modules/electroluminescence', (c) => {
             alert('✅ Layout sauvegardé dans le système de backup multi-niveaux');
         }
         
+        // ===== FONCTIONS CONFIGURATION STRINGS (MODE MANUEL) =====
+        
+        // Mise à jour configuration strings
+        function updateStringConfig() {
+            const stringCount = parseInt(document.getElementById('stringCount').value) || 0;
+            const modulesPerString = parseInt(document.getElementById('modulesPerString').value) || 0;
+            const junctionBoxCount = parseInt(document.getElementById('junctionBoxCount').value) || 0;
+            
+            layoutData.stringConfig.stringCount = stringCount;
+            layoutData.stringConfig.modulesPerString = modulesPerString;
+            layoutData.stringConfig.junctionBoxCount = junctionBoxCount;
+            
+            const totalModules = stringCount * modulesPerString;
+            document.getElementById('totalModulesCalc').value = totalModules;
+            
+            generateStringConfigDetails();
+        }
+        
+        // Générer détails config strings
+        function generateStringConfigDetails() {
+            const config = layoutData.stringConfig;
+            const totalModules = config.stringCount * config.modulesPerString;
+            const modulesPerBox = Math.ceil(config.stringCount / config.junctionBoxCount);
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">';
+            html += '<div><span class="font-medium">Strings:</span> ' + config.stringCount + '</div>';
+            html += '<div><span class="font-medium">Modules/String:</span> ' + config.modulesPerString + '</div>';
+            html += '<div><span class="font-medium">Total Modules:</span> ' + totalModules + '</div>';
+            html += '<div><span class="font-medium">Boîtiers:</span> ' + config.junctionBoxCount + '</div>';
+            html += '<div><span class="font-medium">Strings/Boîtier:</span> ~' + modulesPerBox + '</div>';
+            html += '<div><span class="font-medium">Puissance:</span> ' + (totalModules * layoutData.config.modulePower / 1000).toFixed(1) + ' kWc</div>';
+            html += '</div>';
+            
+            document.getElementById('stringConfigDetails').innerHTML = html;
+        }
+        
+        // Attribution automatique strings
+        function autoAssignStrings() {
+            const config = layoutData.stringConfig;
+            layoutData.stringConfig.stringAssignments = [];
+            
+            for (let i = 0; i < config.stringCount; i++) {
+                const boxNumber = Math.floor(i / Math.ceil(config.stringCount / config.junctionBoxCount)) + 1;
+                layoutData.stringConfig.stringAssignments.push({
+                    stringNumber: i + 1,
+                    junctionBox: boxNumber
+                });
+            }
+            
+            showNotification('Attribution Réussie', config.stringCount + ' strings attribués à ' + config.junctionBoxCount + ' boîtiers', 'success');
+            generateStringConfigDetails();
+        }
+        
+        // Visualisation strings (couleurs)
+        let stringVisualizationActive = false;
+        function toggleStringVisualization() {
+            stringVisualizationActive = !stringVisualizationActive;
+            
+            if (stringVisualizationActive) {
+                applyStringColors();
+                showNotification('Visualisation Activée', 'Modules colorés par string', 'info');
+            } else {
+                restoreNormalColors();
+                showNotification('Visualisation Désactivée', 'Retour couleurs normales', 'info');
+            }
+        }
+        
+        function applyStringColors() {
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+            
+            layoutData.modules.forEach((module, index) => {
+                const stringNumber = Math.floor(index / layoutData.stringConfig.modulesPerString);
+                const color = colors[stringNumber % colors.length];
+                
+                // Appliquer couleur (si rectangles existent)
+                if (moduleRectangles[index * 2]) {
+                    moduleRectangles[index * 2].setStyle({ color: color, fillColor: color });
+                }
+            });
+        }
+        
+        function restoreNormalColors() {
+            layoutData.modules.forEach((module, index) => {
+                if (moduleRectangles[index * 2]) {
+                    const isDefect = module.status === 'defect' || (module.defects && module.defects.length > 0);
+                    const color = isDefect ? '#ef4444' : '#3b82f6';
+                    const fillColor = isDefect ? '#fca5a5' : '#60a5fa';
+                    moduleRectangles[index * 2].setStyle({ color: color, fillColor: fillColor });
+                }
+            });
+        }
+        
+        // FIN FONCTIONS CONFIG STRINGS
+        
+        // ===== FONCTION CHANGEMENT SOURCE DONNÉES =====
+        
+        function switchDataSource() {
+            const source = document.getElementById('dataSourceSelector').value;
+            layoutData.dataSource = source;
+            
+            if (source === 'manual') {
+                // Mode manuel : afficher config strings
+                document.getElementById('manualConfigSection').classList.remove('hidden');
+                document.getElementById('auditDataInfo').classList.add('hidden');
+                updateStringConfig();
+            } else {
+                // Mode audit : charger données audit
+                document.getElementById('manualConfigSection').classList.add('hidden');
+                document.getElementById('auditDataInfo').classList.remove('hidden');
+                layoutData.auditData = loadAuditDataToDesigner();
+                displayAuditDataSummary();
+            }
+        }
+        
+        // FIN FONCTION CHANGEMENT SOURCE
+        
         // ===== FONCTION CHARGEMENT DONNÉES DEPUIS MODULE AUDIT EL =====
         
         /**
@@ -3147,12 +3328,12 @@ app.get('/modules/electroluminescence', (c) => {
                     clearModuleRectangles();
                     layoutData.modules = []; // Réinitialiser données modules
                     
-                    // Créer rectangles PV orientés avec données audit
+                    // Créer rectangles PV orientés selon la source de données
                     let globalModuleIndex = 0;
                     
-                    if (layoutData.auditData && layoutData.auditData.strings) {
-                        // Mode AUDIT : utiliser les vrais modules depuis audit
-                        console.log('📊 Placement avec données audit réelles');
+                    if (layoutData.dataSource === 'audit' && layoutData.auditData && layoutData.auditData.strings) {
+                        // Mode AUDIT : utiliser les vrais modules depuis audit EL
+                        console.log('[PLACEMENT] Mode AUDIT - Donnees depuis audit EL');
                         
                         layoutData.auditData.strings.forEach(string => {
                             string.modules.forEach(moduleAudit => {
@@ -3178,31 +3359,43 @@ app.get('/modules/electroluminescence', (c) => {
                             });
                         });
                         
-                        console.log('[OK] ' + globalModuleIndex + ' modules places depuis donnees audit');
+                        console.log('[OK] ' + globalModuleIndex + ' modules places depuis audit');
+                        showNotification('Modules Placés', globalModuleIndex + ' modules placés avec données audit', 'success');
                         
                     } else {
-                        // Mode SIMPLE : placement sans données audit
-                        console.log('📐 Placement simple (sans données audit)');
+                        // Mode MANUEL : placement avec configuration strings manuelle
+                        console.log('[PLACEMENT] Mode MANUEL - Config strings manuelle');
+                        
                         modules.forEach((module, index) => {
+                            // Calculer attribution string depuis config manuelle
+                            const modulesPerString = layoutData.stringConfig.modulesPerString;
+                            const stringNumber = Math.floor(index / modulesPerString) + 1;
+                            const positionInString = (index % modulesPerString) + 1;
+                            
                             addOrientedModuleRectangle(
                                 module.lat, 
                                 module.lng, 
                                 module.angle, 
                                 module.length, 
                                 module.width, 
-                                index
+                                index,
+                                {
+                                    id: 'S' + stringNumber + '-' + positionInString,
+                                    stringNumber: stringNumber,
+                                    position: positionInString,
+                                    status: 'ok',
+                                    defects: []
+                                }
                             );
                         });
+                        
+                        console.log('[OK] ' + modules.length + ' modules places en mode manuel');
+                        showNotification('Modules Placés', totalModules + ' modules placés (config manuelle)', 'success');
                     }
                     
                     closeZoneInfo();
                     updateStats();
                     saveLayoutToSystem();
-                    
-                    const msg = layoutData.auditData 
-                        ? (globalModuleIndex + ' modules placés avec données audit')
-                        : (totalModules + ' modules placés (mode simple)');
-                    showNotification('Modules Placés', msg, 'success');
                     syncWithAuditData();
                 }
                 return;
