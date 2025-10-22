@@ -6,7 +6,9 @@
     "dev": "vite",
     "dev:sandbox": "wrangler pages dev dist --d1=diagnostic-hub-production --local --ip 0.0.0.0 --port 3001",
     "build": "vite build",
+    "build:audit": "vite build --config vite.config.audit.ts",
     "preview": "wrangler pages dev dist",
+    "preview:audit": "wrangler pages dev dist-audit --ip 0.0.0.0 --port 3002",
     "deploy": "npm run build && wrangler pages deploy dist",
     "deploy:prod": "npm run build && wrangler pages deploy dist --project-name diagnostic-hub",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
@@ -14,7 +16,8 @@
     "db:migrate:prod": "wrangler d1 migrations apply diagnostic-hub-production",
     "db:seed": "wrangler d1 execute diagnostic-hub-production --local --file=./seed.sql",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed",
-    "clean-port": "fuser -k 3001/tcp 2>/dev/null || true"
+    "clean-port": "fuser -k 3001/tcp 2>/dev/null || true",
+    "clean-port:audit": "fuser -k 3002/tcp 2>/dev/null || true"
   },
   "dependencies": {
     "hono": "^4.0.0"
