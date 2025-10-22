@@ -20,7 +20,7 @@ Système unifié développé par **Diagnostic Photovoltaïque** pour audits terr
 
 ## 6 Modules Opérationnels
 
-### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE + 🔄 RECTANGLE ORIENTABLE + 📊 LIAISON AUDIT
+### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE + 🔄 RECTANGLE ORIENTABLE
 - **Route**: `/modules/electroluminescence` (DiagPV Audit intégré dans HUB)
 - **Interface**: Iframe intégré avec dashboard temps réel + synchronisation bidirectionnelle
 - **Normes**: IEC 62446-1, IEC 61215
@@ -30,13 +30,14 @@ Système unifié développé par **Diagnostic Photovoltaïque** pour audits terr
   - **Rendu rectangles PV** : Modules affichés comme vrais panneaux orientés (plus de markers)
   - **Calculs trigonométriques** : Placement modules avec précision GPS
   - **Designer satellite** : Recherche adresse + carte haute résolution Esri
-- **📊 INTÉGRATION AUDIT → DESIGNER (22 Oct 2025)**:
-  - **Chargement automatique** : Designer charge les données du module Audit EL depuis LocalStorage
-  - **Conservation config strings** : Plus besoin de reconfigurer - récupération 10 strings × 24 modules directement
-  - **IDs modules réels** : Modules affichés avec vrais IDs (S1-1, S2-3, etc.) depuis audit
-  - **Statut défauts** : Rectangles colorés (vert=OK, rouge=défaut) selon données audit
-  - **0 duplication** : Interface configuration strings supprimée - source unique de vérité
-  - **Flow**: Audit EL → LocalStorage `diagpv_audit_session` → Designer Layout → Carte satellite
+- **🧪 INTÉGRATION AUDIT → DESIGNER (en développement parallèle)**:
+  - **Fichier séparé** : `src/index-with-audit.tsx` (version prod intacte)
+  - **Mode hybride** : Configuration manuelle OU chargement depuis audit
+  - **IDs modules réels** : Modules avec vrais IDs (S1-1, S2-3, etc.) depuis audit
+  - **Statut défauts** : Rectangles colorés (vert=OK, rouge=défaut)
+  - **Support strings variables** : JALIBAT = 10 strings (S1=26 modules, S2-S10=24)
+  - **Documentation** : Voir [INTEGRATION_AUDIT.md](./INTEGRATION_AUDIT.md) pour tests
+  - **Status** : 🧪 Prêt pour validation - non déployé en production
 - **Fonctionnalités Intégrées**: 
   - Dashboard temps réel (modules/défauts/progression/conformité)
   - Communication cross-origin avec module DiagPV existant
