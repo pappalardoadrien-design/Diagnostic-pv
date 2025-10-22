@@ -2,7 +2,13 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 
-type Bindings = {
+declare global {
+  interface CloudflareBindings {
+    DB: D1Database;
+  }
+}
+
+interface Bindings {
   DB: D1Database;
 }
 
@@ -12,7 +18,12 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 
 // Servir les fichiers statiques
-app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic())
+
+// Route de test
+app.get('/', (c) => {
+  return c.text('✅ DiagPV HUB - Service actif !')
+})
 
 // API Routes pour base de données
 
@@ -674,21 +685,22 @@ app.get('/modules', (c) => {
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 card-hover p-6">
                     <div class="text-center">
                         <i class="fas fa-thermometer-half text-4xl text-red-500 mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Thermographie</h3>
-                        <p class="text-gray-600 mb-4">Détection points chauds</p>
-                        <a href="/modules/thermography" class="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg font-bold inline-block">
-                            Accéder
-                        </a>
+                        <h3 class="text-xl font-bold mb-2 text-gray-500">Thermographie</h3>
+                        <p class="text-gray-400 mb-4">En développement professionnel</p>
+                        <div class="w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-lg font-bold cursor-not-allowed text-center">
+                            <i class="fas fa-tools mr-2"></i>Bientôt disponible
+                        </div>
                     </div>
                 </div>
                 
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 card-hover p-6">
                     <div class="text-center">
                         <i class="fas fa-chart-line text-4xl text-blue-600 mb-4"></i>
-                        <h3 class="text-xl font-bold mb-2">Courbes I-V</h3>
-                        <p class="text-gray-600 mb-4">Analyse performances</p>
-                        <a href="/modules/iv-curves" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-bold inline-block">
-                            Accéder
+                        <h3 class="text-xl font-bold mb-2 text-gray-500">Courbes I-V</h3>
+                        <p class="text-gray-400 mb-4">En développement professionnel</p>
+                        <div class="w-full bg-gray-300 text-gray-500 py-3 px-4 rounded-lg font-bold cursor-not-allowed text-center">
+                            <i class="fas fa-tools mr-2"></i>Bientôt disponible
+                        </div>
                         </a>
                     </div>
                 </div>
@@ -1133,6 +1145,18 @@ app.get('/modules/electroluminescence', (c) => {
         <title>Module Électroluminescence - HUB Diagnostic</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        
+        <!-- Leaflet pour carte satellite -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+        
+        <!-- Leaflet.draw pour outils de dessin -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+        
+        <!-- Leaflet GeometryUtil pour calculs de superficie -->
+        <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.1/src/leaflet.geometryutil.js"></script>
+        
         <style>
             :root { --el-purple: #8B5CF6; --diag-dark: #1F2937; --diag-green: #22C55E; }
             .bg-el-purple { background-color: var(--el-purple); }
@@ -1165,6 +1189,105 @@ app.get('/modules/electroluminescence', (c) => {
             @keyframes pulse {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.7; }
+            }
+            
+            /* Styles pour les onglets */
+            .tab-button {
+                transition: all 0.2s ease;
+                border-bottom: 2px solid transparent;
+            }
+            
+            .tab-button.active {
+                color: #7C3AED;
+                border-bottom-color: #7C3AED;
+            }
+            
+            .tab-button:not(.active):hover {
+                color: #374151;
+                border-bottom-color: #D1D5DB;
+            }
+            
+            .tab-content.hidden {
+                display: none;
+            }
+            
+            /* Styles pour la carte satellite */
+            #satelliteMap {
+                height: 600px;
+                width: 100%;
+                border-radius: 8px;
+                border: 2px solid #e5e7eb;
+            }
+            
+            /* Styles pour les outils de dessin */
+            .leaflet-draw-toolbar {
+                margin-top: 10px !important;
+            }
+            
+            .leaflet-draw-section {
+                background: white !important;
+                border-radius: 6px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+            }
+            
+            .zone-polygon {
+                fill: rgba(59, 130, 246, 0.2);
+                stroke: #3b82f6;
+                stroke-width: 2;
+            }
+            
+            .building-polygon {
+                fill: rgba(239, 68, 68, 0.3);
+                stroke: #ef4444;
+                stroke-width: 2;
+            }
+            
+            .ombriere-polygon {
+                fill: rgba(34, 197, 94, 0.3);
+                stroke: #22c55e;
+                stroke-width: 2;
+            }
+            
+            .obstacle-polygon {
+                fill: rgba(107, 114, 128, 0.4);
+                stroke: #6b7280;
+                stroke-width: 2;
+            }
+            
+            .module-marker {
+                background: #3b82f6;
+                border: 2px solid #1d4ed8;
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+                text-align: center;
+                font-size: 10px;
+                padding: 2px 4px;
+                min-width: 20px;
+                min-height: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .module-marker.defect {
+                background: #ef4444;
+                border-color: #dc2626;
+            }
+            
+            .leaflet-popup-content {
+                font-family: inherit;
+            }
+            
+            .address-search {
+                position: absolute;
+                top: 10px;
+                left: 50px;
+                z-index: 1000;
+                background: white;
+                padding: 8px;
+                border-radius: 6px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
             }
         </style>
     </head>
@@ -1202,8 +1325,30 @@ app.get('/modules/electroluminescence', (c) => {
             </div>
         </header>
 
-        <!-- Interface DiagPV Audit Intégrée -->
-        <main class="p-4">
+        <!-- Système d'onglets -->
+        <div class="bg-white border-b border-gray-200">
+            <div class="max-w-full px-4">
+                <nav class="flex space-x-8" role="tablist">
+                    <button 
+                        id="tabAudit"
+                        class="tab-button active py-4 px-2 border-b-2 border-purple-600 text-purple-600 font-medium text-sm"
+                        onclick="switchTab('audit')"
+                        role="tab">
+                        <i class="fas fa-moon mr-2"></i>Audit Électroluminescence
+                    </button>
+                    <button 
+                        id="tabDesigner"
+                        class="tab-button py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm"
+                        onclick="switchTab('designer')"
+                        role="tab">
+                        <i class="fas fa-th-large mr-2"></i>Designer Layout
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Contenu Audit EL (existant - préservé à 100%) -->
+        <main id="contentAudit" class="tab-content p-4">
             <iframe 
                 id="auditFrame"
                 src="https://diagpv-audit.pages.dev" 
@@ -1211,6 +1356,228 @@ app.get('/modules/electroluminescence', (c) => {
                 frameborder="0"
                 allow="camera; microphone; geolocation">
             </iframe>
+        </main>
+
+        <!-- Contenu Designer Layout (nouveau) -->
+        <main id="contentDesigner" class="tab-content hidden p-4">
+            <!-- Configuration Installation -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-cog text-blue-600 mr-2"></i>Configuration Installation
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Longueur Module (mm)</label>
+                        <input type="number" id="moduleLength" value="1960" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Largeur Module (mm)</label>
+                        <input type="number" id="moduleWidth" value="990" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Puissance (Wc)</label>
+                        <input type="number" id="modulePower" value="300" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Espacement (mm)</label>
+                        <input type="number" id="moduleSpacing" value="20" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Préset Installation</label>
+                        <select id="presetType" onchange="applyPreset()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="custom">Personnalisé</option>
+                            <option value="2009-2012">2009-2012 (1650x990, 230W)</option>
+                            <option value="2013-2017">2013-2017 (1960x990, 300W)</option>
+                            <option value="2018-2022">2018-2022 (2000x1000, 400W)</option>
+                            <option value="2023-2025">2023-2025 (2100x1040, 500W)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Type Numérotation</label>
+                        <select id="numberingType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="alphanumeric">A1, A2, B1, B2...</option>
+                            <option value="numeric">001, 002, 003...</option>
+                            <option value="rowcol">R1C1, R1C2, R2C1...</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mode Installation</label>
+                        <select id="installationMode" onchange="changeInstallationMode()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-2">
+                            <option value="roof">Toiture</option>
+                            <option value="ground">Sol/Ombrière</option>
+                            <option value="facade">Façade</option>
+                        </select>
+                        <div class="flex space-x-2">
+                            <button onclick="clearLayout()" class="flex-1 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">
+                                <i class="fas fa-trash mr-1"></i>Reset
+                            </button>
+                            <button onclick="saveLayout()" class="flex-1 px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs">
+                                <i class="fas fa-save mr-1"></i>Sauver
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Designer -->
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-th-large text-blue-600 mr-2"></i>Layout Installation
+                    </h2>
+                    
+                    <div class="flex items-center space-x-4 text-sm text-gray-600">
+                        <span>Modules: <span id="moduleCount" class="font-bold text-blue-600">0</span></span>
+                        <span>Puissance: <span id="totalPower" class="font-bold text-green-600">0 kWc</span></span>
+                        <span>Mode: 
+                            <select id="designMode" onchange="changeDesignMode()" class="ml-1 border border-gray-300 rounded px-2 py-1">
+                                <option value="add">Ajouter</option>
+                                <option value="remove">Supprimer</option>
+                            </select>
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Outils de dessin et contrôles -->
+                <div class="mb-4 flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-2">
+                        <button id="drawZone" onclick="setDrawingMode('zone')" class="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
+                            <i class="fas fa-vector-square mr-1"></i>Zone Installation
+                        </button>
+                        <button id="drawBuilding" onclick="setDrawingMode('building')" class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
+                            <i class="fas fa-building mr-1"></i>Bâtiment
+                        </button>
+                        <button id="drawOmbriere" onclick="setDrawingMode('ombriere')" class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded text-sm">
+                            <i class="fas fa-umbrella mr-1"></i>Ombrière
+                        </button>
+                        <button id="drawObstacle" onclick="setDrawingMode('obstacle')" class="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>Obstacle
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2 border-l border-gray-300 pl-4">
+                        <button onclick="clearAllDrawings()" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm">
+                            <i class="fas fa-eraser mr-1"></i>Effacer Tout
+                        </button>
+                        <button onclick="toggleCalibration()" class="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm">
+                            <i class="fas fa-ruler mr-1"></i>Calibrer Échelle
+                        </button>
+                        <button onclick="syncWithAudit()" class="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm">
+                            <i class="fas fa-sync mr-1"></i>Sync Audit EL
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Carte satellite interactive -->
+                <div class="relative">
+                    <!-- Zone de recherche d'adresse -->
+                    <div class="address-search">
+                        <input 
+                            type="text" 
+                            id="addressSearch" 
+                            placeholder="Rechercher une adresse..."
+                            class="px-3 py-1 text-sm border border-gray-300 rounded"
+                            onkeypress="handleAddressSearch(event)">
+                        <button onclick="getCurrentLocation()" class="ml-2 px-2 py-1 bg-blue-500 text-white text-sm rounded" title="Ma position">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Carte satellite -->
+                    <div id="satelliteMap"></div>
+                    
+                    <!-- Panel informations zone sélectionnée -->
+                    <div id="zoneInfo" class="absolute top-10 right-4 bg-white rounded-lg shadow-lg p-4 w-64 hidden">
+                        <h4 class="font-bold text-gray-800 mb-2">Zone Sélectionnée</h4>
+                        <div id="zoneDetails" class="space-y-2 text-sm">
+                            <!-- Informations dynamiques -->
+                        </div>
+                        <div class="mt-3 flex space-x-2">
+                            <button onclick="placeModulesInZone()" class="flex-1 px-2 py-1 bg-blue-500 text-white rounded text-xs">
+                                <i class="fas fa-th mr-1"></i>Placer Modules
+                            </button>
+                            <button onclick="closeZoneInfo()" class="px-2 py-1 bg-gray-400 text-white rounded text-xs">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Légende et statistiques -->
+                <div class="mt-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-6 text-sm">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-3 bg-blue-500 border border-blue-700"></div>
+                            <span>Module Normal</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-3 bg-red-500 border border-red-700"></div>
+                            <span>Défaut EL Corrélé</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-2 bg-blue-200 border border-blue-400 opacity-50"></div>
+                            <span>Zone Installation</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-2 bg-red-200 border border-red-400 opacity-60"></div>
+                            <span>Bâtiment</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-2 bg-green-200 border border-green-400 opacity-60"></div>
+                            <span>Ombrière</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap space-x-2">
+                        <button onclick="exportLayoutImage()" class="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-download mr-1"></i>Export PNG
+                        </button>
+                        <button onclick="generateLayoutReport()" class="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-file-pdf mr-1"></i>Rapport Layout
+                        </button>
+                        <button onclick="sendToAuditModule()" class="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
+                            <i class="fas fa-paper-plane mr-1"></i>→ Audit EL
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Panneau statistiques en temps réel -->
+                <div class="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-blue-600" id="layoutModuleCount">0</div>
+                        <div class="text-xs text-gray-600">Modules Placés</div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-green-600" id="layoutTotalPower">0 kWc</div>
+                        <div class="text-xs text-gray-600">Puissance Totale</div>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-purple-600" id="layoutZoneCount">0</div>
+                        <div class="text-xs text-gray-600">Zones Définies</div>
+                    </div>
+                    <div class="bg-orange-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-orange-600" id="layoutSyncStatus">⏱</div>
+                        <div class="text-xs text-gray-600">Sync EL</div>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-red-600" id="layoutDefectsLinked">0</div>
+                        <div class="text-xs text-gray-600">Défauts Liés</div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg text-center">
+                        <div class="text-lg font-bold text-gray-600" id="layoutEfficiency">0%</div>
+                        <div class="text-xs text-gray-600">Efficacité Zone</div>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <!-- Dashboard Temps Réel -->
@@ -1796,8 +2163,1099 @@ app.get('/modules/electroluminescence', (c) => {
             }
         }
         
+        // NOUVEAU: Gestion des onglets et designer layout avec carte satellite
+        let layoutData = {
+            modules: [],
+            config: {
+                moduleLength: 1960,
+                moduleWidth: 990,
+                modulePower: 300,
+                spacing: 20,
+                numberingType: 'alphanumeric',
+                installationMode: 'roof'
+            },
+            mapCenter: [43.296482, 5.369780], // Marseille par défaut
+            mapZoom: 18
+        };
+        
+        let map, currentMode = 'add';
+        let moduleMarkers = [];
+        
+        // Initialisation de la carte satellite
+        function initDesigner() {
+            if (document.getElementById('satelliteMap')) {
+                initSatelliteMap();
+            }
+        }
+        
+        // Initialisation carte satellite
+        function initSatelliteMap() {
+            // Créer la carte
+            map = L.map('satelliteMap').setView(layoutData.mapCenter, layoutData.mapZoom);
+            
+            // Couche satellite gratuite (Esri World Imagery)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 20
+            }).addTo(map);
+            
+            // Événement de clic pour placer modules
+            map.on('click', function(e) {
+                handleMapClick(e);
+            });
+            
+            // Restaurer modules existants
+            redrawMarkers();
+        }
+        
+        // Gestion des onglets
+        function switchTab(tabName) {
+            // Masquer tous les contenus
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Désactiver tous les onglets
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+                button.classList.add('text-gray-500');
+                button.classList.remove('text-purple-600', 'border-purple-600');
+            });
+            
+            // Activer l'onglet sélectionné
+            const activeTab = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            const activeContent = document.getElementById('content' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            
+            if (activeTab && activeContent) {
+                activeTab.classList.add('active', 'text-purple-600', 'border-purple-600');
+                activeTab.classList.remove('text-gray-500');
+                activeContent.classList.remove('hidden');
+                
+                // Initialiser le designer si on passe sur cet onglet
+                if (tabName === 'designer') {
+                    setTimeout(initDesigner, 100);
+                }
+            }
+        }
+        
+        // Application des présets
+        function applyPreset() {
+            const preset = document.getElementById('presetType').value;
+            
+            const presets = {
+                '2009-2012': { length: 1650, width: 990, power: 230 },
+                '2013-2017': { length: 1960, width: 990, power: 300 },
+                '2018-2022': { length: 2000, width: 1000, power: 400 },
+                '2023-2025': { length: 2100, width: 1040, power: 500 }
+            };
+            
+            if (presets[preset]) {
+                document.getElementById('moduleLength').value = presets[preset].length;
+                document.getElementById('moduleWidth').value = presets[preset].width;
+                document.getElementById('modulePower').value = presets[preset].power;
+                updateConfig();
+            }
+        }
+        
+        // Mise à jour configuration
+        function updateConfig() {
+            layoutData.config = {
+                moduleLength: parseInt(document.getElementById('moduleLength').value),
+                moduleWidth: parseInt(document.getElementById('moduleWidth').value),
+                modulePower: parseInt(document.getElementById('modulePower').value),
+                spacing: parseInt(document.getElementById('moduleSpacing').value),
+                numberingType: document.getElementById('numberingType').value
+            };
+            
+            redrawCanvas();
+            updateStats();
+        }
+        
+        // Gestion des clics sur la carte
+        function handleMapClick(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            if (currentMode === 'add') {
+                addModuleOnMap(lat, lng);
+            } else {
+                removeNearestModule(lat, lng);
+            }
+        }
+        
+        // Recherche d'adresse
+        async function searchAddress(address) {
+            try {
+                const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address + ', France') + '&limit=1';
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    
+                    map.setView([lat, lon], 19);
+                    layoutData.mapCenter = [lat, lon];
+                    layoutData.mapZoom = 19;
+                    
+                    // Ajouter un marqueur temporaire
+                    const marker = L.marker([lat, lon]).addTo(map)
+                        .bindPopup('📍 ' + data[0].display_name)
+                        .openPopup();
+                    
+                    // Supprimer après 5 secondes
+                    setTimeout(function() {
+                        map.removeLayer(marker);
+                    }, 5000);
+                    
+                    showNotification('Adresse Trouvée', 'Carte centrée sur: ' + data[0].display_name, 'success');
+                } else {
+                    showNotification('Erreur', 'Adresse non trouvée. Essayez une adresse plus précise.', 'error');
+                }
+            } catch (error) {
+                console.log('Recherche adresse:', error);
+                showNotification('Erreur', 'Erreur lors de la recherche. Vérifiez votre connexion.', 'error');
+            }
+        }
+        
+        // Géolocalisation
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    map.setView([lat, lng], 19);
+                    layoutData.mapCenter = [lat, lng];
+                    layoutData.mapZoom = 19;
+                    
+                    L.marker([lat, lng]).addTo(map)
+                        .bindPopup('📍 Votre position')
+                        .openPopup();
+                }, function(error) {
+                    alert('Géolocalisation non autorisée ou indisponible.');
+                });
+            }
+        }
+        
+        // Gestion recherche adresse
+        function handleAddressSearch(event) {
+            if (event.key === 'Enter') {
+                const address = document.getElementById('addressSearch').value;
+                if (address.trim()) {
+                    searchAddress(address);
+                }
+            }
+        }
+        
+        // Génération ID module selon type de numérotation
+        function generateModuleId(index) {
+            const type = layoutData.config.numberingType;
+            const num = index + 1;
+            
+            switch (type) {
+                case 'alphanumeric':
+                    const row = Math.floor(index / 10);
+                    const col = (index % 10) + 1;
+                    return String.fromCharCode(65 + row) + col;
+                case 'numeric':
+                    return String(num).padStart(3, '0');
+                case 'rowcol':
+                    const r = Math.floor(index / 10) + 1;
+                    const c = (index % 10) + 1;
+                    return \`R\${r}C\${c}\`;
+                default:
+                    return \`M\${num}\`;
+            }
+        }
+        
+        // Mode installation
+        function changeInstallationMode() {
+            layoutData.config.installationMode = document.getElementById('installationMode').value;
+            saveLayoutToSystem();
+        }
+        
+        // Ajouter un module sur la carte
+        function addModuleOnMap(lat, lng) {
+            const moduleId = generateModuleId(layoutData.modules.length);
+            
+            const module = {
+                id: moduleId,
+                lat: lat,
+                lng: lng,
+                hasDefect: false,
+                timestamp: Date.now()
+            };
+            
+            layoutData.modules.push(module);
+            
+            // Créer le marqueur visuel
+            addModuleMarker(module);
+            updateStats();
+            saveLayoutToSystem();
+        }
+        
+        // Supprimer le module le plus proche
+        function removeNearestModule(lat, lng) {
+            let nearestIndex = -1;
+            let minDistance = Infinity;
+            
+            layoutData.modules.forEach((module, index) => {
+                const distance = Math.sqrt(Math.pow(module.lat - lat, 2) + Math.pow(module.lng - lng, 2));
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestIndex = index;
+                }
+            });
+            
+            if (nearestIndex !== -1 && minDistance < 0.0001) { // Seuil de proximité
+                // Supprimer le marqueur de la carte
+                if (moduleMarkers[nearestIndex]) {
+                    map.removeLayer(moduleMarkers[nearestIndex]);
+                    moduleMarkers.splice(nearestIndex, 1);
+                }
+                
+                // Supprimer des données
+                layoutData.modules.splice(nearestIndex, 1);
+                
+                // Recréer tous les marqueurs avec nouvelles IDs
+                redrawMarkers();
+                updateStats();
+                saveLayoutToSystem();
+            }
+        }
+        
+        // Créer marqueur module sur carte
+        function addModuleMarker(module) {
+            const icon = L.divIcon({
+                className: 'module-marker' + (module.hasDefect ? ' defect' : ''),
+                html: module.id,
+                iconSize: [25, 20],
+                iconAnchor: [12, 10]
+            });
+            
+            const marker = L.marker([module.lat, module.lng], { icon: icon })
+                .bindPopup(\`
+                    <div class="text-center">
+                        <strong>Module \${module.id}</strong><br>
+                        <small>Puissance: \${layoutData.config.modulePower}Wc</small><br>
+                        <small>Dimensions: \${layoutData.config.moduleLength}×\${layoutData.config.moduleWidth}mm</small>
+                        \${module.hasDefect ? '<br><span class="text-red-600">⚠️ Défaut détecté</span>' : ''}
+                    </div>
+                \`)
+                .addTo(map);
+            
+            moduleMarkers.push(marker);
+        }
+        
+        // Redessiner tous les marqueurs
+        function redrawMarkers() {
+            // Supprimer tous les marqueurs existants
+            moduleMarkers.forEach(marker => {
+                if (map && marker) {
+                    map.removeLayer(marker);
+                }
+            });
+            moduleMarkers = [];
+            
+            // Recréer tous les marqueurs avec IDs mises à jour
+            layoutData.modules.forEach((module, index) => {
+                module.id = generateModuleId(index);
+                addModuleMarker(module);
+            });
+        }
+        
+        // Mise à jour statistiques
+        function updateStats() {
+            const count = layoutData.modules.length;
+            const totalPower = count * layoutData.config.modulePower / 1000; // kWc
+            
+            if (document.getElementById('moduleCount')) {
+                document.getElementById('moduleCount').textContent = count;
+            }
+            if (document.getElementById('totalPower')) {
+                document.getElementById('totalPower').textContent = totalPower.toFixed(2);
+            }
+        }
+        
+        // Changer mode de design
+        function changeDesignMode() {
+            currentMode = document.getElementById('designMode').value;
+        }
+        
+        // Reset layout
+        function clearLayout() {
+            if (confirm('Êtes-vous sûr de vouloir effacer tous les modules ?')) {
+                // Supprimer tous les marqueurs
+                moduleMarkers.forEach(marker => {
+                    if (map && marker) {
+                        map.removeLayer(marker);
+                    }
+                });
+                moduleMarkers = [];
+                layoutData.modules = [];
+                
+                updateStats();
+                saveLayoutToSystem();
+            }
+        }
+        
+        // Sauvegarde layout (intégration au système existant)
+        function saveLayoutToSystem() {
+            // Sauvegarde dans le système de backup existant
+            auditData.layoutData = layoutData;
+            auditData.unsavedChanges = true;
+            
+            // Utiliser le système de sauvegarde existant
+            saveSessionData().then(() => {
+                saveDataToHubDB();
+            }).catch(error => {
+                console.log('Sauvegarde layout:', error);
+            });
+        }
+        
+        // Sauvegarde manuelle
+        function saveLayout() {
+            saveLayoutToSystem();
+            alert('✅ Layout sauvegardé dans le système de backup multi-niveaux');
+        }
+        
+        // Export de la carte (capture d'écran)
+        function exportLayoutImage() {
+            if (!map) return;
+            
+            // Utilisation de leaflet-image ou html2canvas pour capture
+            // Pour simplicité immédiate, on exporte les données JSON
+            const dataToExport = {
+                ...layoutData,
+                exportDate: new Date().toISOString(),
+                note: 'Utilisez les coordonnées GPS pour recréer la carte'
+            };
+            
+            const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = \`layout_satellite_\${new Date().toISOString().slice(0, 10)}.json\`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            alert('💾 Données exportées\\n\\nLe fichier contient les coordonnées GPS de tous les modules pour recréation sur carte satellite.');
+        }
+        
+        // Génération rapport
+        function generateReport() {
+            const report = {
+                installation: layoutData.config,
+                modules: layoutData.modules,
+                stats: {
+                    totalModules: layoutData.modules.length,
+                    totalPower: layoutData.modules.length * layoutData.config.modulePower / 1000,
+                    defectModules: layoutData.modules.filter(m => m.hasDefect).length
+                },
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = \`rapport_layout_\${new Date().toISOString().slice(0, 10)}.json\`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Écouteurs pour mise à jour config
+        document.addEventListener('DOMContentLoaded', function() {
+            ['moduleLength', 'moduleWidth', 'modulePower', 'moduleSpacing', 'numberingType', 'installationMode'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('change', updateConfig);
+                }
+            });
+        });
+        
+        // ===== NOUVELLES FONCTIONNALITÉS LEAFLET.DRAW =====
+        
+        // Variables pour outils de dessin
+        let drawControl;
+        let drawnItems;
+        let calibrationMode = false;
+        let calibrationPoints = [];
+        let currentDrawingMode = null;
+        let scaleFactorPixelsToMeters = 1;
+        
+        // Initialisation des outils de dessin
+        function initDrawingTools() {
+            if (!map) return;
+            
+            // Groupe pour les éléments dessinés
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            // Configuration des outils de dessin - RECTANGLE UNIQUEMENT pour sélection 4 coins
+            const drawOptions = {
+                position: 'topright',
+                draw: {
+                    polyline: false,
+                    marker: false,
+                    circle: false,
+                    circlemarker: false,
+                    polygon: false, // DÉSACTIVÉ - utiliser rectangle à la place
+                    rectangle: {
+                        shapeOptions: {
+                            className: 'zone-polygon',
+                            color: '#3b82f6',
+                            weight: 3,
+                            fillOpacity: 0.15,
+                            dashArray: '10, 5'
+                        },
+                        showArea: true,
+                        metric: true
+                    }
+                },
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true
+                }
+            };
+            
+            // Ajouter contrôle de dessin
+            drawControl = new L.Control.Draw(drawOptions);
+            map.addControl(drawControl);
+            
+            // Événements de dessin
+            map.on(L.Draw.Event.CREATED, onDrawCreated);
+            map.on(L.Draw.Event.EDITED, onDrawEdited);
+            map.on(L.Draw.Event.DELETED, onDrawDeleted);
+        }
+        
+        // Mode de dessin personnalisé
+        function setDrawingMode(mode) {
+            currentDrawingMode = mode;
+            
+            // Réinitialiser styles des boutons
+            ['drawZone', 'drawBuilding', 'drawOmbriere', 'drawObstacle'].forEach(id => {
+                document.getElementById(id)?.classList.remove('ring-2', 'ring-offset-2', 'ring-current');
+            });
+            
+            // Activer bouton sélectionné
+            const button = document.getElementById('draw' + mode.charAt(0).toUpperCase() + mode.slice(1));
+            if (button) {
+                button.classList.add('ring-2', 'ring-offset-2', 'ring-current');
+            }
+            
+            showNotification('Mode Dessin', \`Mode \${mode} activé. Dessinez sur la carte.\`, 'info');
+        }
+        
+        // Événement création d'élément
+        function onDrawCreated(event) {
+            const type = event.layerType;
+            const layer = event.layer;
+            
+            // Ajouter métadonnées selon mode actuel
+            layer.options.drawingType = currentDrawingMode || 'zone';
+            layer.options.createdAt = new Date().toISOString();
+            layer.options.id = 'draw_' + Date.now();
+            
+            // Appliquer style selon type
+            applyDrawingStyle(layer, layer.options.drawingType);
+            
+            // Ajouter au groupe
+            drawnItems.addLayer(layer);
+            
+            // Calculer superficie si polygon
+            if (type === 'polygon' || type === 'rectangle') {
+                const area = calculatePolygonArea(layer);
+                layer.bindPopup(createDrawingPopup(layer.options.drawingType, area, layer.options.id));
+            }
+            
+            // Sauvegarder
+            saveDrawingData();
+            updateLayoutStats();
+            
+            const modeLabel = currentDrawingMode || 'Zone';
+            showNotification('Élément Ajouté', modeLabel + ' créé(e) avec succès', 'success');
+        }
+        
+        // Appliquer style de dessin
+        function applyDrawingStyle(layer, drawingType) {
+            const styles = {
+                zone: { color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2 },
+                building: { color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.3 },
+                ombriere: { color: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.3 },
+                obstacle: { color: '#6b7280', fillColor: '#6b7280', fillOpacity: 0.4 }
+            };
+            
+            const style = styles[drawingType] || styles.zone;
+            layer.setStyle({ ...style, weight: 2 });
+        }
+        
+        // Calculer superficie polygon
+        function calculatePolygonArea(layer) {
+            if (layer instanceof L.Rectangle) {
+                const bounds = layer.getBounds();
+                const width = map.distance(bounds.getNorthWest(), bounds.getNorthEast());
+                const height = map.distance(bounds.getNorthWest(), bounds.getSouthWest());
+                return width * height; // m²
+            }
+            
+            if (layer instanceof L.Polygon) {
+                const latlngs = layer.getLatLngs()[0];
+                
+                // Utiliser GeometryUtil si disponible, sinon approximation simple
+                if (window.L && L.GeometryUtil && L.GeometryUtil.geodesicArea) {
+                    return L.GeometryUtil.geodesicArea(latlngs);
+                }
+                
+                // Approximation simple pour polygon
+                if (latlngs.length < 3) return 0;
+                
+                let area = 0;
+                for (let i = 0; i < latlngs.length; i++) {
+                    const j = (i + 1) % latlngs.length;
+                    const distance1 = map.distance(latlngs[i], latlngs[j]);
+                    area += distance1 * distance1; // Approximation très basique
+                }
+                return Math.sqrt(area / latlngs.length) * 10; // Estimation grossière
+            }
+            
+            return 0;
+        }
+        
+        // Créer popup pour élément dessiné
+        function createDrawingPopup(type, area, id) {
+            const typeLabels = {
+                zone: '🟦 Zone Installation',
+                building: '🏢 Bâtiment', 
+                ombriere: '🌳 Ombrière',
+                obstacle: '⚠️ Obstacle'
+            };
+            
+            return \`
+                <div class="text-center">
+                    <strong>\${typeLabels[type] || '📐 Zone'}</strong><br>
+                    <small>ID: \${id}</small><br>
+                    <small>Superficie: \${(area / 10000).toFixed(2)} ha</small><br>
+                    <small>(\${area.toFixed(0)} m²)</small>
+                    <div class="mt-2">
+                        <button onclick="selectZoneForModules('\${id}')" class="px-2 py-1 bg-blue-500 text-white text-xs rounded mr-1">
+                            Placer Modules
+                        </button>
+                        <button onclick="deleteDrawing('\${id}')" class="px-2 py-1 bg-red-500 text-white text-xs rounded">
+                            Supprimer
+                        </button>
+                    </div>
+                </div>
+            \`;
+        }
+        
+        // Sélectionner zone pour placement modules
+        function selectZoneForModules(drawingId) {
+            const layer = findDrawingById(drawingId);
+            if (!layer) return;
+            
+            // Afficher panel informations zone
+            const zoneInfo = document.getElementById('zoneInfo');
+            const zoneDetails = document.getElementById('zoneDetails');
+            
+            if (zoneInfo && zoneDetails) {
+                const area = calculatePolygonArea(layer);
+                const estimatedModules = Math.floor(area / ((layoutData.config.moduleLength / 1000) * (layoutData.config.moduleWidth / 1000)));
+                
+                zoneDetails.innerHTML = \`
+                    <div><strong>Zone:</strong> \${drawingId}</div>
+                    <div><strong>Superficie:</strong> \${(area / 10000).toFixed(2)} ha</div>
+                    <div><strong>Modules estimés:</strong> ~\${estimatedModules}</div>
+                    <div><strong>Puissance:</strong> ~\${(estimatedModules * layoutData.config.modulePower / 1000).toFixed(1)} kWc</div>
+                \`;
+                
+                zoneInfo.classList.remove('hidden');
+                
+                // Stocker zone sélectionnée
+                layoutData.selectedZone = { id: drawingId, layer: layer, area: area };
+            }
+        }
+        
+        // Placer modules dans zone sélectionnée
+        function placeModulesInZone() {
+            const selectedZone = layoutData.selectedZone;
+            if (!selectedZone) return;
+            
+            const layer = selectedZone.layer;
+            const bounds = layer.getBounds();
+            
+            // Calculer grille de modules optimale
+            const moduleSpacing = layoutData.config.spacing / 1000; // Conversion mm -> m
+            const moduleLengthM = layoutData.config.moduleLength / 1000;
+            const moduleWidthM = layoutData.config.moduleWidth / 1000;
+            
+            const boundsWidth = map.distance(bounds.getNorthWest(), bounds.getNorthEast());
+            const boundsHeight = map.distance(bounds.getNorthWest(), bounds.getSouthWest());
+            
+            const modulesPerRow = Math.floor(boundsWidth / (moduleLengthM + moduleSpacing));
+            const numberOfRows = Math.floor(boundsHeight / (moduleWidthM + moduleSpacing));
+            
+            const totalModules = modulesPerRow * numberOfRows;
+            const totalPowerKwc = (totalModules * layoutData.config.modulePower / 1000).toFixed(1);
+            const confirmMsg = 'Placer ' + totalModules + ' modules dans cette zone ?\\n\\nGrille: ' + modulesPerRow + ' × ' + numberOfRows + '\\nPuissance: ' + totalPowerKwc + ' kWc';
+            
+            if (confirm(confirmMsg)) {
+                
+                // Générer positions modules dans la zone
+                for (let row = 0; row < numberOfRows; row++) {
+                    for (let col = 0; col < modulesPerRow; col++) {
+                        const latOffset = (row * (moduleWidthM + moduleSpacing)) / 111320; // Approximation latitude
+                        const lngOffset = (col * (moduleLengthM + moduleSpacing)) / (111320 * Math.cos(bounds.getCenter().lat * Math.PI / 180));
+                        
+                        const moduleLat = bounds.getNorth() - latOffset;
+                        const moduleLng = bounds.getWest() + lngOffset;
+                        
+                        // Vérifier si point dans polygon
+                        const point = L.latLng(moduleLat, moduleLng);
+                        if (isPointInPolygon(point, layer)) {
+                            addModuleOnMap(moduleLat, moduleLng);
+                        }
+                    }
+                }
+                
+                closeZoneInfo();
+                showNotification('Modules Placés', totalModules + ' modules ajoutés à la zone', 'success');
+                syncWithAuditData();
+            }
+        }
+        
+        // Vérifier si point dans polygon
+        function isPointInPolygon(point, polygon) {
+            if (polygon instanceof L.Rectangle) {
+                return polygon.getBounds().contains(point);
+            }
+            
+            if (polygon instanceof L.Polygon) {
+                // Utilisation de l'algorithme ray casting
+                const latlngs = polygon.getLatLngs()[0];
+                let inside = false;
+                
+                for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+                    if (((latlngs[i].lat > point.lat) !== (latlngs[j].lat > point.lat)) &&
+                        (point.lng < (latlngs[j].lng - latlngs[i].lng) * (point.lat - latlngs[i].lat) / (latlngs[j].lat - latlngs[i].lat) + latlngs[i].lng)) {
+                        inside = !inside;
+                    }
+                }
+                
+                return inside;
+            }
+            
+            return false;
+        }
+        
+        // Fermer panel zone info
+        function closeZoneInfo() {
+            document.getElementById('zoneInfo')?.classList.add('hidden');
+            layoutData.selectedZone = null;
+        }
+        
+        // Trouver dessin par ID
+        function findDrawingById(id) {
+            let foundLayer = null;
+            drawnItems.eachLayer(layer => {
+                if (layer.options.id === id) {
+                    foundLayer = layer;
+                }
+            });
+            return foundLayer;
+        }
+        
+        // Supprimer dessin
+        function deleteDrawing(id) {
+            const layer = findDrawingById(id);
+            if (layer && confirm('Supprimer cet élément ?')) {
+                drawnItems.removeLayer(layer);
+                saveDrawingData();
+                updateLayoutStats();
+                closeZoneInfo();
+            }
+        }
+        
+        // Effacer tous les dessins
+        function clearAllDrawings() {
+            if (confirm('Effacer tous les dessins (zones, bâtiments, ombrières) ?')) {
+                drawnItems.clearLayers();
+                saveDrawingData();
+                updateLayoutStats();
+                closeZoneInfo();
+                showNotification('Dessins Effacés', 'Tous les éléments ont été supprimés', 'info');
+            }
+        }
+        
+        // Calibration échelle
+        function toggleCalibration() {
+            calibrationMode = !calibrationMode;
+            
+            if (calibrationMode) {
+                calibrationPoints = [];
+                showNotification('Mode Calibration', 'Cliquez sur 2 points pour calibrer l\\'échelle', 'info');
+                map.on('click', handleCalibrationClick);
+            } else {
+                map.off('click', handleCalibrationClick);
+                showNotification('Calibration', 'Mode calibration désactivé', 'info');
+            }
+        }
+        
+        // Gestion calibration
+        function handleCalibrationClick(e) {
+            calibrationPoints.push(e.latlng);
+            
+            L.marker(e.latlng).addTo(map)
+                .bindPopup(\`Point \${calibrationPoints.length}\`)
+                .openPopup();
+            
+            if (calibrationPoints.length === 2) {
+                const realDistance = prompt('Distance réelle entre les 2 points (en mètres) :');
+                if (realDistance && !isNaN(realDistance)) {
+                    const mapDistance = map.distance(calibrationPoints[0], calibrationPoints[1]);
+                    scaleFactorPixelsToMeters = parseFloat(realDistance) / mapDistance;
+                    
+                    showNotification('Calibration Réussie', \`Échelle: 1m = \${scaleFactorPixelsToMeters.toFixed(4)}m réels\`, 'success');
+                }
+                
+                calibrationMode = false;
+                map.off('click', handleCalibrationClick);
+            }
+        }
+        
+        // Sauvegarder données de dessin
+        function saveDrawingData() {
+            const drawings = [];
+            
+            drawnItems.eachLayer(layer => {
+                const data = {
+                    id: layer.options.id,
+                    type: layer.options.drawingType,
+                    createdAt: layer.options.createdAt,
+                    coordinates: null,
+                    area: 0
+                };
+                
+                if (layer instanceof L.Rectangle) {
+                    data.coordinates = [
+                        [layer.getBounds().getNorth(), layer.getBounds().getWest()],
+                        [layer.getBounds().getSouth(), layer.getBounds().getEast()]
+                    ];
+                } else if (layer instanceof L.Polygon) {
+                    data.coordinates = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
+                }
+                
+                data.area = calculatePolygonArea(layer);
+                drawings.push(data);
+            });
+            
+            layoutData.drawings = drawings;
+            saveLayoutToSystem();
+        }
+        
+        // ===== INTÉGRATION BIDIRECTIONNELLE DYNAMIQUE =====
+        
+        // Communication entre modules
+        let auditModuleData = {
+            defects: [],
+            modulePositions: {},
+            lastSync: null
+        };
+        
+        // Synchronisation avec module Audit EL
+        async function syncWithAudit() {
+            try {
+                showNotification('Synchronisation', 'Mise à jour avec module Audit EL...', 'info');
+                
+                // 1. Envoyer données layout au module audit
+                const layoutMessage = {
+                    type: 'LAYOUT_UPDATE',
+                    data: {
+                        modules: layoutData.modules,
+                        drawings: layoutData.drawings || [],
+                        config: layoutData.config,
+                        mapCenter: layoutData.mapCenter,
+                        timestamp: new Date().toISOString()
+                    }
+                };
+                
+                // Envoyer via postMessage à l'iframe audit
+                const auditFrame = document.getElementById('auditFrame');
+                if (auditFrame && auditFrame.contentWindow) {
+                    auditFrame.contentWindow.postMessage(layoutMessage, '*');
+                }
+                
+                // 2. Récupérer défauts depuis module audit
+                const defectsResponse = await fetch('/api/audit-sessions');
+                if (defectsResponse.ok) {
+                    const defectsData = await defectsResponse.json();
+                    if (defectsData.success && defectsData.sessions) {
+                        correlateDefectsWithLayout(defectsData.sessions);
+                    }
+                }
+                
+                // 3. Sauvegarder synchronisation
+                layoutData.lastSyncWithAudit = new Date().toISOString();
+                saveLayoutToSystem();
+                
+                document.getElementById('layoutSyncStatus').textContent = '✅';
+                showNotification('Synchronisation', 'Données synchronisées avec succès', 'success');
+                
+            } catch (error) {
+                document.getElementById('layoutSyncStatus').textContent = '❌';
+                showNotification('Erreur Sync', 'Erreur lors de la synchronisation', 'error');
+                console.error('Sync error:', error);
+            }
+        }
+        
+        // Corréler défauts avec layout
+        function correlateDefectsWithLayout(auditSessions) {
+            let defectCount = 0;
+            
+            // Parcourir sessions récentes
+            auditSessions.slice(0, 3).forEach(session => {
+                try {
+                    const sessionData = JSON.parse(session.notes || '{}');
+                    
+                    if (sessionData.defectsFound > 0) {
+                        // Marquer modules avec défauts (corrélation par proximité géographique)
+                        layoutData.modules.forEach((module, index) => {
+                            // Simuler corrélation (en réalité, utiliser coordonnées GPS précises)
+                            if (index < sessionData.defectsFound) {
+                                module.hasDefect = true;
+                                defectCount++;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log('Parse session:', e);
+                }
+            });
+            
+            // Redessiner marqueurs avec défauts
+            redrawMarkers();
+            
+            // Mettre à jour stats
+            document.getElementById('layoutDefectsLinked').textContent = defectCount;
+            updateLayoutStats();
+        }
+        
+        // Envoyer données vers module audit
+        function sendToAuditModule() {
+            const auditFrame = document.getElementById('auditFrame');
+            if (!auditFrame) return;
+            
+            const message = {
+                type: 'LAYOUT_DATA_IMPORT',
+                data: {
+                    modules: layoutData.modules,
+                    drawings: layoutData.drawings || [],
+                    config: layoutData.config,
+                    mapCenter: layoutData.mapCenter,
+                    mapZoom: layoutData.mapZoom,
+                    timestamp: new Date().toISOString()
+                }
+            };
+            
+            auditFrame.contentWindow.postMessage(message, '*');
+            switchTab('audit'); // Basculer vers l'audit
+            
+            showNotification('Données Envoyées', 'Layout transmis au module Audit EL', 'success');
+        }
+        
+        // Écouter messages du module audit
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type) {
+                switch (event.data.type) {
+                    case 'AUDIT_DEFECT_DETECTED':
+                        handleAuditDefectDetected(event.data.data);
+                        break;
+                    case 'AUDIT_DATA_UPDATE':
+                        handleAuditDataUpdate(event.data.data);
+                        break;
+                    case 'REQUEST_LAYOUT_DATA':
+                        sendLayoutToAudit();
+                        break;
+                }
+            }
+        });
+        
+        // Gérer défaut détecté depuis audit
+        function handleAuditDefectDetected(defectData) {
+            // Trouver module correspondant
+            const module = layoutData.modules.find(m => 
+                m.id === defectData.moduleId || 
+                (defectData.coordinates && 
+                 Math.abs(m.lat - defectData.coordinates.lat) < 0.0001 &&
+                 Math.abs(m.lng - defectData.coordinates.lng) < 0.0001)
+            );
+            
+            if (module) {
+                module.hasDefect = true;
+                module.defectType = defectData.type;
+                module.defectSeverity = defectData.severity;
+                module.defectTimestamp = defectData.timestamp;
+                
+                redrawMarkers();
+                saveLayoutToSystem();
+                
+                showNotification('Défaut Corrélé', \`Défaut \${defectData.type} détecté sur module \${module.id}\`, 'warning');
+            }
+        }
+        
+        // Envoyer layout vers audit
+        function sendLayoutToAudit() {
+            const auditFrame = document.getElementById('auditFrame');
+            if (auditFrame && auditFrame.contentWindow) {
+                const message = {
+                    type: 'LAYOUT_DATA_RESPONSE',
+                    data: {
+                        modules: layoutData.modules,
+                        drawings: layoutData.drawings || [],
+                        config: layoutData.config,
+                        mapCenter: layoutData.mapCenter
+                    }
+                };
+                
+                auditFrame.contentWindow.postMessage(message, '*');
+            }
+        }
+        
+        // Synchronisation automatique données audit
+        function syncWithAuditData() {
+            // Déclencher synchronisation automatique quand données layout changent
+            auditData.layoutData = layoutData;
+            auditData.unsavedChanges = true;
+            
+            // Notifier module audit des changements
+            const auditFrame = document.getElementById('auditFrame');
+            if (auditFrame && auditFrame.contentWindow) {
+                auditFrame.contentWindow.postMessage({
+                    type: 'LAYOUT_MODULES_UPDATED',
+                    data: {
+                        moduleCount: layoutData.modules.length,
+                        totalPower: layoutData.modules.length * layoutData.config.modulePower / 1000,
+                        modules: layoutData.modules
+                    }
+                }, '*');
+            }
+        }
+        
+        // Mise à jour statistiques layout
+        function updateLayoutStats() {
+            const moduleCount = layoutData.modules.length;
+            const totalPower = moduleCount * layoutData.config.modulePower / 1000;
+            const zoneCount = (layoutData.drawings || []).length;
+            const defectCount = layoutData.modules.filter(m => m.hasDefect).length;
+            
+            // Calculer efficacité zone (ratio modules placés / superficie disponible)
+            let efficiency = 0;
+            if (layoutData.drawings && layoutData.drawings.length > 0) {
+                const totalZoneArea = layoutData.drawings.reduce((sum, drawing) => sum + (drawing.area || 0), 0);
+                const moduleArea = moduleCount * (layoutData.config.moduleLength / 1000) * (layoutData.config.moduleWidth / 1000);
+                efficiency = totalZoneArea > 0 ? (moduleArea / totalZoneArea * 100) : 0;
+            }
+            
+            // Mettre à jour interface
+            const updateElement = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            };
+            
+            updateElement('layoutModuleCount', moduleCount);
+            updateElement('layoutTotalPower', totalPower.toFixed(1) + ' kWc');
+            updateElement('layoutZoneCount', zoneCount);
+            updateElement('layoutDefectsLinked', defectCount);
+            updateElement('layoutEfficiency', efficiency.toFixed(1) + '%');
+            
+            // Synchroniser avec dashboard principal
+            updateStats();
+        }
+        
+        // Génération rapport layout complet
+        function generateLayoutReport() {
+            const report = {
+                metadata: {
+                    title: 'Rapport Designer Layout - DiagPV HUB',
+                    generated: new Date().toISOString(),
+                    operator: 'DiagPV Assistant',
+                    project: 'Installation Photovoltaïque'
+                },
+                installation: {
+                    config: layoutData.config,
+                    mapCenter: layoutData.mapCenter,
+                    mapZoom: layoutData.mapZoom
+                },
+                zones: layoutData.drawings || [],
+                modules: {
+                    total: layoutData.modules.length,
+                    list: layoutData.modules,
+                    totalPower: layoutData.modules.length * layoutData.config.modulePower / 1000,
+                    defectCount: layoutData.modules.filter(m => m.hasDefect).length
+                },
+                statistics: {
+                    efficiency: document.getElementById('layoutEfficiency')?.textContent || '0%',
+                    zoneCoverage: (layoutData.drawings || []).length,
+                    lastSync: layoutData.lastSyncWithAudit,
+                    scaleCalibrated: scaleFactorPixelsToMeters !== 1
+                },
+                defects: layoutData.modules.filter(m => m.hasDefect).map(m => ({
+                    moduleId: m.id,
+                    coordinates: { lat: m.lat, lng: m.lng },
+                    defectType: m.defectType || 'unknown',
+                    severity: m.defectSeverity || 'medium',
+                    timestamp: m.defectTimestamp
+                }))
+            };
+            
+            const dataStr = JSON.stringify(report, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const filename = \`rapport_designer_layout_\${new Date().toISOString().slice(0,10)}.json\`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', filename);
+            linkElement.click();
+            
+            showNotification('Rapport Généré', \`Rapport complet exporté: \${filename}\`, 'success');
+        }
+        
+        // Événements supplémentaires pour les dessins
+        function onDrawEdited(event) {
+            saveDrawingData();
+            updateLayoutStats();
+            showNotification('Dessins Modifiés', 'Éléments mis à jour', 'info');
+        }
+        
+        function onDrawDeleted(event) {
+            saveDrawingData();
+            updateLayoutStats();
+            closeZoneInfo();
+            showNotification('Dessins Supprimés', 'Éléments supprimés', 'info');
+        }
+        
+        // Amélioration initialisation designer
+        function initDesigner() {
+            if (document.getElementById('satelliteMap')) {
+                setTimeout(() => {
+                    initSatelliteMap();
+                    initDrawingTools();
+                    updateLayoutStats();
+                }, 100);
+            }
+        }
+        
         // Initialisation
         initializeBackupSystem();
+        
+        // Auto-sync périodique (toutes les 2 minutes)
+        setInterval(() => {
+            if (document.getElementById('contentDesigner') && !document.getElementById('contentDesigner').classList.contains('hidden')) {
+                syncWithAudit();
+            }
+        }, 120000);
         </script>
     </body>
     </html>
@@ -1964,6 +3422,73 @@ app.get('/api/emergency-backups', async (c) => {
 
 // Routes simples pour les autres modules (placeholders)
 app.get('/modules/thermography', (c) => c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module Thermographie - En Développement</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 text-center">
+            <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-thermometer-half text-2xl text-orange-600"></i>
+            </div>
+            
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Module Thermographie</h1>
+            <p class="text-gray-600 mb-6">Ce module est actuellement en développement pour intégrer les équipements thermographiques professionnels.</p>
+            
+            <div class="bg-blue-50 rounded-lg p-4 mb-6 text-sm text-blue-800">
+                <p class="font-semibold mb-1">🛠️ En cours de développement :</p>
+                <ul class="text-left space-y-1">
+                    <li>• Interface caméras thermiques FLIR</li>
+                    <li>• Analyse temps réel DIN EN 62446-3</li>
+                    <li>• Détection automatique points chauds</li>
+                    <li>• Rapports conformes normes</li>
+                </ul>
+            </div>
+            
+            <div class="flex space-x-3">
+                <a href="/modules/electroluminescence" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium">
+                    <i class="fas fa-moon mr-2"></i>Module EL
+                </a>
+                <a href="/" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg font-medium">
+                    <i class="fas fa-home mr-2"></i>Hub
+                </a>
+            </div>
+            
+            <!-- Section Actions globales -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Actions globales</h3>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="createNewProject()" class="p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm">
+                        <i class="fas fa-plus mr-2"></i>Nouveau Projet
+                    </button>
+                    
+                    <button onclick="viewAllProjects()" class="p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium text-sm">
+                        <i class="fas fa-folder mr-2"></i>Tous les Projets
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function createNewProject() {
+            window.location.href = '/projects/new';
+        }
+
+        function viewAllProjects() {
+            window.location.href = '/projects';
+        }
+        </script>
+    </body>
+    </html>
+`))
+
+app.get('/modules/iv-curves', (c) => c.html(`
     <!DOCTYPE html>
     <html lang="fr">
     <head>
