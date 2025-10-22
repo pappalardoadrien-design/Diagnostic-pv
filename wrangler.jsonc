@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "diagnostic-hub",
-  "main": "src/index-fixed.tsx",
+  "main": "src/index.tsx",
   "compatibility_date": "2024-01-01",
   "compatibility_flags": ["nodejs_compat"],
 

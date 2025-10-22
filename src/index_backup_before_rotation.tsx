@@ -1157,9 +1157,6 @@ app.get('/modules/electroluminescence', (c) => {
         <!-- Leaflet GeometryUtil pour calculs de superficie -->
         <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.1/src/leaflet.geometryutil.js"></script>
         
-        <!-- Rectangle orientable personnalisé pour toitures -->
-        <script src="/static/rotatable-rectangle.js"></script>
-        
         <style>
             :root { --el-purple: #8B5CF6; --diag-dark: #1F2937; --diag-green: #22C55E; }
             .bg-el-purple { background-color: var(--el-purple); }
@@ -2451,100 +2448,6 @@ app.get('/modules/electroluminescence', (c) => {
             moduleMarkers.push(marker);
         }
         
-        // NOUVELLES FONCTIONS : Rendu modules comme rectangles PV orientés
-        
-        // Effacer tous les rectangles modules
-        function clearModuleRectangles() {
-            moduleRectangles.forEach(rect => {
-                if (map && rect) {
-                    map.removeLayer(rect);
-                }
-            });
-            moduleRectangles = [];
-        }
-        
-        // Ajouter module comme rectangle PV orienté
-        function addOrientedModuleRectangle(lat, lng, angle, length, width, index) {
-            const moduleId = generateModuleId(index);
-            
-            // Calculer 4 coins du rectangle module
-            const lengthM = length / 1000;
-            const widthM = width / 1000;
-            
-            const metersPerDegreeLat = 111320;
-            const metersPerDegreeLng = 111320 * Math.cos(lat * Math.PI / 180);
-            const angleRad = angle * Math.PI / 180;
-            
-            // Coins dans repère local
-            const corners = [
-                { x: -lengthM/2, y: -widthM/2 },  // SW
-                { x:  lengthM/2, y: -widthM/2 },  // SE
-                { x:  lengthM/2, y:  widthM/2 },  // NE
-                { x: -lengthM/2, y:  widthM/2 }   // NW
-            ];
-            
-            // Rotation et conversion lat/lng
-            const rotatedCorners = corners.map(corner => {
-                const xRot = corner.x * Math.cos(angleRad) - corner.y * Math.sin(angleRad);
-                const yRot = corner.x * Math.sin(angleRad) + corner.y * Math.cos(angleRad);
-                
-                return L.latLng(
-                    lat + yRot / metersPerDegreeLat,
-                    lng + xRot / metersPerDegreeLng
-                );
-            });
-            
-            // Créer rectangle comme polygon
-            const moduleRect = L.polygon(rotatedCorners, {
-                color: '#3b82f6',
-                weight: 2,
-                fillColor: '#60a5fa',
-                fillOpacity: 0.4,
-                className: 'module-pv-rectangle'
-            });
-            
-            // Ajouter label au centre
-            const label = L.marker([lat, lng], {
-                icon: L.divIcon({
-                    className: 'module-label',
-                    html: '<div style="background: rgba(255,255,255,0.9); padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; color: #1f2937; border: 1px solid #3b82f6;">' + moduleId + '</div>',
-                    iconSize: [30, 15],
-                    iconAnchor: [15, 7]
-                })
-            });
-            
-            // Popup informations
-            const popupContent = '<div class="text-center">' +
-                '<strong>Module ' + moduleId + '</strong><br>' +
-                '<small>Puissance: ' + layoutData.config.modulePower + 'Wc</small><br>' +
-                '<small>Angle: ' + Math.round(angle) + '°</small><br>' +
-                '<small>Dimensions: ' + length + '×' + width + 'mm</small>' +
-                '</div>';
-            
-            moduleRect.bindPopup(popupContent);
-            label.bindPopup(popupContent);
-            
-            // Ajouter à la carte
-            moduleRect.addTo(map);
-            label.addTo(map);
-            
-            // Stocker références
-            moduleRectangles.push(moduleRect);
-            moduleRectangles.push(label);
-            
-            // Stocker dans données layout
-            layoutData.modules.push({
-                id: moduleId,
-                lat: lat,
-                lng: lng,
-                angle: angle,
-                hasDefect: false,
-                timestamp: Date.now()
-            });
-        }
-        
-        // FIN NOUVELLES FONCTIONS
-        
         // Redessiner tous les marqueurs
         function redrawMarkers() {
             // Supprimer tous les marqueurs existants
@@ -2681,8 +2584,6 @@ app.get('/modules/electroluminescence', (c) => {
         let calibrationPoints = [];
         let currentDrawingMode = null;
         let scaleFactorPixelsToMeters = 1;
-        let currentRotatableRectangle = null; // Rectangle orientable actuel
-        let moduleRectangles = []; // Liste des modules rendus comme rectangles
         
         // Initialisation des outils de dessin
         function initDrawingTools() {
@@ -2752,37 +2653,7 @@ app.get('/modules/electroluminescence', (c) => {
             const type = event.layerType;
             const layer = event.layer;
             
-            // Si rectangle, convertir en rectangle orientable
-            if (type === 'rectangle' && window.RotatableRectangle) {
-                const bounds = layer.getBounds();
-                
-                // Créer rectangle orientable
-                const rotatableRect = new window.RotatableRectangle(map, bounds, 0);
-                currentRotatableRectangle = rotatableRect;
-                
-                // Ajouter métadonnées
-                rotatableRect.layer.options.drawingType = currentDrawingMode || 'zone';
-                rotatableRect.layer.options.createdAt = new Date().toISOString();
-                rotatableRect.layer.options.id = 'draw_' + Date.now();
-                rotatableRect.layer.options.isRotatable = true;
-                rotatableRect.layer.options.rotation = 0;
-                
-                // Ajouter au groupe
-                rotatableRect.addTo(drawnItems, map);
-                
-                // Calculer superficie
-                const area = calculatePolygonArea(rotatableRect.layer);
-                rotatableRect.layer.bindPopup(createDrawingPopup(rotatableRect.layer.options.drawingType, area, rotatableRect.layer.options.id));
-                
-                // Sauvegarder
-                saveDrawingData();
-                updateLayoutStats();
-                
-                showNotification('Rectangle Orientable', 'Utilisez le point central bleu pour faire pivoter le rectangle', 'success');
-                return;
-            }
-            
-            // Traitement standard pour autres types
+            // Ajouter métadonnées selon mode actuel
             layer.options.drawingType = currentDrawingMode || 'zone';
             layer.options.createdAt = new Date().toISOString();
             layer.options.id = 'draw_' + Date.now();
@@ -2884,11 +2755,6 @@ app.get('/modules/electroluminescence', (c) => {
             const layer = findDrawingById(drawingId);
             if (!layer) return;
             
-            // Si rectangle orientable, mettre à jour référence
-            if (layer.options.isRotatable && currentRotatableRectangle) {
-                // currentRotatableRectangle déjà défini lors de la création
-            }
-            
             // Afficher panel informations zone
             const zoneInfo = document.getElementById('zoneInfo');
             const zoneDetails = document.getElementById('zoneDetails');
@@ -2897,13 +2763,12 @@ app.get('/modules/electroluminescence', (c) => {
                 const area = calculatePolygonArea(layer);
                 const estimatedModules = Math.floor(area / ((layoutData.config.moduleLength / 1000) * (layoutData.config.moduleWidth / 1000)));
                 
-                const rotationInfo = layer.options.isRotatable ? '<div><strong>Rotation:</strong> ' + Math.round(layer.options.rotation || 0) + '° (utilisez handle bleu)</div>' : '';
-                
-                zoneDetails.innerHTML = '<div><strong>Zone:</strong> ' + drawingId + '</div>' +
-                    '<div><strong>Superficie:</strong> ' + (area / 10000).toFixed(2) + ' ha</div>' +
-                    '<div><strong>Modules estimés:</strong> ~' + estimatedModules + '</div>' +
-                    '<div><strong>Puissance:</strong> ~' + (estimatedModules * layoutData.config.modulePower / 1000).toFixed(1) + ' kWc</div>' +
-                    rotationInfo;
+                zoneDetails.innerHTML = \`
+                    <div><strong>Zone:</strong> \${drawingId}</div>
+                    <div><strong>Superficie:</strong> \${(area / 10000).toFixed(2)} ha</div>
+                    <div><strong>Modules estimés:</strong> ~\${estimatedModules}</div>
+                    <div><strong>Puissance:</strong> ~\${(estimatedModules * layoutData.config.modulePower / 1000).toFixed(1)} kWc</div>
+                \`;
                 
                 zoneInfo.classList.remove('hidden');
                 
@@ -2918,41 +2783,6 @@ app.get('/modules/electroluminescence', (c) => {
             if (!selectedZone) return;
             
             const layer = selectedZone.layer;
-            
-            // NOUVEAU : Vérifier si zone avec rotation (rectangle orientable)
-            if (layer.options.isRotatable && currentRotatableRectangle) {
-                // Utiliser système de grille orientée
-                const modules = currentRotatableRectangle.getOrientedModuleGrid(
-                    layoutData.config.moduleLength,
-                    layoutData.config.moduleWidth,
-                    layoutData.config.spacing
-                );
-                
-                const totalModules = modules.length;
-                const totalPowerKwc = (totalModules * layoutData.config.modulePower / 1000).toFixed(1);
-                const rotationDeg = Math.round(currentRotatableRectangle.getRotation());
-                const confirmMsg = 'Placer ' + totalModules + ' modules orientés à ' + rotationDeg + '° ?\\n\\nPuissance: ' + totalPowerKwc + ' kWc';
-                
-                if (confirm(confirmMsg)) {
-                    // Effacer anciens rectangles modules ET données modules
-                    clearModuleRectangles();
-                    layoutData.modules = []; // Réinitialiser données modules
-                    
-                    // Créer rectangles PV orientés
-                    modules.forEach((module, index) => {
-                        addOrientedModuleRectangle(module.lat, module.lng, module.angle, module.length, module.width, index);
-                    });
-                    
-                    closeZoneInfo();
-                    updateStats();
-                    saveLayoutToSystem();
-                    showNotification('Modules Placés', totalModules + ' modules orientés ajoutés', 'success');
-                    syncWithAuditData();
-                }
-                return;
-            }
-            
-            // ANCIEN SYSTÈME : Rectangle standard non-orienté
             const bounds = layer.getBounds();
             
             // Calculer grille de modules optimale

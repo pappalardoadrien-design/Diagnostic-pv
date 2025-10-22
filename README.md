@@ -20,10 +20,16 @@ Système unifié développé par **Diagnostic Photovoltaïque** pour audits terr
 
 ## 6 Modules Opérationnels
 
-### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE
+### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE + 🔄 RECTANGLE ORIENTABLE
 - **Route**: `/modules/electroluminescence` (DiagPV Audit intégré dans HUB)
 - **Interface**: Iframe intégré avec dashboard temps réel + synchronisation bidirectionnelle
 - **Normes**: IEC 62446-1, IEC 61215
+- **🆕 NOUVEAU : Rectangle Orientable SolarEdge-Style**:
+  - **Rotation 0-360°** : Handle central pour orienter rectangle selon angle toiture
+  - **Calepinage orienté** : Grille modules respecte l'angle du rectangle
+  - **Rendu rectangles PV** : Modules affichés comme vrais panneaux orientés (plus de markers)
+  - **Calculs trigonométriques** : Placement modules avec précision GPS
+  - **Designer satellite** : Recherche adresse + carte haute résolution Esri
 - **Fonctionnalités Intégrées**: 
   - Dashboard temps réel (modules/défauts/progression/conformité)
   - Communication cross-origin avec module DiagPV existant
@@ -31,6 +37,7 @@ Système unifié développé par **Diagnostic Photovoltaïque** pour audits terr
   - Notifications push automatiques lors détection défauts
   - Export données JSON compatible autres modules HUB
   - Synchronisation bidirectionnelle données audit ↔ HUB
+  - **📐 Voir détails techniques** : [RECTANGLE_ORIENTABLE.md](./RECTANGLE_ORIENTABLE.md)
 
 ### 2. **Thermographie** ✅ OPÉRATIONNEL
 - **Route**: `/modules/thermography`
@@ -180,17 +187,19 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - **SSL/TLS** : Cloudflare SSL automatique
 
 ## Statut Déploiement
-- **Statut**: ✅ PRODUCTION - Carte Satellite Intégrée au Designer EL
+- **Statut**: ✅ PRODUCTION - Rectangle Orientable Intégré
 - **HUB Principal**: ✅ https://diagnostic-hub.pappalardoadrien.workers.dev
 - **Gestion Projets**: ✅ Création/Consultation projets fonctionnelle
-- **Module EL + Satellite**: ✅ Designer avec vraie carte satellite + système sauvegarde intact
-- **Fonctionnalités Carte**: ✅ Géolocalisation GPS + recherche adresse + positionnement réel
+- **Module EL + Rectangle Orientable**: ✅ Designer satellite + rectangles rotatifs + modules PV orientés
+- **🆕 Rectangle Orientable**: ✅ Rotation 0-360° + handle drag + grille orientée + rendu rectangles PV
+- **Fonctionnalités Carte**: ✅ Géolocalisation GPS + recherche adresse + positionnement réel + imagerie Esri
+- **Conservation Données**: ✅ 100% données audit existantes préservées (JALIBAT Castelmoron)
 - **Modules 2-6**: ⏳ Temporairement désactivés (en développement professionnel)
 - **API Fonctionnelle**: ✅ POST/GET projets + clients automatiques
-- **Dernière MAJ**: 2025-10-17 (Carte satellite Leaflet+OpenStreetMap)
-- **Version**: 2.5.0 (Carte Satellite + Designer + Module EL + Gestion Projets)
-- **Performance**: < 50ms edge latency mondiale, 54.56 kB gzip
-- **Backup System**: ✅ LocalStorage + IndexedDB + Cloudflare D1 + Emergency API + Coordonnées GPS
+- **Dernière MAJ**: 2025-10-22 (Rectangle Orientable + Modules PV Rendus)
+- **Version**: 2.6.0 (Rectangle Orientable + Carte Satellite + Designer + Module EL)
+- **Performance**: < 50ms edge latency mondiale, ~62 kB gzip
+- **Backup System**: ✅ LocalStorage + IndexedDB + Cloudflare D1 + Emergency API + GPS + Rotation
 
 ## Prochaines Actions Recommandées
 
