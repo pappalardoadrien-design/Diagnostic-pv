@@ -156,25 +156,24 @@ app.post('/api/projects/sync', async (c) => {
       clientId = clientResult.id;
     }
 
-    // 2. Vérifier si projet existe déjà (par sessionId ou nom)
+    // 2. Vérifier si projet existe déjà (par nom uniquement - sessionId stocké dans interventions.notes)
     let projectResult = await c.env.DB.prepare(`
-      SELECT id FROM projects WHERE name = ? OR notes LIKE ?
-    `).bind(projectName, `%${auditData.sessionId}%`).first();
+      SELECT id FROM projects WHERE name = ?
+    `).bind(projectName).first();
 
     let projectId;
     if (!projectResult) {
       // Créer nouveau projet
       const newProject = await c.env.DB.prepare(`
         INSERT INTO projects (
-          client_id, name, site_address, installation_power, module_count, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          client_id, name, site_address, installation_power, module_count, created_at
+        ) VALUES (?, ?, ?, ?, ?, datetime('now'))
       `).bind(
         clientId, 
         projectName, 
         installationAddress, 
         installationPower, 
-        moduleCount,
-        JSON.stringify({ sessionId: auditData.sessionId, source: 'Audit EL LocalStorage' })
+        moduleCount
       ).run();
       projectId = newProject.meta.last_row_id;
     } else {
@@ -196,10 +195,11 @@ app.post('/api/projects/sync', async (c) => {
     if (!interventionResult) {
       const newIntervention = await c.env.DB.prepare(`
         INSERT INTO interventions (
-          project_id, intervention_type, scheduled_date, status, completion_date, notes
-        ) VALUES (?, ?, datetime('now'), ?, datetime('now'), ?)
+          project_id, technician_id, intervention_type, scheduled_date, status, completion_date, notes
+        ) VALUES (?, ?, ?, datetime('now'), ?, datetime('now'), ?)
       `).bind(
-        projectId, 
+        projectId,
+        1, // Technician ID 1 (admin par défaut pour syncs automatiques)
         'electroluminescence',
         progress === 100 ? 'completed' : 'in_progress',
         JSON.stringify({
