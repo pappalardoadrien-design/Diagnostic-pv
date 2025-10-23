@@ -264,6 +264,58 @@ app.post('/api/projects/sync', async (c) => {
   }
 });
 
+// Endpoint administratif : Supprimer les projets de test
+// ATTENTION : Supprime en cascade toutes les données liées
+app.delete('/api/projects/cleanup-tests', async (c) => {
+  try {
+    // IDs des projets à supprimer (tous sauf JALIBAT ID=8)
+    const testProjectIds = [1, 2, 3, 4, 5, 6, 7, 9, 10];
+    const testInterventionIds = [1, 2, 3, 5, 6];
+    
+    // Suppression en cascade dans l'ordre inverse des dépendances
+    
+    // 1. Reports
+    await c.env.DB.prepare(`DELETE FROM reports WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 2. Post incident expertise
+    await c.env.DB.prepare(`DELETE FROM post_incident_expertise WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 3. Visual inspections
+    await c.env.DB.prepare(`DELETE FROM visual_inspections WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 4. Isolation tests
+    await c.env.DB.prepare(`DELETE FROM isolation_tests WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 5. IV measurements
+    await c.env.DB.prepare(`DELETE FROM iv_measurements WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 6. Thermal measurements
+    await c.env.DB.prepare(`DELETE FROM thermal_measurements WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 7. EL measurements
+    await c.env.DB.prepare(`DELETE FROM el_measurements WHERE intervention_id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 8. Modules
+    await c.env.DB.prepare(`DELETE FROM modules WHERE project_id IN (${testProjectIds.join(',')})`).run();
+    
+    // 9. Interventions
+    await c.env.DB.prepare(`DELETE FROM interventions WHERE id IN (${testInterventionIds.join(',')})`).run();
+    
+    // 10. Projects
+    const result = await c.env.DB.prepare(`DELETE FROM projects WHERE id IN (${testProjectIds.join(',')})`).run();
+    
+    return c.json({ 
+      success: true, 
+      message: 'Projets de test supprimés avec succès',
+      deletedProjects: testProjectIds.length,
+      deletedInterventions: testInterventionIds.length
+    });
+  } catch (error) {
+    console.error('Erreur nettoyage projets test:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Statistiques dashboard
 app.get('/api/dashboard/stats', async (c) => {
   try {
