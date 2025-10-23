@@ -103,6 +103,153 @@ app.post('/api/projects', async (c) => {
   }
 });
 
+// 🔄 SYNCHRONISATION LocalStorage → D1
+app.post('/api/projects/sync', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { auditData } = body;
+
+    if (!auditData) {
+      return c.json({ success: false, error: 'Données audit manquantes' }, 400);
+    }
+
+    // Extraire informations projet depuis auditData
+    const projectName = auditData.projectName || auditData.sessionId || 'Audit Sans Nom';
+    const moduleCount = auditData.totalModules || 0;
+    const defectsCount = auditData.defectsFound || 0;
+    const progress = auditData.progress || 0;
+    const conformityRate = auditData.conformityRate || 100;
+    const clientName = auditData.clientName || 'Client Inconnu';
+    const clientEmail = auditData.clientEmail || null;
+    const installationAddress = auditData.siteAddress || 'Adresse à définir';
+    const installationPower = auditData.installedPower || (moduleCount * 0.4); // Estimation 400Wc/module
+
+    // 1. Créer ou trouver le client
+    let clientResult = await c.env.DB.prepare(`
+      SELECT id FROM clients WHERE name = ?
+    `).bind(clientName).first();
+
+    let clientId;
+    if (!clientResult) {
+      const newClient = await c.env.DB.prepare(`
+        INSERT INTO clients (name, contact_email) VALUES (?, ?)
+      `).bind(clientName, clientEmail).run();
+      clientId = newClient.meta.last_row_id;
+    } else {
+      clientId = clientResult.id;
+    }
+
+    // 2. Vérifier si projet existe déjà (par sessionId ou nom)
+    let projectResult = await c.env.DB.prepare(`
+      SELECT id FROM projects WHERE name = ? OR notes LIKE ?
+    `).bind(projectName, `%${auditData.sessionId}%`).first();
+
+    let projectId;
+    if (!projectResult) {
+      // Créer nouveau projet
+      const newProject = await c.env.DB.prepare(`
+        INSERT INTO projects (
+          client_id, name, site_address, installation_power, module_count, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `).bind(
+        clientId, 
+        projectName, 
+        installationAddress, 
+        installationPower, 
+        moduleCount,
+        JSON.stringify({ sessionId: auditData.sessionId, source: 'Audit EL LocalStorage' })
+      ).run();
+      projectId = newProject.meta.last_row_id;
+    } else {
+      // Mettre à jour projet existant
+      projectId = projectResult.id;
+      await c.env.DB.prepare(`
+        UPDATE projects 
+        SET module_count = ?, installation_power = ?, site_address = ?
+        WHERE id = ?
+      `).bind(moduleCount, installationPower, installationAddress, projectId).run();
+    }
+
+    // 3. Créer intervention EL si pas déjà existante
+    let interventionResult = await c.env.DB.prepare(`
+      SELECT id FROM interventions WHERE project_id = ? AND intervention_type = 'electroluminescence'
+    `).bind(projectId).first();
+
+    let interventionId;
+    if (!interventionResult) {
+      const newIntervention = await c.env.DB.prepare(`
+        INSERT INTO interventions (
+          project_id, intervention_type, scheduled_date, status, completion_date, notes
+        ) VALUES (?, ?, datetime('now'), ?, datetime('now'), ?)
+      `).bind(
+        projectId, 
+        'electroluminescence',
+        progress === 100 ? 'completed' : 'in_progress',
+        JSON.stringify({
+          totalModules: moduleCount,
+          defectsFound: defectsCount,
+          conformityRate: conformityRate,
+          progress: progress
+        })
+      ).run();
+      interventionId = newIntervention.meta.last_row_id;
+    } else {
+      // Mettre à jour intervention existante
+      interventionId = interventionResult.id;
+      await c.env.DB.prepare(`
+        UPDATE interventions 
+        SET status = ?, notes = ?
+        WHERE id = ?
+      `).bind(
+        progress === 100 ? 'completed' : 'in_progress',
+        JSON.stringify({
+          totalModules: moduleCount,
+          defectsFound: defectsCount,
+          conformityRate: conformityRate,
+          progress: progress
+        }),
+        interventionId
+      ).run();
+    }
+
+    // 4. Créer mesures globales
+    await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO measurements (
+        intervention_id, measurement_type, value_numeric, conformity
+      ) VALUES (?, ?, ?, ?)
+    `).bind(interventionId, 'module_count', moduleCount, 1).run();
+
+    await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO measurements (
+        intervention_id, measurement_type, value_numeric, conformity
+      ) VALUES (?, ?, ?, ?)
+    `).bind(interventionId, 'defect_count', defectsCount, defectsCount === 0 ? 1 : 0).run();
+
+    await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO measurements (
+        intervention_id, measurement_type, value_numeric, conformity
+      ) VALUES (?, ?, ?, ?)
+    `).bind(interventionId, 'conformity_rate', conformityRate, conformityRate >= 95 ? 1 : 0).run();
+
+    return c.json({ 
+      success: true, 
+      message: 'Synchronisation réussie',
+      data: {
+        projectId,
+        projectName,
+        interventionId,
+        moduleCount,
+        defectsCount,
+        conformityRate
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur synchronisation:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Statistiques dashboard
 app.get('/api/dashboard/stats', async (c) => {
   try {
@@ -1611,31 +1758,69 @@ app.get('/modules/electroluminescence', (c) => {
         }
 
         // Actions HUB
-        function saveToHub() {
+        async function saveToHub() {
             updateSaveStatus('saving');
             
-            // Envoyer signal au module audit pour synchronisation complète
-            const auditFrame = document.getElementById('auditFrame');
-            auditFrame.contentWindow.postMessage({
-                type: 'HUB_REQUEST_FULL_SYNC'
-            }, 'https://diagpv-audit.pages.dev');
-            
-            // Forcer sauvegarde complète
-            saveSessionData(true).then(() => {
-                showSyncIndicator();
+            try {
+                // 1. Récupérer données LocalStorage
+                const localData = localStorage.getItem(BACKUP_CONFIG.LOCAL_STORAGE_KEY);
+                if (!localData) {
+                    showNotification(
+                        'Aucune Donnée', 
+                        'Aucun audit en cours. Veuillez démarrer un audit depuis le module Électroluminescence.',
+                        'warning'
+                    );
+                    return;
+                }
+                
+                const auditDataToSync = JSON.parse(localData);
+                
+                // 2. Envoyer signal au module audit pour synchronisation complète
+                const auditFrame = document.getElementById('auditFrame');
+                if (auditFrame) {
+                    auditFrame.contentWindow.postMessage({
+                        type: 'HUB_REQUEST_FULL_SYNC'
+                    }, 'https://diagpv-audit.pages.dev');
+                }
+                
+                // 3. Synchroniser vers D1 Database
+                const response = await fetch('/api/projects/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        auditData: auditDataToSync
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 4. Sauvegarde locale
+                    await saveSessionData(true);
+                    
+                    showSyncIndicator();
+                    showNotification(
+                        '✅ Synchronisation Réussie', 
+                        \`Projet "\${result.data.projectName}" synchronisé avec le HUB. \${result.data.moduleCount} modules, \${result.data.defectsCount} défauts.\`,
+                        'success'
+                    );
+                    
+                    console.log('✅ Synchronisation D1:', result.data);
+                } else {
+                    throw new Error(result.error || 'Erreur synchronisation');
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur synchronisation HUB:', error);
                 showNotification(
-                    'Sauvegarde HUB Réussie', 
-                    'Données DiagPV Audit sécurisées dans le HUB',
-                    'success'
+                    'Erreur Synchronisation', 
+                    \`Impossible de synchroniser avec le HUB: \${error.message}\`,
+                    'error'
                 );
-            }).catch(error => {
-                console.error('Erreur sauvegarde HUB:', error);
-                showNotification(
-                    'Erreur Sauvegarde', 
-                    'Données sauvegardées localement uniquement',
-                    'warning'
-                );
-            });
+                updateSaveStatus('error');
+            }
         }
 
         function exportData() {
