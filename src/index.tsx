@@ -31,6 +31,23 @@ app.get('/api/users', async (c) => {
   }
 });
 
+// Récupérer tous les clients
+app.get('/api/clients', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT c.*, COUNT(DISTINCT p.id) as project_count
+      FROM clients c
+      LEFT JOIN projects p ON c.id = p.client_id
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `).all();
+    
+    return c.json({ success: true, clients: results });
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Récupérer tous les projets
 app.get('/api/projects', async (c) => {
   try {
@@ -212,24 +229,21 @@ app.post('/api/projects/sync', async (c) => {
       ).run();
     }
 
-    // 4. Créer mesures globales
+    // 4. Mettre à jour notes intervention avec stats
     await c.env.DB.prepare(`
-      INSERT OR REPLACE INTO measurements (
-        intervention_id, measurement_type, value_numeric, conformity
-      ) VALUES (?, ?, ?, ?)
-    `).bind(interventionId, 'module_count', moduleCount, 1).run();
-
-    await c.env.DB.prepare(`
-      INSERT OR REPLACE INTO measurements (
-        intervention_id, measurement_type, value_numeric, conformity
-      ) VALUES (?, ?, ?, ?)
-    `).bind(interventionId, 'defect_count', defectsCount, defectsCount === 0 ? 1 : 0).run();
-
-    await c.env.DB.prepare(`
-      INSERT OR REPLACE INTO measurements (
-        intervention_id, measurement_type, value_numeric, conformity
-      ) VALUES (?, ?, ?, ?)
-    `).bind(interventionId, 'conformity_rate', conformityRate, conformityRate >= 95 ? 1 : 0).run();
+      UPDATE interventions 
+      SET notes = ? 
+      WHERE id = ?
+    `).bind(
+      JSON.stringify({
+        sessionId: auditData.sessionId,
+        moduleCount,
+        defectsCount,
+        conformityRate,
+        progress: auditData.progress || 0
+      }),
+      interventionId
+    ).run();
 
     return c.json({ 
       success: true, 
@@ -253,48 +267,41 @@ app.post('/api/projects/sync', async (c) => {
 // Statistiques dashboard
 app.get('/api/dashboard/stats', async (c) => {
   try {
-    // Interventions ce mois
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const { results: monthlyStats } = await c.env.DB.prepare(`
-      SELECT COUNT(*) as count FROM interventions 
-      WHERE strftime('%Y-%m', scheduled_date) = ?
-    `).bind(currentMonth).all();
+    // Projets actifs
+    const { results: projectStats } = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM projects
+    `).all();
     
-    // Modules analysés
+    // Interventions totales
+    const { results: interventionStats } = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM interventions
+    `).all();
+    
+    // Modules totaux (depuis table modules)
     const { results: moduleStats } = await c.env.DB.prepare(`
-      SELECT SUM(value_numeric) as total FROM measurements 
-      WHERE measurement_type = 'module_count'
+      SELECT COUNT(*) as count FROM modules
     `).all();
     
-    // Défauts détectés
+    // Défauts détectés (depuis el_measurements avec defect_type)
     const { results: defectStats } = await c.env.DB.prepare(`
-      SELECT COUNT(*) as total FROM defects
-    `).all();
-    
-    // Taux de conformité
-    const { results: conformityStats } = await c.env.DB.prepare(`
-      SELECT 
-        COUNT(*) as total_measurements,
-        COUNT(CASE WHEN conformity = 1 THEN 1 END) as conforming_measurements
-      FROM measurements WHERE conformity IS NOT NULL
+      SELECT COUNT(*) as count FROM el_measurements 
+      WHERE defect_type IS NOT NULL AND defect_type != ''
     `).all();
     
     const stats = {
-      monthly_interventions: monthlyStats[0]?.count || 12,
-      modules_analyzed: moduleStats[0]?.total || 1247,
-      defects_detected: defectStats[0]?.total || 89,
-      conformity_rate: conformityStats[0]?.total > 0 
-        ? ((conformityStats[0]?.conforming_measurements / conformityStats[0]?.total) * 100).toFixed(1)
-        : "92.8"
+      active_projects: projectStats[0]?.count || 0,
+      total_interventions: interventionStats[0]?.count || 0,
+      modules_analyzed: moduleStats[0]?.count || 0,
+      defects_detected: defectStats[0]?.count || 0
     };
     
     return c.json({ success: true, stats });
   } catch (error) {
     return c.json({ success: false, error: error.message, stats: {
-      monthly_interventions: 12,
-      modules_analyzed: 1247, 
-      defects_detected: 89,
-      conformity_rate: "92.8"
+      active_projects: 0,
+      total_interventions: 0,
+      modules_analyzed: 0,
+      defects_detected: 0
     }}, 200);
   }
 });
