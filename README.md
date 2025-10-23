@@ -163,13 +163,14 @@ npm run db:migrate:local
 npm run db:seed
 
 # Développement  
-pm2 start ecosystem.config.cjs  # Port 3001
-curl http://localhost:3001/api/users
+pm2 start ecosystem.config.cjs  # Port 3000
+curl http://localhost:3000/api/users
 
 # APIs disponibles
 /api/users          // Équipe DiagPV
 /api/clients        // Base clients
-/api/projects       // Installations  
+/api/projects       // Installations (GET + POST)
+/api/projects/sync  // 🆕 Synchronisation LocalStorage → D1
 /api/interventions  // Missions
 /api/modules        // Configuration physique
 ```
@@ -195,19 +196,21 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - **SSL/TLS** : Cloudflare SSL automatique
 
 ## Statut Déploiement
-- **Statut**: ✅ PRODUCTION - Rectangle Orientable Intégré
+- **Statut**: ✅ PRODUCTION - Synchronisation LocalStorage ↔ D1
 - **HUB Principal**: ✅ https://diagnostic-hub.pappalardoadrien.workers.dev
 - **Gestion Projets**: ✅ Création/Consultation projets fonctionnelle
+- **🆕 Synchronisation Données**: ✅ Endpoint POST /api/projects/sync pour sync audits EL → D1
 - **Module EL + Rectangle Orientable**: ✅ Designer satellite + rectangles rotatifs + modules PV orientés
-- **🆕 Rectangle Orientable**: ✅ Rotation 0-360° + handle drag + grille orientée + rendu rectangles PV
+- **Rectangle Orientable**: ✅ Rotation 0-360° + handle drag + grille orientée + rendu rectangles PV
 - **Fonctionnalités Carte**: ✅ Géolocalisation GPS + recherche adresse + positionnement réel + imagerie Esri
-- **Conservation Données**: ✅ 100% données audit existantes préservées (JALIBAT Castelmoron)
+- **Conservation Données**: ✅ 100% données audit existantes préservées (JALIBAT, LES FORGES, ARKOUA-BONNAUD-DEMO)
+- **Page Projects**: ✅ Affichage combiné D1 + LocalStorage non synchronisé
 - **Modules 2-6**: ⏳ Temporairement désactivés (en développement professionnel)
-- **API Fonctionnelle**: ✅ POST/GET projets + clients automatiques
-- **Dernière MAJ**: 2025-10-22 (Rectangle Orientable + Modules PV Rendus)
-- **Version**: 2.6.0 (Rectangle Orientable + Carte Satellite + Designer + Module EL)
+- **API Fonctionnelle**: ✅ POST/GET projets + clients automatiques + sync endpoint
+- **Dernière MAJ**: 2025-10-23 (Synchronisation LocalStorage → D1 Backend)
+- **Version**: 2.7.0 (Sync LocalStorage ↔ D1 + Rectangle Orientable + Carte Satellite + Designer + Module EL)
 - **Performance**: < 50ms edge latency mondiale, ~62 kB gzip
-- **Backup System**: ✅ LocalStorage + IndexedDB + Cloudflare D1 + Emergency API + GPS + Rotation
+- **Backup System**: ✅ LocalStorage + IndexedDB + Cloudflare D1 + Emergency API + GPS + Rotation + Sync
 
 ## Prochaines Actions Recommandées
 
