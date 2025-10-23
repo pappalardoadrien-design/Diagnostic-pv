@@ -976,10 +976,13 @@ app.get('/projects', (c) => {
                     <div class="flex items-center justify-between">
                         <h2 class="text-xl font-semibold text-gray-900">Liste des Projets</h2>
                         <div class="flex items-center space-x-3">
+                            <button id="syncAllBtn" onclick="syncAllProjects()" class="px-4 py-2 text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50">
+                                <i class="fas fa-sync-alt mr-2"></i>Synchroniser Tout
+                            </button>
                             <button class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
                                 <i class="fas fa-filter mr-2"></i>Filtrer
                             </button>
-                            <button class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <button onclick="window.location.href='/projects/new'" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                                 <i class="fas fa-plus mr-2"></i>Nouveau Projet
                             </button>
                         </div>
@@ -1237,7 +1240,16 @@ app.get('/projects', (c) => {
             if (!projectId.startsWith('local_')) return;
             
             const localData = localStorage.getItem('diagpv_audit_session');
-            if (!localData) return;
+            if (!localData) {
+                alert('❌ Aucune donnée audit trouvée dans LocalStorage');
+                return;
+            }
+            
+            // Afficher loader
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Synchronisation...';
             
             try {
                 const auditData = JSON.parse(localData);
@@ -1251,13 +1263,101 @@ app.get('/projects', (c) => {
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert(\`✅ Projet "\${result.data.projectName}" synchronisé avec succès !\`);
-                    loadProjects(); // Recharger
+                    // Animation succès
+                    btn.innerHTML = '<i class="fas fa-check mr-1"></i>Synchronisé !';
+                    btn.classList.add('bg-green-100', 'text-green-700', 'border-green-300');
+                    
+                    // Notification succès
+                    showNotification('success', \`Projet "\${auditData.projectName || 'Audit'}" synchronisé vers le cloud !\`);
+                    
+                    // Recharger après 1s
+                    setTimeout(() => {
+                        loadProjects();
+                    }, 1000);
                 } else {
-                    alert('❌ Erreur: ' + result.error);
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    showNotification('error', 'Erreur: ' + result.error);
                 }
             } catch (error) {
-                alert('❌ Erreur synchronisation: ' + error.message);
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                showNotification('error', 'Erreur synchronisation: ' + error.message);
+            }
+        }
+        
+        // Système de notifications
+        function showNotification(type, message) {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = \`fixed top-4 right-4 \${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg z-50 transform transition-all duration-300\`;
+            notification.innerHTML = \`
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-\${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} text-2xl"></i>
+                    <span class="font-medium">\${message}</span>
+                </div>
+            \`;
+            
+            document.body.appendChild(notification);
+            
+            // Animation entrée
+            setTimeout(() => {
+                notification.style.transform = 'translateY(0)';
+            }, 10);
+            
+            // Auto-suppression après 4s
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+        
+        // Synchroniser tous les projets non synchronisés
+        async function syncAllProjects() {
+            const localData = localStorage.getItem('diagpv_audit_session');
+            if (!localData) {
+                showNotification('error', 'Aucune donnée locale à synchroniser');
+                return;
+            }
+            
+            const btn = document.getElementById('syncAllBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Synchronisation en cours...';
+            }
+            
+            try {
+                const auditData = JSON.parse(localData);
+                
+                const response = await fetch('/api/projects/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auditData })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('success', \`✅ Tous les projets synchronisés !\`);
+                    setTimeout(() => loadProjects(), 1000);
+                } else {
+                    showNotification('error', result.error);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Synchroniser Tout';
+                    }
+                }
+            } catch (error) {
+                showNotification('error', 'Erreur: ' + error.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Synchroniser Tout';
+                }
             }
         }
         
@@ -1906,9 +2006,32 @@ app.get('/modules/electroluminescence', (c) => {
             }
             
             if (data.progress !== undefined && data.progress !== auditData.progress) {
+                const oldProgress = auditData.progress;
                 auditData.progress = data.progress;
                 document.getElementById('progress').textContent = data.progress + '%';
                 dataChanged = true;
+                
+                // 🆕 AUTO-SYNC quand audit terminé (progress = 100%)
+                if (data.progress === 100 && oldProgress < 100) {
+                    console.log('🎯 Audit terminé à 100% - Déclenchement auto-sync vers cloud');
+                    setTimeout(async () => {
+                        try {
+                            await saveToHub();
+                            showNotification(
+                                '✅ Auto-Sync Complété', 
+                                \`Audit "\${auditData.projectName || 'Projet'}" automatiquement synchronisé vers le cloud !\`,
+                                'success'
+                            );
+                        } catch (error) {
+                            console.error('❌ Erreur auto-sync:', error);
+                            showNotification(
+                                '⚠️ Auto-Sync Échoué', 
+                                'Utilisez le bouton "Sauvegarder HUB" pour synchroniser manuellement.',
+                                'warning'
+                            );
+                        }
+                    }, 2000); // Délai 2s pour laisser l'interface se stabiliser
+                }
             }
             
             if (data.conformityRate !== undefined && data.conformityRate !== auditData.conformityRate) {
