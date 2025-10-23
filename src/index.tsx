@@ -1047,18 +1047,217 @@ app.get('/projects', (c) => {
         </div>
 
         <script>
-        // Chargement dynamique des projets
+        // Chargement dynamique des projets (D1 + LocalStorage)
         async function loadProjects() {
             try {
+                // 1. Charger projets depuis D1
                 const response = await fetch('/api/projects');
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Mise à jour interface avec données réelles
-                    console.log('Projets chargés:', data.projects);
+                let allProjects = [];
+                
+                // Projets depuis D1
+                if (data.success && data.projects) {
+                    allProjects = data.projects.map(p => ({
+                        ...p,
+                        source: 'd1',
+                        synced: true
+                    }));
+                }
+                
+                // 2. Ajouter projets depuis LocalStorage (non synchronisés)
+                const localData = localStorage.getItem('diagpv_audit_session');
+                if (localData) {
+                    try {
+                        const auditData = JSON.parse(localData);
+                        const projectName = auditData.projectName || auditData.sessionId || 'Audit Sans Nom';
+                        
+                        // Vérifier si déjà synchronisé
+                        const alreadySynced = allProjects.some(p => 
+                            p.name === projectName || (p.notes && p.notes.includes(auditData.sessionId))
+                        );
+                        
+                        if (!alreadySynced) {
+                            allProjects.push({
+                                id: 'local_' + (auditData.sessionId || Date.now()),
+                                name: projectName,
+                                client_name: auditData.clientName || 'Client Inconnu',
+                                module_count: auditData.totalModules || 0,
+                                installation_power: auditData.installedPower || (auditData.totalModules * 0.4),
+                                site_address: auditData.siteAddress || 'Adresse à définir',
+                                created_at: auditData.timestamp || new Date().toISOString(),
+                                source: 'localStorage',
+                                synced: false,
+                                progress: auditData.progress || 0,
+                                defects: auditData.defectsFound || 0,
+                                conformityRate: auditData.conformityRate || 100
+                            });
+                        }
+                    } catch (e) {
+                        console.log('Erreur parsing LocalStorage:', e);
+                    }
+                }
+                
+                // 3. Afficher tous les projets
+                renderProjects(allProjects);
+                updateStats(allProjects);
+                
+            } catch (error) {
+                console.log('Chargement projets hors ligne:', error);
+                // Fallback sur LocalStorage uniquement
+                loadLocalStorageProjects();
+            }
+        }
+        
+        // Rendu de la liste des projets
+        function renderProjects(projects) {
+            const container = document.getElementById('projectsList');
+            
+            if (projects.length === 0) {
+                container.innerHTML = \`
+                    <div class="text-center py-12">
+                        <i class="fas fa-folder-open text-gray-300 text-6xl mb-4"></i>
+                        <p class="text-gray-600">Aucun projet trouvé. Créez votre premier audit depuis le module Électroluminescence.</p>
+                        <a href="/" class="mt-4 inline-block px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-home mr-2"></i>Retour au Hub
+                        </a>
+                    </div>
+                \`;
+                return;
+            }
+            
+            container.innerHTML = projects.map(project => \`
+                <div class="border \${project.synced ? 'border-gray-200' : 'border-orange-300 bg-orange-50'} rounded-lg p-6 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 \${project.synced ? 'bg-green-100' : 'bg-orange-100'} rounded-lg flex items-center justify-center">
+                                <i class="fas fa-solar-panel \${project.synced ? 'text-green-600' : 'text-orange-600'} text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">\${project.name}</h3>
+                                <p class="text-sm text-gray-600">
+                                    Client: \${project.client_name || 'N/A'} • 
+                                    \${project.installation_power ? project.installation_power.toFixed(1) + ' kWc' : 'Puissance N/A'} • 
+                                    \${project.module_count || 0} modules
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            \${!project.synced ? \`
+                                <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">
+                                    <i class="fas fa-cloud-upload-alt mr-1"></i>Non Synchronisé
+                                </span>
+                            \` : \`
+                                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                    <i class="fas fa-check mr-1"></i>Synchronisé
+                                </span>
+                            \`}
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">Modules</p>
+                            <p class="font-semibold text-purple-600">\${project.module_count || 0}</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">Défauts</p>
+                            <p class="font-semibold text-red-600">\${project.defects || 0}</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">Conformité</p>
+                            <p class="font-semibold text-green-600">\${project.conformityRate || 100}%</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">Progression</p>
+                            <p class="font-semibold text-blue-600">\${project.progress || 0}%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-600">
+                            <i class="fas fa-calendar mr-1"></i>Créé le \${new Date(project.created_at).toLocaleDateString('fr-FR')}
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            \${!project.synced ? \`
+                                <button onclick="syncProject('\${project.id}')" class="px-3 py-1 text-orange-600 border border-orange-200 rounded hover:bg-orange-50">
+                                    <i class="fas fa-sync mr-1"></i>Synchroniser
+                                </button>
+                            \` : ''}
+                            <button class="px-3 py-1 text-blue-600 border border-blue-200 rounded hover:bg-blue-50">
+                                <i class="fas fa-eye mr-1"></i>Voir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        // Mise à jour des statistiques
+        function updateStats(projects) {
+            const activeProjects = projects.length;
+            const completedAudits = projects.filter(p => p.progress === 100 || p.intervention_count > 0).length;
+            const totalModules = projects.reduce((sum, p) => sum + (p.module_count || 0), 0);
+            const totalDefects = projects.reduce((sum, p) => sum + (p.defects || 0), 0);
+            
+            // Mettre à jour les cards
+            document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4 .bg-white:nth-child(1) .text-3xl').textContent = activeProjects;
+            document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4 .bg-white:nth-child(2) .text-3xl').textContent = completedAudits;
+            document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4 .bg-white:nth-child(3) .text-3xl').textContent = totalModules.toLocaleString();
+            document.querySelector('.grid.grid-cols-1.md\\:grid-cols-4 .bg-white:nth-child(4) .text-3xl').textContent = totalDefects;
+        }
+        
+        // Fallback LocalStorage
+        function loadLocalStorageProjects() {
+            const localData = localStorage.getItem('diagpv_audit_session');
+            if (localData) {
+                try {
+                    const auditData = JSON.parse(localData);
+                    renderProjects([{
+                        id: 'local_' + (auditData.sessionId || Date.now()),
+                        name: auditData.projectName || 'Audit Local',
+                        client_name: auditData.clientName || 'Client Inconnu',
+                        module_count: auditData.totalModules || 0,
+                        installation_power: auditData.installedPower || 0,
+                        created_at: auditData.timestamp || new Date().toISOString(),
+                        source: 'localStorage',
+                        synced: false,
+                        progress: auditData.progress || 0,
+                        defects: auditData.defectsFound || 0,
+                        conformityRate: auditData.conformityRate || 100
+                    }]);
+                } catch (e) {
+                    console.error('Erreur parsing LocalStorage:', e);
+                }
+            }
+        }
+        
+        // Synchroniser un projet local
+        async function syncProject(projectId) {
+            if (!projectId.startsWith('local_')) return;
+            
+            const localData = localStorage.getItem('diagpv_audit_session');
+            if (!localData) return;
+            
+            try {
+                const auditData = JSON.parse(localData);
+                
+                const response = await fetch('/api/projects/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auditData })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(\`✅ Projet "\${result.data.projectName}" synchronisé avec succès !\`);
+                    loadProjects(); // Recharger
+                } else {
+                    alert('❌ Erreur: ' + result.error);
                 }
             } catch (error) {
-                console.log('Chargement projets hors ligne');
+                alert('❌ Erreur synchronisation: ' + error.message);
             }
         }
         
