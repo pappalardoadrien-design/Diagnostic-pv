@@ -2543,10 +2543,46 @@ app.get('/modules/electroluminescence', (c) => {
                         console.log('📊 Données projet chargées:', data.project);
                         // Stocker pour utilisation future
                         window.currentProject = data.project;
+                        
+                        // 📤 NOUVEAU : Envoyer données projet vers iframe DiagPV pour initialisation
+                        const auditFrame = document.getElementById('auditFrame');
+                        if (auditFrame) {
+                            const sendProjectData = () => {
+                                try {
+                                    auditFrame.contentWindow.postMessage({
+                                        type: 'HUB_INIT_PROJECT',
+                                        project: {
+                                            projectId: data.project.id,
+                                            projectName: data.project.name,
+                                            clientName: data.project.client_name || '',
+                                            siteAddress: data.project.site_address || '',
+                                            totalModules: data.project.module_count || 0,
+                                            installedPower: data.project.installation_power || 0,
+                                            sessionId: 'hub_project_' + projectId,
+                                            timestamp: new Date().toISOString()
+                                        }
+                                    }, 'https://diagpv-audit.pages.dev');
+                                    
+                                    console.log('📤 Données projet envoyées vers iframe DiagPV:', data.project.name);
+                                } catch (postError) {
+                                    console.error('❌ Erreur envoi postMessage:', postError);
+                                }
+                            };
+                            
+                            // Si iframe déjà chargée, envoyer immédiatement
+                            if (auditFrame.contentDocument && auditFrame.contentDocument.readyState === 'complete') {
+                                sendProjectData();
+                            } else {
+                                // Sinon attendre événement load
+                                auditFrame.addEventListener('load', sendProjectData, { once: true });
+                            }
+                        } else {
+                            console.warn('⚠️ Iframe auditFrame non trouvée');
+                        }
                     }
                 }
             } catch (error) {
-                console.error('Erreur chargement projet:', error);
+                console.error('❌ Erreur chargement projet:', error);
             }
         }
         
