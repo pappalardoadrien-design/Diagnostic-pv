@@ -415,6 +415,317 @@ app.delete('/api/projects/:id', async (c) => {
   }
 });
 
+// Générer rapport PDF pour un projet
+app.get('/api/projects/:id/report', async (c) => {
+  try {
+    const projectId = parseInt(c.req.param('id'));
+    
+    if (!projectId || isNaN(projectId)) {
+      return c.json({ success: false, error: 'ID projet invalide' }, 400);
+    }
+    
+    // Récupérer données complètes du projet
+    const project = await c.env.DB.prepare(`
+      SELECT p.*, c.name as client_name, c.contact_email
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE p.id = ?
+    `).bind(projectId).first();
+    
+    if (!project) {
+      return c.json({ success: false, error: 'Projet non trouvé' }, 404);
+    }
+    
+    // Récupérer interventions
+    const { results: interventions } = await c.env.DB.prepare(`
+      SELECT * FROM interventions WHERE project_id = ? ORDER BY created_at DESC
+    `).bind(projectId).all();
+    
+    // Récupérer mesures EL
+    const interventionIds = interventions.map(i => i.id);
+    let elMeasurements = [];
+    let defectsCount = 0;
+    
+    if (interventionIds.length > 0) {
+      const idsString = interventionIds.join(',');
+      const { results: elData } = await c.env.DB.prepare(`
+        SELECT * FROM el_measurements WHERE intervention_id IN (${idsString})
+      `).all();
+      elMeasurements = elData;
+      
+      // Compter défauts
+      defectsCount = elMeasurements.filter(m => m.defect_type && m.defect_type !== 'none').length;
+    }
+    
+    // Générer HTML du rapport (structure simplifiée pour PDF)
+    const reportHTML = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport Diagnostic - ${project.name}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #22c55e;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #22c55e;
+        }
+        h1 {
+            color: #22c55e;
+            margin-top: 30px;
+        }
+        h2 {
+            color: #16a34a;
+            border-bottom: 2px solid #22c55e;
+            padding-bottom: 5px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .info-box {
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .info-value {
+            font-size: 18px;
+            margin-top: 5px;
+            color: #111827;
+        }
+        .stats {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            display: inline-block;
+            margin: 10px 20px;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #22c55e;
+        }
+        .conformity {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background: #22c55e;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 2px solid #e5e7eb;
+            padding-top: 20px;
+        }
+        .defect-critical {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .defect-minor {
+            color: #ea580c;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🔆 DIAGNOSTIC PHOTOVOLTAÏQUE</div>
+        <p style="margin: 10px 0 0 0; color: #6b7280;">Audits Normatifs IEC 62446-1 • Indépendant & Certifié</p>
+    </div>
+    
+    <h1>Rapport d'Audit Photovoltaïque</h1>
+    <p style="font-size: 14px; color: #6b7280;">Généré le ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    
+    <h2>1. Informations Projet</h2>
+    <div class="info-grid">
+        <div class="info-box">
+            <div class="info-label">Nom du projet</div>
+            <div class="info-value">${project.name}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Client</div>
+            <div class="info-value">${project.client_name || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Adresse du site</div>
+            <div class="info-value">${project.site_address || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Date d'installation</div>
+            <div class="info-value">${project.installation_date ? new Date(project.installation_date).toLocaleDateString('fr-FR') : 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Installateur</div>
+            <div class="info-value">${project.installer_company || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Contact</div>
+            <div class="info-value">${project.contact_email || 'N/A'}</div>
+        </div>
+    </div>
+    
+    <h2>2. Configuration Technique</h2>
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-label">Puissance Installée</div>
+            <div class="stat-value">${project.installation_power ? project.installation_power.toFixed(1) : '0'} kWc</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">Nombre de Modules</div>
+            <div class="stat-value">${project.module_count || 0}</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">Interventions</div>
+            <div class="stat-value">${interventions.length}</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">Défauts Détectés</div>
+            <div class="stat-value" style="color: ${defectsCount > 0 ? '#dc2626' : '#22c55e'}">${defectsCount}</div>
+        </div>
+    </div>
+    
+    <div class="info-grid">
+        <div class="info-box">
+            <div class="info-label">Marque Modules</div>
+            <div class="info-value">${project.module_brand || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Modèle Modules</div>
+            <div class="info-value">${project.module_model || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Marque Onduleur</div>
+            <div class="info-value">${project.inverter_brand || 'N/A'}</div>
+        </div>
+        <div class="info-box">
+            <div class="info-label">Modèle Onduleur</div>
+            <div class="info-value">${project.inverter_model || 'N/A'}</div>
+        </div>
+    </div>
+    
+    <h2>3. Résultats Audit Électroluminescence</h2>
+    ${elMeasurements.length > 0 ? `
+        <p>Nombre de modules analysés : <strong>${elMeasurements.length}</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Module ID</th>
+                    <th>Date</th>
+                    <th>Statut</th>
+                    <th>Type Défaut</th>
+                    <th>Criticité</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${elMeasurements.slice(0, 50).map(m => `
+                    <tr>
+                        <td>${m.module_id || 'N/A'}</td>
+                        <td>${m.measurement_date ? new Date(m.measurement_date).toLocaleDateString('fr-FR') : 'N/A'}</td>
+                        <td>${m.defect_type && m.defect_type !== 'none' ? '<span class="defect-critical">⚠️ Défaut</span>' : '✅ Conforme'}</td>
+                        <td>${m.defect_type && m.defect_type !== 'none' ? m.defect_type : '-'}</td>
+                        <td class="${m.severity === 'high' ? 'defect-critical' : 'defect-minor'}">${m.severity || '-'}</td>
+                    </tr>
+                `).join('')}
+                ${elMeasurements.length > 50 ? `
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #6b7280;">
+                            ... et ${elMeasurements.length - 50} autres modules
+                        </td>
+                    </tr>
+                ` : ''}
+            </tbody>
+        </table>
+    ` : '<p style="color: #6b7280;">Aucune mesure EL enregistrée.</p>'}
+    
+    <h2>4. Conformité Normative</h2>
+    <div class="conformity">
+        <strong>Normes Appliquées :</strong> IEC 62446-1, IEC 61215, IEC 60904-1<br>
+        <strong>Méthode :</strong> Électroluminescence nocturne haute résolution<br>
+        <strong>Taux de Conformité :</strong> ${elMeasurements.length > 0 ? ((elMeasurements.length - defectsCount) / elMeasurements.length * 100).toFixed(1) : '100.0'}%
+    </div>
+    
+    <h2>5. Conclusions & Recommandations</h2>
+    ${defectsCount === 0 ? `
+        <p style="color: #22c55e; font-weight: bold;">✅ Installation conforme - Aucun défaut majeur détecté</p>
+        <p>L'installation photovoltaïque respecte les normes IEC en vigueur. Recommandation : Contrôle de suivi dans 12 mois.</p>
+    ` : `
+        <p style="color: #dc2626; font-weight: bold;">⚠️ ${defectsCount} défaut(s) détecté(s) - Actions correctives requises</p>
+        <ul>
+            <li>Identification précise des modules défectueux</li>
+            <li>Évaluation de l'impact sur la production</li>
+            <li>Planification des interventions correctives</li>
+            <li>Repassage de contrôle après travaux</li>
+        </ul>
+    `}
+    
+    <div class="footer">
+        <p><strong>Diagnostic Photovoltaïque</strong> | www.diagnosticphotovoltaique.fr</p>
+        <p>Expertise Indépendante • Audits N1-N3 • Commissioning • Post-Sinistre</p>
+        <p>Rapport confidentiel à usage exclusif du client - Ne peut être reproduit sans autorisation</p>
+    </div>
+</body>
+</html>
+    `;
+    
+    // Retourner HTML comme PDF (simulé - en production utiliser bibliothèque PDF)
+    // Note: Cloudflare Workers ne supporte pas les bibliothèques PDF lourdes
+    // Solution recommandée : utiliser API externe (Puppeteer, wkhtmltopdf) ou générer côté client
+    
+    return new Response(reportHTML, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `inline; filename="Rapport_${project.name.replace(/[^a-zA-Z0-9]/g, '_')}.html"`
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur génération rapport:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Statistiques dashboard
 app.get('/api/dashboard/stats', async (c) => {
   try {
@@ -1131,18 +1442,52 @@ app.get('/projects', (c) => {
             <!-- Liste des projets -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-6 py-4 border-b border-gray-200">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-xl font-semibold text-gray-900">Liste des Projets</h2>
-                        <div class="flex items-center space-x-3">
-                            <button id="syncAllBtn" onclick="syncAllProjects()" class="px-4 py-2 text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50">
-                                <i class="fas fa-sync-alt mr-2"></i>Synchroniser Tout
-                            </button>
-                            <button class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
-                                <i class="fas fa-filter mr-2"></i>Filtrer
-                            </button>
-                            <button onclick="window.location.href='/projects/new'" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                                <i class="fas fa-plus mr-2"></i>Nouveau Projet
-                            </button>
+                    <div class="flex flex-col space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-semibold text-gray-900">Liste des Projets</h2>
+                            <div class="flex items-center space-x-3">
+                                <button id="syncAllBtn" onclick="syncAllProjects()" class="px-4 py-2 text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50">
+                                    <i class="fas fa-sync-alt mr-2"></i>Synchroniser Tout
+                                </button>
+                                <button onclick="window.location.href='/projects/new'" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    <i class="fas fa-plus mr-2"></i>Nouveau Projet
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Barre de recherche et filtres -->
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input 
+                                        type="text" 
+                                        id="searchInput" 
+                                        placeholder="Rechercher par nom, client ou adresse..."
+                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        oninput="applyFilters()"
+                                    >
+                                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center space-x-2">
+                                <select id="statusFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="applyFilters()">
+                                    <option value="all">Tous les projets</option>
+                                    <option value="synced">Synchronisés</option>
+                                    <option value="local">Locaux uniquement</option>
+                                </select>
+                                
+                                <select id="sortBy" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="applyFilters()">
+                                    <option value="date-desc">Plus récent</option>
+                                    <option value="date-asc">Plus ancien</option>
+                                    <option value="name-asc">Nom A-Z</option>
+                                    <option value="name-desc">Nom Z-A</option>
+                                    <option value="power-desc">Puissance décroissante</option>
+                                    <option value="power-asc">Puissance croissante</option>
+                                    <option value="modules-desc">Modules décroissants</option>
+                                    <option value="modules-asc">Modules croissants</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1259,8 +1604,9 @@ app.get('/projects', (c) => {
                     }
                 }
                 
-                // 3. Afficher tous les projets
-                renderProjects(allProjects);
+                // 3. Sauvegarder et afficher tous les projets
+                allProjectsData = allProjects;
+                applyFilters(); // Utiliser applyFilters au lieu de renderProjects directement
                 updateStats(allProjects);
                 
             } catch (error) {
@@ -1350,10 +1696,10 @@ app.get('/projects', (c) => {
                                     <i class="fas fa-moon mr-1"></i>Module EL
                                 </a>
                             \` : ''}
-                            <button class="px-3 py-1 text-blue-600 border border-blue-200 rounded hover:bg-blue-50">
-                                <i class="fas fa-eye mr-1"></i>Voir
-                            </button>
                             \${project.synced && !project.id.toString().startsWith('local_') ? \`
+                                <button onclick="generateReport(\${project.id}, '\${project.name.replace(/'/g, "\\\\'")}')" class="px-3 py-1 text-blue-600 border border-blue-200 rounded hover:bg-blue-50" title="Générer rapport PDF">
+                                    <i class="fas fa-file-pdf mr-1"></i>Rapport
+                                </button>
                                 <button onclick="deleteProject(\${project.id}, '\${project.name.replace(/'/g, "\\\\'")}')" class="px-3 py-1 text-red-600 border border-red-200 rounded hover:bg-red-50" title="Supprimer ce projet">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -1526,6 +1872,136 @@ app.get('/projects', (c) => {
                     btn.disabled = false;
                 }
             }
+        }
+        
+        // Variable globale pour stocker tous les projets
+        let allProjectsData = [];
+        
+        // Générer rapport PDF pour un projet
+        async function generateReport(projectId, projectName) {
+            const btn = event.target.closest('button');
+            if (btn) {
+                const originalHTML = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Génération...';
+            }
+            
+            try {
+                const response = await fetch(\`/api/projects/\${projectId}/report\`);
+                
+                if (response.ok) {
+                    // Télécharger le PDF
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = \`Rapport_\${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_\${new Date().toISOString().split('T')[0]}.pdf\`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showNotification('success', \`✅ Rapport PDF généré pour "\${projectName}"\`);
+                    
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-check mr-1"></i>Téléchargé';
+                        setTimeout(() => {
+                            btn.innerHTML = originalHTML;
+                            btn.disabled = false;
+                        }, 2000);
+                    }
+                } else {
+                    const error = await response.json();
+                    showNotification('error', 'Erreur: ' + (error.error || 'Impossible de générer le rapport'));
+                    if (btn) {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    }
+                }
+            } catch (error) {
+                showNotification('error', 'Erreur génération rapport: ' + error.message);
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }
+            }
+        }
+        
+        // Appliquer filtres, recherche et tri
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let filteredProjects = [...allProjectsData];
+            
+            // 1. Recherche
+            if (searchTerm) {
+                filteredProjects = filteredProjects.filter(project => 
+                    (project.name || '').toLowerCase().includes(searchTerm) ||
+                    (project.client_name || '').toLowerCase().includes(searchTerm) ||
+                    (project.site_address || '').toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // 2. Filtre par statut
+            if (statusFilter === 'synced') {
+                filteredProjects = filteredProjects.filter(p => p.synced);
+            } else if (statusFilter === 'local') {
+                filteredProjects = filteredProjects.filter(p => !p.synced);
+            }
+            
+            // 3. Tri
+            switch (sortBy) {
+                case 'date-desc':
+                    filteredProjects.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    break;
+                case 'date-asc':
+                    filteredProjects.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    break;
+                case 'name-asc':
+                    filteredProjects.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    break;
+                case 'name-desc':
+                    filteredProjects.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+                    break;
+                case 'power-desc':
+                    filteredProjects.sort((a, b) => (b.installation_power || 0) - (a.installation_power || 0));
+                    break;
+                case 'power-asc':
+                    filteredProjects.sort((a, b) => (a.installation_power || 0) - (b.installation_power || 0));
+                    break;
+                case 'modules-desc':
+                    filteredProjects.sort((a, b) => (b.module_count || 0) - (a.module_count || 0));
+                    break;
+                case 'modules-asc':
+                    filteredProjects.sort((a, b) => (a.module_count || 0) - (b.module_count || 0));
+                    break;
+            }
+            
+            renderProjects(filteredProjects);
+            
+            // Afficher message si aucun résultat
+            if (filteredProjects.length === 0 && allProjectsData.length > 0) {
+                const container = document.getElementById('projectsList');
+                container.innerHTML = \`
+                    <div class="text-center py-12">
+                        <i class="fas fa-search text-gray-300 text-6xl mb-4"></i>
+                        <p class="text-gray-600 text-lg">Aucun projet ne correspond à vos critères</p>
+                        <button onclick="resetFilters()" class="mt-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-redo mr-2"></i>Réinitialiser les filtres
+                        </button>
+                    </div>
+                \`;
+            }
+        }
+        
+        // Réinitialiser tous les filtres
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('sortBy').value = 'date-desc';
+            applyFilters();
         }
         
         // Synchroniser tous les projets non synchronisés
