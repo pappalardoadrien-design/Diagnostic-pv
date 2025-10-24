@@ -6,20 +6,21 @@
 Système unifié développé par **Diagnostic Photovoltaïque** pour audits terrain, commissioning indépendant et expertise post-sinistre avec traçabilité normative complète.
 
 ## URLs Production
-- **🎯 HUB PRINCIPAL**: https://c9e90768.diagnostic-hub.pages.dev
-- **📂 Gestion Projets**: https://c9e90768.diagnostic-hub.pages.dev/projects
-- **➕ Nouveau Projet**: https://c9e90768.diagnostic-hub.pages.dev/projects/new
-- **🛰️ Module EL + Carte Satellite**: https://c9e90768.diagnostic-hub.pages.dev/modules/electroluminescence
-- **📋 Liste Modules**: https://c9e90768.diagnostic-hub.pages.dev/modules
-- **🌡️ Module Thermographie**: https://c9e90768.diagnostic-hub.pages.dev/modules/thermography
-- **⚡ Module Courbes I-V**: https://c9e90768.diagnostic-hub.pages.dev/modules/iv-curves
-- **🔌 Module Tests Isolement**: https://c9e90768.diagnostic-hub.pages.dev/modules/isolation
-- **📡 API Projets**: https://c9e90768.diagnostic-hub.pages.dev/api/projects
-- **🔄 API Sync**: https://c9e90768.diagnostic-hub.pages.dev/api/projects/sync
-- **🗑️ Admin Cleanup Tests**: https://c9e90768.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
-- **📊 Stats Temps Réel**: https://c9e90768.diagnostic-hub.pages.dev/api/dashboard/stats
-- **👥 API Clients**: https://c9e90768.diagnostic-hub.pages.dev/api/clients
-- **👤 API Utilisateurs**: https://c9e90768.diagnostic-hub.pages.dev/api/users
+- **🎯 HUB PRINCIPAL**: https://d94b3e06.diagnostic-hub.pages.dev
+- **📂 Gestion Projets**: https://d94b3e06.diagnostic-hub.pages.dev/projects
+- **➕ Nouveau Projet**: https://d94b3e06.diagnostic-hub.pages.dev/projects/new
+- **🛰️ Module EL + Carte Satellite**: https://d94b3e06.diagnostic-hub.pages.dev/modules/electroluminescence
+- **📋 Liste Modules**: https://d94b3e06.diagnostic-hub.pages.dev/modules
+- **🌡️ Module Thermographie**: https://d94b3e06.diagnostic-hub.pages.dev/modules/thermography
+- **⚡ Module Courbes I-V**: https://d94b3e06.diagnostic-hub.pages.dev/modules/iv-curves
+- **🔌 Module Tests Isolement**: https://d94b3e06.diagnostic-hub.pages.dev/modules/isolation
+- **📡 API Projets**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects
+- **🔄 API Sync**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/sync
+- **🗑️ Admin Cleanup Tests**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
+- **🗑️ Supprimer Projet**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
+- **📊 Stats Temps Réel**: https://d94b3e06.diagnostic-hub.pages.dev/api/dashboard/stats
+- **👥 API Clients**: https://d94b3e06.diagnostic-hub.pages.dev/api/clients
+- **👤 API Utilisateurs**: https://d94b3e06.diagnostic-hub.pages.dev/api/users
 
 ## 6 Modules Opérationnels
 
@@ -200,14 +201,16 @@ wrangler pages deploy dist --project-name diagnostic-hub
 
 ## Statut Déploiement
 - **Statut**: ✅ PRODUCTION CLOUDFLARE PAGES - 100% Opérationnel
-- **HUB Principal**: ✅ https://c9e90768.diagnostic-hub.pages.dev
+- **HUB Principal**: ✅ https://d94b3e06.diagnostic-hub.pages.dev
 - **Plateforme**: Cloudflare Pages (Edge Network Global)
 - **Build System**: Vite + @hono/vite-cloudflare-pages plugin
 - **Tests Routes**: ✅ 14/14 routes validées (100% success)
-- **Gestion Projets**: ✅ Création/Consultation projets fonctionnelle
+- **Gestion Projets**: ✅ Création/Consultation/Suppression projets fonctionnelle
 - **🆕 Synchronisation Complète**: ✅ POST /api/projects/sync opérationnel
 - **🆕 Auto-Sync**: ✅ Synchronisation automatique à 100% progression audit
 - **🆕 Admin Cleanup**: ✅ DELETE /api/projects/cleanup-tests pour nettoyer projets test
+- **🆕 Suppression Projets**: ✅ DELETE /api/projects/:id avec confirmation UI + cascade
+- **🆕 Accès Module EL**: ✅ Bouton "Module EL" sur projets avec audits (localStorage + D1)
 - **Interface Synchronisation**: ✅ Boutons sync + notifications toast + feedback visuel
 - **Module EL + Rectangle Orientable**: ✅ Designer satellite + rectangles rotatifs + modules PV orientés
 - **Rectangle Orientable**: ✅ Rotation 0-360° + handle drag + grille orientée + rendu rectangles PV
@@ -215,14 +218,15 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - **Conservation Données**: ✅ 100% données audit existantes préservées (JALIBAT, LES FORGES, ARKOUA-BONNAUD-DEMO)
 - **Base D1 Production**: ✅ 1 projet actif (JALIBAT), projets test supprimés
 - **Page Projects**: ✅ Affichage hybride D1 (vert ✅) + LocalStorage (orange 🔶)
+- **Gestion UI Complète**: ✅ Boutons suppression (corbeille) + Module EL + Synchroniser
 - **Système Notifications**: ✅ Toast animées + feedback temps réel
 - **Modules Professionnels**: ✅ Thermographie, I-V Curves, Isolation tous actifs
-- **API Complète**: ✅ Projects, Users, Clients, Stats, Sync, Cleanup (GET/POST/DELETE)
-- **Dernière MAJ**: 2025-10-23 (Nettoyage Base D1 + Endpoint Cleanup)
-- **Version**: 3.0.2 (Production + Base D1 Propre)
-- **Performance**: < 50ms edge latency mondiale, 260 kB worker bundle
+- **API Complète**: ✅ Projects (GET/POST/DELETE/:id), Users, Clients, Stats, Sync, Cleanup
+- **Dernière MAJ**: 2025-10-23 (Suppression Projets + Accès Module EL)
+- **Version**: 3.1.0 (Production + Gestion Projets Complète)
+- **Performance**: < 50ms edge latency mondiale, 264 kB worker bundle
 - **Backup System**: ✅ LocalStorage + IndexedDB + Cloudflare D1 + Emergency API + Auto-Sync + UI Complete
-- **GitHub Repository**: ✅ https://github.com/pappalardoadrien-design/Diagnostic-pv.git (Commit e757463)
+- **GitHub Repository**: ✅ https://github.com/pappalardoadrien-design/Diagnostic-pv.git (Commit 2752ef0)
 
 ## Prochaines Actions Recommandées
 
@@ -234,17 +238,22 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - ✅ Feedback visuel (spinners, check, badges)
 - ✅ Affichage hybride D1 + LocalStorage
 
-### ✅ **TERMINÉ - Déploiement Production Cloudflare** (v3.0.2)
+### ✅ **TERMINÉ - Gestion Complète des Projets** (v3.1.0)
 - ✅ Configuration Vite avec plugin @hono/vite-cloudflare-pages
-- ✅ Build optimisé (_worker.js 260 kB)
+- ✅ Build optimisé (_worker.js 264 kB)
 - ✅ Déploiement Cloudflare Pages réussi
 - ✅ Migrations D1 appliquées en production (15 tables)
 - ✅ Endpoint /api/projects/sync corrigé et validé
 - ✅ Endpoint /api/projects/cleanup-tests pour nettoyage admin
+- ✅ Endpoint DELETE /api/projects/:id pour suppression individuelle
 - ✅ Base D1 propre : 1 projet actif (JALIBAT), 9 projets test supprimés
-- ✅ Tests complets : 14/14 routes validées (100% success)
-- ✅ GitHub synchronisé (commit e757463)
-- ✅ URL production active : https://c9e90768.diagnostic-hub.pages.dev
+- ✅ Fonction deleteProject() avec confirmation utilisateur
+- ✅ Bouton corbeille (🗑️) sur chaque carte projet synchronisé
+- ✅ Bouton "Module EL" (🌙) sur projets avec audits
+- ✅ Accès direct au module électroluminescence depuis /projects
+- ✅ Tests validés : création ID=11, suppression OK, seul JALIBAT restant
+- ✅ GitHub synchronisé (commit 2752ef0)
+- ✅ URL production active : https://d94b3e06.diagnostic-hub.pages.dev
 - ✅ Projet JALIBAT conservé (ID=8, 242 modules, 98.5 kWc)
 
 ### 1. **Tests Utilisateurs & Feedback** (Priorité Haute)
