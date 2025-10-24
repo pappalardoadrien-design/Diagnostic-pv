@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiagPV Audit EL - Exemple Intégration Sync</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --el-purple: #8B5CF6;
+            --diag-dark: #1F2937;
+        }
+        
+        .bg-el-purple { background-color: var(--el-purple); }
+        .text-el-purple { color: var(--el-purple); }
+        
+        /* Animation bouton sync */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .btn-sync-loading .fa-sync-alt {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    
+    <!-- Header -->
+    <header class="bg-el-purple text-white py-4 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white bg-opacity-20 rounded-lg">
+                        <i class="fas fa-moon text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">ÉLECTROLUMINESCENCE</h1>
+                        <p class="text-purple-100 text-sm">IEC 62446-1 • DiagPV Professional</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <div class="flex items-center space-x-3">
+                    <!-- Bouton Synchronisation Hub -->
+                    <button 
+                        id="syncBtn"
+                        onclick="handleSyncClick()"
+                        class="btn-sync bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2"
+                    >
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Sync Hub</span>
+                    </button>
+                    
+                    <a href="/" class="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-sm font-medium transition">
+                        <i class="fas fa-home mr-1"></i>Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Info Session -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                Informations Session
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <div class="text-sm text-gray-600">Session ID</div>
+                    <div class="font-mono text-sm text-gray-900" id="sessionIdDisplay">-</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-600">Statut Sync</div>
+                    <div class="font-medium" id="syncStatusDisplay">
+                        <span class="text-orange-600">⏳ Non synchronisé</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-600">Progression</div>
+                    <div class="font-medium text-green-600" id="progressDisplay">100%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Données Projet (Simulation) -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-solar-panel text-purple-600 mr-2"></i>
+                Données Projet
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Nom du projet</div>
+                    <div class="font-bold text-gray-900">Les Forges de Lanouée</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Client</div>
+                    <div class="font-bold text-gray-900">ARKOLIA</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Modules</div>
+                    <div class="font-bold text-gray-900">220 modules</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Puissance</div>
+                    <div class="font-bold text-gray-900">88 kWc</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Strings</div>
+                    <div class="font-bold text-gray-900">11 strings</div>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600 mb-1">Défauts</div>
+                    <div class="font-bold text-red-600">5 anomalies</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-cogs text-green-600 mr-2"></i>
+                Actions Disponibles
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="testCreateAuditData()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg font-medium transition">
+                    <i class="fas fa-database mr-2"></i>
+                    Créer Données Test
+                </button>
+                
+                <button onclick="testLoadAuditData()" class="bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg font-medium transition">
+                    <i class="fas fa-eye mr-2"></i>
+                    Voir Données LocalStorage
+                </button>
+                
+                <button onclick="testClearSync()" class="bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg font-medium transition">
+                    <i class="fas fa-trash mr-2"></i>
+                    Réinitialiser Sync
+                </button>
+            </div>
+        </div>
+        
+        <!-- Log Console -->
+        <div class="mt-6 bg-gray-900 rounded-xl shadow-sm p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-white">
+                    <i class="fas fa-terminal text-green-400 mr-2"></i>
+                    Console Log
+                </h2>
+                <button onclick="clearLog()" class="text-gray-400 hover:text-white text-sm">
+                    <i class="fas fa-times mr-1"></i>Effacer
+                </button>
+            </div>
+            <div id="logConsole" class="font-mono text-sm text-green-400 space-y-1 max-h-64 overflow-y-auto">
+                <div class="text-gray-500">En attente d'actions...</div>
+            </div>
+        </div>
+        
+    </main>
+    
+    <!-- Script de Synchronisation DiagPV -->
+    <script src="./diagpv-sync.js"></script>
+    
+    <!-- Scripts de Test -->
+    <script>
+        // Configuration
+        DiagPVSync.config.debugMode = true; // Activer logs
+        
+        // Afficher session ID
+        document.addEventListener('DOMContentLoaded', () => {
+            const sessionId = DiagPVSync.getSessionId() || 'Aucun (utiliser données test)';
+            document.getElementById('sessionIdDisplay').textContent = sessionId;
+            updateSyncStatus();
+            addLog('✅ Page chargée - Session: ' + sessionId);
+        });
+        
+        // Gestion clic bouton sync
+        async function handleSyncClick() {
+            const btn = document.getElementById('syncBtn');
+            const icon = btn.querySelector('i');
+            const text = btn.querySelector('span');
+            
+            // État loading
+            btn.disabled = true;
+            btn.classList.add('btn-sync-loading');
+            text.textContent = 'Synchronisation...';
+            
+            addLog('🔄 Démarrage synchronisation...');
+            
+            try {
+                const result = await syncAuditToHub();
+                addLog('✅ Synchronisation réussie !');
+                addLog(`📊 Projet ID: ${result.projectId}`);
+                addLog(`📋 Intervention ID: ${result.interventionId}`);
+                updateSyncStatus();
+            } catch (error) {
+                addLog('❌ Erreur: ' + error.message);
+            } finally {
+                // Restaurer état bouton
+                btn.disabled = false;
+                btn.classList.remove('btn-sync-loading');
+                text.textContent = 'Sync Hub';
+            }
+        }
+        
+        // Créer données test
+        function testCreateAuditData() {
+            const sessionId = '76e6eb36-8b49-4255-99d3-55fc1adfc1c9';
+            const auditData = {
+                projectName: 'Les Forges de Lanouée',
+                clientName: 'ARKOLIA',
+                clientEmail: 'contact@arkolia.fr',
+                siteAddress: 'Les Forges de Lanouée',
+                totalModules: 220,
+                installedPower: 88,
+                stringCount: 11,
+                defectsFound: 5,
+                conformityRate: 97.7,
+                progress: 100,
+                auditDate: new Date().toISOString()
+            };
+            
+            localStorage.setItem(`audit_${sessionId}`, JSON.stringify(auditData));
+            document.getElementById('sessionIdDisplay').textContent = sessionId;
+            
+            addLog('✅ Données test créées en localStorage');
+            addLog(`📋 Session: ${sessionId}`);
+            updateSyncStatus();
+        }
+        
+        // Charger données audit
+        function testLoadAuditData() {
+            const sessionId = DiagPVSync.getSessionId() || '76e6eb36-8b49-4255-99d3-55fc1adfc1c9';
+            const rawData = localStorage.getItem(`audit_${sessionId}`);
+            
+            if (rawData) {
+                const data = JSON.parse(rawData);
+                addLog('✅ Données trouvées:');
+                addLog(JSON.stringify(data, null, 2));
+            } else {
+                addLog('⚠️ Aucune donnée trouvée pour cette session');
+            }
+        }
+        
+        // Réinitialiser sync
+        function testClearSync() {
+            const sessionId = DiagPVSync.getSessionId() || '76e6eb36-8b49-4255-99d3-55fc1adfc1c9';
+            localStorage.removeItem(`audit_${sessionId}_synced`);
+            addLog('🔄 Statut synchronisation réinitialisé');
+            updateSyncStatus();
+        }
+        
+        // Mettre à jour statut sync
+        function updateSyncStatus() {
+            const sessionId = DiagPVSync.getSessionId() || '76e6eb36-8b49-4255-99d3-55fc1adfc1c9';
+            const isSynced = DiagPVSync.isSynced(sessionId);
+            const display = document.getElementById('syncStatusDisplay');
+            
+            if (isSynced) {
+                const syncInfo = JSON.parse(localStorage.getItem(`audit_${sessionId}_synced`));
+                display.innerHTML = `
+                    <span class="text-green-600">✅ Synchronisé</span>
+                    <div class="text-xs text-gray-500 mt-1">
+                        ${new Date(syncInfo.syncDate).toLocaleString('fr-FR')}
+                    </div>
+                `;
+            } else {
+                display.innerHTML = '<span class="text-orange-600">⏳ Non synchronisé</span>';
+            }
+        }
+        
+        // Ajouter log
+        function addLog(message) {
+            const logConsole = document.getElementById('logConsole');
+            const timestamp = new Date().toLocaleTimeString('fr-FR');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logConsole.appendChild(logEntry);
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+        
+        // Effacer log
+        function clearLog() {
+            document.getElementById('logConsole').innerHTML = '<div class="text-gray-500">Console effacée</div>';
+        }
+    </script>
+    
+</body>
+</html>
