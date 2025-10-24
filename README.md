@@ -5,30 +5,38 @@
 
 Système unifié développé par **Diagnostic Photovoltaïque** pour audits terrain, commissioning indépendant et expertise post-sinistre avec traçabilité normative complète.
 
-## URLs Production
-- **🎯 HUB PRINCIPAL**: https://d94b3e06.diagnostic-hub.pages.dev
-- **📂 Gestion Projets**: https://d94b3e06.diagnostic-hub.pages.dev/projects
-- **➕ Nouveau Projet**: https://d94b3e06.diagnostic-hub.pages.dev/projects/new
-- **🛰️ Module EL + Carte Satellite**: https://d94b3e06.diagnostic-hub.pages.dev/modules/electroluminescence
-- **📋 Liste Modules**: https://d94b3e06.diagnostic-hub.pages.dev/modules
-- **🌡️ Module Thermographie**: https://d94b3e06.diagnostic-hub.pages.dev/modules/thermography
-- **⚡ Module Courbes I-V**: https://d94b3e06.diagnostic-hub.pages.dev/modules/iv-curves
-- **🔌 Module Tests Isolement**: https://d94b3e06.diagnostic-hub.pages.dev/modules/isolation
-- **📡 API Projets**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects
-- **🔄 API Sync**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/sync
-- **🗑️ Admin Cleanup Tests**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
-- **🗑️ Supprimer Projet**: https://d94b3e06.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
-- **📊 Stats Temps Réel**: https://d94b3e06.diagnostic-hub.pages.dev/api/dashboard/stats
-- **👥 API Clients**: https://d94b3e06.diagnostic-hub.pages.dev/api/clients
-- **👤 API Utilisateurs**: https://d94b3e06.diagnostic-hub.pages.dev/api/users
+## URLs Production (v3.3.0)
+- **🎯 HUB PRINCIPAL**: https://7e96ed14.diagnostic-hub.pages.dev
+- **📂 Gestion Projets**: https://7e96ed14.diagnostic-hub.pages.dev/projects
+- **➕ Nouveau Projet**: https://7e96ed14.diagnostic-hub.pages.dev/projects/new
+- **🛰️ Module EL + Carte Satellite**: https://7e96ed14.diagnostic-hub.pages.dev/modules/electroluminescence?project=8&name=Audit%20JALIBAT
+- **📋 Liste Modules**: https://7e96ed14.diagnostic-hub.pages.dev/modules
+- **🌡️ Module Thermographie**: https://7e96ed14.diagnostic-hub.pages.dev/modules/thermography
+- **⚡ Module Courbes I-V**: https://7e96ed14.diagnostic-hub.pages.dev/modules/iv-curves
+- **🔌 Module Tests Isolement**: https://7e96ed14.diagnostic-hub.pages.dev/modules/isolation
+- **📡 API Projets**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects
+- **📊 API Projet Détails**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/:id (GET)
+- **🔄 API Sync**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/sync
+- **🗑️ Admin Cleanup Tests**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
+- **🗑️ Supprimer Projet**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
+- **📊 Stats Temps Réel**: https://7e96ed14.diagnostic-hub.pages.dev/api/dashboard/stats
+- **👥 API Clients**: https://7e96ed14.diagnostic-hub.pages.dev/api/clients
+- **👤 API Utilisateurs**: https://7e96ed14.diagnostic-hub.pages.dev/api/users
 
 ## 6 Modules Opérationnels
 
-### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE + 🔄 RECTANGLE ORIENTABLE
+### 1. **Électroluminescence** ✅ INTÉGRATION DYNAMIQUE + 🔄 RECTANGLE ORIENTABLE + 📤 INIT PROJET
 - **Route**: `/modules/electroluminescence` (DiagPV Audit intégré dans HUB)
 - **Interface**: Iframe intégré avec dashboard temps réel + synchronisation bidirectionnelle
 - **Normes**: IEC 62446-1, IEC 61215
-- **🆕 NOUVEAU : Rectangle Orientable SolarEdge-Style**:
+- **🆕 v3.3.0 : Initialisation Projet via postMessage** ✅:
+  - **Communication Hub→Iframe** : `HUB_INIT_PROJECT` envoyé automatiquement
+  - **Données transmises** : ID projet, nom, client, adresse, modules, puissance
+  - **Chargement asynchrone** : Gestion event listener 'load' pour iframe
+  - **Pre-remplissage audit** : Session DiagPV initialisée avec contexte projet
+  - **URL parameters** : `?project=8&name=Audit%20JALIBAT` depuis bouton "Module EL"
+  - **Logs debug** : Console Hub et iframe pour tracer communication
+- **🆕 ANCIEN : Rectangle Orientable SolarEdge-Style**:
   - **Rotation 0-360°** : Handle central pour orienter rectangle selon angle toiture
   - **Calepinage orienté** : Grille modules respecte l'angle du rectangle
   - **Rendu rectangles PV** : Modules affichés comme vrais panneaux orientés (plus de markers)
@@ -240,10 +248,11 @@ wrangler pages deploy dist --project-name diagnostic-hub
 
 ### ✅ **TERMINÉ - Gestion Complète des Projets** (v3.1.0)
 - ✅ Configuration Vite avec plugin @hono/vite-cloudflare-pages
-- ✅ Build optimisé (_worker.js 264 kB)
+- ✅ Build optimisé (_worker.js 269 kB)
 - ✅ Déploiement Cloudflare Pages réussi
 - ✅ Migrations D1 appliquées en production (15 tables)
 - ✅ Endpoint /api/projects/sync corrigé et validé
+- ✅ Endpoint GET /api/projects/:id pour récupération détails projet
 - ✅ Endpoint /api/projects/cleanup-tests pour nettoyage admin
 - ✅ Endpoint DELETE /api/projects/:id pour suppression individuelle
 - ✅ Base D1 propre : 1 projet actif (JALIBAT), 9 projets test supprimés
@@ -251,9 +260,13 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - ✅ Bouton corbeille (🗑️) sur chaque carte projet synchronisé
 - ✅ Bouton "Module EL" (🌙) sur projets avec audits
 - ✅ Accès direct au module électroluminescence depuis /projects
+- ✅ **v3.3.0** : Communication postMessage HUB_INIT_PROJECT vers iframe DiagPV
+- ✅ **v3.3.0** : Initialisation automatique projet dans audit EL
+- ✅ **v3.3.0** : loadProjectData() envoie données (ID, nom, client, modules) vers iframe
+- ✅ **v3.3.0** : Gestion chargement asynchrone iframe avec event listener 'load'
 - ✅ Tests validés : création ID=11, suppression OK, seul JALIBAT restant
-- ✅ GitHub synchronisé (commit 2752ef0)
-- ✅ URL production active : https://d94b3e06.diagnostic-hub.pages.dev
+- ✅ GitHub synchronisé (commit 5145a56)
+- ✅ URL production active : https://7e96ed14.diagnostic-hub.pages.dev
 - ✅ Projet JALIBAT conservé (ID=8, 242 modules, 98.5 kWc)
 
 ### 1. **Tests Utilisateurs & Feedback** (Priorité Haute)
@@ -285,6 +298,42 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - **IoT sensors** : Irradiance/température temps réel
 - **IA prédictive** : Détection précoce dégradations
 - **Sync bidirectionnel** : D1 → LocalStorage (multi-devices)
+
+---
+
+## 📝 Changelog
+
+### v3.3.0 (2025-10-24)
+**🔗 Communication Hub ↔ Module EL via postMessage**
+- ✅ Ajout `postMessage` type `HUB_INIT_PROJECT` dans `loadProjectData()`
+- ✅ Transmission automatique données projet vers iframe DiagPV
+- ✅ Données envoyées : `projectId`, `projectName`, `clientName`, `siteAddress`, `totalModules`, `installedPower`, `sessionId`
+- ✅ Gestion chargement asynchrone iframe avec event listener `load`
+- ✅ Logs console pour debug communication Hub↔Iframe
+- ✅ Pre-remplissage session audit EL depuis contexte Hub
+- 🐛 Fix ecosystem.config.cjs : `wrangler pages dev` au lieu de `wrangler dev`
+- 🚀 Déploiement production : https://7e96ed14.diagnostic-hub.pages.dev
+
+### v3.2.0 (2025-10-23)
+**🗑️ Suppression Projets + 🔗 Accès Module EL**
+- ✅ Endpoint `DELETE /api/projects/:id` avec cascade 10 tables
+- ✅ Endpoint `DELETE /api/projects/cleanup-tests` pour nettoyage bulk
+- ✅ Endpoint `GET /api/projects/:id` pour récupération détails
+- ✅ Fonction `deleteProject()` avec confirmation utilisateur
+- ✅ Bouton corbeille (🗑️) sur cartes projets synchronisés
+- ✅ Bouton "Module EL" (🌙) sur projets localStorage + synchronisés
+- ✅ URL parameters : `?project=8&name=Audit%20JALIBAT`
+- ✅ `loadProjectContext()` : lecture params URL + mise à jour header dynamique
+- ✅ Nettoyage base D1 : 9 projets test supprimés, JALIBAT conservé
+- 🚀 Déploiement production : https://eaf6e9b1.diagnostic-hub.pages.dev
+
+### v3.1.0 (2025-10-22)
+**🔄 Synchronisation localStorage → D1**
+- ✅ Endpoint `POST /api/projects/sync` pour migration données
+- ✅ Fonction `syncProject()` frontend avec bouton UI
+- ✅ Validation projets déjà synchronisés (pas de doublons)
+- ✅ Badge "Synchronisé" (✓) sur cartes projets
+- 🚀 Déploiement production : https://d94b3e06.diagnostic-hub.pages.dev
 
 ---
 
