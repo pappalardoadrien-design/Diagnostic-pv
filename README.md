@@ -5,24 +5,33 @@
 
 Système unifié développé par **Diagnostic Photovoltaïque** pour audits terrain, commissioning indépendant et expertise post-sinistre avec traçabilité normative complète.
 
-## URLs Production (v3.4.0)
-- **🎯 HUB PRINCIPAL**: https://273bf220.diagnostic-hub.pages.dev
-- **📂 Gestion Projets**: https://273bf220.diagnostic-hub.pages.dev/projects
-- **➕ Nouveau Projet**: https://273bf220.diagnostic-hub.pages.dev/projects/new
-- **🛰️ Module EL + Carte Satellite**: https://273bf220.diagnostic-hub.pages.dev/modules/electroluminescence?project=8&name=Audit%20JALIBAT
-- **📋 Liste Modules**: https://273bf220.diagnostic-hub.pages.dev/modules
-- **🌡️ Module Thermographie**: https://273bf220.diagnostic-hub.pages.dev/modules/thermography
-- **⚡ Module Courbes I-V**: https://273bf220.diagnostic-hub.pages.dev/modules/iv-curves
-- **🔌 Module Tests Isolement**: https://273bf220.diagnostic-hub.pages.dev/modules/isolation
-- **📡 API Projets**: https://273bf220.diagnostic-hub.pages.dev/api/projects
-- **📊 API Projet Détails**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id (GET)
-- **📄 API Rapport PDF**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id/report (GET)
-- **🔄 API Sync**: https://273bf220.diagnostic-hub.pages.dev/api/projects/sync
-- **🗑️ Admin Cleanup Tests**: https://273bf220.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
-- **🗑️ Supprimer Projet**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
-- **📊 Stats Temps Réel**: https://273bf220.diagnostic-hub.pages.dev/api/dashboard/stats
-- **👥 API Clients**: https://273bf220.diagnostic-hub.pages.dev/api/clients
-- **👤 API Utilisateurs**: https://273bf220.diagnostic-hub.pages.dev/api/users
+## 🌐 URL Production Unique (v3.4.0)
+
+**URL PRINCIPALE** : https://diagnostic-hub.pages.dev
+
+### Pages Principales
+- **🎯 Accueil Hub** : https://diagnostic-hub.pages.dev
+- **📂 Gestion Projets** : https://diagnostic-hub.pages.dev/projects
+- **➕ Nouveau Projet** : https://diagnostic-hub.pages.dev/projects/new
+- **📋 Liste Modules** : https://diagnostic-hub.pages.dev/modules
+
+### Modules Diagnostiques
+- **🛰️ Module EL** : https://diagnostic-hub.pages.dev/modules/electroluminescence
+- **🌡️ Thermographie** : https://diagnostic-hub.pages.dev/modules/thermography
+- **⚡ Courbes I-V** : https://diagnostic-hub.pages.dev/modules/iv-curves
+- **🔌 Tests Isolement** : https://diagnostic-hub.pages.dev/modules/isolation
+- **👁️ Contrôles Visuels** : https://diagnostic-hub.pages.dev/modules/visual
+- **🔥 Expertise Post-Sinistre** : https://diagnostic-hub.pages.dev/modules/expertise
+
+### API Endpoints
+- **📡 Liste Projets** : https://diagnostic-hub.pages.dev/api/projects (GET)
+- **📊 Détails Projet** : https://diagnostic-hub.pages.dev/api/projects/:id (GET)
+- **📄 Rapport PDF** : https://diagnostic-hub.pages.dev/api/projects/:id/report (GET)
+- **🔄 Sync Projet** : https://diagnostic-hub.pages.dev/api/projects/sync (POST)
+- **🗑️ Supprimer Projet** : https://diagnostic-hub.pages.dev/api/projects/:id (DELETE)
+- **📊 Stats Dashboard** : https://diagnostic-hub.pages.dev/api/dashboard/stats (GET)
+- **👥 Clients** : https://diagnostic-hub.pages.dev/api/clients (GET)
+- **👤 Utilisateurs** : https://diagnostic-hub.pages.dev/api/users (GET)
 
 ## 6 Modules Opérationnels
 
