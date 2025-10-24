@@ -316,6 +316,75 @@ app.delete('/api/projects/cleanup-tests', async (c) => {
   }
 });
 
+// Endpoint : Supprimer un projet individuel
+app.delete('/api/projects/:id', async (c) => {
+  try {
+    const projectId = parseInt(c.req.param('id'));
+    
+    if (!projectId || isNaN(projectId)) {
+      return c.json({ success: false, error: 'ID projet invalide' }, 400);
+    }
+    
+    // Vérifier que le projet existe
+    const project = await c.env.DB.prepare(`SELECT id, name FROM projects WHERE id = ?`).bind(projectId).first();
+    
+    if (!project) {
+      return c.json({ success: false, error: 'Projet non trouvé' }, 404);
+    }
+    
+    // Récupérer les IDs des interventions liées
+    const { results: interventions } = await c.env.DB.prepare(`
+      SELECT id FROM interventions WHERE project_id = ?
+    `).bind(projectId).all();
+    
+    const interventionIds = interventions.map(i => i.id);
+    
+    // Suppression en cascade dans l'ordre inverse des dépendances
+    if (interventionIds.length > 0) {
+      const idsString = interventionIds.join(',');
+      
+      // 1. Reports
+      await c.env.DB.prepare(`DELETE FROM reports WHERE intervention_id IN (${idsString})`).run();
+      
+      // 2. Post incident expertise
+      await c.env.DB.prepare(`DELETE FROM post_incident_expertise WHERE intervention_id IN (${idsString})`).run();
+      
+      // 3. Visual inspections
+      await c.env.DB.prepare(`DELETE FROM visual_inspections WHERE intervention_id IN (${idsString})`).run();
+      
+      // 4. Isolation tests
+      await c.env.DB.prepare(`DELETE FROM isolation_tests WHERE intervention_id IN (${idsString})`).run();
+      
+      // 5. IV measurements
+      await c.env.DB.prepare(`DELETE FROM iv_measurements WHERE intervention_id IN (${idsString})`).run();
+      
+      // 6. Thermal measurements
+      await c.env.DB.prepare(`DELETE FROM thermal_measurements WHERE intervention_id IN (${idsString})`).run();
+      
+      // 7. EL measurements
+      await c.env.DB.prepare(`DELETE FROM el_measurements WHERE intervention_id IN (${idsString})`).run();
+    }
+    
+    // 8. Modules
+    await c.env.DB.prepare(`DELETE FROM modules WHERE project_id = ?`).bind(projectId).run();
+    
+    // 9. Interventions
+    await c.env.DB.prepare(`DELETE FROM interventions WHERE project_id = ?`).bind(projectId).run();
+    
+    // 10. Projects
+    await c.env.DB.prepare(`DELETE FROM projects WHERE id = ?`).bind(projectId).run();
+    
+    return c.json({ 
+      success: true, 
+      message: `Projet "${project.name}" supprimé avec succès`,
+      projectId: projectId
+    });
+  } catch (error) {
+    console.error('Erreur suppression projet:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Statistiques dashboard
 app.get('/api/dashboard/stats', async (c) => {
   try {
@@ -1246,9 +1315,19 @@ app.get('/projects', (c) => {
                                     <i class="fas fa-sync mr-1"></i>Synchroniser
                                 </button>
                             \` : ''}
+                            \${project.source === 'localStorage' || project.synced ? \`
+                                <a href="/modules/electroluminescence" class="px-3 py-1 text-purple-600 border border-purple-200 rounded hover:bg-purple-50">
+                                    <i class="fas fa-moon mr-1"></i>Module EL
+                                </a>
+                            \` : ''}
                             <button class="px-3 py-1 text-blue-600 border border-blue-200 rounded hover:bg-blue-50">
                                 <i class="fas fa-eye mr-1"></i>Voir
                             </button>
+                            \${project.synced && !project.id.toString().startsWith('local_') ? \`
+                                <button onclick="deleteProject(\${project.id}, '\${project.name.replace(/'/g, "\\\\'")}')" class="px-3 py-1 text-red-600 border border-red-200 rounded hover:bg-red-50" title="Supprimer ce projet">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            \` : ''}
                         </div>
                     </div>
                 </div>
@@ -1374,6 +1453,49 @@ app.get('/projects', (c) => {
                 notification.style.opacity = '0';
                 setTimeout(() => notification.remove(), 300);
             }, 4000);
+        }
+        
+        // Supprimer un projet
+        async function deleteProject(projectId, projectName) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer le projet "' + projectName + '" ?\\n\\nCette action est irréversible et supprimera toutes les données associées (interventions, mesures, rapports).')) {
+                return;
+            }
+            
+            // Afficher loader
+            const btn = event.target.closest('button');
+            if (btn) {
+                const originalHTML = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            }
+            
+            try {
+                const response = await fetch(\`/api/projects/\${projectId}\`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('success', '✅ Projet "' + projectName + '" supprimé avec succès');
+                    // Recharger la liste après 1s
+                    setTimeout(() => {
+                        loadProjects();
+                    }, 1000);
+                } else {
+                    showNotification('error', 'Erreur: ' + result.error);
+                    if (btn) {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    }
+                }
+            } catch (error) {
+                showNotification('error', 'Erreur suppression: ' + error.message);
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                }
+            }
         }
         
         // Synchroniser tous les projets non synchronisés
