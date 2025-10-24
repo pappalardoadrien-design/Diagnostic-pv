@@ -316,6 +316,36 @@ app.delete('/api/projects/cleanup-tests', async (c) => {
   }
 });
 
+// Endpoint : Récupérer un projet individuel
+app.get('/api/projects/:id', async (c) => {
+  try {
+    const projectId = parseInt(c.req.param('id'));
+    
+    if (!projectId || isNaN(projectId)) {
+      return c.json({ success: false, error: 'ID projet invalide' }, 400);
+    }
+    
+    const project = await c.env.DB.prepare(`
+      SELECT p.*, c.name as client_name, c.contact_email, 
+             COUNT(DISTINCT i.id) as intervention_count,
+             MAX(i.completion_date) as last_intervention
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN interventions i ON p.id = i.project_id
+      WHERE p.id = ?
+      GROUP BY p.id
+    `).bind(projectId).first();
+    
+    if (!project) {
+      return c.json({ success: false, error: 'Projet non trouvé' }, 404);
+    }
+    
+    return c.json({ success: true, project });
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 // Endpoint : Supprimer un projet individuel
 app.delete('/api/projects/:id', async (c) => {
   try {
@@ -1316,7 +1346,7 @@ app.get('/projects', (c) => {
                                 </button>
                             \` : ''}
                             \${project.source === 'localStorage' || project.synced ? \`
-                                <a href="/modules/electroluminescence" class="px-3 py-1 text-purple-600 border border-purple-200 rounded hover:bg-purple-50">
+                                <a href="/modules/electroluminescence?project=\${project.id}&name=\${encodeURIComponent(project.name)}" class="px-3 py-1 text-purple-600 border border-purple-200 rounded hover:bg-purple-50">
                                     <i class="fas fa-moon mr-1"></i>Module EL
                                 </a>
                             \` : ''}
@@ -1805,8 +1835,8 @@ app.get('/modules/electroluminescence', (c) => {
                             <i class="fas fa-moon text-lg text-white"></i>
                         </div>
                         <div>
-                            <h1 class="text-lg font-bold">ÉLECTROLUMINESCENCE</h1>
-                            <p class="text-purple-100 text-sm">IEC 62446-1 • Intégré HUB DiagPV</p>
+                            <h1 class="text-lg font-bold" id="moduleTitle">ÉLECTROLUMINESCENCE</h1>
+                            <p class="text-purple-100 text-sm" id="moduleSubtitle">IEC 62446-1 • Intégré HUB DiagPV</p>
                         </div>
                     </div>
                     
@@ -2484,7 +2514,44 @@ app.get('/modules/electroluminescence', (c) => {
             }
         }
         
+        // Récupération des paramètres URL et affichage contexte projet
+        function loadProjectContext() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectId = urlParams.get('project');
+            const projectName = urlParams.get('name');
+            
+            if (projectName) {
+                const decodedName = decodeURIComponent(projectName);
+                document.getElementById('moduleTitle').textContent = 'ÉLECTROLUMINESCENCE - ' + decodedName;
+                document.getElementById('moduleSubtitle').textContent = 'IEC 62446-1 • Projet #' + (projectId || 'local');
+                console.log('📂 Module EL chargé pour projet:', decodedName, '(ID:', projectId, ')');
+            }
+            
+            // Charger données projet depuis D1 si projectId fourni
+            if (projectId && !projectId.startsWith('local_')) {
+                loadProjectData(projectId);
+            }
+        }
+        
+        // Charger données projet depuis API
+        async function loadProjectData(projectId) {
+            try {
+                const response = await fetch('/api/projects/' + projectId);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.project) {
+                        console.log('📊 Données projet chargées:', data.project);
+                        // Stocker pour utilisation future
+                        window.currentProject = data.project;
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur chargement projet:', error);
+            }
+        }
+        
         // Initialisation
+        loadProjectContext();
         initializeBackupSystem();
         </script>
     </body>
