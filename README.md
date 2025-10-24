@@ -5,23 +5,24 @@
 
 Système unifié développé par **Diagnostic Photovoltaïque** pour audits terrain, commissioning indépendant et expertise post-sinistre avec traçabilité normative complète.
 
-## URLs Production (v3.3.0)
-- **🎯 HUB PRINCIPAL**: https://7e96ed14.diagnostic-hub.pages.dev
-- **📂 Gestion Projets**: https://7e96ed14.diagnostic-hub.pages.dev/projects
-- **➕ Nouveau Projet**: https://7e96ed14.diagnostic-hub.pages.dev/projects/new
-- **🛰️ Module EL + Carte Satellite**: https://7e96ed14.diagnostic-hub.pages.dev/modules/electroluminescence?project=8&name=Audit%20JALIBAT
-- **📋 Liste Modules**: https://7e96ed14.diagnostic-hub.pages.dev/modules
-- **🌡️ Module Thermographie**: https://7e96ed14.diagnostic-hub.pages.dev/modules/thermography
-- **⚡ Module Courbes I-V**: https://7e96ed14.diagnostic-hub.pages.dev/modules/iv-curves
-- **🔌 Module Tests Isolement**: https://7e96ed14.diagnostic-hub.pages.dev/modules/isolation
-- **📡 API Projets**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects
-- **📊 API Projet Détails**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/:id (GET)
-- **🔄 API Sync**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/sync
-- **🗑️ Admin Cleanup Tests**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
-- **🗑️ Supprimer Projet**: https://7e96ed14.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
-- **📊 Stats Temps Réel**: https://7e96ed14.diagnostic-hub.pages.dev/api/dashboard/stats
-- **👥 API Clients**: https://7e96ed14.diagnostic-hub.pages.dev/api/clients
-- **👤 API Utilisateurs**: https://7e96ed14.diagnostic-hub.pages.dev/api/users
+## URLs Production (v3.4.0)
+- **🎯 HUB PRINCIPAL**: https://273bf220.diagnostic-hub.pages.dev
+- **📂 Gestion Projets**: https://273bf220.diagnostic-hub.pages.dev/projects
+- **➕ Nouveau Projet**: https://273bf220.diagnostic-hub.pages.dev/projects/new
+- **🛰️ Module EL + Carte Satellite**: https://273bf220.diagnostic-hub.pages.dev/modules/electroluminescence?project=8&name=Audit%20JALIBAT
+- **📋 Liste Modules**: https://273bf220.diagnostic-hub.pages.dev/modules
+- **🌡️ Module Thermographie**: https://273bf220.diagnostic-hub.pages.dev/modules/thermography
+- **⚡ Module Courbes I-V**: https://273bf220.diagnostic-hub.pages.dev/modules/iv-curves
+- **🔌 Module Tests Isolement**: https://273bf220.diagnostic-hub.pages.dev/modules/isolation
+- **📡 API Projets**: https://273bf220.diagnostic-hub.pages.dev/api/projects
+- **📊 API Projet Détails**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id (GET)
+- **📄 API Rapport PDF**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id/report (GET)
+- **🔄 API Sync**: https://273bf220.diagnostic-hub.pages.dev/api/projects/sync
+- **🗑️ Admin Cleanup Tests**: https://273bf220.diagnostic-hub.pages.dev/api/projects/cleanup-tests (DELETE)
+- **🗑️ Supprimer Projet**: https://273bf220.diagnostic-hub.pages.dev/api/projects/:id (DELETE)
+- **📊 Stats Temps Réel**: https://273bf220.diagnostic-hub.pages.dev/api/dashboard/stats
+- **👥 API Clients**: https://273bf220.diagnostic-hub.pages.dev/api/clients
+- **👤 API Utilisateurs**: https://273bf220.diagnostic-hub.pages.dev/api/users
 
 ## 6 Modules Opérationnels
 
@@ -246,27 +247,35 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - ✅ Feedback visuel (spinners, check, badges)
 - ✅ Affichage hybride D1 + LocalStorage
 
-### ✅ **TERMINÉ - Gestion Complète des Projets** (v3.1.0)
+### ✅ **TERMINÉ - Gestion Complète des Projets** (v3.4.0)
 - ✅ Configuration Vite avec plugin @hono/vite-cloudflare-pages
-- ✅ Build optimisé (_worker.js 269 kB)
+- ✅ Build optimisé (_worker.js 288 kB)
 - ✅ Déploiement Cloudflare Pages réussi
 - ✅ Migrations D1 appliquées en production (15 tables)
 - ✅ Endpoint /api/projects/sync corrigé et validé
 - ✅ Endpoint GET /api/projects/:id pour récupération détails projet
+- ✅ Endpoint GET /api/projects/:id/report pour génération rapports HTML/PDF
 - ✅ Endpoint /api/projects/cleanup-tests pour nettoyage admin
 - ✅ Endpoint DELETE /api/projects/:id pour suppression individuelle
 - ✅ Base D1 propre : 1 projet actif (JALIBAT), 9 projets test supprimés
 - ✅ Fonction deleteProject() avec confirmation utilisateur
+- ✅ Fonction generateReport() avec téléchargement automatique
 - ✅ Bouton corbeille (🗑️) sur chaque carte projet synchronisé
 - ✅ Bouton "Module EL" (🌙) sur projets avec audits
+- ✅ Bouton "Rapport" (📄) pour génération PDF par projet
 - ✅ Accès direct au module électroluminescence depuis /projects
 - ✅ **v3.3.0** : Communication postMessage HUB_INIT_PROJECT vers iframe DiagPV
 - ✅ **v3.3.0** : Initialisation automatique projet dans audit EL
 - ✅ **v3.3.0** : loadProjectData() envoie données (ID, nom, client, modules) vers iframe
 - ✅ **v3.3.0** : Gestion chargement asynchrone iframe avec event listener 'load'
+- ✅ **v3.4.0** : Barre de recherche temps réel (nom, client, adresse)
+- ✅ **v3.4.0** : Filtres par statut (Tous/Synchronisés/Locaux)
+- ✅ **v3.4.0** : Tri dynamique (date, nom, puissance, modules)
+- ✅ **v3.4.0** : Fonction applyFilters() centralisée avec variable globale
+- ✅ **v3.4.0** : Rapports HTML professionnels avec stats, mesures EL, conformité IEC
 - ✅ Tests validés : création ID=11, suppression OK, seul JALIBAT restant
-- ✅ GitHub synchronisé (commit 5145a56)
-- ✅ URL production active : https://7e96ed14.diagnostic-hub.pages.dev
+- ✅ GitHub synchronisé (commit f4b31eb)
+- ✅ URL production active : https://273bf220.diagnostic-hub.pages.dev
 - ✅ Projet JALIBAT conservé (ID=8, 242 modules, 98.5 kWc)
 
 ### 1. **Tests Utilisateurs & Feedback** (Priorité Haute)
@@ -281,11 +290,14 @@ wrangler pages deploy dist --project-name diagnostic-hub
 - GPS intégré pour géolocalisation mesures
 - Camera API pour capture photos défauts
 
-### 3. **Automatisation Rapports** (Priorité Moyenne)
-- Templates PDF normatifs IEC/NFC/DIN
-- Signature électronique certifiée
-- Envoi automatique clients (< 5 jours)
-- Génération depuis données D1 synchronisées
+### 3. **Automatisation Rapports** (Priorité Moyenne) ✅ PARTIELLEMENT
+- ✅ Génération rapports HTML professionnels (v3.4.0)
+- ✅ Endpoint /api/projects/:id/report opérationnel
+- ✅ Bouton téléchargement par projet
+- ⏳ Conversion HTML → PDF serveur (bibliothèque externe requise)
+- ⏳ Signature électronique certifiée
+- ⏳ Envoi automatique clients (< 5 jours)
+- ✅ Génération depuis données D1 synchronisées
 
 ### 4. **Dashboard Analytics** (Priorité Moyenne)
 - KPI temps réel (interventions/mois, défauts détectés)
@@ -302,6 +314,22 @@ wrangler pages deploy dist --project-name diagnostic-hub
 ---
 
 ## 📝 Changelog
+
+### v3.4.0 (2025-10-24)
+**🔍 Recherche, Filtres, Tri & 📄 Rapports PDF**
+- ✅ **Barre de recherche temps réel** : recherche par nom projet, client, adresse avec `oninput`
+- ✅ **Filtres par statut** : dropdown Tous/Synchronisés/Locaux avec `onchange`
+- ✅ **Tri dynamique** : 8 options (date asc/desc, nom A-Z/Z-A, puissance, modules)
+- ✅ **Fonction centralisée** : `applyFilters()` gère recherche + filtres + tri
+- ✅ **Variable globale** : `allProjectsData` stocke tous projets pour filtrage
+- ✅ **Bouton Reset** : réinitialiser filtres si aucun résultat
+- ✅ **Endpoint rapport** : `GET /api/projects/:id/report` génère HTML professionnel
+- ✅ **Bouton Rapport** : téléchargement automatique via blob sur cartes projets
+- ✅ **Contenu rapport** : en-tête DiagPV, stats projet, mesures EL, conformité IEC, footer
+- ✅ **Fonction generateReport()** : téléchargement avec nom fichier personnalisé
+- 🐛 Fix colonnes SQL : suppression `c.phone`, correction `intervention_date → created_at`
+- 📦 Build : `_worker.js 288 kB` (optimisé)
+- 🚀 Déploiement production : https://273bf220.diagnostic-hub.pages.dev
 
 ### v3.3.0 (2025-10-24)
 **🔗 Communication Hub ↔ Module EL via postMessage**
