@@ -1,16 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "diagpv-audit",
-  "compatibility_date": "2025-10-03", 
+  "name": "diagnostic-hub",
+  "compatibility_date": "2025-10-27", 
   "pages_build_output_dir": "./dist",
   "compatibility_flags": ["nodejs_compat"],
   
-  // Configuration D1 Database pour audits EL
+  // Configuration D1 Database unifiée (plateforme monolithe)
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "diagpv-audit-production",
-      "database_id": "dfa92296-cb50-4ce4-b135-009f530d6224"
+      "database_name": "diagnostic-hub-production",
+      "database_id": "72be68d4-c5c5-4854-9ead-3bbcc131d199"
     }
   ],
   
