@@ -3,7 +3,7 @@
 
 // Configuration logging production
 const DEBUG_APP = localStorage.getItem('diagpv_debug') === 'true'
-const logApp = (...args) => DEBUG_APP && console.logApp(...args)
+const logApp = (...args) => DEBUG_APP && console.log(...args)
 const error = (...args) => console.error(...args)
 
 class DiagPVApp {

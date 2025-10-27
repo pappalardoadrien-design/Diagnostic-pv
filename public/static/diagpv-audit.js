@@ -3,8 +3,8 @@
 
 // Configuration logging production
 const DEBUG_AUDIT = localStorage.getItem('diagpv_debug') === 'true'
-const logAudit = (...args) => DEBUG_AUDIT && console.logAudit(...args)
-const error = (...args) => console.error(...args) // Toujours afficher les erreurs
+const logAudit = (...args) => DEBUG_AUDIT && console.log(...args)
+const errorAudit = (...args) => console.error(...args) // Toujours afficher les erreurs
 
 class DiagPVAudit {
     constructor() {
@@ -38,7 +38,7 @@ class DiagPVAudit {
             this.setupRealtimeSync()
             this.setupOfflineSupport()
         } catch (err) {
-            error('Erreur initialisation:', err)
+            errorAudit('Erreur initialisation:', err)
             this.showAlert('Erreur chargement audit: ' + error.message, 'error')
         }
     }
@@ -293,7 +293,7 @@ class DiagPVAudit {
                         this.openModuleModal(moduleId)
                     }
                 } else {
-                    error('❌ Pas de module-id trouvé sur:', e.target)
+                    errorAudit('❌ Pas de module-id trouvé sur:', e.target)
                 }
             }
         })
@@ -321,13 +321,13 @@ class DiagPVAudit {
         logAudit('📝 Ouverture modal pour module:', moduleId)
         
         if (!moduleId) {
-            error('❌ Module ID manquant')
+            errorAudit('❌ Module ID manquant')
             return
         }
         
         const module = this.modules.get(moduleId)
         if (!module) {
-            error('❌ Module non trouvé:', moduleId, 'Modules disponibles:', Array.from(this.modules.keys()).slice(0, 5))
+            errorAudit('❌ Module non trouvé:', moduleId, 'Modules disponibles:', Array.from(this.modules.keys()).slice(0, 5))
             return
         }
 
@@ -438,7 +438,7 @@ class DiagPVAudit {
         }
 
         if (!this.selectedModule.module_id) {
-            error('❌ Module ID manquant dans selectedModule:', this.selectedModule)
+            errorAudit('❌ Module ID manquant dans selectedModule:', this.selectedModule)
             this.showAlert('Erreur: Module ID manquant', 'error')
             return
         }
@@ -495,7 +495,7 @@ class DiagPVAudit {
             logAudit('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
         } catch (err) {
-            error('Erreur validation module:', err)
+            errorAudit('Erreur validation module:', err)
             
             // Mode offline - queue pour sync ultérieure
             if (!navigator.onLine) {
@@ -511,19 +511,19 @@ class DiagPVAudit {
         logAudit('🔄 Mise à jour bouton module:', moduleId)
         
         if (!moduleId) {
-            error('❌ Module ID manquant pour mise à jour bouton')
+            errorAudit('❌ Module ID manquant pour mise à jour bouton')
             return
         }
         
         const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
         if (!btn) {
-            error('❌ Bouton module non trouvé:', moduleId)
+            errorAudit('❌ Bouton module non trouvé:', moduleId)
             return
         }
 
         const module = this.modules.get(moduleId)
         if (!module) {
-            error('❌ Module non trouvé dans Map:', moduleId)
+            errorAudit('❌ Module non trouvé dans Map:', moduleId)
             return
         }
         
@@ -582,7 +582,7 @@ class DiagPVAudit {
                         this.handleRealtimeUpdate(data)
                     }
                 } catch (err) {
-                    error('Erreur parsing SSE:', err)
+                    errorAudit('Erreur parsing SSE:', err)
                 }
             }
 
@@ -673,7 +673,7 @@ class DiagPVAudit {
                     body: JSON.stringify(update)
                 })
             } catch (err) {
-                error('Erreur sync offline:', err)
+                errorAudit('Erreur sync offline:', err)
                 break
             }
         }
@@ -773,7 +773,7 @@ class DiagPVAudit {
             logAudit('📄 Rapport généré:', reportUrl)
             
         } catch (err) {
-            error('Erreur génération rapport:', err)
+            errorAudit('Erreur génération rapport:', err)
             this.showAlert('Erreur génération rapport', 'error')
         }
     }
@@ -921,7 +921,7 @@ class DiagPVAudit {
             logAudit('✅ Audit modifié:', formData.project_name)
             
         } catch (err) {
-            error('Erreur modification audit:', err)
+            errorAudit('Erreur modification audit:', err)
             this.showAlert('Erreur lors de la modification', 'error')
         }
     }
@@ -1217,7 +1217,7 @@ class DiagPVAudit {
                     }
 
                 } catch (err) {
-                    error(`❌ Erreur lot ${i + 1}:`, error)
+                    errorAudit(`❌ Erreur lot ${i + 1}:`, error)
                     hasErrors = true
                     // On continue avec les autres lots
                 }
@@ -1256,7 +1256,7 @@ class DiagPVAudit {
             }
 
         } catch (err) {
-            error('❌ Erreur globale mise à jour en lot:', err)
+            errorAudit('❌ Erreur globale mise à jour en lot:', err)
             this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
             
             // Fermeture modal en cas d'erreur critique
