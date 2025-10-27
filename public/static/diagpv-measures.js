@@ -1,6 +1,6 @@
 // Configuration logging production
-const DEBUG = localStorage.getItem("diagpv_debug") === "true"
-const log = (...args) => DEBUG && log(...args)
+const DEBUG_MEASURES = localStorage.getItem("diagpv_debug") === "true"
+const log = (...args) => DEBUG_MEASURES && console.log(...args)
 const error = (...args) => console.error(...args)
 
 // DiagPV - Interface mesures PVserv

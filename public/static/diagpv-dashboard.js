@@ -1,6 +1,6 @@
 // Configuration logging production
-const DEBUG = localStorage.getItem("diagpv_debug") === "true"
-const log = (...args) => DEBUG && log(...args)
+const DEBUG_DASHBOARD = localStorage.getItem("diagpv_debug") === "true"
+const log = (...args) => DEBUG_DASHBOARD && console.log(...args)
 const error = (...args) => console.error(...args)
 
 // DiagPV Dashboard - Tableau de bord audits temps réel

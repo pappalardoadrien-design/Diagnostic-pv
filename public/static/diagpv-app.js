@@ -2,8 +2,8 @@
 // Optimisé pour usage terrain nocturne + tablette tactile
 
 // Configuration logging production
-const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
-const log = (...args) => DEBUG && log(...args)
+const DEBUG_APP = localStorage.getItem('diagpv_debug') === 'true'
+const log = (...args) => DEBUG_APP && console.log(...args)
 const error = (...args) => console.error(...args)
 
 class DiagPVApp {

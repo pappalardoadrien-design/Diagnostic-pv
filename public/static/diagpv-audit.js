@@ -2,8 +2,8 @@
 // Collaboration temps réel + diagnostic modules optimisé tablette tactile
 
 // Configuration logging production
-const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
-const log = (...args) => DEBUG && log(...args)
+const DEBUG_AUDIT = localStorage.getItem('diagpv_debug') === 'true'
+const log = (...args) => DEBUG_AUDIT && console.log(...args)
 const error = (...args) => console.error(...args) // Toujours afficher les erreurs
 
 class DiagPVAudit {
@@ -44,7 +44,7 @@ class DiagPVAudit {
     }
 
     async loadAuditData() {
-        const response = await fetch(`/api/audit/${this.auditToken}`)
+        const response = await fetch(`/api/el/audit/${this.auditToken}`)
         
         if (!response.ok) {
             throw new Error('Audit introuvable')
@@ -460,7 +460,7 @@ class DiagPVAudit {
                 technicianId: this.technicianId
             }
 
-            const response = await fetch(`/api/audit/${this.auditToken}/module/${moduleId}`, {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/module/${moduleId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -573,7 +573,7 @@ class DiagPVAudit {
     setupRealtimeSync() {
         // Server-Sent Events pour collaboration temps réel
         if (typeof EventSource !== 'undefined') {
-            this.eventSource = new EventSource(`/api/audit/${this.auditToken}/stream`)
+            this.eventSource = new EventSource(`/api/el/audit/${this.auditToken}/stream`)
             
             this.eventSource.onmessage = (event) => {
                 try {
@@ -667,7 +667,7 @@ class DiagPVAudit {
         
         for (const update of this.offlineQueue) {
             try {
-                await fetch(`/api/audit/${this.auditToken}/module/${update.moduleId}`, {
+                await fetch(`/api/el/audit/${this.auditToken}/module/${update.moduleId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(update)
@@ -767,7 +767,7 @@ class DiagPVAudit {
             this.showAlert('Génération rapport en cours...', 'info')
             
             // Ouverture rapport dans nouvel onglet
-            const reportUrl = `/api/audit/${this.auditToken}/report`
+            const reportUrl = `/api/el/audit/${this.auditToken}/report`
             window.open(reportUrl, '_blank')
             
             log('📄 Rapport généré:', reportUrl)
@@ -893,7 +893,7 @@ class DiagPVAudit {
     // Sauvegarde modifications audit
     async saveAuditChanges(formData) {
         try {
-            const response = await fetch(`/api/audit/${this.auditToken}`, {
+            const response = await fetch(`/api/el/audit/${this.auditToken}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1159,7 +1159,7 @@ class DiagPVAudit {
 
                 try {
                     // Appel API pour ce lot
-                    const response = await fetch(`/api/audit/${this.auditToken}/bulk-update`, {
+                    const response = await fetch(`/api/el/audit/${this.auditToken}/bulk-update`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
