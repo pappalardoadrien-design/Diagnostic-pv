@@ -363,6 +363,204 @@ auditsRouter.delete('/:token', async (c) => {
 })
 
 // ============================================================================
+// GET /api/el/audit/:token/report - Générer rapport PDF de l'audit
+// ============================================================================
+auditsRouter.get('/:token/report', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  
+  try {
+    // Récupération audit
+    const auditResult = await env.DB.prepare(`
+      SELECT * FROM el_audits WHERE audit_token = ?
+    `).bind(token).first()
+    
+    if (!auditResult) {
+      return c.json({ error: 'Audit non trouvé' }, 404)
+    }
+    
+    const audit = auditResult as ELAudit
+    
+    // Récupération tous les modules
+    const modulesResult = await env.DB.prepare(`
+      SELECT * FROM el_modules 
+      WHERE audit_token = ?
+      ORDER BY string_number, position_in_string
+    `).bind(token).all()
+    
+    const modules = modulesResult.results as ELModule[]
+    
+    // Statistiques pour le rapport
+    const stats = {
+      total: modules.length,
+      ok: modules.filter(m => m.defect_type === 'none').length,
+      inequality: modules.filter(m => m.defect_type === 'luminescence_inequality').length,
+      microcracks: modules.filter(m => m.defect_type === 'microcrack').length,
+      dead: modules.filter(m => m.defect_type === 'dead_module').length,
+      string_open: modules.filter(m => m.defect_type === 'string_open').length,
+      not_connected: modules.filter(m => m.defect_type === 'not_connected').length,
+      pending: modules.filter(m => m.defect_type === 'pending').length
+    }
+    
+    const completion_rate = ((stats.total - stats.pending) / stats.total * 100).toFixed(1)
+    
+    // Génération HTML du rapport
+    const reportHTML = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport EL - ${audit.project_name}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #fff; color: #000; }
+        h1 { color: #ea580c; border-bottom: 3px solid #facc15; padding-bottom: 10px; }
+        h2 { color: #ea580c; margin-top: 30px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .info-box { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .info-row { display: flex; margin: 10px 0; }
+        .info-label { font-weight: bold; width: 200px; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-box { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 32px; font-weight: bold; }
+        .stat-label { font-size: 14px; color: #666; margin-top: 5px; }
+        .module-list { margin: 20px 0; }
+        .module-item { display: flex; padding: 10px; border-bottom: 1px solid #ddd; }
+        .module-id { width: 100px; font-weight: bold; }
+        .module-status { width: 150px; }
+        .module-comment { flex: 1; color: #666; }
+        .status-ok { color: #16a34a; }
+        .status-inequality { color: #facc15; }
+        .status-microcracks { color: #fb923c; }
+        .status-dead { color: #dc2626; }
+        .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #ddd; font-size: 12px; color: #666; text-align: center; }
+        @media print {
+            body { margin: 20px; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px;">
+        <button onclick="window.print()" style="background: #ea580c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+            📄 Imprimer / Enregistrer PDF
+        </button>
+        <button onclick="window.close()" style="background: #666; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-left: 10px;">
+            ✕ Fermer
+        </button>
+    </div>
+
+    <h1>🔋 RAPPORT AUDIT ÉLECTROLUMINESCENCE</h1>
+    
+    <div class="info-box">
+        <div class="info-row">
+            <div class="info-label">Projet :</div>
+            <div>${audit.project_name}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Client :</div>
+            <div>${audit.client_name}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Localisation :</div>
+            <div>${audit.location || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Date d'installation :</div>
+            <div>${audit.installation_date || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Type d'installation :</div>
+            <div>${audit.installation_type || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Puissance panneaux :</div>
+            <div>${audit.panel_power || 'N/A'} Wc</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Date d'audit :</div>
+            <div>${new Date(audit.created_at).toLocaleDateString('fr-FR')}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Token audit :</div>
+            <div>${audit.audit_token}</div>
+        </div>
+    </div>
+
+    <h2>📊 STATISTIQUES</h2>
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-number">${stats.total}</div>
+            <div class="stat-label">Total modules</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #16a34a;">${stats.ok}</div>
+            <div class="stat-label">Modules OK</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #fb923c;">${stats.microcracks}</div>
+            <div class="stat-label">Microfissures</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #dc2626;">${stats.dead}</div>
+            <div class="stat-label">Modules HS</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #facc15;">${stats.inequality}</div>
+            <div class="stat-label">Inégalités</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #60a5fa;">${stats.string_open}</div>
+            <div class="stat-label">Strings ouverts</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" style="color: #9ca3af;">${stats.not_connected}</div>
+            <div class="stat-label">Non raccordés</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number">${completion_rate}%</div>
+            <div class="stat-label">Complétion</div>
+        </div>
+    </div>
+
+    <h2>📋 DÉTAIL DES MODULES</h2>
+    <div class="module-list">
+        ${modules.filter(m => m.defect_type !== 'none' && m.defect_type !== 'pending').map(module => `
+            <div class="module-item">
+                <div class="module-id">${module.module_identifier}</div>
+                <div class="module-status status-${module.defect_type}">
+                    ${module.defect_type === 'luminescence_inequality' ? '🟡 Inégalité luminescence' : 
+                      module.defect_type === 'microcrack' ? '🟠 Microfissures' :
+                      module.defect_type === 'dead_module' ? '🔴 Module HS' :
+                      module.defect_type === 'string_open' ? '🔵 String ouvert' :
+                      module.defect_type === 'not_connected' ? '⚫ Non raccordé' :
+                      module.defect_type}
+                </div>
+                <div class="module-comment">${module.comment || ''}</div>
+            </div>
+        `).join('')}
+    </div>
+
+    <div class="footer">
+        <p><strong>Diagnostic Photovoltaïque - Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</strong></p>
+        <p>Ce document a été généré automatiquement par le système DiagPV Audit EL</p>
+    </div>
+</body>
+</html>
+    `
+    
+    return c.html(reportHTML)
+    
+  } catch (error: any) {
+    console.error('Erreur génération rapport:', error)
+    return c.json({ 
+      error: 'Erreur lors de la génération du rapport',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
 // IMPORT ET MONTAGE ROUTES MODULES SOUS /:token
 // ============================================================================
 import modulesRouter from './modules'
