@@ -1,7 +1,7 @@
 // Configuration logging production
 const DEBUG = localStorage.getItem("diagpv_debug") === "true"
 const log = (...args) => DEBUG && log(...args)
-const error = (...args) => error(...args)
+const error = (...args) => console.error(...args)
 
 // DiagPV - Interface mesures PVserv
 // Upload et visualisation mesures électriques
@@ -133,7 +133,7 @@ class DiagPVMeasures {
                     this.displayExistingMeasures(data.measurements)
                 }
             }
-        } catch (error) {
+        } catch (err) {
             log('Aucune mesure existante trouvée')
         }
     }
@@ -194,8 +194,8 @@ class DiagPVMeasures {
             // Affichage résultats
             this.displayResults(results)
             
-        } catch (error) {
-            error('Erreur traitement fichier:', error)
+        } catch (err) {
+            error('error('Erreur traitement fichier:', error)', err)
             this.showAlert('Erreur traitement fichier: ' + error.message, 'error')
         }
     }
@@ -379,8 +379,8 @@ class DiagPVMeasures {
 
             this.showAlert('Mesures sauvegardées avec succès', 'success')
             
-        } catch (error) {
-            error('Erreur sauvegarde mesures:', error)
+        } catch (err) {
+            error('error('Erreur sauvegarde mesures:', error)', err)
             this.showAlert('Erreur sauvegarde: ' + error.message, 'error')
         }
     }

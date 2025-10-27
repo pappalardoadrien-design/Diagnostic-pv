@@ -1,7 +1,7 @@
 // Configuration logging production
 const DEBUG = localStorage.getItem("diagpv_debug") === "true"
 const log = (...args) => DEBUG && log(...args)
-const error = (...args) => error(...args)
+const error = (...args) => console.error(...args)
 
 // DiagPV Dashboard - Tableau de bord audits temps réel
 // Interface de gestion globale des audits avec mise à jour automatique
@@ -68,8 +68,8 @@ class DiagPVDashboard {
                 throw new Error(data.error || 'Erreur chargement')
             }
 
-        } catch (error) {
-            error('Erreur dashboard:', error)
+        } catch (err) {
+            error('error('Erreur dashboard:', error)', err)
             this.showError('Erreur de chargement: ' + error.message)
         } finally {
             document.getElementById('loading').classList.add('hidden')
@@ -305,8 +305,8 @@ class DiagPVDashboard {
                 throw new Error(result.error || 'Erreur suppression')
             }
             
-        } catch (error) {
-            error('❌ Erreur suppression audit:', error)
+        } catch (err) {
+            error('error('❌ Erreur suppression audit:', error)', err)
             alert(`❌ ERREUR SUPPRESSION\n\n${error.message}\n\nL'audit n'a pas pu être supprimé.`)
         }
     }

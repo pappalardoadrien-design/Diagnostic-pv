@@ -4,7 +4,7 @@
 // Configuration logging production
 const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
 const log = (...args) => DEBUG && log(...args)
-const error = (...args) => error(...args)
+const error = (...args) => console.error(...args)
 
 class DiagPVApp {
     constructor() {
@@ -391,8 +391,8 @@ class DiagPVApp {
                 window.location.href = result.auditUrl
             }, 1500)
 
-        } catch (error) {
-            error('❌ Erreur création audit:', error)
+        } catch (err) {
+            error('❌ Erreur création audit:', err)
             this.showAlert('Erreur: ' + error.message, 'error')
         } finally {
             // Reset bouton
@@ -473,8 +473,8 @@ class DiagPVApp {
                 // Fallback vers localStorage si API échoue
                 this.loadRecentAuditsFromStorage()
             }
-        } catch (error) {
-            error('Erreur chargement audits:', error)
+        } catch (err) {
+            console.error('Erreur chargement audits:', err)
             // Fallback vers localStorage en cas d'erreur
             this.loadRecentAuditsFromStorage()
         }

@@ -4,7 +4,7 @@
 // Configuration logging production
 const DEBUG = localStorage.getItem('diagpv_debug') === 'true'
 const log = (...args) => DEBUG && log(...args)
-const error = (...args) => error(...args) // Toujours afficher les erreurs
+const error = (...args) => console.error(...args) // Toujours afficher les erreurs
 
 class DiagPVAudit {
     constructor() {
@@ -37,8 +37,8 @@ class DiagPVAudit {
             this.setupEventListeners()
             this.setupRealtimeSync()
             this.setupOfflineSupport()
-        } catch (error) {
-            error('Erreur initialisation:', error)
+        } catch (err) {
+            error('error('Erreur initialisation:', error)', err)
             this.showAlert('Erreur chargement audit: ' + error.message, 'error')
         }
     }
@@ -494,8 +494,8 @@ class DiagPVAudit {
 
             log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
-        } catch (error) {
-            error('Erreur validation module:', error)
+        } catch (err) {
+            error('error('Erreur validation module:', error)', err)
             
             // Mode offline - queue pour sync ultérieure
             if (!navigator.onLine) {
@@ -581,8 +581,8 @@ class DiagPVAudit {
                     if (data.type !== 'ping') {
                         this.handleRealtimeUpdate(data)
                     }
-                } catch (error) {
-                    error('Erreur parsing SSE:', error)
+                } catch (err) {
+                    error('error('Erreur parsing SSE:', error)', err)
                 }
             }
 
@@ -672,8 +672,8 @@ class DiagPVAudit {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(update)
                 })
-            } catch (error) {
-                error('Erreur sync offline:', error)
+            } catch (err) {
+                error('error('Erreur sync offline:', error)', err)
                 break
             }
         }
@@ -772,8 +772,8 @@ class DiagPVAudit {
             
             log('📄 Rapport généré:', reportUrl)
             
-        } catch (error) {
-            error('Erreur génération rapport:', error)
+        } catch (err) {
+            error('error('Erreur génération rapport:', error)', err)
             this.showAlert('Erreur génération rapport', 'error')
         }
     }
@@ -920,8 +920,8 @@ class DiagPVAudit {
             
             log('✅ Audit modifié:', formData.project_name)
             
-        } catch (error) {
-            error('Erreur modification audit:', error)
+        } catch (err) {
+            error('error('Erreur modification audit:', error)', err)
             this.showAlert('Erreur lors de la modification', 'error')
         }
     }
@@ -1216,7 +1216,7 @@ class DiagPVAudit {
                         this.updateProgress()
                     }
 
-                } catch (error) {
+                } catch (err) {
                     error(`❌ Erreur lot ${i + 1}:`, error)
                     hasErrors = true
                     // On continue avec les autres lots
@@ -1255,8 +1255,8 @@ class DiagPVAudit {
                 this.showAlert(`⚠️ ${modulesToUpdate.length} modules mis à jour localement (audit non synchronisé)`, 'warning')
             }
 
-        } catch (error) {
-            error('❌ Erreur globale mise à jour en lot:', error)
+        } catch (err) {
+            error('error('❌ Erreur globale mise à jour en lot:', error)', err)
             this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
             
             // Fermeture modal en cas d'erreur critique
