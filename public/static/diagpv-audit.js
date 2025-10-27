@@ -39,7 +39,7 @@ class DiagPVAudit {
             this.setupOfflineSupport()
         } catch (err) {
             errorAudit('Erreur initialisation:', err)
-            this.showAlert('Erreur chargement audit: ' + error.message, 'error')
+            this.showAlert('Erreur chargement audit: ' + err.message, 'error')
         }
     }
 
@@ -502,7 +502,7 @@ class DiagPVAudit {
                 this.queueOfflineUpdate(updateData)
                 this.showAlert('Mis à jour en mode offline - Sera synchronisé', 'warning')
             } else {
-                this.showAlert('Erreur: ' + error.message, 'error')
+                this.showAlert('Erreur: ' + err.message, 'error')
             }
         }
     }
@@ -1257,7 +1257,7 @@ class DiagPVAudit {
 
         } catch (err) {
             errorAudit('❌ Erreur globale mise à jour en lot:', err)
-            this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
+            this.showAlert('Erreur critique lors de la mise à jour: ' + err.message, 'error')
             
             // Fermeture modal en cas d'erreur critique
             this.exitMultiSelectMode()
