@@ -59,9 +59,12 @@ diagnostic-hub/
 
 #### 📄 Génération rapports auto
 - Format professionnel Diagnostic Photovoltaïque
-- Cartographie couleur haute résolution
+- **🗺️ Plan de calepinage physique** - Grille visuelle avec localisation exacte
+- **Codes couleur** - Identification immédiate modules à remplacer
+- **Légende complète** - 7 états visuels (OK, Inégalité, Microfissures, HS, etc.)
 - Statistiques par état (%, nombres)
-- Listing modules non-conformes
+- Listing détaillé modules non-conformes avec commentaires
+- Export PDF imprimable pour intervention sur site
 - Mesures PVserv intégrées
 - Génération <5s pour 1000 modules
 
@@ -133,7 +136,7 @@ diagnostic-hub/
 ## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production**: https://c8ab162a.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
+- **Production**: https://ebd50293.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
 - **Domaine principal**: https://diagnostic-hub.pages.dev
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
@@ -159,6 +162,7 @@ diagnostic-hub/
 - ✅ Database size: 0.44 MB
 - ✅ **Édition modules opérationnelle** - Tests validation réussis
 - ✅ **Génération rapports PDF** - Imprimables avec stats complètes
+- ✅ **Plan de calepinage physique** - Grille visuelle pour localisation sur site
 
 ## 🔧 Développement Local
 
