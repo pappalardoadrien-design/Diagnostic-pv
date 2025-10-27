@@ -70,7 +70,7 @@ class DiagPVDashboard {
 
         } catch (err) {
             error('Erreur dashboard:', err)
-            this.showError('Erreur de chargement: ' + error.message)
+            this.showError('Erreur de chargement: ' + err.message)
         } finally {
             document.getElementById('loading').classList.add('hidden')
         }
@@ -145,22 +145,22 @@ class DiagPVDashboard {
                 
                 <td class="py-3 px-2 text-center">
                     <div class="flex justify-center space-x-1">
-                        <a href="/audit/${audit.token}" 
+                        <a href="/audit/${audit.audit_token}" 
                            class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-bold"
                            title="Ouvrir audit">
                             <i class="fas fa-eye"></i>
                         </a>
-                        <button onclick="dashboard.editAudit('${audit.token}')" 
+                        <button onclick="dashboard.editAudit('${audit.audit_token}')" 
                                 class="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs font-bold"
                                 title="Modifier">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button onclick="dashboard.generateReport('${audit.token}')" 
+                        <button onclick="dashboard.generateReport('${audit.audit_token}')" 
                                 class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-bold"
                                 title="Rapport">
                             <i class="fas fa-file-pdf"></i>
                         </button>
-                        <button onclick="dashboard.deleteAudit('${audit.token}', '${audit.project_name}')" 
+                        <button onclick="dashboard.deleteAudit('${audit.audit_token}', '${audit.project_name}')" 
                                 class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs font-bold"
                                 title="Supprimer définitivement">
                             <i class="fas fa-trash"></i>
@@ -253,7 +253,7 @@ class DiagPVDashboard {
 
     generateReport(token) {
         // Ouvre le rapport dans nouvel onglet
-        window.open(`/api/audit/${token}/report`, '_blank')
+        window.open(`/api/el/audit/${token}/report`, '_blank')
     }
 
     async deleteAudit(token, projectName) {
@@ -285,7 +285,7 @@ class DiagPVDashboard {
         try {
             logDashboard(`🗑️ Suppression audit: ${projectName} (${token})`)
             
-            const response = await fetch(`/api/audit/${token}`, {
+            const response = await fetch(`/api/el/audit/${token}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
@@ -307,7 +307,7 @@ class DiagPVDashboard {
             
         } catch (err) {
             error('❌ Erreur suppression audit:', err)
-            alert(`❌ ERREUR SUPPRESSION\n\n${error.message}\n\nL'audit n'a pas pu être supprimé.`)
+            alert(`❌ ERREUR SUPPRESSION\n\n${err.message}\n\nL'audit n'a pas pu être supprimé.`)
         }
     }
 

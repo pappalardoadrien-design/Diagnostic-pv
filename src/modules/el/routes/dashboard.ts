@@ -22,10 +22,15 @@ dashboardRouter.get('/audits', async (c) => {
   const { env } = c
   
   try {
-    // Utilisation de la vue précalculée pour performances optimales
+    // Utilisation de la vue précalculée + données additionnelles de el_audits
     const audits = await env.DB.prepare(`
-      SELECT * FROM v_el_audit_statistics
-      ORDER BY created_at DESC
+      SELECT 
+        v.*,
+        ea.location,
+        ea.string_count
+      FROM v_el_audit_statistics v
+      LEFT JOIN el_audits ea ON v.audit_id = ea.id
+      ORDER BY v.created_at DESC
     `).all()
     
     // Calcul statistiques globales
