@@ -452,14 +452,18 @@ class DiagPVApp {
                         <div class="flex justify-between items-start">
                             <div>
                                 <h4 class="font-bold text-lg">${audit.project_name}</h4>
-                                <p class="text-gray-300">${audit.client_name} - ${audit.location}</p>
+                                <p class="text-gray-300">${audit.client_name}</p>
                                 <p class="text-sm text-blue-400">
                                     <i class="fas fa-solar-panel mr-1"></i>
-                                    ${audit.total_modules} modules (${audit.string_count} strings)
+                                    ${audit.total_modules} modules | ${audit.modules_ok || 0} OK | ${audit.modules_critical || 0} défauts
+                                </p>
+                                <p class="text-xs text-gray-400">
+                                    <i class="fas fa-chart-line mr-1"></i>
+                                    Progression: ${audit.completion_rate}%
                                 </p>
                             </div>
                             <div class="text-right">
-                                <p class="text-xs text-gray-400">${new Date(audit.created_at).toLocaleDateString('fr-FR')}</p>
+                                <p class="text-xs text-gray-400">${audit.created_at_formatted || new Date(audit.created_at).toLocaleDateString('fr-FR')}</p>
                                 <span class="inline-block px-2 py-1 rounded text-xs ${audit.status === 'created' ? 'bg-green-600' : 'bg-orange-600'}">${audit.status}</span>
                             </div>
                         </div>
