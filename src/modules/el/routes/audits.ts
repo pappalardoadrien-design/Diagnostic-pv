@@ -313,6 +313,166 @@ auditsRouter.put('/:token', async (c) => {
 })
 
 // ============================================================================
+// PUT /api/el/audit/:token/configuration - Modifier configuration technique audit
+// ============================================================================
+// Permet de modifier le nombre de strings, modules, BJ, onduleurs même après début audit
+auditsRouter.put('/:token/configuration', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const { 
+    string_count, 
+    total_modules,
+    panel_power,
+    junction_boxes,
+    inverter_count,
+    add_strings 
+  } = await c.req.json()
+  
+  try {
+    // Vérification que l'audit existe
+    const existingAudit = await env.DB.prepare(
+      'SELECT * FROM el_audits WHERE audit_token = ?'
+    ).bind(token).first()
+    
+    if (!existingAudit) {
+      return c.json({ error: 'Audit non trouvé' }, 404)
+    }
+    
+    const audit = existingAudit as any
+    
+    // Construction de la requête de mise à jour dynamique
+    const updates: string[] = []
+    const bindings: any[] = []
+    
+    if (string_count !== undefined) {
+      updates.push('string_count = ?')
+      bindings.push(string_count)
+    }
+    
+    if (total_modules !== undefined) {
+      updates.push('total_modules = ?')
+      bindings.push(total_modules)
+    }
+    
+    if (panel_power !== undefined) {
+      updates.push('panel_power = ?')
+      bindings.push(panel_power)
+    }
+    
+    if (junction_boxes !== undefined) {
+      updates.push('junction_boxes = ?')
+      bindings.push(junction_boxes)
+    }
+    
+    if (inverter_count !== undefined) {
+      updates.push('inverter_count = ?')
+      bindings.push(inverter_count)
+    }
+    
+    // Toujours mettre à jour le timestamp
+    updates.push('updated_at = datetime(\'now\')')
+    
+    if (updates.length > 1) { // > 1 car updated_at est toujours présent
+      bindings.push(token)
+      
+      await env.DB.prepare(`
+        UPDATE el_audits 
+        SET ${updates.join(', ')}
+        WHERE audit_token = ?
+      `).bind(...bindings).run()
+    }
+    
+    // Gestion ajout de strings avec modules
+    if (add_strings && Array.isArray(add_strings) && add_strings.length > 0) {
+      for (const stringConfig of add_strings) {
+        const { string_number, module_count, start_position = 1 } = stringConfig
+        
+        if (!string_number || !module_count) {
+          continue
+        }
+        
+        // Vérifier que le string n'existe pas déjà
+        const existingModules = await env.DB.prepare(`
+          SELECT COUNT(*) as count 
+          FROM el_modules 
+          WHERE audit_token = ? AND string_number = ?
+        `).bind(token, string_number).first()
+        
+        if ((existingModules as any).count > 0) {
+          console.log(`String ${string_number} existe déjà, skip`)
+          continue
+        }
+        
+        // Création des modules pour ce string
+        for (let i = 0; i < module_count; i++) {
+          const position = start_position + i
+          const moduleId = `S${string_number}-${position}`
+          
+          await env.DB.prepare(`
+            INSERT INTO el_modules (
+              el_audit_id,
+              audit_token,
+              module_identifier,
+              string_number,
+              position_in_string,
+              defect_type,
+              severity_level,
+              physical_row,
+              physical_col
+            ) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)
+          `).bind(
+            audit.id,
+            token,
+            moduleId,
+            string_number,
+            position,
+            string_number,  // physical_row = string_number par défaut
+            position        // physical_col = position par défaut
+          ).run()
+        }
+        
+        console.log(`✅ String ${string_number} ajouté: ${module_count} modules`)
+      }
+    }
+    
+    // Recompter les modules réels
+    const moduleCountResult = await env.DB.prepare(`
+      SELECT COUNT(*) as total FROM el_modules WHERE audit_token = ?
+    `).bind(token).first()
+    
+    const actualModuleCount = (moduleCountResult as any).total
+    
+    // Mettre à jour le total_modules avec le compte réel
+    await env.DB.prepare(`
+      UPDATE el_audits 
+      SET total_modules = ?,
+          updated_at = datetime('now')
+      WHERE audit_token = ?
+    `).bind(actualModuleCount, token).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Configuration mise à jour avec succès',
+      updated: {
+        string_count,
+        total_modules: actualModuleCount,
+        panel_power,
+        junction_boxes,
+        inverter_count,
+        strings_added: add_strings?.length || 0
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur mise à jour configuration:', error)
+    return c.json({ 
+      error: 'Erreur lors de la mise à jour de la configuration',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
 // DELETE /api/el/audit/:token - Supprimer un audit complet
 // ============================================================================
 auditsRouter.delete('/:token', async (c) => {

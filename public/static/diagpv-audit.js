@@ -306,6 +306,7 @@ class DiagPVAudit {
         document.getElementById('reportBtn').addEventListener('click', () => this.generateReport())
         document.getElementById('shareBtn').addEventListener('click', () => this.shareAudit())
         document.getElementById('editAuditBtn').addEventListener('click', () => this.showEditAuditModal())
+        document.getElementById('configBtn').addEventListener('click', () => this.showConfigModal())
 
         // Sélection multiple
         this.setupMultiSelectEvents()
@@ -385,6 +386,9 @@ class DiagPVAudit {
 
         // Configuration modal édition audit
         this.setupEditModalEvents()
+        
+        // Configuration modal config technique
+        this.setupConfigModalEvents()
     }
 
     setupEditModalEvents() {
@@ -426,6 +430,109 @@ class DiagPVAudit {
                 this.closeModal()
             }
         })
+    }
+
+    setupConfigModalEvents() {
+        const configModal = document.getElementById('configModal')
+        const configForm = document.getElementById('configForm')
+        
+        // Liste temporaire des strings à ajouter
+        this.stringsToAdd = []
+        
+        // Bouton ajout string
+        document.getElementById('addStringBtn').addEventListener('click', () => {
+            const stringNumber = parseInt(document.getElementById('addStringNumber').value)
+            const moduleCount = parseInt(document.getElementById('addStringModuleCount').value)
+            const startPos = parseInt(document.getElementById('addStringStartPos').value) || 1
+            
+            if (!stringNumber || !moduleCount) {
+                this.showAlert('Veuillez renseigner le N° string et le nombre de modules', 'warning')
+                return
+            }
+            
+            if (stringNumber < 1 || stringNumber > 50) {
+                this.showAlert('N° String doit être entre 1 et 50', 'error')
+                return
+            }
+            
+            if (moduleCount < 1 || moduleCount > 100) {
+                this.showAlert('Nombre de modules doit être entre 1 et 100', 'error')
+                return
+            }
+            
+            // Vérifier que le string n'est pas déjà dans la liste
+            if (this.stringsToAdd.some(s => s.string_number === stringNumber)) {
+                this.showAlert(`String ${stringNumber} déjà dans la liste`, 'warning')
+                return
+            }
+            
+            // Ajouter à la liste temporaire
+            this.stringsToAdd.push({
+                string_number: stringNumber,
+                module_count: moduleCount,
+                start_position: startPos
+            })
+            
+            // Afficher dans la liste
+            this.updateAddedStringsList()
+            
+            // Reset champs
+            document.getElementById('addStringNumber').value = ''
+            document.getElementById('addStringModuleCount').value = ''
+            document.getElementById('addStringStartPos').value = '1'
+            
+            this.showAlert(`String ${stringNumber} ajouté (${moduleCount} modules)`, 'success')
+            logAudit('✅ String ajouté à la liste:', { stringNumber, moduleCount, startPos })
+        })
+        
+        // Soumission formulaire configuration
+        configForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            await this.saveConfigChanges()
+        })
+        
+        // Annulation configuration
+        document.getElementById('cancelConfigBtn').addEventListener('click', () => {
+            this.closeConfigModal()
+        })
+        
+        // Fermeture ESC ou clic extérieur
+        configModal.addEventListener('click', (e) => {
+            if (e.target === configModal) {
+                this.closeConfigModal()
+            }
+        })
+    }
+
+    updateAddedStringsList() {
+        const listDiv = document.getElementById('addedStringsList')
+        
+        if (this.stringsToAdd.length === 0) {
+            listDiv.classList.add('hidden')
+            return
+        }
+        
+        listDiv.classList.remove('hidden')
+        listDiv.innerHTML = `
+            <div class="border-t border-gray-600 pt-2 mt-2">
+                <p class="font-bold mb-2">Strings à ajouter :</p>
+                ${this.stringsToAdd.map(s => `
+                    <div class="flex justify-between items-center bg-gray-700 px-2 py-1 rounded mb-1">
+                        <span>String ${s.string_number}: ${s.module_count} modules (début: ${s.start_position})</span>
+                        <button type="button" onclick="diagpvAudit.removeStringFromList(${s.string_number})" 
+                                class="text-red-400 hover:text-red-300 font-bold">
+                            ✕
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `
+    }
+
+    removeStringFromList(stringNumber) {
+        this.stringsToAdd = this.stringsToAdd.filter(s => s.string_number !== stringNumber)
+        this.updateAddedStringsList()
+        logAudit('🗑️ String retiré de la liste:', stringNumber)
     }
 
     async validateModuleStatus() {
@@ -890,6 +997,39 @@ class DiagPVAudit {
         document.getElementById('editAuditModal').classList.add('hidden')
     }
 
+    // Affichage modal configuration technique
+    showConfigModal() {
+        // Pré-remplissage avec données actuelles
+        document.getElementById('configStringCount').value = this.auditData.string_count || ''
+        document.getElementById('configPanelPower').value = this.auditData.panel_power || ''
+        document.getElementById('configJunctionBoxes').value = this.auditData.junction_boxes || ''
+        document.getElementById('configInverterCount').value = this.auditData.inverter_count || ''
+        
+        // Reset liste strings à ajouter
+        this.stringsToAdd = []
+        this.updateAddedStringsList()
+        
+        // Reset champs ajout string
+        document.getElementById('addStringNumber').value = ''
+        document.getElementById('addStringModuleCount').value = ''
+        document.getElementById('addStringStartPos').value = '1'
+        
+        // Affichage modal
+        document.getElementById('configModal').classList.remove('hidden')
+        
+        // Focus sur premier champ
+        document.getElementById('configStringCount').focus()
+        
+        logAudit('📝 Modal configuration ouverte')
+    }
+
+    // Fermeture modal configuration
+    closeConfigModal() {
+        document.getElementById('configModal').classList.add('hidden')
+        this.stringsToAdd = []
+        logAudit('❌ Modal configuration fermée')
+    }
+
     // Sauvegarde modifications audit
     async saveAuditChanges(formData) {
         try {
@@ -923,6 +1063,89 @@ class DiagPVAudit {
         } catch (err) {
             errorAudit('Erreur modification audit:', err)
             this.showAlert('Erreur lors de la modification', 'error')
+        }
+    }
+
+    // Sauvegarde modifications configuration technique
+    async saveConfigChanges() {
+        try {
+            // Récupération valeurs formulaire
+            const stringCountValue = document.getElementById('configStringCount').value.trim()
+            const panelPowerValue = document.getElementById('configPanelPower').value.trim()
+            const junctionBoxesValue = document.getElementById('configJunctionBoxes').value.trim()
+            const inverterCountValue = document.getElementById('configInverterCount').value.trim()
+            
+            // Construction objet données à envoyer (seulement les champs modifiés)
+            const configData = {}
+            
+            if (stringCountValue !== '') {
+                configData.string_count = parseInt(stringCountValue)
+            }
+            
+            if (panelPowerValue !== '') {
+                configData.panel_power = parseInt(panelPowerValue)
+            }
+            
+            if (junctionBoxesValue !== '') {
+                configData.junction_boxes = parseInt(junctionBoxesValue)
+            }
+            
+            if (inverterCountValue !== '') {
+                configData.inverter_count = parseInt(inverterCountValue)
+            }
+            
+            // Ajout des strings si présents
+            if (this.stringsToAdd.length > 0) {
+                configData.add_strings = this.stringsToAdd
+            }
+            
+            // Vérifier qu'au moins un champ est modifié
+            if (Object.keys(configData).length === 0) {
+                this.showAlert('Aucune modification à enregistrer', 'warning')
+                return
+            }
+            
+            logAudit('📡 Envoi configuration:', configData)
+            
+            // Afficher message d'attente
+            this.showAlert('⏳ Sauvegarde en cours...', 'info')
+            
+            // Appel API
+            const response = await fetch(`/api/el/audit/${this.auditToken}/configuration`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(configData)
+            })
+            
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Erreur sauvegarde configuration')
+            }
+            
+            const result = await response.json()
+            
+            logAudit('✅ Configuration sauvegardée:', result)
+            
+            // Fermer modal
+            this.closeConfigModal()
+            
+            // Message succès
+            this.showAlert(`✅ Configuration mise à jour ! ${result.updated.strings_added || 0} string(s) ajouté(s)`, 'success')
+            
+            // Recharger les données de l'audit pour refléter les changements
+            logAudit('🔄 Rechargement données audit...')
+            await this.loadAuditData()
+            
+            // Re-rendu complet interface
+            this.setupInterface()
+            
+            logAudit('✅ Interface rechargée avec nouvelle configuration')
+            
+        } catch (err) {
+            errorAudit('❌ Erreur sauvegarde configuration:', err)
+            this.showAlert('Erreur: ' + err.message, 'error')
         }
     }
 

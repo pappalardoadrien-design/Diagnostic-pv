@@ -963,7 +963,10 @@ app.get('/audit/:token', async (c) => {
                     <button id="multiSelectToggleBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold border-2 border-yellow-400" title="Activer la sélection multiple pour gagner du temps sur les modules défectueux">
                         <i class="fas fa-check-square mr-1"></i>SÉLECTION MULTIPLE
                     </button>
-                    <button id="measureBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
+                    <button id="configBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold" title="Modifier configuration technique (strings, BJ, onduleurs)">
+                        <i class="fas fa-cog mr-1"></i>CONFIG
+                    </button>
+                    <button id="measureBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-chart-line mr-1"></i>MESURES
                     </button>
                     <button id="reportBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">
@@ -1111,6 +1114,96 @@ app.get('/audit/:token', async (c) => {
                             <i class="fas fa-save mr-2"></i>SAUVEGARDER
                         </button>
                         <button type="button" id="cancelEditBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                            ANNULER
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Modal configuration technique -->
+        <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+                <h3 class="text-xl font-black mb-4 text-center text-purple-400">
+                    <i class="fas fa-cog mr-2"></i>CONFIGURATION TECHNIQUE
+                </h3>
+                
+                <div class="bg-yellow-900 border border-yellow-400 rounded p-3 mb-4">
+                    <p class="text-sm text-yellow-200">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>ATTENTION :</strong> Modifier la configuration en cours d'audit peut affecter vos données.
+                        Soyez sûr des valeurs entrées.
+                    </p>
+                </div>
+                
+                <form id="configForm" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Nombre de strings :</label>
+                            <input type="number" id="configStringCount" min="1" max="50"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Puissance panneau (Wc) :</label>
+                            <input type="number" id="configPanelPower" min="100" max="1000"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Boîtes de jonction (BJ) :</label>
+                            <input type="number" id="configJunctionBoxes" min="0" max="100"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Nombre d'onduleurs :</label>
+                            <input type="number" id="configInverterCount" min="1" max="50"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="border-t-2 border-gray-700 pt-4 mt-4">
+                        <h4 class="text-lg font-black mb-3 text-purple-400">
+                            <i class="fas fa-plus-circle mr-2"></i>AJOUTER UN STRING
+                        </h4>
+                        
+                        <div class="bg-gray-800 rounded p-4 space-y-3">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold mb-1">N° String :</label>
+                                    <input type="number" id="addStringNumber" min="1" max="50" placeholder="Ex: 11"
+                                           class="w-full bg-black border-2 border-gray-600 rounded px-2 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-bold mb-1">Nb modules :</label>
+                                    <input type="number" id="addStringModuleCount" min="1" max="100" placeholder="Ex: 24"
+                                           class="w-full bg-black border-2 border-gray-600 rounded px-2 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-bold mb-1">Début :</label>
+                                    <input type="number" id="addStringStartPos" min="1" max="100" value="1"
+                                           class="w-full bg-black border-2 border-gray-600 rounded px-2 py-2 text-lg focus:border-purple-400 focus:outline-none">
+                                </div>
+                            </div>
+                            
+                            <button type="button" id="addStringBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold">
+                                <i class="fas fa-plus mr-2"></i>AJOUTER CE STRING
+                            </button>
+                            
+                            <div id="addedStringsList" class="text-sm text-green-400 hidden">
+                                <!-- Liste des strings ajoutés -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-black">
+                            <i class="fas fa-save mr-2"></i>SAUVEGARDER CONFIGURATION
+                        </button>
+                        <button type="button" id="cancelConfigBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
                             ANNULER
                         </button>
                     </div>
