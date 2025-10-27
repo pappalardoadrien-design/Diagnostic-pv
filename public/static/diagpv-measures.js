@@ -195,7 +195,7 @@ class DiagPVMeasures {
             this.displayResults(results)
             
         } catch (err) {
-            error('error('Erreur traitement fichier:', error)', err)
+            error('Erreur traitement fichier:', err)
             this.showAlert('Erreur traitement fichier: ' + error.message, 'error')
         }
     }
@@ -380,7 +380,7 @@ class DiagPVMeasures {
             this.showAlert('Mesures sauvegardées avec succès', 'success')
             
         } catch (err) {
-            error('error('Erreur sauvegarde mesures:', error)', err)
+            error('Erreur sauvegarde mesures:', err)
             this.showAlert('Erreur sauvegarde: ' + error.message, 'error')
         }
     }

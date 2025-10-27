@@ -69,7 +69,7 @@ class DiagPVDashboard {
             }
 
         } catch (err) {
-            error('error('Erreur dashboard:', error)', err)
+            error('Erreur dashboard:', err)
             this.showError('Erreur de chargement: ' + error.message)
         } finally {
             document.getElementById('loading').classList.add('hidden')
@@ -306,7 +306,7 @@ class DiagPVDashboard {
             }
             
         } catch (err) {
-            error('error('❌ Erreur suppression audit:', error)', err)
+            error('❌ Erreur suppression audit:', err)
             alert(`❌ ERREUR SUPPRESSION\n\n${error.message}\n\nL'audit n'a pas pu être supprimé.`)
         }
     }

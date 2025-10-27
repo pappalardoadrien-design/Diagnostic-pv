@@ -38,7 +38,7 @@ class DiagPVAudit {
             this.setupRealtimeSync()
             this.setupOfflineSupport()
         } catch (err) {
-            error('error('Erreur initialisation:', error)', err)
+            error('Erreur initialisation:', err)
             this.showAlert('Erreur chargement audit: ' + error.message, 'error')
         }
     }
@@ -495,7 +495,7 @@ class DiagPVAudit {
             log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
         } catch (err) {
-            error('error('Erreur validation module:', error)', err)
+            error('Erreur validation module:', err)
             
             // Mode offline - queue pour sync ultérieure
             if (!navigator.onLine) {
@@ -582,7 +582,7 @@ class DiagPVAudit {
                         this.handleRealtimeUpdate(data)
                     }
                 } catch (err) {
-                    error('error('Erreur parsing SSE:', error)', err)
+                    error('Erreur parsing SSE:', err)
                 }
             }
 
@@ -673,7 +673,7 @@ class DiagPVAudit {
                     body: JSON.stringify(update)
                 })
             } catch (err) {
-                error('error('Erreur sync offline:', error)', err)
+                error('Erreur sync offline:', err)
                 break
             }
         }
@@ -773,7 +773,7 @@ class DiagPVAudit {
             log('📄 Rapport généré:', reportUrl)
             
         } catch (err) {
-            error('error('Erreur génération rapport:', error)', err)
+            error('Erreur génération rapport:', err)
             this.showAlert('Erreur génération rapport', 'error')
         }
     }
@@ -921,7 +921,7 @@ class DiagPVAudit {
             log('✅ Audit modifié:', formData.project_name)
             
         } catch (err) {
-            error('error('Erreur modification audit:', error)', err)
+            error('Erreur modification audit:', err)
             this.showAlert('Erreur lors de la modification', 'error')
         }
     }
@@ -1256,7 +1256,7 @@ class DiagPVAudit {
             }
 
         } catch (err) {
-            error('error('❌ Erreur globale mise à jour en lot:', error)', err)
+            error('❌ Erreur globale mise à jour en lot:', err)
             this.showAlert('Erreur critique lors de la mise à jour: ' + error.message, 'error')
             
             // Fermeture modal en cas d'erreur critique
