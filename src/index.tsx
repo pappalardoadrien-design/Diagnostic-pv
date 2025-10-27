@@ -1178,7 +1178,6 @@ app.get('/', (c) => {
         
 
         <script src="/static/diagpv-app.js"></script>
-        <script src="/static/diagpv-json-importer.js"></script>
     </body>
     </html>
   `)
