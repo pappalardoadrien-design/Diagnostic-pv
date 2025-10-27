@@ -186,7 +186,9 @@ app.get('/api/audit/:token/report', async (c) => {
 // INTERFACE FRONTEND
 // ============================================================================
 
-// Page d'accueil - Dashboard DiagPV
+// ============================================================================
+// PAGE D'ACCUEIL - DIAGNOSTIC HUB
+// ============================================================================
 app.get('/', (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -194,7 +196,7 @@ app.get('/', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DiagPV Audit - Électroluminescence Photovoltaïque</title>
+        <title>Diagnostic Hub - Plateforme Unifiée DiagPV</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/diagpv-styles.css" rel="stylesheet">
@@ -387,22 +389,211 @@ app.get('/', (c) => {
     <body class="bg-black text-white min-h-screen font-bold">
 
         <div class="container mx-auto p-6">
-            <!-- En-tête DiagPV -->
+            <!-- En-tête Diagnostic Hub -->
             <header class="mb-8 text-center">
                 <div class="inline-flex items-center mb-4">
-                    <i class="fas fa-solar-panel text-4xl text-yellow-400 mr-4"></i>
-                    <h1 class="text-4xl font-black">DIAGNOSTIC PHOTOVOLTAÏQUE</h1>
+                    <i class="fas fa-solar-panel text-5xl text-yellow-400 mr-4"></i>
+                    <div>
+                        <h1 class="text-5xl font-black">DIAGNOSTIC HUB</h1>
+                        <p class="text-2xl text-orange-400 mt-2">Plateforme Unifiée DiagPV</p>
+                    </div>
                 </div>
-                <p class="text-xl text-gray-300">Audit Électroluminescence - Interface Terrain Nocturne</p>
+                <p class="text-xl text-gray-300 mt-4">Tous vos outils d'audit photovoltaïque en un seul endroit</p>
                 <p class="text-lg text-blue-400 mt-2">
                     <i class="fas fa-globe mr-2"></i>
                     www.diagnosticphotovoltaique.fr
                 </p>
             </header>
             
-            <!-- Interface création audit -->
-            <div class="max-w-4xl mx-auto">
+            <!-- Modules disponibles -->
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-3xl font-black mb-8 text-center text-yellow-400">
+                    <i class="fas fa-th mr-2"></i>
+                    MODULES DISPONIBLES
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <!-- Module EL - OPÉRATIONNEL -->
+                    <a href="/el" class="bg-gradient-to-br from-green-900 to-green-700 rounded-lg p-8 border-4 border-green-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-green-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-moon text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE EL</h3>
+                            <p class="text-lg text-green-200 mb-3">Électroluminescence</p>
+                            <div class="bg-green-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
+                            </div>
+                            <p class="text-sm text-green-100">Audit nocturne EL terrain avec cartographie temps réel</p>
+                        </div>
+                    </a>
+                    
+                    <!-- Module I-V - À VENIR -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                        <div class="text-center">
+                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-chart-line text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE I-V</h3>
+                            <p class="text-lg text-gray-300 mb-3">Courbes I-V</p>
+                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            </div>
+                            <p class="text-sm text-gray-300">Mesures électriques et analyse performances</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Module Thermographie -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                        <div class="text-center">
+                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-thermometer-half text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE THERMIQUE</h3>
+                            <p class="text-lg text-gray-300 mb-3">Thermographie IR</p>
+                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            </div>
+                            <p class="text-sm text-gray-300">Détection points chauds et anomalies thermiques</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Module Visuels -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                        <div class="text-center">
+                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-eye text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE VISUELS</h3>
+                            <p class="text-lg text-gray-300 mb-3">Contrôles Visuels</p>
+                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            </div>
+                            <p class="text-sm text-gray-300">Inspection visuelle et défauts mécaniques</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Module Isolation -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                        <div class="text-center">
+                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-bolt text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE ISOLATION</h3>
+                            <p class="text-lg text-gray-300 mb-3">Tests d'Isolation</p>
+                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            </div>
+                            <p class="text-sm text-gray-300">Mesures résistance isolation et défauts électriques</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Module Expertise Post-Sinistre -->
+                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                        <div class="text-center">
+                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-gavel text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE EXPERTISE</h3>
+                            <p class="text-lg text-gray-300 mb-3">Expertise Post-Sinistre</p>
+                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            </div>
+                            <p class="text-sm text-gray-300">Analyse sinistres et rapports experts judiciaires</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Accès rapides -->
                 <div class="bg-gray-900 rounded-lg p-8 border-2 border-yellow-400">
+                    <h2 class="text-2xl font-black mb-6 text-center">
+                        <i class="fas fa-rocket mr-2 text-green-400"></i>
+                        ACCÈS RAPIDES
+                    </h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-lg p-6 border border-green-400 hover:bg-gray-750 transition-colors">
+                            <h3 class="text-xl font-bold mb-3 text-green-400 flex items-center">
+                                <i class="fas fa-plus-circle mr-2"></i>
+                                NOUVEL AUDIT EL
+                            </h3>
+                            <p class="text-gray-300 mb-4">Créer un nouvel audit électroluminescence terrain nocturne</p>
+                            <a href="/el" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                                <i class="fas fa-moon mr-2"></i>
+                                CRÉER AUDIT EL
+                            </a>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-orange-400 hover:bg-gray-750 transition-colors">
+                            <h3 class="text-xl font-bold mb-3 text-orange-400 flex items-center">
+                                <i class="fas fa-tachometer-alt mr-2"></i>
+                                TABLEAU DE BORD
+                            </h3>
+                            <p class="text-gray-300 mb-4">Gérez tous vos audits en cours avec mise à jour temps réel</p>
+                            <a href="/dashboard" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                ACCÉDER AU DASHBOARD
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="mt-12 text-center text-gray-400 text-sm">
+                    <p>Diagnostic Hub v1.0 - Architecture Modulaire Unifiée</p>
+                    <p class="mt-2">
+                        <i class="fas fa-shield-alt mr-1"></i>
+                        Conformité IEC 62446-1 | IEC 61215 | NF C 15-100
+                    </p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// ROUTE MODULE EL - INTERFACE CRÉATION AUDIT ÉLECTROLUMINESCENCE
+// ============================================================================
+app.get('/el', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module EL - Création Audit Électroluminescence</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/diagpv-styles.css" rel="stylesheet">
+        <meta name="theme-color" content="#000000">
+    </head>
+    <body class="bg-black text-white min-h-screen font-bold">
+        <div class="container mx-auto p-6">
+            <!-- En-tête retour Hub -->
+            <div class="mb-6">
+                <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Retour au Diagnostic Hub
+                </a>
+            </div>
+            
+            <!-- En-tête Module EL -->
+            <header class="mb-8 text-center">
+                <div class="inline-flex items-center mb-4">
+                    <i class="fas fa-moon text-4xl text-green-400 mr-4"></i>
+                    <h1 class="text-4xl font-black">MODULE EL - ÉLECTROLUMINESCENCE</h1>
+                </div>
+                <p class="text-xl text-gray-300">Interface Terrain Nocturne - Audit Photovoltaïque</p>
+                <p class="text-lg text-blue-400 mt-2">
+                    <i class="fas fa-globe mr-2"></i>
+                    www.diagnosticphotovoltaique.fr
+                </p>
+            </header>
+            
+            <!-- Interface création audit (contenu identique à l'ancienne page /) -->
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-gray-900 rounded-lg p-8 border-2 border-green-400">
                     <h2 class="text-2xl font-black mb-6 text-center">
                         <i class="fas fa-plus-circle mr-2 text-green-400"></i>
                         NOUVEL AUDIT ÉLECTROLUMINESCENCE
@@ -413,12 +604,12 @@ app.get('/', (c) => {
                             <div>
                                 <label class="block text-lg font-bold mb-2">Nom du projet :</label>
                                 <input type="text" id="projectName" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
                             </div>
                             <div>
                                 <label class="block text-lg font-bold mb-2">Client :</label>
                                 <input type="text" id="clientName" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
                             </div>
                         </div>
                         
@@ -426,32 +617,31 @@ app.get('/', (c) => {
                             <div>
                                 <label class="block text-lg font-bold mb-2">Localisation :</label>
                                 <input type="text" id="location" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
                             </div>
                             <div>
                                 <label class="block text-lg font-bold mb-2">Date :</label>
                                 <input type="date" id="auditDate" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
                             </div>
                         </div>
                         
                         <div class="bg-gray-800 rounded-lg p-6 border border-gray-600">
-                            <h3 class="text-xl font-bold mb-4 text-yellow-400">CONFIGURATION OU UPLOAD PLAN</h3>
+                            <h3 class="text-xl font-bold mb-4 text-green-400">CONFIGURATION OU UPLOAD PLAN</h3>
                             
                             <div class="mb-6">
                                 <h4 class="text-lg font-bold mb-3">Option A - Configuration manuelle :</h4>
                                 
-                                <!-- Configuration simple (mode actuel) -->
                                 <div id="simpleConfig" class="grid md:grid-cols-3 gap-4 mb-4">
                                     <div>
                                         <label class="block text-sm font-bold mb-2">Nombre de strings :</label>
                                         <input type="number" id="stringCount" min="1" max="100" 
-                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-yellow-400 focus:outline-none">
+                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-green-400 focus:outline-none">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-bold mb-2">Modules par string :</label>
                                         <input type="number" id="modulesPerString" min="1" max="50" 
-                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-yellow-400 focus:outline-none">
+                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-green-400 focus:outline-none">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-bold mb-2">Total modules :</label>
@@ -459,19 +649,17 @@ app.get('/', (c) => {
                                     </div>
                                 </div>
                                 
-                                <!-- Bouton pour configuration avancée -->
                                 <div class="text-center mb-4 space-x-3">
                                     <button type="button" id="toggleAdvancedConfig" 
                                             class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-bold text-sm">
-                                        <i class="fas fa-cog mr-2"></i>CONFIGURATION AVANCÉE (Strings différents)
+                                        <i class="fas fa-cog mr-2"></i>CONFIGURATION AVANCÉE
                                     </button>
                                     <button type="button" id="loadExampleConfig" 
                                             class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold text-sm">
-                                        <i class="fas fa-magic mr-2"></i>EXEMPLE MPPT (26+9×24)
+                                        <i class="fas fa-magic mr-2"></i>EXEMPLE MPPT
                                     </button>
                                 </div>
                                 
-                                <!-- Configuration avancée (masquée par défaut) -->
                                 <div id="advancedConfig" class="hidden bg-gray-700 rounded-lg p-4 border border-orange-400">
                                     <div class="flex items-center justify-between mb-4">
                                         <h5 class="text-lg font-bold text-orange-400">Configuration par String/MPPT</h5>
@@ -482,7 +670,6 @@ app.get('/', (c) => {
                                     </div>
                                     
                                     <div id="stringsList" class="space-y-2 max-h-60 overflow-y-auto">
-                                        <!-- Strings dynamiques seront ajoutés ici -->
                                     </div>
                                     
                                     <div class="mt-4 p-3 bg-gray-800 rounded border-l-4 border-green-400">
@@ -497,8 +684,7 @@ app.get('/', (c) => {
                             <div class="border-t border-gray-600 pt-6">
                                 <h4 class="text-lg font-bold mb-3">Option B - Upload plan :</h4>
                                 <div class="flex items-center space-x-4">
-                                    <input type="file" id="planFile" accept=".pdf,.png,.jpg,.jpeg" 
-                                           class="hidden">
+                                    <input type="file" id="planFile" accept=".pdf,.png,.jpg,.jpeg" class="hidden">
                                     <button type="button" onclick="document.getElementById('planFile').click()" 
                                             class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-bold text-lg">
                                         <i class="fas fa-paperclip mr-2"></i>CHARGER PLAN PDF/IMAGE
@@ -515,7 +701,6 @@ app.get('/', (c) => {
                     </form>
                 </div>
                 
-                <!-- Boutons d'accès -->
                 <div class="mt-8 grid md:grid-cols-2 gap-6">
                     <div class="bg-gray-900 rounded-lg p-6 border border-gray-600">
                         <h3 class="text-xl font-bold mb-4 flex items-center">
@@ -532,8 +717,8 @@ app.get('/', (c) => {
                             <i class="fas fa-tachometer-alt mr-2"></i>
                             TABLEAU DE BORD
                         </h3>
-                        <p class="text-gray-300 mb-4">Gérez tous vos audits en cours avec mise à jour temps réel</p>
-                        <a href="/dashboard" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                        <p class="text-gray-300 mb-4">Gérez tous vos audits en cours</p>
+                        <a href="/dashboard" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-black text-lg flex items-center justify-center">
                             <i class="fas fa-chart-line mr-2"></i>
                             ACCÉDER AU DASHBOARD
                         </a>
@@ -541,7 +726,6 @@ app.get('/', (c) => {
                 </div>
             </div>
         </div>
-        
 
         <script src="/static/diagpv-app.js"></script>
     </body>
