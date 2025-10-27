@@ -257,9 +257,22 @@ auditsRouter.get('/:token', async (c) => {
     FROM el_modules WHERE audit_token = ?
   `).bind(token).first()
   
+  // Transform modules pour compatibilité frontend
+  const transformedModules = modules.results.map((m: any) => ({
+    ...m,
+    module_id: m.module_identifier,  // Ajouter alias pour ancien nom
+    status: m.defect_type === 'none' ? 'ok' : 
+            m.defect_type === 'luminescence_inequality' ? 'inequality' :
+            m.defect_type === 'microcrack' ? 'microcracks' :
+            m.defect_type === 'dead_module' ? 'dead' :
+            m.defect_type === 'string_open' ? 'string_open' :
+            m.defect_type === 'not_connected' ? 'not_connected' :
+            m.defect_type === 'pending' ? 'pending' : m.defect_type
+  }))
+  
   return c.json({
     audit,
-    modules: modules.results,
+    modules: transformedModules,
     progress
   })
 })

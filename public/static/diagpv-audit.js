@@ -3,7 +3,7 @@
 
 // Configuration logging production
 const DEBUG_AUDIT = localStorage.getItem('diagpv_debug') === 'true'
-const log = (...args) => DEBUG_AUDIT && console.log(...args)
+const logAudit = (...args) => DEBUG_AUDIT && console.logAudit(...args)
 const error = (...args) => console.error(...args) // Toujours afficher les erreurs
 
 class DiagPVAudit {
@@ -29,7 +29,7 @@ class DiagPVAudit {
     }
 
     async init() {
-        log('🌙 DiagPV Audit Terrain - Token:', this.auditToken)
+        logAudit('🌙 DiagPV Audit Terrain - Token:', this.auditToken)
         
         try {
             await this.loadAuditData()
@@ -58,7 +58,7 @@ class DiagPVAudit {
             this.modules.set(module.module_id, module)
         })
 
-        log('✅ Audit chargé:', this.auditData.project_name, 'Modules:', this.modules.size)
+        logAudit('✅ Audit chargé:', this.auditData.project_name, 'Modules:', this.modules.size)
     }
 
     setupInterface() {
@@ -266,7 +266,7 @@ class DiagPVAudit {
     setViewMode(mode) {
         this.viewMode = mode
         this.renderModulesGrid()
-        log('🔄 Mode d\'affichage changé:', mode)
+        logAudit('🔄 Mode d\'affichage changé:', mode)
     }
 
     setupEventListeners() {
@@ -284,7 +284,7 @@ class DiagPVAudit {
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('module-btn')) {
                 const moduleId = e.target.getAttribute('data-module-id')
-                log('🎯 Module cliqué:', moduleId, 'Mode:', this.multiSelectMode ? 'Sélection' : 'Normal')
+                logAudit('🎯 Module cliqué:', moduleId, 'Mode:', this.multiSelectMode ? 'Sélection' : 'Normal')
                 
                 if (moduleId) {
                     if (this.multiSelectMode) {
@@ -318,7 +318,7 @@ class DiagPVAudit {
     }
 
     openModuleModal(moduleId) {
-        log('📝 Ouverture modal pour module:', moduleId)
+        logAudit('📝 Ouverture modal pour module:', moduleId)
         
         if (!moduleId) {
             error('❌ Module ID manquant')
@@ -429,8 +429,8 @@ class DiagPVAudit {
     }
 
     async validateModuleStatus() {
-        log('🔍 Validation module - selectedModule:', this.selectedModule)
-        log('🔍 Validation module - selectedStatus:', this.selectedStatus)
+        logAudit('🔍 Validation module - selectedModule:', this.selectedModule)
+        logAudit('🔍 Validation module - selectedStatus:', this.selectedStatus)
         
         if (!this.selectedModule || !this.selectedStatus) {
             this.showAlert('Veuillez sélectionner un statut', 'warning')
@@ -451,7 +451,7 @@ class DiagPVAudit {
             const selectedModule = { ...this.selectedModule } // copie de sécurité
             const selectedStatus = this.selectedStatus
             
-            log('📡 Mise à jour module:', moduleId, '→', selectedStatus)
+            logAudit('📡 Mise à jour module:', moduleId, '→', selectedStatus)
             
             // API update
             const updateData = {
@@ -492,7 +492,7 @@ class DiagPVAudit {
             this.closeModal()
             this.showAlert(`Module ${moduleId} mis à jour`, 'success')
 
-            log('✅ Module mis à jour:', moduleId, '→', selectedStatus)
+            logAudit('✅ Module mis à jour:', moduleId, '→', selectedStatus)
 
         } catch (err) {
             error('Erreur validation module:', err)
@@ -508,7 +508,7 @@ class DiagPVAudit {
     }
 
     updateModuleButton(moduleId) {
-        log('🔄 Mise à jour bouton module:', moduleId)
+        logAudit('🔄 Mise à jour bouton module:', moduleId)
         
         if (!moduleId) {
             error('❌ Module ID manquant pour mise à jour bouton')
@@ -552,7 +552,7 @@ class DiagPVAudit {
 
         // Statistiques détaillées
         const stats = this.calculateStats()
-        log('📊 Progression:', stats)
+        logAudit('📊 Progression:', stats)
     }
 
     calculateStats() {
@@ -587,7 +587,7 @@ class DiagPVAudit {
             }
 
             this.eventSource.onerror = () => {
-                log('⚠️ Connexion temps réel interrompue')
+                logAudit('⚠️ Connexion temps réel interrompue')
                 // Reconnexion automatique après 5s
                 setTimeout(() => this.setupRealtimeSync(), 5000)
             }
@@ -647,7 +647,7 @@ class DiagPVAudit {
         const data = localStorage.getItem(`diagpv_audit_${this.auditToken}`)
         if (data) {
             const parsed = JSON.parse(data)
-            log('📱 Données offline chargées:', parsed.lastSync)
+            logAudit('📱 Données offline chargées:', parsed.lastSync)
         }
     }
 
@@ -657,13 +657,13 @@ class DiagPVAudit {
             moduleId: this.selectedModule.module_id,
             timestamp: Date.now()
         })
-        log('📤 Queued offline:', this.offlineQueue.length, 'updates')
+        logAudit('📤 Queued offline:', this.offlineQueue.length, 'updates')
     }
 
     async syncOfflineQueue() {
         if (this.offlineQueue.length === 0) return
 
-        log('🔄 Sync offline queue:', this.offlineQueue.length, 'items')
+        logAudit('🔄 Sync offline queue:', this.offlineQueue.length, 'items')
         
         for (const update of this.offlineQueue) {
             try {
@@ -770,7 +770,7 @@ class DiagPVAudit {
             const reportUrl = `/api/el/audit/${this.auditToken}/report`
             window.open(reportUrl, '_blank')
             
-            log('📄 Rapport généré:', reportUrl)
+            logAudit('📄 Rapport généré:', reportUrl)
             
         } catch (err) {
             error('Erreur génération rapport:', err)
@@ -918,7 +918,7 @@ class DiagPVAudit {
             this.closeEditAuditModal()
             this.showAlert('Audit modifié avec succès', 'success')
             
-            log('✅ Audit modifié:', formData.project_name)
+            logAudit('✅ Audit modifié:', formData.project_name)
             
         } catch (err) {
             error('Erreur modification audit:', err)
@@ -984,7 +984,7 @@ class DiagPVAudit {
 
     toggleMultiSelectMode() {
         this.multiSelectMode = !this.multiSelectMode
-        log('🔄 Mode sélection multiple:', this.multiSelectMode ? 'ACTIVÉ' : 'DÉSACTIVÉ')
+        logAudit('🔄 Mode sélection multiple:', this.multiSelectMode ? 'ACTIVÉ' : 'DÉSACTIVÉ')
 
         const toggleBtn = document.getElementById('multiSelectToggleBtn')
         const toolbar = document.getElementById('multiSelectToolbar')
@@ -1022,7 +1022,7 @@ class DiagPVAudit {
             btn.classList.remove('multi-select-mode', 'selected-for-bulk')
         })
 
-        log('✅ Mode sélection multiple désactivé')
+        logAudit('✅ Mode sélection multiple désactivé')
     }
 
     toggleModuleSelection(moduleId, element) {
@@ -1030,12 +1030,12 @@ class DiagPVAudit {
             // Désélectionner
             this.selectedModules.delete(moduleId)
             element.classList.remove('selected-for-bulk')
-            log('➖ Module désélectionné:', moduleId)
+            logAudit('➖ Module désélectionné:', moduleId)
         } else {
             // Sélectionner
             this.selectedModules.add(moduleId)
             element.classList.add('selected-for-bulk')
-            log('➕ Module sélectionné:', moduleId)
+            logAudit('➕ Module sélectionné:', moduleId)
         }
 
         this.updateSelectionCount()
@@ -1056,7 +1056,7 @@ class DiagPVAudit {
 
         this.updateSelectionCount()
         this.showAlert(`${addedCount} modules sélectionnés`, 'success')
-        log('✅ Tous les modules visibles sélectionnés:', addedCount)
+        logAudit('✅ Tous les modules visibles sélectionnés:', addedCount)
     }
 
     clearSelection() {
@@ -1065,7 +1065,7 @@ class DiagPVAudit {
             btn.classList.remove('selected-for-bulk')
         })
         this.updateSelectionCount()
-        log('🗑️ Sélection effacée')
+        logAudit('🗑️ Sélection effacée')
     }
 
     updateSelectionCount() {
@@ -1128,7 +1128,7 @@ class DiagPVAudit {
         const modulesToUpdate = Array.from(this.selectedModules)
 
         try {
-            log('🔄 Mise à jour en lot:', {
+            logAudit('🔄 Mise à jour en lot:', {
                 total: modulesToUpdate.length,
                 status: this.bulkActionStatus,
                 comment: comment
@@ -1146,7 +1146,7 @@ class DiagPVAudit {
                 batches.push(modulesToUpdate.slice(i, i + batchSize))
             }
 
-            log(`📦 ${batches.length} lot(s) à traiter (${modulesToUpdate.length} modules total)`)
+            logAudit(`📦 ${batches.length} lot(s) à traiter (${modulesToUpdate.length} modules total)`)
 
             // Traitement séquentiel des lots
             let totalUpdated = 0
@@ -1155,7 +1155,7 @@ class DiagPVAudit {
 
             for (let i = 0; i < batches.length; i++) {
                 const batch = batches[i]
-                log(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
+                logAudit(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
 
                 try {
                     // Appel API pour ce lot
@@ -1177,7 +1177,7 @@ class DiagPVAudit {
                     }
 
                     const result = await response.json()
-                    log(`✅ Lot ${i + 1} traité:`, result)
+                    logAudit(`✅ Lot ${i + 1} traité:`, result)
 
                     // Accumulation des résultats
                     totalUpdated += result.updated || 0
@@ -1223,10 +1223,10 @@ class DiagPVAudit {
                 }
             }
 
-            log(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
+            logAudit(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
 
             // Re-rendu final de l'interface  
-            log('🎨 Re-rendu final interface après multi-sélection')
+            logAudit('🎨 Re-rendu final interface après multi-sélection')
             this.renderModulesGrid()
             this.updateProgress()
             
@@ -1236,7 +1236,7 @@ class DiagPVAudit {
                     const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
                     const module = this.modules.get(moduleId)
                     if (btn && module) {
-                        log(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
+                        logAudit(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
                     }
                 })
             }, 100)
@@ -1270,7 +1270,7 @@ class DiagPVAudit {
 
 // Initialisation audit au chargement DOM
 document.addEventListener('DOMContentLoaded', () => {
-    log('🌙 DiagPV Audit Terrain - Interface Nocturne Initialisée')
+    logAudit('🌙 DiagPV Audit Terrain - Interface Nocturne Initialisée')
     window.diagpvAudit = new DiagPVAudit()
 })
 

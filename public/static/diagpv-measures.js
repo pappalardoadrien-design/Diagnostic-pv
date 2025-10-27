@@ -1,6 +1,6 @@
 // Configuration logging production
 const DEBUG_MEASURES = localStorage.getItem("diagpv_debug") === "true"
-const log = (...args) => DEBUG_MEASURES && console.log(...args)
+const logMeasures = (...args) => DEBUG_MEASURES && console.logMeasures(...args)
 const error = (...args) => console.error(...args)
 
 // DiagPV - Interface mesures PVserv
@@ -134,7 +134,7 @@ class DiagPVMeasures {
                 }
             }
         } catch (err) {
-            log('Aucune mesure existante trouvée')
+            logMeasures('Aucune mesure existante trouvée')
         }
     }
 
@@ -449,7 +449,7 @@ class DiagPVMeasures {
         if (window.diagpvAudit && window.diagpvAudit.showAlert) {
             window.diagpvAudit.showAlert(message, type)
         } else {
-            log(`[${type.toUpperCase()}] ${message}`)
+            logMeasures(`[${type.toUpperCase()}] ${message}`)
             alert(message)
         }
     }
@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const auditToken = document.body.dataset.auditToken
     if (auditToken) {
         window.diagpvMeasures = new DiagPVMeasures(auditToken)
-        log('📊 DiagPV Measures Interface Initialized')
+        logMeasures('📊 DiagPV Measures Interface Initialized')
     }
 })
 
