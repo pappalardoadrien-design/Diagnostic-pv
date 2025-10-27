@@ -54,7 +54,7 @@ class DiagPVDashboard {
             document.getElementById('auditsContainer').classList.add('hidden')
             document.getElementById('noAudits').classList.add('hidden')
 
-            const response = await fetch('/api/dashboard/audits')
+            const response = await fetch('/api/el/dashboard/audits')
             const data = await response.json()
 
             if (data.success) {
