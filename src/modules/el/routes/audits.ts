@@ -453,7 +453,16 @@ auditsRouter.get('/:token/report', async (c) => {
         gridHTML += '<div class="grid-row">'
         row.forEach((cell) => {
           if (cell) {
-            const statusClass = `module-${cell.defect_type}`
+            // Mapping defect_type vers classes CSS
+            let statusClass = 'module-ok'
+            if (cell.defect_type === 'none') {
+              statusClass = 'module-ok'
+            } else if (cell.defect_type === 'luminescence_inequality') {
+              statusClass = 'module-inequality'
+            } else {
+              statusClass = `module-${cell.defect_type}`
+            }
+            
             const displayId = cell.module_identifier.includes('-') 
               ? cell.module_identifier.split('-')[1] 
               : cell.module_identifier.substring(1)
@@ -569,7 +578,15 @@ auditsRouter.get('/:token/report', async (c) => {
             background: #d1fae5; 
             color: #065f46; 
         }
+        .grid-cell.module-none { 
+            background: #d1fae5; 
+            color: #065f46; 
+        }
         .grid-cell.module-inequality { 
+            background: #fef3c7; 
+            color: #92400e; 
+        }
+        .grid-cell.module-luminescence_inequality { 
             background: #fef3c7; 
             color: #92400e; 
         }
