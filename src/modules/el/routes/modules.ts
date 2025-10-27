@@ -64,9 +64,9 @@ function validateAndTransformStatus(status: string): { defect_type: string; seve
 // ============================================================================
 // POST /api/el/audit/:token/module/:moduleId - Mettre à jour le statut d'un module
 // ============================================================================
-modulesRouter.post('/:token/module/:moduleId', async (c) => {
+modulesRouter.post('/module/:moduleId', async (c) => {
   const { env } = c
-  const token = c.req.param('token')
+  const token = c.req.param('token')  // Token vient du parent auditsRouter
   const moduleId = c.req.param('moduleId')
   const { status, comment, technicianId }: UpdateModuleRequest = await c.req.json()
   
@@ -80,7 +80,7 @@ modulesRouter.post('/:token/module/:moduleId', async (c) => {
     UPDATE el_modules 
     SET defect_type = ?, 
         severity_level = ?, 
-        technician_comment = ?, 
+        comment = ?, 
         technician_id = ?, 
         updated_at = datetime('now')
     WHERE audit_token = ? AND module_identifier = ?
@@ -112,9 +112,9 @@ modulesRouter.post('/:token/module/:moduleId', async (c) => {
 // ============================================================================
 // POST /api/el/audit/:token/module - Créer un module individuel
 // ============================================================================
-modulesRouter.post('/:token/module', async (c) => {
+modulesRouter.post('/module', async (c) => {
   const { env } = c
-  const token = c.req.param('token')
+  const token = c.req.param('token')  // Token vient du parent auditsRouter
   const { module_id, status, comment, technician_id } = await c.req.json()
   
   // Validation entrée
@@ -150,7 +150,7 @@ modulesRouter.post('/:token/module', async (c) => {
     const stmt = env.DB.prepare(`
       INSERT OR REPLACE INTO el_modules 
       (el_audit_id, audit_token, module_identifier, string_number, position_in_string, 
-       defect_type, severity_level, technician_comment, technician_id, updated_at)
+       defect_type, severity_level, comment, technician_id, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `)
     
@@ -188,9 +188,9 @@ modulesRouter.post('/:token/module', async (c) => {
 // ============================================================================
 // POST /api/el/audit/:token/bulk-update - Mise à jour en lot des modules
 // ============================================================================
-modulesRouter.post('/:token/bulk-update', async (c) => {
+modulesRouter.post('/bulk-update', async (c) => {
   const { env } = c
-  const token = c.req.param('token')
+  const token = c.req.param('token')  // Token vient du parent auditsRouter
   const { modules, status, comment, technician_id }: BulkUpdateRequest = await c.req.json()
   
   // Validation entrée
@@ -214,7 +214,7 @@ modulesRouter.post('/:token/bulk-update', async (c) => {
       UPDATE el_modules 
       SET defect_type = ?, 
           severity_level = ?, 
-          technician_comment = ?, 
+          comment = ?, 
           technician_id = ?, 
           updated_at = datetime('now')
       WHERE audit_token = ? AND module_identifier = ?

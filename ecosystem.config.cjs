@@ -2,10 +2,10 @@
 module.exports = {
   apps: [
     {
-      name: 'diagpv-audit',
+      name: 'diagnostic-hub',
       script: 'npx',
-      args: 'wrangler pages dev dist --d1=diagpv-audit-production --local --ip 0.0.0.0 --port 3000',
-      cwd: '/home/user/webapp',
+      args: 'wrangler pages dev dist --d1=diagnostic-hub-production --local --ip 0.0.0.0 --port 3000',
+      cwd: '/home/user/diagnostic-hub',
       env: {
         NODE_ENV: 'development',
         PORT: 3000

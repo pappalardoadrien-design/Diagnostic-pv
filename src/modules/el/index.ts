@@ -20,10 +20,7 @@ const elModule = new Hono<{ Bindings: Bindings }>()
 // Routes dashboard (statistiques globales)
 elModule.route('/dashboard', dashboardRouter)
 
-// Routes pour la gestion des audits
+// Routes pour la gestion des audits (inclut les routes modules intégrées)
 elModule.route('/audit', auditsRouter)
-
-// Routes pour la gestion des modules (nested sous /audit/:token)
-auditsRouter.route('/:token', modulesRouter)
 
 export default elModule

@@ -349,4 +349,10 @@ auditsRouter.delete('/:token', async (c) => {
   }
 })
 
+// ============================================================================
+// IMPORT ET MONTAGE ROUTES MODULES SOUS /:token
+// ============================================================================
+import modulesRouter from './modules'
+auditsRouter.route('/:token', modulesRouter)
+
 export default auditsRouter
