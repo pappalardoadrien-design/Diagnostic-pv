@@ -404,6 +404,106 @@ auditsRouter.get('/:token/report', async (c) => {
     
     const completion_rate = ((stats.total - stats.pending) / stats.total * 100).toFixed(1)
     
+    // Fonction génération grille physique
+    const generatePhysicalGrid = (modules: ELModule[]) => {
+      if (!modules || modules.length === 0) {
+        return '<p>Aucun module trouvé</p>'
+      }
+
+      // Tri par position physique
+      const sortedModules = modules.sort((a, b) => {
+        if (a.physical_row !== b.physical_row) {
+          return (a.physical_row || 0) - (b.physical_row || 0)
+        }
+        return (a.physical_col || 0) - (b.physical_col || 0)
+      })
+
+      // Déterminer dimensions grille
+      const maxRow = Math.max(...sortedModules.map(m => m.physical_row || 0))
+      const maxCol = Math.max(...sortedModules.map(m => m.physical_col || 0))
+      const minRow = Math.min(...sortedModules.map(m => m.physical_row || 0))
+      const minCol = Math.min(...sortedModules.map(m => m.physical_col || 0))
+
+      // Créer grille vide
+      const grid: (ELModule | null)[][] = []
+      for (let row = maxRow; row >= minRow; row--) {
+        const gridRow: (ELModule | null)[] = []
+        for (let col = minCol; col <= maxCol; col++) {
+          gridRow.push(null)
+        }
+        grid.push(gridRow)
+      }
+
+      // Placer les modules dans la grille
+      sortedModules.forEach(module => {
+        const row = module.physical_row || 0
+        const col = module.physical_col || 0
+        const gridRowIndex = maxRow - row
+        const gridColIndex = col - minCol
+        
+        if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
+          grid[gridRowIndex][gridColIndex] = module
+        }
+      })
+
+      // Génération HTML de la grille
+      let gridHTML = '<div class="physical-grid">'
+      
+      grid.forEach((row) => {
+        gridHTML += '<div class="grid-row">'
+        row.forEach((cell) => {
+          if (cell) {
+            const statusClass = `module-${cell.defect_type}`
+            const displayId = cell.module_identifier.includes('-') 
+              ? cell.module_identifier.split('-')[1] 
+              : cell.module_identifier.substring(1)
+            gridHTML += `<div class="grid-cell ${statusClass}" title="${cell.module_identifier} - ${cell.defect_type}">${displayId}</div>`
+          } else {
+            gridHTML += '<div class="grid-cell empty"></div>'
+          }
+        })
+        gridHTML += '</div>'
+      })
+      
+      gridHTML += '</div>'
+      
+      // Légende
+      gridHTML += `
+        <div class="grid-legend">
+          <div class="legend-item">
+            <div class="legend-box" style="background: #d1fae5;"></div>
+            <span>🟢 OK</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #fef3c7;"></div>
+            <span>🟡 Inégalité</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #fed7aa;"></div>
+            <span>🟠 Microfissures</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #fecaca;"></div>
+            <span>🔴 HS - À REMPLACER</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #dbeafe;"></div>
+            <span>🔵 String ouvert</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #e5e7eb;"></div>
+            <span>⚫ Non raccordé</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: #f5f5f5;"></div>
+            <span>⬜ Vide</span>
+          </div>
+        </div>
+      `
+      
+      return gridHTML
+    }
+    
     // Génération HTML du rapport
     const reportHTML = `
 <!DOCTYPE html>
@@ -433,10 +533,93 @@ auditsRouter.get('/:token/report', async (c) => {
         .status-inequality { color: #facc15; }
         .status-microcracks { color: #fb923c; }
         .status-dead { color: #dc2626; }
+        
+        /* Styles grille calepinage */
+        .physical-grid { 
+            display: inline-block; 
+            border: 2px solid #333; 
+            background: #fff;
+            margin: 10px auto;
+        }
+        .grid-row { 
+            display: flex; 
+            border-bottom: 1px solid #ddd; 
+        }
+        .grid-row:last-child { 
+            border-bottom: none; 
+        }
+        .grid-cell { 
+            width: 50px; 
+            height: 50px; 
+            border-right: 1px solid #ddd; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 10px; 
+            font-weight: bold; 
+            position: relative;
+        }
+        .grid-cell:last-child { 
+            border-right: none; 
+        }
+        .grid-cell.empty { 
+            background: #f5f5f5; 
+        }
+        .grid-cell.module-ok { 
+            background: #d1fae5; 
+            color: #065f46; 
+        }
+        .grid-cell.module-inequality { 
+            background: #fef3c7; 
+            color: #92400e; 
+        }
+        .grid-cell.module-microcrack { 
+            background: #fed7aa; 
+            color: #9a3412; 
+        }
+        .grid-cell.module-dead_module { 
+            background: #fecaca; 
+            color: #991b1b; 
+            font-weight: 900;
+        }
+        .grid-cell.module-string_open { 
+            background: #dbeafe; 
+            color: #1e40af; 
+        }
+        .grid-cell.module-not_connected { 
+            background: #e5e7eb; 
+            color: #374151; 
+        }
+        .grid-cell.module-pending { 
+            background: #fff; 
+            color: #9ca3af; 
+        }
+        .grid-legend { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 15px; 
+            margin-top: 15px; 
+            padding: 15px; 
+            background: #fff; 
+            border: 1px solid #ddd; 
+            border-radius: 5px;
+        }
+        .legend-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+        }
+        .legend-box { 
+            width: 30px; 
+            height: 30px; 
+            border: 1px solid #333; 
+        }
+        
         .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #ddd; font-size: 12px; color: #666; text-align: center; }
         @media print {
             body { margin: 20px; }
             .no-print { display: none; }
+            .physical-grid { page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -523,7 +706,15 @@ auditsRouter.get('/:token/report', async (c) => {
         </div>
     </div>
 
-    <h2>📋 DÉTAIL DES MODULES</h2>
+    <h2>🗺️ PLAN DE CALEPINAGE - LOCALISATION PHYSIQUE DES MODULES</h2>
+    <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; page-break-inside: avoid;">
+        <p style="margin-bottom: 15px; font-weight: bold; color: #ea580c;">
+            ⚠️ IMPORTANT : Utilisez ce plan pour localiser les modules à remplacer sur site
+        </p>
+        ${generatePhysicalGrid(modules)}
+    </div>
+
+    <h2>📋 DÉTAIL DES MODULES À REMPLACER</h2>
     <div class="module-list">
         ${modules.filter(m => m.defect_type !== 'none' && m.defect_type !== 'pending').map(module => `
             <div class="module-item">
