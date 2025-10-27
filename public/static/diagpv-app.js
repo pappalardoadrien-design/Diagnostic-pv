@@ -441,14 +441,14 @@ class DiagPVApp {
         const container = document.getElementById('recentAudits')
         
         try {
-            // Récupération depuis l'API
-            const response = await fetch('/api/dashboard/audits')
+            // Récupération depuis l'API Module EL
+            const response = await fetch('/api/el/dashboard/audits')
             const data = await response.json()
             
             if (data.success && data.audits && data.audits.length > 0) {
                 container.innerHTML = data.audits.map(audit => `
                     <div class="bg-gray-800 rounded-lg p-4 border border-gray-600 hover:border-yellow-400 cursor-pointer transition-colors"
-                         onclick="window.location.href='/audit/${audit.token}'">
+                         onclick="window.location.href='/audit/${audit.audit_token}'">
                         <div class="flex justify-between items-start">
                             <div>
                                 <h4 class="font-bold text-lg">${audit.project_name}</h4>
