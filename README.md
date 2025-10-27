@@ -136,7 +136,7 @@ diagnostic-hub/
 ## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production**: https://ebd50293.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
+- **Production**: https://cd24ef69.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
 - **Domaine principal**: https://diagnostic-hub.pages.dev
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
