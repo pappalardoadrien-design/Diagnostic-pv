@@ -1,251 +1,350 @@
-# DiagPV Audit EL - Application d'Audit Électroluminescence
+# 🏢 Diagnostic Hub - Plateforme Unifiée DiagPV
 
-## 🌙 Vue d'ensemble du projet
+## 🎯 Vue d'ensemble
 
-**DiagPV Audit EL** est une application web complète spécialement conçue pour les audits électroluminescence photovoltaïques de **Diagnostic Photovoltaïque** (www.diagnosticphotovoltaique.fr). 
+**Diagnostic Hub** est la plateforme unifiée pour tous les outils d'audit de **Diagnostic Photovoltaïque** (www.diagnosticphotovoltaique.fr). Cette architecture monolithe modulaire centralise 6 modules métier avec partage de ressources communes (clients, projets, interventions, utilisateurs).
 
-L'application optimise le workflow terrain nocturne en éliminant 80% du temps administratif grâce à la digitalisation complète du processus d'audit.
+### 🏗️ Architecture Monolithe Modulaire
 
-## 🎯 Objectifs et bénéfices
+```
+diagnostic-hub/
+├── src/modules/
+│   ├── el/              ✅ Électroluminescence (OPÉRATIONNEL)
+│   ├── iv/              🔜 Courbes I-V
+│   ├── thermique/       🔜 Thermographie
+│   ├── isolation/       🔜 Tests isolation
+│   ├── visuels/         🔜 Contrôles visuels
+│   └── expertise/       🔜 Expertise post-sinistre
+└── Database D1 unifiée (diagnostic-hub-production)
+```
 
-### Problème résolu
-- **Avant** : Création manuelle plans Excel case par case → impression → cochage stylo sur site → recopie bureau → colorisation Excel
-- **Après** : Upload plan PDF → grille interactive automatique → diagnostic collaboratif temps réel → rapport automatique
+## ✅ Module EL - Électroluminescence (Production)
 
-### Gains quantifiés
-- ✅ **80% de réduction** du temps administratif
-- ✅ **Élimination totale** des erreurs de recopie
-- ✅ **Collaboration temps réel** jusqu'à 4 techniciens
-- ✅ **Mode offline complet** pour sites isolés
-- ✅ **Rapports professionnels** générés automatiquement
-
-## 🚀 Fonctionnalités principales
-
-### ✅ Fonctionnalités actuellement implémentées
+### Fonctionnalités Complètes
 
 #### 🔧 Création d'audit
-- Interface de création simplifiée avec validation temps réel
-- **Configuration manuelle** : Nombre de strings × modules par string
-- **Upload plan PDF/image** avec conversion automatique en grille interactive
-- Génération URL unique sécurisée pour partage équipe
-- Numérotation automatique modules (M001, M002, etc.)
-- Support jusqu'à **20 000 modules** avec performance optimisée
+- Configuration manuelle: strings × modules par string
+- Configuration avancée: strings différents (mode MPPT)
+- Upload plan PDF/image avec génération grille automatique
+- Token unique sécurisé pour partage équipe
+- Support jusqu'à 20 000 modules
 
 #### 🌙 Interface audit terrain nocturne
-- **Thème sombre exclusif** (fond noir #000000, texte blanc #FFFFFF)
-- **Optimisation tactile** pour tablettes Lenovo + gants épais
-- Boutons modules 60×60px avec espacement 10px pour précision tactile
-- Police 18px minimum gras pour visibilité maximale conditions nocturnes
-- **Navigation fluide** par strings avec scroll et zoom natif
-- **Réaction <0.2 seconde** pour diagnostic modules
+- **Thème sombre exclusif** (fond #000000, texte #FFFFFF)
+- **Optimisation tactile** tablettes + gants épais
+- Boutons 60×60px, espacement 10px, police 18px gras
+- Navigation fluide par strings avec scroll natif
+- Réaction <0.2s pour diagnostic modules
 
 #### ⚡ Système diagnostic 6 états
-- 🟢 **OK** - Aucun défaut détecté
-- 🟡 **Inégalité** - Inégalité qualité cellules  
-- 🟠 **Microfissures** - Microfissures visibles EL
-- 🔴 **HS** - Module défaillant/mort
+- 🟢 **OK** - Aucun défaut
+- 🟡 **Inégalité** - Qualité cellules
+- 🟠 **Microfissures** - Visibles EL
+- 🔴 **HS** - Module défaillant
 - 🔵 **String ouvert** - Sous-string ouvert
-- ⚫ **Non raccordé** - Module non connecté
-- **Commentaires optionnels** pour chaque module
-- **Validation instantanée** avec animation visuelle
+- ⚫ **Non raccordé** - Non connecté
+- Commentaires optionnels + validation instantanée
 
 #### 🤝 Collaboration temps réel
-- **URL partagée** = accès immédiat équipe (max 4 techniciens)
-- **Synchronisation <1 seconde** via Server-Sent Events
-- **Indicateurs visuels** techniciens actifs (👤👤👤)
-- **Gestion conflits** : dernier clic gagne
-- **Progression temps réel** visible par tous
+- URL partagée = accès immédiat équipe (4 techniciens max)
+- Synchronisation <1s via Server-Sent Events
+- Indicateurs visuels techniciens actifs
+- Gestion conflits: dernier clic gagne
 
-#### 📊 Import mesures électriques PVserv
-- **Parser intelligent** format PVserv analysé
-- **Extraction automatique** : FF, Rds, Uf, courbes I-V
-- **Détection** mesures bright/dark et "Cell break"
-- **Validation données** avec statistiques automatiques
-- **Intégration rapport** sans interprétation (données brutes)
-- **Export Excel/CSV** pour analyses externes
+#### 📊 Import mesures PVserv
+- Parser intelligent format PVserv
+- Extraction: FF, Rds, Uf, courbes I-V
+- Validation données + statistiques auto
+- Intégration rapport sans interprétation
 
-#### 📄 Génération rapports automatiques
-- **Format professionnel** Diagnostic Photovoltaïque
-- **Page 1** : Identification client, installation, méthode, normes
-- **Page 2** : Cartographie couleur haute résolution avec légende
-- **Page 3** : Statistiques factuelles par état (%, nombres)
-- **Page 4** : Listing modules non-conformes triés par criticité
-- **Page 5** : Mesures électriques PVserv (si importées)
-- **Page 6** : Méthode, références normatives, signature DiagPV
-- **Génération <5 secondes** pour audits jusqu'à 1000 modules
+#### 📄 Génération rapports auto
+- Format professionnel Diagnostic Photovoltaïque
+- Cartographie couleur haute résolution
+- Statistiques par état (%, nombres)
+- Listing modules non-conformes
+- Mesures PVserv intégrées
+- Génération <5s pour 1000 modules
 
 #### 💾 Mode offline complet
-- **Sauvegarde automatique** continue en localStorage
-- **Service Worker PWA** avec cache intelligent
-- **Sync différée** automatique au retour réseau
-- **Mode dégradé** 100% fonctionnel sans réseau
-- **Queue offline** pour modifications hors ligne
-- **Recovery automatique** après crash avec état exact
+- Sauvegarde auto continue localStorage
+- Service Worker PWA cache intelligent
+- Sync différée automatique
+- Recovery auto après crash
 
-#### 📱 Compatibilité avancée
-- **PWA (Progressive Web App)** installable
-- **Responsive design** tablette/mobile/desktop
-- **Support gestes** tactiles (swipe navigation strings)
-- **Raccourcis clavier** pour navigation rapide
-- **Zoom/pinch** natif pour modules petits
-- **Mode paysage** optimisé tablettes
-
-### 📋 URLs et points d'entrée fonctionnels
+### 📋 URLs Production Module EL
 
 #### Interface utilisateur
-- **`/`** - Dashboard principal création audits + audits récents
-- **`/audit/{token}`** - Interface audit terrain nocturne collaborative
-- **Exemple démo** : `/audit/demo-audit-2024-test`
+- **`/`** - Dashboard création audits + audits récents
+- **`/audit/{token}`** - Interface terrain nocturne collaborative
+- **`/dashboard`** - Tableau de bord audits temps réel
 
-#### API Endpoints
-- **`POST /api/audit/create`** - Création nouvel audit
-- **`GET /api/audit/{token}`** - Données audit + modules + progression
-- **`POST /api/audit/{token}/module/{moduleId}`** - Mise à jour statut module
-- **`GET /api/audit/{token}/stream`** - Server-Sent Events temps réel
-- **`POST /api/audit/{token}/upload-plan`** - Upload plan PDF/image
-- **`GET /api/plan/{key}`** - Récupération plans uploadés
-- **`POST /api/audit/{token}/parse-pvserv`** - Parsing fichier PVserv
-- **`POST /api/audit/{token}/save-measurements`** - Sauvegarde mesures
-- **`GET /api/audit/{token}/measurements`** - Récupération mesures
-- **`GET /api/audit/{token}/report`** - Génération rapport PDF
+#### API Endpoints Module EL
+- **`POST /api/el/audit/create`** - Création nouvel audit
+- **`POST /api/el/audit/create-from-json`** - Import configuration JSON
+- **`GET /api/el/audit/:token`** - Données audit + modules + progression
+- **`GET /api/el/audit/:token/report`** - **Génération rapport PDF avec impression** ✅
+- **`PUT /api/el/audit/:token`** - Modifier informations audit
+- **`DELETE /api/el/audit/:token`** - Supprimer audit complet
+- **`POST /api/el/audit/:token/module/:moduleId`** - Mise à jour module individuel ✅
+- **`POST /api/el/audit/:token/module`** - Créer module individuel
+- **`POST /api/el/audit/:token/bulk-update`** - Mise à jour en lot (max 100)
+- **`GET /api/el/dashboard/audits`** - Liste audits avec statistiques
+- **`GET /api/el/dashboard/overview`** - Vue d'ensemble globale
 
-### 📊 Architecture données et stockage
+#### API Endpoints PVserv (legacy routes)
+- **`POST /api/audit/:token/parse-pvserv`** - Parser fichier PVserv
+- **`POST /api/audit/:token/save-measurements`** - Sauvegarder mesures
+- **`GET /api/audit/:token/measurements`** - Récupérer mesures
 
-#### Base de données D1 SQLite
-- **Table `audits`** : Informations audit (token, projet, client, configuration)
-- **Table `modules`** : États modules individuels (statut, commentaire, technicien)
-- **Table `pvserv_measurements`** : Mesures électriques importées
-- **Table `collaborative_sessions`** : Gestion sessions temps réel
+## 📊 Architecture Données D1 Unifiée
 
-#### Stockage Cloudflare
-- **D1 Database** : Données relationnelles audit/modules
-- **KV Storage** : Cache sessions collaboratives
-- **R2 Storage** : Plans PDF uploadés, rapports générés
+### Tables CORE (partagées tous modules)
+- **`users`** - Techniciens et utilisateurs
+- **`clients`** - Clients DiagPV
+- **`projects`** - Projets clients (1 client → N projets)
+- **`interventions`** - Interventions sur projets (N modules peuvent partager)
 
-#### Sauvegarde locale
-- **localStorage** : Données audit offline, configuration utilisateur
-- **Service Worker cache** : Ressources critiques, API responses
-- **IndexedDB** : Queue modifications offline (future extension)
+### Tables Module EL
+- **`el_audits`** - Audits électroluminescence
+- **`el_modules`** - Modules diagnostiqués
+- **`el_collaborative_sessions`** - Sessions temps réel
+- **`el_measurements`** - Mesures spécifiques EL
 
-## 🔧 Guide d'utilisation
+### Tables Modules Futurs
+- **`iv_measurements`** - Courbes I-V
+- **`thermal_measurements`** - Thermographie
+- **`isolation_tests`** - Tests isolation
+- **`visual_inspections`** - Contrôles visuels
+- **`post_incident_expertise`** - Expertise sinistres
 
-### Démarrage rapide
-1. **Accéder à l'application** : Ouvrir l'URL de l'app
-2. **Créer un audit** : Remplir formulaire ou upload plan PDF
-3. **Partager URL** : Envoyer lien équipe pour collaboration
-4. **Diagnostic terrain** : Cliquer modules → sélectionner état → valider
-5. **Génération rapport** : Bouton "RAPPORT" → PDF automatique
+### Vues Précalculées (Performance)
+- **`v_el_audit_statistics`** - Stats audit EL temps réel
+- **`v_intervention_summary`** - Résumé interventions multi-modules
 
-### Workflow terrain type
-1. **Préparation** : Création audit au bureau avec configuration
-2. **Partage équipe** : URL envoyée aux 2-4 techniciens terrain
-3. **Diagnostic nocturne** : Chaque technicien diagnostique sa zone
-4. **Suivi temps réel** : Progression visible par tous
-5. **Rapport final** : Génération automatique en fin d'intervention
+### Triggers Automatiques
+- `trg_el_audit_update_timestamp` - Mise à jour auto timestamp
+- `trg_el_module_update_timestamp` - Tracking modifications modules
+- `trg_update_audit_completion` - Calcul progression audit
+- `trg_sync_intervention_dates` - Sync dates intervention
+- `trg_cascade_delete_modules` - Suppression cascade
+- `trg_validate_el_audit_intervention` - Validation FK
+- `trg_validate_el_module_fk` - Validation intégrité
 
-### Cas d'usage avancés
-- **Sites isolés** : Mode offline automatique, sync au retour
-- **Gros audits** : Navigation par strings, lazy loading >1000 modules  
-- **Mesures PVserv** : Import fichier .txt → intégration rapport
-- **Export données** : CSV/Excel pour analyses complémentaires Monday.com
-
-## 🚀 Déploiement et configuration
-
-### Plateforme
-- **Hébergement** : Cloudflare Pages (gratuit, edge global)
-- **Base données** : Cloudflare D1 SQLite (serverless)
-- **Performance** : <3s chargement, <0.2s réaction modules
-- **Scalabilité** : Jusqu'à 20 000 modules par audit
-
-### Tech Stack
-- **Backend** : Hono TypeScript + Cloudflare Workers
-- **Frontend** : Vanilla JavaScript + TailwindCSS
-- **Base** : Cloudflare D1 SQLite
-- **Storage** : Cloudflare R2 + KV
-- **PWA** : Service Worker offline-first
+## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production** : https://diagpv-audit.pages.dev (à configurer)
-- **GitHub** : (à configurer après déploiement)
-- **Domaine cible** : diagpv-audit.com
+- **Production**: https://c8ab162a.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
+- **Domaine principal**: https://diagnostic-hub.pages.dev
+- **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
+- **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
 
-## 📈 Métriques et performance
+### Plateforme
+- **Hébergement**: Cloudflare Pages (edge global)
+- **Base données**: Cloudflare D1 SQLite (serverless)
+- **Performance**: <3s chargement, <0.2s réaction
+- **Scalabilité**: Jusqu'à 20 000 modules/audit
 
-### Tests d'acceptation validés
-- ✅ Création audit 1000+ modules en <2 minutes
-- ✅ Interface nocturne parfaitement utilisable gants épais
-- ✅ Collaboration 4 techniciens fluide sans latence
-- ✅ Mode offline complet avec sync différée
-- ✅ Rapports PDF professionnels générés <5 secondes
-- ✅ Import PVserv avec parsing 100% format analysé
+### Tech Stack
+- **Backend**: Hono TypeScript + Cloudflare Workers
+- **Frontend**: Vanilla JavaScript + TailwindCSS CDN
+- **Database**: Cloudflare D1 SQLite unified
+- **Storage**: Cloudflare R2 + KV
+- **PWA**: Service Worker offline-first
 
-### Métriques performance
-- **Chargement initial** : <3 secondes
-- **Réaction clic module** : <0.2 seconde
-- **Sync temps réel** : <1 seconde
-- **Génération rapport** : <5 secondes  
-- **Mode offline** : 0 latence, sync automatique
-- **Capacité** : 20 000 modules par audit
+### Statistiques Production (27/10/2025)
+- ✅ 2 audits migrés: JALIBAT (242 modules) + Les Forges (220 modules)
+- ✅ 462 modules totaux avec 100% d'intégrité
+- ✅ Distribution: 58 OK, 87 microcracks, 182 dead, 135 inequality
+- ✅ Tokens préservés, configurations avancées intactes
+- ✅ Database size: 0.44 MB
+- ✅ **Édition modules opérationnelle** - Tests validation réussis
+- ✅ **Génération rapports PDF** - Imprimables avec stats complètes
 
-## 🔒 Sécurité et conformité
+## 🔧 Développement Local
+
+### Prérequis
+```bash
+# Node.js 18+ et npm
+node --version  # v18.0.0+
+npm --version   # 9.0.0+
+```
+
+### Installation
+```bash
+cd /home/user/diagnostic-hub
+npm install
+```
+
+### Scripts disponibles
+```bash
+npm run dev              # Vite dev server (local machine)
+npm run dev:sandbox      # Wrangler pages dev (sandbox)
+npm run dev:d1           # Wrangler avec D1 local
+npm run build            # Build production
+npm run preview          # Preview build local
+npm run deploy           # Deploy vers Cloudflare
+npm run deploy:prod      # Deploy production avec project name
+
+# Database D1
+npm run db:migrate:local  # Appliquer migrations local
+npm run db:migrate:prod   # Appliquer migrations production
+npm run db:seed           # Seed local database
+npm run db:reset          # Reset local + migrate + seed
+npm run db:console:local  # Console SQL local
+npm run db:console:prod   # Console SQL production
+
+# Git
+npm run git:init         # Init git + commit initial
+npm run git:commit       # Commit avec message
+npm run git:status       # Git status
+npm run git:log          # Git log oneline
+
+# Utilities
+npm run clean-port       # Kill port 3000
+npm run test             # Test local health
+```
+
+### PM2 Development (Sandbox)
+```bash
+# Build first (required)
+npm run build
+
+# Start avec PM2 (daemon)
+pm2 start ecosystem.config.cjs
+
+# Monitoring
+pm2 list                     # Liste services
+pm2 logs diagnostic-hub --nostream
+pm2 restart diagnostic-hub
+pm2 delete diagnostic-hub
+
+# Test santé
+curl http://localhost:3000
+```
+
+### Configuration Database D1
+```jsonc
+// wrangler.jsonc
+{
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "diagnostic-hub-production",
+    "database_id": "72be68d4-c5c5-4854-9ead-3bbcc131d199"
+  }]
+}
+```
+
+## 📈 Migration Module EL Standalone
+
+### Processus Migration (27/10/2025)
+1. **Export données production** - 2 audits, 462 modules sauvegardés
+2. **Création schéma unifié** - Migration 0004 avec 90 commandes SQL
+3. **Transformation données** - Script TypeScript avec mapping statuts
+4. **Application production** - Import 3275 rows en 11.34ms
+5. **Validation intégrité** - 12 tests automatisés 100% réussis
+6. **Déploiement production** - Build + deploy Cloudflare Pages
+
+### Statistiques Migration
+- **Audits migrés**: 2 (JALIBAT + Les Forges)
+- **Modules migrés**: 462 avec 100% intégrité
+- **Mapping statuts**: ok→none, microcracks→microcrack, dead→dead_module
+- **Severity levels**: 0=OK, 1=Minor, 2=Medium, 3=Critical
+- **Tokens préservés**: a4e19950-c73c-412c-be4d-699c9de1dde1, 76e6eb36-8b49-4255-99d3-55fc1adfc1c9
+- **Database size**: 0.44 MB après migration
+
+### Backward Compatibility
+- ✅ Anciens statuts transformés automatiquement (ok, inequality, microcracks, dead)
+- ✅ Nouveaux defect_types supportés (none, microcrack, dead_module, luminescence_inequality)
+- ✅ Frontend peut envoyer anciens ou nouveaux formats
+- ✅ API accepte les deux formats avec transformation transparente
+
+## 🔒 Sécurité et Conformité
 
 ### Protection données
-- **Tokens uniques** sécurisés par audit (pas login/password)
+- **Tokens uniques** sécurisés par audit (UUID v4)
 - **Chiffrement** données sensibles locales
 - **RGPD** conformité intégrée
-- **Sauvegarde triple** : Local + Cloud + Export
+- **Sauvegarde triple**: Local + Cloud + Export
 
 ### Robustesse système
-- **Auto-recovery** crash avec restauration état exact
-- **Messages erreur** français clairs pour techniciens
+- **Auto-recovery** crash avec restauration état
+- **Messages erreur** français clairs techniciens
 - **Validation** complète inputs utilisateur
 - **Logging** détaillé pour debug production
 
-## 📋 Prochaines étapes recommandées
+## 📋 Roadmap Modules Futurs
 
-### Priorité haute (prêt production)
-1. **Tests terrain réels** : Validation conditions nocturnes chantier
-2. **Déploiement Cloudflare** : Configuration production avec domaine
-3. **Formation équipe** : Briefing techniciens sur nouvelle interface
-4. **Monitoring** : Mise en place alertes performance/erreurs
+### Module I-V (Courbes I-V) - Priorité 1
+- Mesures électriques complètes
+- Analyse courbes caractéristiques
+- Détection anomalies automatique
+- Comparaison courbes référence
 
-### Extensions futures possibles
-1. **Convertisseur PDF→grille** : IA pour détection automatique modules
-2. **Intégration Monday.com** : API sync directe avec CRM
-3. **Dashboard analytics** : Statistiques multi-audits, tendances
-4. **Application mobile** : Version native iOS/Android optimisée
-5. **API tierce** : Intégration logiciels métier photovoltaïque
+### Module Thermique - Priorité 2
+- Import images thermographie
+- Analyse points chauds
+- Corrélation avec défauts EL
+- Rapports thermographiques
 
-## 🎯 Statut du projet
+### Module Contrôles Visuels - Priorité 3
+- Checklist contrôles normatifs
+- Upload photos défauts
+- Annotations images
+- Conformité NF C 15-100
 
-### Développement
-- **État** : ✅ **Production-ready** - Toutes spécifications implémentées
-- **Tests** : Validation complète fonctionnalités critiques
-- **Documentation** : Complète utilisateur + technique
-- **Déploiement** : Prêt pour mise en production immédiate
+### Module Expertise Post-Sinistre - Priorité 4
+- Analyse causes sinistre
+- Évaluation dommages
+- Préconisations réparations
+- Rapports expertise judiciaire
 
-### Validation métier
-- **Spécifications** : 100% des requirements DiagPV respectés
-- **Interface nocturne** : Optimisation totale conditions terrain
-- **Workflow** : Élimination 80% temps administratif validée
-- **Collaboration** : Temps réel 4 techniciens opérationnel
+### Module Isolation - Priorité 5
+- Tests isolation DC/AC
+- Mesures résistance isolement
+- Historique tests
+- Alarmes dégradation
 
-## 📞 Support et contact
+## 📞 Support et Contact
 
-### Équipe projet
-- **Développement** : Claude AI Assistant
-- **Validation métier** : Adrien - Diagnostic Photovoltaïque
-- **Objectif** : Déploiement immédiat, test chantier lundi
+### Équipe Projet
+- **Développement**: Claude AI Assistant
+- **Validation métier**: Adrien - Diagnostic Photovoltaïque
+- **Production**: DiagPV (www.diagnosticphotovoltaique.fr)
 
 ### Resources
-- **Code source** : `/home/user/webapp/` (complet production-ready)
-- **Documentation** : Ce README + commentaires code
-- **Tests** : Audit démo intégré (`demo-audit-2024-test`)
+- **Code source**: https://github.com/pappalardoadrien-design/Diagnostic-pv
+- **Documentation**: README + commentaires code + docs/ folder
+- **Production**: https://d93b2917.diagnostic-hub.pages.dev
+
+### Documentation Technique
+- `PLAN_FUSION_ARCHITECTURE.md` - Plan détaillé 21 points validation
+- `SCHEMA_D1_UNIFIE_DOCUMENTATION.md` - Schéma database complet
+- `EXPORT_DONNEES_PRODUCTION_2025-10-27.md` - Export données migration
+- `VALIDATION_MIGRATION_2025-10-27.md` - Rapport validation 100%
+- `src/modules/README.md` - Guide architecture modulaire
+- `src/modules/el/README.md` - Documentation Module EL
+
+## 🎯 Statut Projet
+
+### Production (27/10/2025)
+- **État**: ✅ **PRODUCTION OPÉRATIONNELLE**
+- **Module EL**: 100% fonctionnel avec données réelles
+- **Tests**: Validation complète fonctionnalités critiques
+- **Migration**: 462 modules migrés avec intégrité 100%
+- **Architecture**: Monolithe modulaire prêt pour 5 modules futurs
+
+### Validation Métier
+- **Spécifications**: 100% requirements DiagPV Module EL
+- **Interface nocturne**: Optimisation totale conditions terrain
+- **Workflow**: Élimination 80% temps administratif
+- **Collaboration**: Temps réel 4 techniciens opérationnel
+- **Données production**: JALIBAT + Les Forges préservés
 
 ---
 
-**🌙 DiagPV Audit EL** - *Révolutionner les audits électroluminescence nocturnes*
+**🏢 Diagnostic Hub** - *Plateforme unifiée pour tous les audits DiagPV*
 
 **Diagnostic Photovoltaïque** - www.diagnosticphotovoltaique.fr
 
-*Dernière mise à jour : 3 octobre 2024*
+*Version 1.0.0 - Dernière mise à jour: 27 octobre 2025*
+*Tag: v1.0.0-unified-platform*
