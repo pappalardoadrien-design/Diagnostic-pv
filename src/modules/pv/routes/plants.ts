@@ -319,13 +319,13 @@ plantsRouter.put('/:plantId/zones/:zoneId', async (c: Context) => {
           updated_at = datetime('now')
       WHERE id = ?
     `).bind(
-      data.zone_name,
-      data.zone_type,
-      data.azimuth,
-      data.tilt,
-      JSON.stringify(data.outline_coordinates),
-      data.area_sqm,
-      data.notes,
+      data.zone_name || 'Zone',
+      data.zone_type || 'roof',
+      data.azimuth || 180,
+      data.tilt || 30,
+      JSON.stringify(data.outline_coordinates || []),
+      data.area_sqm || null,
+      data.notes || null,
       zoneId
     ).run()
     

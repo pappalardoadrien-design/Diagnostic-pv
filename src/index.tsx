@@ -2698,4 +2698,457 @@ app.get('/pv/plants', (c) => {
   `)
 })
 
+// ============================================================================
+// ROUTE PV CARTOGRAPHY - Détail Centrale (PHASE 2a)
+// ============================================================================
+app.get('/pv/plant/:id', async (c) => {
+  const plantId = c.req.param('id')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Centrale PV - Détail & Zones</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/diagpv-styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-black text-white min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-7xl">
+            <!-- Header Navigation -->
+            <div class="mb-6 flex justify-between items-center">
+                <div class="flex gap-3">
+                    <a href="/pv/plants" class="text-purple-400 hover:text-purple-300 font-bold">
+                        <i class="fas fa-arrow-left mr-2"></i>RETOUR CENTRALES
+                    </a>
+                    <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-chart-line mr-1"></i>AUDITS
+                    </a>
+                </div>
+                <a href="/" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-bold">
+                    <i class="fas fa-home mr-2"></i>ACCUEIL
+                </a>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading" class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-4xl text-purple-400 mb-4"></i>
+                <p class="text-gray-400">Chargement centrale...</p>
+            </div>
+
+            <!-- Erreur -->
+            <div id="error" class="hidden bg-red-900 border-2 border-red-400 rounded-lg p-6 text-center">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-4"></i>
+                <p id="errorMessage" class="text-xl"></p>
+                <a href="/pv/plants" class="inline-block mt-4 bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold">
+                    RETOUR LISTE CENTRALES
+                </a>
+            </div>
+
+            <!-- Contenu Principal -->
+            <div id="content" class="hidden">
+                <!-- Header Centrale -->
+                <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-6 mb-8">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h1 id="plantName" class="text-3xl font-black text-purple-400 mb-2">...</h1>
+                            <p id="plantType" class="text-gray-400">
+                                <i class="fas fa-building mr-2"></i>Type: ...
+                            </p>
+                            <p id="plantAddress" class="text-gray-400 mt-1">
+                                <i class="fas fa-map-marker-alt mr-2"></i>...
+                            </p>
+                        </div>
+                        <button id="editPlantBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-edit mr-2"></i>MODIFIER
+                        </button>
+                    </div>
+
+                    <!-- Stats Globales -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-black text-blue-400" id="statsZones">0</div>
+                            <div class="text-sm text-gray-400">Zones</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-black text-green-400" id="statsModules">0</div>
+                            <div class="text-sm text-gray-400">Modules</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-black text-yellow-400" id="statsPower">0</div>
+                            <div class="text-sm text-gray-400">kWc</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-black text-purple-400" id="statsArea">0</div>
+                            <div class="text-sm text-gray-400">m²</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Zones -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-black text-purple-400">
+                            <i class="fas fa-layer-group mr-2"></i>ZONES
+                        </h2>
+                        <button id="addZoneBtn" class="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-black">
+                            <i class="fas fa-plus mr-2"></i>AJOUTER ZONE
+                        </button>
+                    </div>
+
+                    <!-- Liste Zones (vide) -->
+                    <div id="emptyZones" class="hidden text-center py-12 bg-gray-900 rounded-lg border-2 border-gray-700">
+                        <i class="fas fa-layer-group text-6xl text-gray-600 mb-4"></i>
+                        <p class="text-gray-400 text-xl mb-6">Aucune zone créée</p>
+                        <button onclick="showAddZoneModal()" class="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded font-black text-lg">
+                            <i class="fas fa-plus mr-2"></i>CRÉER PREMIÈRE ZONE
+                        </button>
+                    </div>
+
+                    <!-- Liste Zones (remplie) -->
+                    <div id="zonesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Ajout/Édition Zone -->
+        <div id="zoneModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-2xl w-full">
+                <h3 class="text-2xl font-black mb-4 text-purple-400">
+                    <i class="fas fa-layer-group mr-2"></i><span id="modalTitle">NOUVELLE ZONE</span>
+                </h3>
+                
+                <form id="zoneForm" class="space-y-4">
+                    <input type="hidden" id="zoneId">
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Nom de la zone *</label>
+                        <input type="text" id="zoneName" required
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                               placeholder="Ex: Toiture Sud, Secteur A">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Type de zone *</label>
+                        <select id="zoneType" required
+                                class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none">
+                            <option value="roof">Toiture</option>
+                            <option value="ground">Sol</option>
+                            <option value="carport">Ombrière</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Azimut (°) *</label>
+                            <input type="number" id="zoneAzimuth" required min="0" max="360" value="180"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none">
+                            <p class="text-xs text-gray-500 mt-1">0°=Nord, 90°=Est, 180°=Sud, 270°=Ouest</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Inclinaison (°) *</label>
+                            <input type="number" id="zoneTilt" required min="0" max="90" value="30"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none">
+                            <p class="text-xs text-gray-500 mt-1">0°=Plat, 90°=Vertical</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Surface estimée (m²)</label>
+                        <input type="number" id="zoneArea" min="0" step="0.1"
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                               placeholder="Ex: 150.5">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Notes</label>
+                        <textarea id="zoneNotes" rows="3"
+                                  class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                                  placeholder="Remarques techniques..."></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-black">
+                            <i class="fas fa-save mr-2"></i>ENREGISTRER
+                        </button>
+                        <button type="button" id="cancelZoneBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                            ANNULER
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+        const plantId = '${plantId}'
+        let plantData = null
+        let zones = []
+
+        async function loadPlantDetail() {
+            try {
+                document.getElementById('loading').classList.remove('hidden')
+                document.getElementById('error').classList.add('hidden')
+                document.getElementById('content').classList.add('hidden')
+
+                const response = await fetch(\`/api/pv/plants/\${plantId}\`)
+                const data = await response.json()
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Erreur chargement centrale')
+                }
+                
+                plantData = data.plant
+                zones = data.zones || []
+                
+                renderPlantHeader()
+                renderZonesList()
+                updateStats()
+                
+                document.getElementById('loading').classList.add('hidden')
+                document.getElementById('content').classList.remove('hidden')
+            } catch (error) {
+                console.error('Erreur:', error)
+                document.getElementById('loading').classList.add('hidden')
+                document.getElementById('error').classList.remove('hidden')
+                document.getElementById('errorMessage').textContent = error.message
+            }
+        }
+
+        function renderPlantHeader() {
+            const typeIcons = {
+                rooftop: 'fa-building',
+                ground: 'fa-mountain',
+                carport: 'fa-car'
+            }
+            
+            const typeLabels = {
+                rooftop: 'Toiture',
+                ground: 'Sol',
+                carport: 'Ombrière'
+            }
+            
+            document.getElementById('plantName').textContent = plantData.plant_name
+            
+            document.getElementById('plantType').innerHTML = \`
+                <i class="fas \${typeIcons[plantData.plant_type] || 'fa-solar-panel'} mr-2"></i>
+                Type: \${typeLabels[plantData.plant_type] || plantData.plant_type}
+            \`
+            
+            const addressParts = []
+            if (plantData.address) addressParts.push(plantData.address)
+            if (plantData.city) addressParts.push(plantData.city)
+            if (plantData.postal_code) addressParts.push(plantData.postal_code)
+            
+            if (addressParts.length > 0) {
+                document.getElementById('plantAddress').innerHTML = \`
+                    <i class="fas fa-map-marker-alt mr-2"></i>\${addressParts.join(', ')}
+                \`
+            } else {
+                document.getElementById('plantAddress').innerHTML = \`
+                    <i class="fas fa-map-marker-alt mr-2"></i>Adresse non renseignée
+                \`
+            }
+        }
+
+        function updateStats() {
+            const totalModules = zones.reduce((sum, z) => sum + (parseInt(z.module_count) || 0), 0)
+            const totalPower = zones.reduce((sum, z) => sum + (parseFloat(z.total_power_wp) || 0), 0)
+            const totalArea = zones.reduce((sum, z) => sum + (parseFloat(z.area_sqm) || 0), 0)
+            
+            document.getElementById('statsZones').textContent = zones.length
+            document.getElementById('statsModules').textContent = totalModules
+            document.getElementById('statsPower').textContent = (totalPower / 1000).toFixed(1)
+            document.getElementById('statsArea').textContent = totalArea.toFixed(0)
+        }
+
+        function renderZonesList() {
+            const container = document.getElementById('zonesList')
+            const emptyState = document.getElementById('emptyZones')
+            
+            if (zones.length === 0) {
+                container.classList.add('hidden')
+                emptyState.classList.remove('hidden')
+                return
+            }
+            
+            container.classList.remove('hidden')
+            emptyState.classList.add('hidden')
+            
+            const typeIcons = {
+                roof: 'fa-building',
+                ground: 'fa-mountain',
+                carport: 'fa-car'
+            }
+            
+            const typeLabels = {
+                roof: 'Toiture',
+                ground: 'Sol',
+                carport: 'Ombrière'
+            }
+            
+            container.innerHTML = zones.map(zone => \`
+                <div class="bg-gray-900 rounded-lg border-2 border-gray-700 hover:border-blue-400 transition-all p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-black text-blue-400 mb-1">\${zone.zone_name}</h3>
+                            <p class="text-sm text-gray-400">
+                                <i class="fas \${typeIcons[zone.zone_type] || 'fa-layer-group'} mr-1"></i>
+                                \${typeLabels[zone.zone_type] || zone.zone_type}
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editZone(\${zone.id})" class="text-orange-400 hover:text-orange-300" title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteZone(\${zone.id})" class="text-red-400 hover:text-red-300" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div>
+                            <div class="text-sm text-gray-500">Azimut</div>
+                            <div class="text-lg font-bold text-yellow-400">\${zone.azimuth}°</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-500">Inclinaison</div>
+                            <div class="text-lg font-bold text-yellow-400">\${zone.tilt}°</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-500">Modules</div>
+                            <div class="text-lg font-bold text-green-400">\${zone.module_count || 0}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-500">Surface</div>
+                            <div class="text-lg font-bold text-blue-400">\${zone.area_sqm ? zone.area_sqm.toFixed(0) + ' m²' : '-'}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-700">
+                        <button onclick="viewZoneModules(\${zone.id})" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold" disabled>
+                            <i class="fas fa-th mr-1"></i>VOIR MODULES (Phase 2b)
+                        </button>
+                    </div>
+                </div>
+            \`).join('')
+        }
+
+        function showAddZoneModal() {
+            document.getElementById('modalTitle').textContent = 'NOUVELLE ZONE'
+            document.getElementById('zoneForm').reset()
+            document.getElementById('zoneId').value = ''
+            document.getElementById('zoneAzimuth').value = '180'
+            document.getElementById('zoneTilt').value = '30'
+            document.getElementById('zoneModal').classList.remove('hidden')
+        }
+
+        async function editZone(zoneId) {
+            const zone = zones.find(z => z.id === zoneId)
+            if (!zone) return
+            
+            document.getElementById('modalTitle').textContent = 'MODIFIER ZONE'
+            document.getElementById('zoneId').value = zone.id
+            document.getElementById('zoneName').value = zone.zone_name
+            document.getElementById('zoneType').value = zone.zone_type
+            document.getElementById('zoneAzimuth').value = zone.azimuth
+            document.getElementById('zoneTilt').value = zone.tilt
+            document.getElementById('zoneArea').value = zone.area_sqm || ''
+            document.getElementById('zoneNotes').value = zone.notes || ''
+            document.getElementById('zoneModal').classList.remove('hidden')
+        }
+
+        async function deleteZone(zoneId) {
+            if (!confirm('Supprimer cette zone ? Tous les modules associés seront supprimés.')) return
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}\`, {
+                    method: 'DELETE'
+                })
+                
+                const data = await response.json()
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Erreur suppression zone')
+                }
+                
+                alert('Zone supprimée avec succès')
+                loadPlantDetail()
+            } catch (error) {
+                console.error('Erreur:', error)
+                alert('Erreur: ' + error.message)
+            }
+        }
+
+        function hideZoneModal() {
+            document.getElementById('zoneModal').classList.add('hidden')
+            document.getElementById('zoneForm').reset()
+        }
+
+        async function saveZone(formData) {
+            try {
+                const zoneId = document.getElementById('zoneId').value
+                const isEdit = !!zoneId
+                
+                const url = isEdit 
+                    ? \`/api/pv/plants/\${plantId}/zones/\${zoneId}\`
+                    : \`/api/pv/plants/\${plantId}/zones\`
+                
+                const method = isEdit ? 'PUT' : 'POST'
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                })
+                
+                const data = await response.json()
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Erreur enregistrement zone')
+                }
+                
+                alert(isEdit ? 'Zone modifiée avec succès' : 'Zone créée avec succès')
+                hideZoneModal()
+                loadPlantDetail()
+            } catch (error) {
+                console.error('Erreur:', error)
+                alert('Erreur: ' + error.message)
+            }
+        }
+
+        function viewZoneModules(zoneId) {
+            alert('Placement modules disponible en Phase 2b (Canvas Editor)')
+        }
+
+        // Event Listeners
+        document.getElementById('addZoneBtn').addEventListener('click', showAddZoneModal)
+        document.getElementById('cancelZoneBtn').addEventListener('click', hideZoneModal)
+        
+        document.getElementById('zoneForm').addEventListener('submit', (e) => {
+            e.preventDefault()
+            
+            const formData = {
+                zone_name: document.getElementById('zoneName').value,
+                zone_type: document.getElementById('zoneType').value,
+                azimuth: parseInt(document.getElementById('zoneAzimuth').value),
+                tilt: parseInt(document.getElementById('zoneTilt').value),
+                area_sqm: parseFloat(document.getElementById('zoneArea').value) || null,
+                notes: document.getElementById('zoneNotes').value || null
+            }
+            
+            saveZone(formData)
+        })
+
+        // Init
+        loadPlantDetail()
+        </script>
+    </body>
+    </html>
+  `)
+})
+
 export default app
