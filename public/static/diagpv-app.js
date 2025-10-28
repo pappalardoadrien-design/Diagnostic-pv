@@ -345,7 +345,7 @@ class DiagPVApp {
 
             logApp('📡 Envoi requête API:', auditData)
 
-            const response = await fetch('/api/audit/create', {
+            const response = await fetch('/api/el/audit/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
