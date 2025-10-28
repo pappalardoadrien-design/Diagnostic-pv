@@ -434,6 +434,21 @@ app.get('/', (c) => {
                         </div>
                     </a>
                     
+                    <!-- Module PV CARTOGRAPHY - OPÉRATIONNEL -->
+                    <a href="/pv/plants" class="bg-gradient-to-br from-purple-900 to-purple-700 rounded-lg p-8 border-4 border-purple-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-purple-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-solar-panel text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">PV CARTOGRAPHY</h3>
+                            <p class="text-lg text-purple-200 mb-3">Modélisation Centrales</p>
+                            <div class="bg-purple-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
+                            </div>
+                            <p class="text-sm text-purple-100">Cartographie & placement modules photovoltaïques</p>
+                        </div>
+                    </a>
+                    
                     <!-- Module I-V - À VENIR -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
                         <div class="text-center">
@@ -540,6 +555,18 @@ app.get('/', (c) => {
                                 ACCÉDER AU DASHBOARD
                             </a>
                         </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-purple-400 hover:bg-gray-750 transition-colors">
+                            <h3 class="text-xl font-bold mb-3 text-purple-400 flex items-center">
+                                <i class="fas fa-solar-panel mr-2"></i>
+                                PV CARTOGRAPHY
+                            </h3>
+                            <p class="text-gray-300 mb-4">Modélisez vos centrales PV avec placement précis modules</p>
+                            <a href="/pv/plants" class="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                                <i class="fas fa-map mr-2"></i>
+                                GÉRER CENTRALES PV
+                            </a>
+                        </div>
                     </div>
                 </div>
                 
@@ -577,11 +604,19 @@ app.get('/el', (c) => {
     <body class="bg-black text-white min-h-screen font-bold">
         <div class="container mx-auto p-6">
             <!-- En-tête retour Hub -->
-            <div class="mb-6">
+            <div class="mb-6 flex justify-between items-center">
                 <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
                     <i class="fas fa-arrow-left mr-2"></i>
                     Retour au Diagnostic Hub
                 </a>
+                <div class="flex gap-3">
+                    <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-chart-line mr-1"></i>DASHBOARD
+                    </a>
+                    <a href="/pv/plants" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-solar-panel mr-1"></i>PV CARTO
+                    </a>
+                </div>
             </div>
             
             <!-- En-tête Module EL -->
@@ -965,6 +1000,9 @@ app.get('/audit/:token', async (c) => {
                 <div class="flex space-x-2 flex-wrap">
                     <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold flex items-center border-2 border-orange-400 shadow-lg" title="Accéder au tableau de bord - Vue d'ensemble audits">
                         <i class="fas fa-tachometer-alt mr-2 text-lg"></i>TABLEAU DE BORD
+                    </a>
+                    <a href="/pv/plants" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold flex items-center" title="Cartographie centrales PV">
+                        <i class="fas fa-solar-panel mr-1"></i>PV CARTO
                     </a>
                     <button id="multiSelectToggleBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold border-2 border-yellow-400" title="Activer la sélection multiple pour gagner du temps sur les modules défectueux">
                         <i class="fas fa-check-square mr-1"></i>SÉLECTION MULTIPLE
@@ -2233,6 +2271,9 @@ app.get('/dashboard', (c) => {
                 <div class="flex space-x-3">
                     <a href="/" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-home mr-1"></i>ACCUEIL
+                    </a>
+                    <a href="/pv/plants" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-solar-panel mr-1"></i>PV CARTO
                     </a>
                     <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-sync-alt mr-1"></i>ACTUALISER
