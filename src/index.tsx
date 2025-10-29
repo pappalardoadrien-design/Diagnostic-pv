@@ -3738,8 +3738,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         className: 'roof-polygon'
                     }).addTo(drawnItems)
                     
-                    const geoJSON = roofPolygon.toGeoJSON()
-                    roofArea = turf.area(geoJSON)
+                    // Calculer surface avec polygone fermé
+                    const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
+                    if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                        coords.push([...coords[0]])
+                    }
+                    const validGeoJSON = turf.polygon([coords])
+                    roofArea = turf.area(validGeoJSON)
                     document.getElementById('roofArea').textContent = roofArea.toFixed(2) + ' m²'
                     document.getElementById('roofInfo').classList.remove('hidden')
                 } catch (e) {
@@ -4014,7 +4019,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const moduleLng = center.lng + lngOffset - (cols * moduleWidth / 2 / (111320 * Math.cos(center.lat * Math.PI / 180)))
                     
                     const point = turf.point([moduleLng, moduleLat])
-                    const poly = roofPolygon.toGeoJSON()
+                    const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
+                    // Fermer le polygone pour Turf.js
+                    if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                        coords.push([...coords[0]])
+                    }
+                    const poly = turf.polygon([coords])
                     
                     if (turf.booleanPointInPolygon(point, poly)) {
                         modules.push({
@@ -4214,7 +4224,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     // Vérifier si dans contour toiture
                     const point = turf.point([moduleLng, moduleLat])
-                    const polygon = turf.polygon([roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])])
+                    const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
+                    // Fermer le polygone pour Turf.js
+                    if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                        coords.push([...coords[0]])
+                    }
+                    const polygon = turf.polygon([coords])
                     
                     if (turf.booleanPointInPolygon(point, polygon)) {
                         // Déterminer string et position selon stringsConfig
