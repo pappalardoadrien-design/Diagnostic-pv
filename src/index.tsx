@@ -3798,18 +3798,28 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 drawnItems.addLayer(roofPolygon)
                 
                 // S'assurer que le polygone est fermé pour Turf.js
-                const geoJSON = roofPolygon.toGeoJSON()
-                const coords = geoJSON.geometry.coordinates[0]
+                const latLngs = roofPolygon.getLatLngs()[0]
+                const coords = latLngs.map(ll => [ll.lng, ll.lat]) // GeoJSON format: [lng, lat]
+                
+                // Fermer le polygone si nécessaire (premier === dernier point)
                 const firstPoint = coords[0]
                 const lastPoint = coords[coords.length - 1]
-                
-                // Fermer le polygone si nécessaire
                 if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
                     coords.push([...firstPoint])
                 }
                 
+                // Créer un GeoJSON valide manuellement
+                const validGeoJSON = {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [coords]
+                    }
+                }
+                
                 try {
-                    roofArea = turf.area(geoJSON)
+                    roofArea = turf.area(validGeoJSON)
                 } catch (error) {
                     console.warn('Erreur calcul surface Turf.js:', error)
                     roofArea = 0
