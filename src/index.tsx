@@ -3441,14 +3441,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                                    class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold">
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-400 mb-1">Strings</label>
+                            <label class="block text-xs text-gray-400 mb-1">Nombre de Strings</label>
                             <input type="number" id="stringCount" min="1" max="50" value="2"
                                    class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold">
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">Modules/String</label>
-                            <input type="number" id="modulesPerString" min="1" max="30" value="10"
-                                   class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold">
+                        <button id="configureStringsBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-sliders-h mr-1"></i>Configurer Strings
+                        </button>
+                        <div id="stringsSummary" class="p-2 bg-black rounded text-xs text-gray-400 hidden">
+                            <div class="font-bold text-yellow-400 mb-1">Config actuelle:</div>
+                            <div id="stringsSummaryText">2 strings × 10 modules = 20 total</div>
                         </div>
                         <button id="saveConfigBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold">
                             <i class="fas fa-check mr-1"></i>Sauvegarder Config
@@ -3594,6 +3596,38 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             </div>
         </div>
 
+        <!-- Modal Configuration Strings -->
+        <div id="stringsModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                <h3 class="text-xl font-black mb-4 text-center text-yellow-400">
+                    <i class="fas fa-sliders-h mr-2"></i>CONFIGURATION STRINGS NON RÉGULIERS
+                </h3>
+                
+                <div class="mb-4 p-3 bg-black rounded text-sm text-gray-400">
+                    <i class="fas fa-info-circle mr-2 text-yellow-400"></i>
+                    Configurez le nombre de modules pour chaque string individuellement (ex: String 1 = 26 modules, String 2 = 24 modules)
+                </div>
+                
+                <div id="stringsConfigContainer" class="space-y-3 mb-4">
+                    <!-- Généré dynamiquement par JS -->
+                </div>
+                
+                <div class="p-3 bg-green-900/30 border border-green-400 rounded mb-4">
+                    <div class="text-sm font-bold text-green-400">TOTAL MODULES</div>
+                    <div id="totalModulesDisplay" class="text-3xl font-black text-green-400">0</div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button id="applyStringsConfigBtn" class="flex-1 bg-yellow-600 hover:bg-yellow-700 py-3 rounded font-black">
+                        <i class="fas fa-check mr-2"></i>APPLIQUER
+                    </button>
+                    <button id="cancelStringsConfigBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                        ANNULER
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script>
         // ================================================================
         // VARIABLES GLOBALES
@@ -3613,6 +3647,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let placementMode = 'manual'
         let drawControl = null
         let nextModuleNum = 1
+        let stringsConfig = [] // Configuration strings non réguliers: [{stringNum: 1, modulesCount: 26}, ...]
         
         const STATUS_COLORS = {
             ok: '#22c55e',
@@ -3796,6 +3831,81 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         // CONFIG ÉLECTRIQUE
         // ================================================================
+        function openStringsConfigModal() {
+            const stringCount = parseInt(document.getElementById('stringCount').value)
+            
+            // Initialiser config si vide ou si nombre strings changé
+            if (stringsConfig.length !== stringCount) {
+                stringsConfig = []
+                for (let i = 0; i < stringCount; i++) {
+                    stringsConfig.push({
+                        stringNum: i + 1,
+                        modulesCount: 10 // Valeur par défaut
+                    })
+                }
+            }
+            
+            // Générer inputs
+            const container = document.getElementById('stringsConfigContainer')
+            container.innerHTML = ''
+            
+            stringsConfig.forEach((config, index) => {
+                const div = document.createElement('div')
+                div.className = 'flex items-center gap-3 p-3 bg-black rounded border border-gray-600'
+                div.innerHTML = \`
+                    <div class="flex-1">
+                        <label class="block text-sm font-bold text-yellow-400 mb-1">String \${config.stringNum}</label>
+                        <input type="number" 
+                               class="string-modules-input w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-center font-bold" 
+                               data-index="\${index}"
+                               min="1" 
+                               max="50" 
+                               value="\${config.modulesCount}">
+                    </div>
+                    <div class="text-2xl font-black text-gray-400">\${config.modulesCount}</div>
+                \`
+                container.appendChild(div)
+            })
+            
+            // Event listeners pour update en temps réel
+            document.querySelectorAll('.string-modules-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const index = parseInt(e.target.dataset.index)
+                    const value = parseInt(e.target.value) || 0
+                    stringsConfig[index].modulesCount = value
+                    
+                    // Update display à côté
+                    e.target.parentElement.nextElementSibling.textContent = value
+                    
+                    // Update total
+                    updateTotalModulesDisplay()
+                })
+            })
+            
+            updateTotalModulesDisplay()
+            document.getElementById('stringsModal').classList.remove('hidden')
+        }
+        
+        function updateTotalModulesDisplay() {
+            const total = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
+            document.getElementById('totalModulesDisplay').textContent = total
+        }
+        
+        function applyStringsConfig() {
+            // Update summary display
+            const total = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
+            const summaryText = stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ') + \` (Total: \${total})\`
+            document.getElementById('stringsSummaryText').textContent = summaryText
+            document.getElementById('stringsSummary').classList.remove('hidden')
+            
+            closeStringsModal()
+            alert(\`✅ Configuration appliquée: \${total} modules répartis sur \${stringsConfig.length} strings\`)
+        }
+        
+        function closeStringsModal() {
+            document.getElementById('stringsModal').classList.add('hidden')
+        }
+        
         async function saveElectricalConfig() {
             const config = {
                 inverter_count: parseInt(document.getElementById('inverterCount').value),
@@ -3825,9 +3935,17 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 return
             }
             
+            // Utiliser config strings si définie, sinon config uniforme
             const stringCount = parseInt(document.getElementById('stringCount').value)
-            const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
-            const totalModules = stringCount * modulesPerString
+            let totalModules = 0
+            let useCustomConfig = stringsConfig.length === stringCount && stringsConfig.length > 0
+            
+            if (!useCustomConfig) {
+                alert('⚠️ Configurez d\\'abord les strings avec le bouton "Configurer Strings"!')
+                return
+            }
+            
+            totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             
             const moduleWidth = 1.7
             const moduleHeight = 1.0
@@ -3836,18 +3954,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const bounds = roofPolygon.getBounds()
             const center = bounds.getCenter()
             
-            const cols = modulesPerString
-            const rows = stringCount
-            
             modules = []
             let moduleNum = 1
+            let currentRow = 0
             
-            for (let row = 0; row < rows; row++) {
+            // Placer modules string par string (config non régulière)
+            stringsConfig.forEach((stringConfig, stringIndex) => {
+                const cols = stringConfig.modulesCount
+                
                 for (let col = 0; col < cols; col++) {
-                    const latOffset = (row * (moduleHeight + spacing)) / 111320
+                    const latOffset = (currentRow * (moduleHeight + spacing)) / 111320
                     const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(center.lat * Math.PI / 180))
                     
-                    const moduleLat = center.lat + latOffset - (rows * moduleHeight / 2 / 111320)
+                    const moduleLat = center.lat + latOffset - (stringCount * moduleHeight / 2 / 111320)
                     const moduleLng = center.lng + lngOffset - (cols * moduleWidth / 2 / (111320 * Math.cos(center.lat * Math.PI / 180)))
                     
                     const point = turf.point([moduleLng, moduleLat])
@@ -3861,11 +3980,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             latitude: moduleLat,
                             longitude: moduleLng,
                             pos_x_meters: col * (moduleWidth + spacing),
-                            pos_y_meters: row * (moduleHeight + spacing),
+                            pos_y_meters: currentRow * (moduleHeight + spacing),
                             width_meters: moduleWidth,
                             height_meters: moduleHeight,
                             rotation: currentRotation,
-                            string_number: row + 1,
+                            string_number: stringConfig.stringNum,
                             position_in_string: col + 1,
                             power_wp: 450,
                             module_status: 'pending',
@@ -3874,12 +3993,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         moduleNum++
                     }
                 }
-            }
+                
+                currentRow++ // Passer à la ligne suivante pour le prochain string
+            })
             
             nextModuleNum = moduleNum
             renderModules()
             updateStats()
-            alert(\`✅ \${modules.length} modules placés automatiquement!\`)
+            alert(\`✅ \${modules.length} modules placés!\n\${stringsConfig.map(c => \`String \${c.stringNum}: \${c.modulesCount} modules\`).join('\\n')}\`)
         }
         
         function placeModuleManual() {
@@ -4140,6 +4261,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('drawRoofBtn').addEventListener('click', enableRoofDrawing)
             document.getElementById('clearRoofBtn').addEventListener('click', clearRoof)
             document.getElementById('saveConfigBtn').addEventListener('click', saveElectricalConfig)
+            
+            // Strings Configuration (Non-Regular)
+            document.getElementById('configureStringsBtn').addEventListener('click', openStringsConfigModal)
+            document.getElementById('applyStringsConfigBtn').addEventListener('click', applyStringsConfig)
+            document.getElementById('cancelStringsConfigBtn').addEventListener('click', closeStringsModal)
+            
             document.getElementById('placeManualBtn').addEventListener('click', placeModuleManual)
             document.getElementById('placeAutoBtn').addEventListener('click', placeModulesAuto)
             document.getElementById('rotateBtn').addEventListener('click', () => {
