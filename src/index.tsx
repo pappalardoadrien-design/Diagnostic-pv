@@ -3851,12 +3851,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             stringsConfig.forEach((config, index) => {
                 const div = document.createElement('div')
-                div.className = 'flex items-center gap-3 p-3 bg-black rounded border border-gray-600'
+                div.className = 'flex items-center gap-3 p-3 bg-gray-800 rounded border border-gray-600'
                 div.innerHTML = \`
                     <div class="flex-1">
                         <label class="block text-sm font-bold text-yellow-400 mb-1">String \${config.stringNum}</label>
                         <input type="number" 
-                               class="string-modules-input w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-center font-bold" 
+                               class="string-modules-input w-full bg-gray-700 border border-gray-500 rounded px-3 py-2 text-center font-bold text-white" 
                                data-index="\${index}"
                                min="1" 
                                max="50" 
@@ -4010,11 +4010,27 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             map.once('click', (e) => {
                 if (placementMode !== 'manual') return
                 
-                const stringCount = parseInt(document.getElementById('stringCount').value)
-                const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
+                // Déterminer string et position en fonction de stringsConfig
+                let stringNum = 1
+                let posInString = 1
                 
-                const stringNum = Math.floor((nextModuleNum - 1) / modulesPerString) + 1
-                const posInString = ((nextModuleNum - 1) % modulesPerString) + 1
+                if (stringsConfig.length > 0) {
+                    let accumulatedModules = 0
+                    for (let i = 0; i < stringsConfig.length; i++) {
+                        const config = stringsConfig[i]
+                        if (nextModuleNum <= accumulatedModules + config.modulesCount) {
+                            stringNum = config.stringNum
+                            posInString = nextModuleNum - accumulatedModules
+                            break
+                        }
+                        accumulatedModules += config.modulesCount
+                    }
+                } else {
+                    // Fallback si pas de config strings
+                    const modulesPerString = 10 // Valeur par défaut
+                    stringNum = Math.floor((nextModuleNum - 1) / modulesPerString) + 1
+                    posInString = ((nextModuleNum - 1) % modulesPerString) + 1
+                }
                 
                 modules.push({
                     id: null,
