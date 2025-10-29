@@ -3982,12 +3982,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Validation: Si strings configurés, vérifier cohérence
             if (stringCount > 0 && stringsConfig.length === 0) {
-                alert('ATTENTION: Configurez d abord les strings avec le bouton "Configurer Strings"!')
+                alert("ATTENTION: Configurez d'abord les strings avec le bouton Configurer Strings!")
                 return
             }
             
             if (stringsConfig.length > 0 && stringsConfig.length !== stringCount) {
-                alert('ATTENTION: Nombre de strings configure (' + stringsConfig.length + ') different du nombre saisi (' + stringCount + ')!')
+                alert("ATTENTION: Nombre de strings configure (" + stringsConfig.length + ") different du nombre saisi (" + stringCount + ")!")
                 return
             }
             
@@ -4031,7 +4031,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             let useCustomConfig = stringsConfig.length === stringCount && stringsConfig.length > 0
             
             if (!useCustomConfig) {
-                alert("ATTENTION: Configurez d'abord les strings avec le bouton 'Configurer Strings'!")
+                alert("ATTENTION: Configurez d'abord les strings avec le bouton Configurer Strings!")
                 return
             }
             
