@@ -4334,6 +4334,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
         }
         
+        function cleanInvalidModules() {
+            const before = modules.length
+            modules = modules.filter(m => m.latitude !== null && m.longitude !== null && m.latitude && m.longitude)
+            const after = modules.length
+            const removed = before - after
+            
+            console.log(\`🧹 Nettoyage: \${removed} modules invalides supprimés (\${after} restants)\`)
+            
+            renderModules()
+            updateStats()
+            
+            if (removed > 0) {
+                alert(\`Nettoyage termine: \${removed} modules sans GPS supprimes\`)
+            } else {
+                alert('Aucun module invalide trouve')
+            }
+        }
+        
         // ================================================================
         // RENDU MODULES
         // ================================================================
@@ -4347,6 +4365,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             
             modules.forEach((module, index) => {
+                // Ignorer modules sans coordonnées GPS valides
+                if (!module.latitude || !module.longitude || module.latitude === null || module.longitude === null) {
+                    console.warn('⚠️ Module ignoré (pas de GPS):', module.module_identifier)
+                    return
+                }
+                
                 console.log(\`🎨 Render module \${index + 1}:\`, module.module_identifier, 'at', module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
@@ -4568,6 +4592,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 btn.addEventListener('click', () => selectStatus(btn.dataset.status))
             })
             document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
+        }
+        
+        // Exposer fonctions debug dans console
+        window.cleanInvalidModules = cleanInvalidModules
+        window.debugModules = () => {
+            console.log('📊 Modules totaux:', modules.length)
+            console.log('❌ Modules invalides:', modules.filter(m => !m.latitude || !m.longitude).length)
+            console.log('✅ Modules valides:', modules.filter(m => m.latitude && m.longitude).length)
         }
         
         // INIT
