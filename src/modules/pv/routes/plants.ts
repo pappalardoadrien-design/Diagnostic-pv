@@ -592,4 +592,78 @@ plantsRouter.put('/:plantId/zones/:zoneId/background', async (c: Context) => {
   }
 })
 
+// PUT /api/pv/plants/:plantId/zones/:zoneId/config - Configuration électrique zone
+plantsRouter.put('/:plantId/zones/:zoneId/config', async (c: Context) => {
+  const { env } = c
+  const zoneId = c.req.param('zoneId')
+  const { 
+    inverter_count, 
+    junction_box_count, 
+    string_count, 
+    modules_per_string 
+  } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE pv_zones 
+      SET inverter_count = ?, 
+          junction_box_count = ?, 
+          string_count = ?, 
+          modules_per_string = ?
+      WHERE id = ?
+    `).bind(
+      inverter_count || 0, 
+      junction_box_count || 0, 
+      string_count || 0, 
+      modules_per_string || 0, 
+      zoneId
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Configuration électrique mise à jour'
+    })
+  } catch (error: any) {
+    console.error('Erreur mise à jour config:', error)
+    return c.json({ 
+      error: 'Erreur mise à jour configuration',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// PUT /api/pv/plants/:plantId/zones/:zoneId/roof - Contour toiture GPS
+plantsRouter.put('/:plantId/zones/:zoneId/roof', async (c: Context) => {
+  const { env } = c
+  const zoneId = c.req.param('zoneId')
+  const { roof_polygon, roof_area_sqm } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE pv_zones 
+      SET roof_polygon = ?, 
+          roof_area_sqm = ?,
+          outline_coordinates = ?
+      WHERE id = ?
+    `).bind(
+      roof_polygon || null,
+      roof_area_sqm || 0,
+      roof_polygon || null, // Alias pour compatibilité
+      zoneId
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Contour toiture sauvegardé',
+      area_sqm: roof_area_sqm
+    })
+  } catch (error: any) {
+    console.error('Erreur sauvegarde contour toiture:', error)
+    return c.json({ 
+      error: 'Erreur sauvegarde contour',
+      details: error.message 
+    }, 500)
+  }
+})
+
 export default plantsRouter
