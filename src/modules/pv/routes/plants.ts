@@ -384,13 +384,15 @@ plantsRouter.post('/:plantId/zones/:zoneId/modules', async (c: Context) => {
     for (const m of modules) {
       await env.DB.prepare(`
         INSERT INTO pv_modules (
-          zone_id, module_identifier, string_number, position_in_string,
+          zone_id, module_identifier, latitude, longitude, string_number, position_in_string,
           pos_x_meters, pos_y_meters, width_meters, height_meters, 
           rotation, power_wp, module_status, status_comment, brand, model, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         zoneId,
         m.module_identifier,
+        m.latitude || null,
+        m.longitude || null,
         m.string_number,
         m.position_in_string,
         m.pos_x_meters,
