@@ -3730,8 +3730,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Charger contour toiture existant
             if (zoneData.roof_polygon) {
                 try {
-                    const coords = JSON.parse(zoneData.roof_polygon)
-                    roofPolygon = L.polygon(coords, {
+                    const savedCoords = JSON.parse(zoneData.roof_polygon)
+                    roofPolygon = L.polygon(savedCoords, {
                         color: '#fbbf24',
                         weight: 3,
                         fillOpacity: 0.1,
@@ -4272,15 +4272,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
             }
             
+            // Debug logs
+            console.log('🔷 Modules générés:', generatedModules.length)
+            console.log('🔷 Premier module:', generatedModules[0])
+            console.log('🔷 Total modules avant:', modules.length)
+            
             // Ajouter modules générés
             modules.push(...generatedModules)
             nextModuleNum = moduleNum
+            
+            console.log('🔷 Total modules après:', modules.length)
             
             // Nettoyer mode dessin
             cancelDrawRowMode()
             
             // Render
+            console.log('🔷 Appel renderModules...')
             renderModules()
+            console.log('🔷 Appel updateStats...')
             updateStats()
             
             alert(\`OK: \${generatedModules.length} modules crees!\n\nRectangle: \${widthMeters.toFixed(1)}m x \${heightMeters.toFixed(1)}m\nGrille: \${cols} x \${rows}\`)
@@ -4329,13 +4338,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // RENDU MODULES
         // ================================================================
         function renderModules() {
+            console.log('🎨 renderModules: Nombre de modules à afficher:', modules.length)
+            
             drawnItems.eachLayer(layer => {
                 if (layer.options.className && layer.options.className.startsWith('module-')) {
                     drawnItems.removeLayer(layer)
                 }
             })
             
-            modules.forEach(module => {
+            modules.forEach((module, index) => {
+                console.log(\`🎨 Render module \${index + 1}:\`, module.module_identifier, 'at', module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
                 const latOffset = module.height_meters / 111320 / 2
