@@ -3377,6 +3377,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             .module-not_connected { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
             .module-pending { background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border: 2px dashed #9ca3af !important; }
             @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+            
+            /* Fix z-index modal au-dessus de Leaflet */
+            #statusModal { z-index: 9999 !important; }
         </style>
     </head>
     <body class="bg-black text-white">
