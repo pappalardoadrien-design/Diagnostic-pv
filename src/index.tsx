@@ -3704,14 +3704,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (zoneData.modules_per_string) document.getElementById('modulesPerString').value = zoneData.modules_per_string
                 
                 // Charger config strings non réguliers
-                if (zoneData.strings_config) {
+                if (zoneData.strings_config && zoneData.strings_config !== 'null') {
                     try {
-                        stringsConfig = JSON.parse(zoneData.strings_config)
-                        console.log('✅ Configuration strings chargée:', stringsConfig)
+                        const parsed = JSON.parse(zoneData.strings_config)
+                        // Vérifier que c'est bien un array valide
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            stringsConfig = parsed
+                            console.log('✅ Configuration strings chargée:', stringsConfig)
+                        } else {
+                            stringsConfig = []
+                            console.log('⚠️ Configuration strings vide ou invalide')
+                        }
                     } catch (e) {
-                        console.error('Erreur parsing strings_config:', e)
+                        console.error('❌ Erreur parsing strings_config:', e)
                         stringsConfig = []
                     }
+                } else {
+                    stringsConfig = []
+                    console.log('ℹ️ Aucune configuration strings sauvegardée')
                 }
             } catch (error) {
                 console.error('Erreur chargement zone:', error)
@@ -3967,11 +3977,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 return
             }
             
+            const stringCount = parseInt(stringEl.value) || 0
+            const modulesPerString = parseInt(modulesPerStringEl.value) || 0
+            
+            // Validation: Si strings configurés, vérifier cohérence
+            if (stringCount > 0 && stringsConfig.length === 0) {
+                alert('ATTENTION: Configurez d abord les strings avec le bouton "Configurer Strings"!')
+                return
+            }
+            
+            if (stringsConfig.length > 0 && stringsConfig.length !== stringCount) {
+                alert('ATTENTION: Nombre de strings configure (' + stringsConfig.length + ') different du nombre saisi (' + stringCount + ')!')
+                return
+            }
+            
             const config = {
                 inverter_count: parseInt(inverterEl.value) || 0,
                 junction_box_count: parseInt(junctionBoxEl.value) || 0,
-                string_count: parseInt(stringEl.value) || 0,
-                modules_per_string: parseInt(modulesPerStringEl.value) || 0,
+                string_count: stringCount,
+                modules_per_string: modulesPerString,
                 strings_config: stringsConfig.length > 0 ? stringsConfig : null
             }
             
@@ -3981,7 +4005,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 })
-                alert('OK: Configuration electrique sauvegardee!')
+                
+                const summary = stringsConfig.length > 0 
+                    ? stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ')
+                    : 'Config uniforme: ' + stringCount + ' strings x ' + modulesPerString + ' modules'
+                
+                alert('OK: Configuration electrique sauvegardee!\n\n' + summary)
             } catch (error) {
                 alert('ERREUR: ' + error.message)
             }
