@@ -3464,6 +3464,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <i class="fas fa-solar-panel mr-2"></i>ÉTAPE 3 : MODULES
                     </h3>
                     <div class="space-y-2">
+                        <button id="drawRowBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-draw-polygon mr-1"></i>Dessiner Rangée
+                        </button>
                         <button id="placeManualBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm">
                             <i class="fas fa-mouse-pointer mr-1"></i>Placement Manuel
                         </button>
@@ -3648,6 +3651,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let drawControl = null
         let nextModuleNum = 1
         let stringsConfig = [] // Configuration strings non réguliers: [{stringNum: 1, modulesCount: 26}, ...]
+        
+        // Variables pour dessin rangée drag & drop
+        let isDrawingRow = false
+        let rowStartLatLng = null
+        let rowPreviewRect = null
         
         const STATUS_COLORS = {
             ok: '#22c55e',
@@ -4059,6 +4067,183 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
         }
         
+        function drawRowMode() {
+            if (!roofPolygon) {
+                alert('⚠️ Dessinez d\'abord le contour de toiture!')
+                return
+            }
+            
+            if (stringsConfig.length === 0) {
+                alert('⚠️ Configurez d\'abord les strings!')
+                return
+            }
+            
+            placementMode = 'drawRow'
+            isDrawingRow = false
+            rowStartLatLng = null
+            
+            alert('🎨 MODE DESSIN RANGÉE\n\n1️⃣ Cliquez sur point de départ\n2️⃣ Glissez la souris\n3️⃣ Relâchez pour créer rangée\n\n💡 Les modules seront générés automatiquement dans le rectangle')
+            
+            // Désactiver événements Leaflet par défaut
+            map.dragging.disable()
+            map.doubleClickZoom.disable()
+            
+            // Event mousedown - Démarrer dessin
+            map.on('mousedown', onRowMouseDown)
+            map.on('mousemove', onRowMouseMove)
+            map.on('mouseup', onRowMouseUp)
+        }
+        
+        function onRowMouseDown(e) {
+            if (placementMode !== 'drawRow') return
+            
+            isDrawingRow = true
+            rowStartLatLng = e.latlng
+            
+            // Créer rectangle preview
+            rowPreviewRect = L.rectangle([
+                [e.latlng.lat, e.latlng.lng],
+                [e.latlng.lat, e.latlng.lng]
+            ], {
+                color: '#22c55e',
+                weight: 3,
+                fillColor: '#22c55e',
+                fillOpacity: 0.2,
+                dashArray: '10, 10'
+            }).addTo(map)
+        }
+        
+        function onRowMouseMove(e) {
+            if (!isDrawingRow || !rowPreviewRect) return
+            
+            // Mettre à jour rectangle preview
+            rowPreviewRect.setBounds([
+                [rowStartLatLng.lat, rowStartLatLng.lng],
+                [e.latlng.lat, e.latlng.lng]
+            ])
+        }
+        
+        function onRowMouseUp(e) {
+            if (!isDrawingRow) return
+            
+            isDrawingRow = false
+            
+            // Calculer dimensions rectangle en mètres
+            const bounds = rowPreviewRect.getBounds()
+            const latDiff = Math.abs(bounds.getNorth() - bounds.getSouth())
+            const lngDiff = Math.abs(bounds.getEast() - bounds.getWest())
+            
+            const heightMeters = latDiff * 111320 // 1 degré latitude ≈ 111.32 km
+            const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2
+            const widthMeters = lngDiff * 111320 * Math.cos(centerLat * Math.PI / 180)
+            
+            // Dimensions module + espacement
+            const moduleWidth = 1.7 + 0.02  // 1.7m + 2cm espacement
+            const moduleHeight = 1.0 + 0.02 // 1.0m + 2cm espacement
+            
+            // Calculer nombre de modules (colonnes × lignes)
+            const cols = Math.floor(widthMeters / moduleWidth)
+            const rows = Math.floor(heightMeters / moduleHeight)
+            const totalModules = cols * rows
+            
+            if (totalModules === 0) {
+                alert('⚠️ Rectangle trop petit! Dessinez une zone plus grande.')
+                map.removeLayer(rowPreviewRect)
+                rowPreviewRect = null
+                return
+            }
+            
+            // Confirmation
+            const confirmed = confirm(\`🎯 CRÉATION RANGÉE\n\nDimensions: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nModules: \${cols} colonnes × \${rows} lignes = \${totalModules} modules\n\nCréer cette rangée?\`)
+            
+            if (!confirmed) {
+                map.removeLayer(rowPreviewRect)
+                rowPreviewRect = null
+                return
+            }
+            
+            // Générer modules dans le rectangle
+            const generatedModules = []
+            let moduleNum = nextModuleNum
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    // Calculer position GPS
+                    const latOffset = (row * moduleHeight) / 111320
+                    const lngOffset = (col * moduleWidth) / (111320 * Math.cos(centerLat * Math.PI / 180))
+                    
+                    const moduleLat = bounds.getSouth() + latOffset
+                    const moduleLng = bounds.getWest() + lngOffset
+                    
+                    // Vérifier si dans contour toiture
+                    const point = turf.point([moduleLng, moduleLat])
+                    const polygon = turf.polygon([roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])])
+                    
+                    if (turf.booleanPointInPolygon(point, polygon)) {
+                        // Déterminer string et position selon stringsConfig
+                        let stringNum = 1
+                        let posInString = 1
+                        
+                        if (stringsConfig.length > 0) {
+                            let accumulatedModules = 0
+                            for (let i = 0; i < stringsConfig.length; i++) {
+                                const config = stringsConfig[i]
+                                if (moduleNum <= accumulatedModules + config.modulesCount) {
+                                    stringNum = config.stringNum
+                                    posInString = moduleNum - accumulatedModules
+                                    break
+                                }
+                                accumulatedModules += config.modulesCount
+                            }
+                        }
+                        
+                        generatedModules.push({
+                            id: null,
+                            zone_id: parseInt(zoneId),
+                            module_identifier: \`M\${moduleNum}\`,
+                            latitude: moduleLat,
+                            longitude: moduleLng,
+                            pos_x_meters: 0,
+                            pos_y_meters: 0,
+                            width_meters: 1.7,
+                            height_meters: 1.0,
+                            rotation: currentRotation,
+                            string_number: stringNum,
+                            position_in_string: posInString,
+                            power_wp: 450,
+                            module_status: 'pending',
+                            status_comment: null
+                        })
+                        
+                        moduleNum++
+                    }
+                }
+            }
+            
+            // Ajouter modules générés
+            modules.push(...generatedModules)
+            nextModuleNum = moduleNum
+            
+            // Nettoyer
+            map.removeLayer(rowPreviewRect)
+            rowPreviewRect = null
+            
+            // Réactiver Leaflet
+            map.dragging.enable()
+            map.doubleClickZoom.enable()
+            map.off('mousedown', onRowMouseDown)
+            map.off('mousemove', onRowMouseMove)
+            map.off('mouseup', onRowMouseUp)
+            
+            placementMode = 'manual'
+            
+            // Render
+            renderModules()
+            updateStats()
+            
+            alert(\`✅ \${generatedModules.length} modules créés!\n\nRectangle: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nGrille: \${cols} × \${rows}\`)
+        }
+        
         function clearModules() {
             if (confirm('Effacer tous les modules ?')) {
                 modules = []
@@ -4283,6 +4468,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('applyStringsConfigBtn').addEventListener('click', applyStringsConfig)
             document.getElementById('cancelStringsConfigBtn').addEventListener('click', closeStringsModal)
             
+            // Module Placement
+            document.getElementById('drawRowBtn').addEventListener('click', drawRowMode)
             document.getElementById('placeManualBtn').addEventListener('click', placeModuleManual)
             document.getElementById('placeAutoBtn').addEventListener('click', placeModulesAuto)
             document.getElementById('rotateBtn').addEventListener('click', () => {
