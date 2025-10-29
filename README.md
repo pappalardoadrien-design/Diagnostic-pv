@@ -99,6 +99,144 @@ diagnostic-hub/
 - **`POST /api/audit/:token/save-measurements`** - Sauvegarder mesures
 - **`GET /api/audit/:token/measurements`** - Récupérer mesures
 
+## 🗺️ Module PV Cartography - Cartographie GPS (Beta)
+
+### Fonctionnalités Actuelles
+
+#### 📍 Système GPS précis
+- Cartographie modules avec coordonnées latitude/longitude exactes
+- Base Google Satellite zoom 22 (haute résolution) via Leaflet.js
+- Calculs géospatiaux Turf.js (GPS ↔ mètres, surface, point-in-polygon)
+- Support toiture, ombrière, champ au sol (14 à 50 000 modules)
+
+#### ✏️ Workflow Canvas V2
+**ÉTAPE 1: Dessin Toiture**
+- Outil Leaflet.Draw pour tracer contour polygone GPS
+- Calcul automatique surface (m²) avec Turf.js
+- Validation visuelle sur imagerie satellite
+
+**ÉTAPE 2: Configuration Électrique Manuelle**
+- Onduleurs, boîtes de jonction, nombre de strings
+- **🎯 Strings non réguliers** - Config individuelle par string (ex: S1=26, S2=24, S3=28, S4=22)
+- Modal configuration intuitive avec calcul total temps réel
+- Résumé config visible après application
+
+**ÉTAPE 3: Placement Modules**
+- **Placement Manuel** - Click map → Modal annotation → Module créé avec GPS
+- **Placement Auto (Config)** - Génération automatique selon config strings non réguliers
+- Validation point-in-polygon (modules uniquement dans contour)
+- Dimensions physiques réalistes (1.0m × 1.7m, espacement 2cm)
+
+#### 🎨 Système Annotation 7 Statuts (Module EL)
+- 🟢 **OK** (#22c55e) - Module sain
+- 🟡 **INÉGALITÉ** (#eab308) - Inégalité courant
+- 🟠 **MICROFISSURES** (#f97316) - Microfissures visibles
+- 🔴 **MODULE MORT** (#ef4444) - Module défaillant
+- 🔵 **STRING OUVERT** (#3b82f6) - String ouvert
+- ⚫ **NON CONNECTÉ** (#6b7280) - Non connecté
+- ⚪ **EN ATTENTE** (#e5e7eb) - En attente annotation
+- Modal annotation avec commentaires + mise à jour instantanée
+
+#### 📄 Export PDF Technique
+- Page 1: Carte satellite avec modules colorés + stats 7 statuts
+- Page 2: Liste détaillée modules avec string/position/statut/commentaires
+- Caractéristiques techniques (puissance kWc, config électrique, surface)
+- Génération <5s avec html2canvas + jsPDF
+
+#### 💾 Persistance Database D1
+- Sauvegarde config électrique (onduleurs, BJ, strings, modules/string)
+- Sauvegarde contour toiture GPS (polygon + surface m²)
+- Sauvegarde modules individuels (identifier, string, position, lat/lng, statut)
+- Reload page restaure état complet (contour + config + modules)
+
+### 📋 URLs Module PV Cartography
+
+#### Interface utilisateur
+- **`/pv/plants`** - Liste centrales PV (CRUD)
+- **`/pv/plant/:id`** - Détail centrale + zones (CRUD)
+- **`/pv/plant/:plantId/zone/:zoneId/editor/v2`** - **Canvas V2 Leaflet** (Beta)
+- **`/pv/plant/:plantId/zone/:zoneId/editor`** - Canvas V1 legacy (comparaison)
+
+#### API Endpoints PV Cartography
+- **`GET /api/pv/plants`** - Liste centrales
+- **`POST /api/pv/plants`** - Créer centrale
+- **`PUT /api/pv/plants/:id`** - Modifier centrale
+- **`DELETE /api/pv/plants/:id`** - Supprimer centrale
+- **`GET /api/pv/plants/:plantId/zones`** - Liste zones centrale
+- **`POST /api/pv/plants/:plantId/zones`** - Créer zone
+- **`PUT /api/pv/plants/:plantId/zones/:zoneId`** - Modifier zone
+- **`DELETE /api/pv/plants/:plantId/zones/:zoneId`** - Supprimer zone
+- **`PUT /api/pv/plants/:plantId/zones/:zoneId/config`** - **Sauvegarder config électrique**
+- **`PUT /api/pv/plants/:plantId/zones/:zoneId/roof`** - **Sauvegarder contour toiture GPS**
+- **`GET /api/pv/plants/:plantId/zones/:zoneId/modules`** - Liste modules zone
+- **`POST /api/pv/plants/:plantId/zones/:zoneId/modules`** - Créer modules (bulk)
+- **`PUT /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId`** - Modifier module
+- **`DELETE /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId`** - Supprimer module
+
+### 🔧 Implémentation Technique Canvas V2
+
+**Frontend Stack**:
+- Leaflet.js 1.9.4 (cartographie interactive)
+- Leaflet.Draw 1.0.4 (dessin polygones)
+- Turf.js 7.1.0 (calculs géospatiaux)
+- html2canvas 1.4.1 (capture carte)
+- jsPDF 2.5.2 (export PDF)
+
+**Backend Stack**:
+- Hono TypeScript routes (`/src/modules/pv/routes/plants.ts`)
+- Cloudflare D1 SQLite (tables `pv_plants`, `pv_zones`, `pv_modules`)
+- Vue `v_pv_zones_stats` (agrégation 7 statuts temps réel)
+
+**Fichiers Clés**:
+- `/src/index.tsx` (lignes 3344-4286) - Canvas V2 Leaflet complet
+- `/src/modules/pv/routes/plants.ts` - Routes API CRUD + config
+- `/migrations/0007_add_gps_cartography.sql` - Schéma GPS + config électrique
+- `/PV_CARTOGRAPHY_TEST_GUIDE.md` - Guide test complet strings non réguliers
+- `/PV_CARTOGRAPHY_COLOR_SYSTEM.md` - Référence 7 statuts couleurs
+- `/GOOGLE_MAPS_API_SETUP.md` - Guide création clé API
+
+### 📊 État Avancement Cartography (29/10/2025)
+
+**Phase 1 - Architecture Base**: ✅ **COMPLÉTÉ**
+- Tables D1 (pv_plants, pv_zones, pv_modules) avec GPS
+- Routes API CRUD centrales/zones/modules
+- Vue stats agrégation 7 statuts
+
+**Phase 2a - Canvas V2 GPS**: ✅ **95% COMPLÉTÉ**
+- ✅ Carte Leaflet + Google Satellite zoom 22
+- ✅ Dessin toiture GPS + calcul surface Turf.js
+- ✅ Modal annotation 7 statuts (couleurs exactes Module EL)
+- ✅ Placement manuel modules avec GPS lat/lng
+- ✅ Placement auto avec validation point-in-polygon
+- ✅ **Strings non réguliers** - Config individuelle par string (S1=26, S2=24, etc.)
+- ✅ Export PDF (carte + stats + liste modules)
+- ✅ Sauvegarde/reload persistance DB
+- ⏳ **Tests locaux complets** (en cours)
+- ⏳ **Clé Google Maps API** (user à créer)
+
+**Phase 2b - Optimisations**: ⏳ **À VENIR**
+- Sauvegarde stringsConfig en DB (colonne JSON ou table)
+- Chargement stringsConfig depuis DB au reload
+- Export stringsConfig dans PDF (tableau récap)
+- Interface modification config sans tout replacer
+
+**Phase 3 - Liaison EL**: 🔜 **PLANIFIÉ**
+- Liaison bidirectionnelle PV Cartography ↔ Audits EL
+- Table `pv_cartography_audit_links`
+- Synchronisation statuts modules GPS ↔ Audits
+- Vue unifiée cartographie + audits EL
+
+**Phase 4 - Avancé**: 🔜 **PLANIFIÉ**
+- Duplication layouts entre zones (templates)
+- Clustering marqueurs >5000 modules (performance)
+- Import layouts depuis fichiers CSV/JSON
+- Historique modifications modules
+
+### 📄 Documentation Cartography
+- **`PV_CARTOGRAPHY_TEST_GUIDE.md`** - Guide test complet strings non réguliers (scénarios, cas limites, bugs connus)
+- **`PV_CARTOGRAPHY_COLOR_SYSTEM.md`** - Référence 7 statuts avec hex codes, dégradés, animations
+- **`GOOGLE_MAPS_API_SETUP.md`** - Guide création clé Google Maps API + restrictions sécurité
+
 ## 📊 Architecture Données D1 Unifiée
 
 ### Tables CORE (partagées tous modules)
@@ -112,6 +250,13 @@ diagnostic-hub/
 - **`el_modules`** - Modules diagnostiqués
 - **`el_collaborative_sessions`** - Sessions temps réel
 - **`el_measurements`** - Mesures spécifiques EL
+
+### Tables Module PV Cartography (Beta)
+- **`pv_plants`** - Centrales solaires (site_name, client_id, total_capacity_kwp, lat/lng)
+- **`pv_zones`** - Zones/toitures (zone_name, plant_id, inverter_count, string_count, roof_polygon, roof_area_sqm)
+- **`pv_modules`** - Modules GPS (module_identifier, zone_id, string_number, position_in_string, latitude, longitude, module_status)
+- **`v_pv_zones_stats`** - Vue agrégation 7 statuts par zone (total_modules, modules_ok, modules_dead, etc.)
+- **`pv_cartography_audit_links`** - Liens bidirectionnels Cartography ↔ EL Audits (Phase 3)
 
 ### Tables Modules Futurs
 - **`iv_measurements`** - Courbes I-V
