@@ -4405,6 +4405,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     className: \`module-\${module.module_status}\`
                 })
                 
+                // Ajouter label texte au centre du module
+                const moduleLabel = L.marker([module.latitude, module.longitude], {
+                    icon: L.divIcon({
+                        className: 'module-label',
+                        html: \`<div style="background: rgba(0,0,0,0.7); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">\${module.module_identifier}</div>\`,
+                        iconSize: [30, 12],
+                        iconAnchor: [15, 6]
+                    })
+                })
+                
                 rect.bindPopup(\`
                     <strong>\${module.module_identifier}</strong><br>
                     String \${module.string_number} | Pos \${module.position_in_string}<br>
@@ -4413,6 +4423,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 rect.on('click', () => openStatusModal(module))
                 rect.addTo(drawnItems)
+                moduleLabel.addTo(drawnItems)
             })
         }
         
@@ -4518,7 +4529,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             doc.text(\`Modules: \${modules.length} | Puissance: \${(modules.length * 450 / 1000).toFixed(2)} kWc\`, 20, 210)
             doc.text(\`Onduleurs: \${inverterCount} | Boîtes Jonction: \${junctionBoxCount} | Strings: \${stringCount}\`, 20, 216)
-            doc.text(\`Surface toiture: \${roofArea.toFixed(2)} m² | Azimut: \${zoneData.azimuth}° | Inclinaison: \${zoneData.tilt}°\`, 20, 222)
+            
+            // Configuration strings détaillée
+            if (stringsConfig.length > 0) {
+                const stringsDetail = stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ')
+                doc.text(\`Configuration Strings: \${stringsDetail}\`, 20, 222)
+                doc.text(\`Surface toiture: \${roofArea.toFixed(2)} m² | Azimut: \${zoneData.azimuth}° | Inclinaison: \${zoneData.tilt}°\`, 20, 228)
+            } else {
+                doc.text(\`Surface toiture: \${roofArea.toFixed(2)} m² | Azimut: \${zoneData.azimuth}° | Inclinaison: \${zoneData.tilt}°\`, 20, 222)
+            }
             
             // PAGE 2: Liste modules
             doc.addPage()
