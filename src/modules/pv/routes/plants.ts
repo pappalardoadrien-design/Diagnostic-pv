@@ -602,7 +602,8 @@ plantsRouter.put('/:plantId/zones/:zoneId/config', async (c: Context) => {
     inverter_count, 
     junction_box_count, 
     string_count, 
-    modules_per_string 
+    modules_per_string,
+    strings_config // Configuration strings non réguliers
   } = await c.req.json()
   
   try {
@@ -611,13 +612,15 @@ plantsRouter.put('/:plantId/zones/:zoneId/config', async (c: Context) => {
       SET inverter_count = ?, 
           junction_box_count = ?, 
           string_count = ?, 
-          modules_per_string = ?
+          modules_per_string = ?,
+          strings_config = ?
       WHERE id = ?
     `).bind(
       inverter_count || 0, 
       junction_box_count || 0, 
       string_count || 0, 
-      modules_per_string || 0, 
+      modules_per_string || 0,
+      strings_config ? JSON.stringify(strings_config) : null,
       zoneId
     ).run()
     

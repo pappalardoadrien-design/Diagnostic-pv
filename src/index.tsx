@@ -3702,6 +3702,17 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (zoneData.junction_box_count) document.getElementById('junctionBoxCount').value = zoneData.junction_box_count
                 if (zoneData.string_count) document.getElementById('stringCount').value = zoneData.string_count
                 if (zoneData.modules_per_string) document.getElementById('modulesPerString').value = zoneData.modules_per_string
+                
+                // Charger config strings non réguliers
+                if (zoneData.strings_config) {
+                    try {
+                        stringsConfig = JSON.parse(zoneData.strings_config)
+                        console.log('✅ Configuration strings chargée:', stringsConfig)
+                    } catch (e) {
+                        console.error('Erreur parsing strings_config:', e)
+                        stringsConfig = []
+                    }
+                }
             } catch (error) {
                 console.error('Erreur chargement zone:', error)
                 zoneData = { zone_name: 'Zone', azimuth: 180, tilt: 30 }
@@ -3718,10 +3729,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 maxZoom: 22
             })
             
-            // Google Satellite (sans clé API, limitations possibles)
-            L.tileLayer('https://{s}.google.com/vrt/lyrs=s&x={x}&y={y}&z={z}', {
-                maxZoom: 22,
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+            // OpenStreetMap Standard (pas de CORS pour export PDF)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
             }).addTo(map)
             
             map.addLayer(drawnItems)
@@ -3960,7 +3971,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 inverter_count: parseInt(inverterEl.value) || 0,
                 junction_box_count: parseInt(junctionBoxEl.value) || 0,
                 string_count: parseInt(stringEl.value) || 0,
-                modules_per_string: parseInt(modulesPerStringEl.value) || 0
+                modules_per_string: parseInt(modulesPerStringEl.value) || 0,
+                strings_config: stringsConfig.length > 0 ? stringsConfig : null
             }
             
             try {
@@ -4237,12 +4249,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         let posInString = 1
                         
                         if (stringsConfig.length > 0) {
+                            // Calculer l'index relatif du module (0-based)
+                            const relativeModuleIndex = generatedModules.length
                             let accumulatedModules = 0
+                            
                             for (let i = 0; i < stringsConfig.length; i++) {
                                 const config = stringsConfig[i]
-                                if (moduleNum <= accumulatedModules + config.modulesCount) {
+                                if (relativeModuleIndex < accumulatedModules + config.modulesCount) {
                                     stringNum = config.stringNum
-                                    posInString = moduleNum - accumulatedModules
+                                    posInString = relativeModuleIndex - accumulatedModules + 1
                                     break
                                 }
                                 accumulatedModules += config.modulesCount
