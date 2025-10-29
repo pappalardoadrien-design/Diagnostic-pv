@@ -1,0 +1,126 @@
+// ============================================================================
+// ROUTE PV CARTOGRAPHY - Canvas Editor V2 LEAFLET (PHASE 2c)
+// ============================================================================
+app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
+  const plantId = c.req.param('plantId')
+  const zoneId = c.req.param('zoneId')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cartographie PV Professionnelle - Zone</title>
+        
+        <!-- TailwindCSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        
+        <!-- FontAwesome -->
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        
+        <!-- Leaflet CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        
+        <!-- Leaflet Draw CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+        
+        <!-- Leaflet JS -->
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        
+        <!-- Leaflet Draw JS -->
+        <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+        
+        <!-- Turf.js (calculs géométriques) -->
+        <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+        
+        <!-- jsPDF -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        
+        <!-- html2canvas (capture carte) -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        
+        <style>
+            #map { 
+                height: 700px; 
+                width: 100%; 
+                border: 2px solid #9333ea;
+                border-radius: 0.5rem;
+            }
+            
+            /* Styles statuts modules (IDENTIQUE Module EL) */
+            .leaflet-marker-icon.module-ok { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+            .leaflet-marker-icon.module-inequality { background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%); }
+            .leaflet-marker-icon.module-microcracks { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+            .leaflet-marker-icon.module-dead { 
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                animation: pulse-danger 2s infinite;
+            }
+            .leaflet-marker-icon.module-string_open { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+            .leaflet-marker-icon.module-not_connected { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
+            .leaflet-marker-icon.module-pending { 
+                background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+                border: 2px dashed #9ca3af !important;
+            }
+            
+            @keyframes pulse-danger {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+            }
+            
+            /* Polygone toiture style */
+            .roof-polygon {
+                stroke: #fbbf24 !important;
+                stroke-width: 3 !important;
+                fill: #fbbf24 !important;
+                fill-opacity: 0.1 !important;
+            }
+            
+            /* Module rectangle style */
+            .module-rect {
+                stroke: #000 !important;
+                stroke-width: 2 !important;
+                fill-opacity: 0.7 !important;
+            }
+            
+            /* Leaflet controls dark theme */
+            .leaflet-control-layers,
+            .leaflet-control-zoom {
+                background: #1f2937 !important;
+                border: 2px solid #9333ea !important;
+            }
+            
+            .leaflet-control-zoom a {
+                background: #374151 !important;
+                color: #fff !important;
+            }
+            
+            .leaflet-control-zoom a:hover {
+                background: #9333ea !important;
+            }
+            
+            /* Badge notifications */
+            .badge-warning {
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: #ef4444;
+                color: white;
+                border-radius: 9999px;
+                padding: 2px 6px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            
+            /* Config panel */
+            .config-card {
+                transition: all 0.3s ease;
+            }
+            
+            .config-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+            }
+        </style>
+    </head>
+    <body class="bg-black text-white min-h-screen">
