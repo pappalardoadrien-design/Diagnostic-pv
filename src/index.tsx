@@ -3650,7 +3650,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let placementMode = 'manual'
         let drawControl = null
         let nextModuleNum = 1
-        let stringsConfig = [] // Configuration strings non réguliers: [{stringNum: 1, modulesCount: 26}, ...]
+        let stringsConfig = [] // Configuration strings non réguliers: [{stringNum: 1, modulesCount: 26}, ...] - v2.1
         
         // Variables pour dessin rangée drag & drop
         let isDrawingRow = false
@@ -4170,7 +4170,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             isDrawingRow = false
             rowStartLatLng = null
             
-            alert('MODE DESSIN RANGEE\\n\\n1. Cliquez sur point de depart\\n2. Glissez la souris\\n3. Relachez pour creer rangee\\n\\nAppuyez sur ESC pour annuler')
+            alert("MODE DESSIN RANGEE\n\n1. Cliquez sur point de depart\n2. Glissez la souris\n3. Relachez pour creer rangee\n\nAppuyez sur ESC pour annuler")
             
             // Désactiver événements Leaflet par défaut
             map.dragging.disable()
