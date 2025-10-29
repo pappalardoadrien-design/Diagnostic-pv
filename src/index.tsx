@@ -4082,16 +4082,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             isDrawingRow = false
             rowStartLatLng = null
             
-            alert('🎨 MODE DESSIN RANGÉE\n\n1️⃣ Cliquez sur point de départ\n2️⃣ Glissez la souris\n3️⃣ Relâchez pour créer rangée\n\n💡 Les modules seront générés automatiquement dans le rectangle')
+            alert('🎨 MODE DESSIN RANGÉE\n\n1️⃣ Cliquez sur point de départ\n2️⃣ Glissez la souris\n3️⃣ Relâchez pour créer rangée\n\n💡 Appuyez sur ESC pour annuler')
             
             // Désactiver événements Leaflet par défaut
             map.dragging.disable()
             map.doubleClickZoom.disable()
             
-            // Event mousedown - Démarrer dessin
+            // Event listeners
             map.on('mousedown', onRowMouseDown)
             map.on('mousemove', onRowMouseMove)
             map.on('mouseup', onRowMouseUp)
+            
+            // ESC pour annuler
+            document.addEventListener('keydown', onEscapeKey)
         }
         
         function onRowMouseDown(e) {
@@ -4148,8 +4151,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             if (totalModules === 0) {
                 alert('⚠️ Rectangle trop petit! Dessinez une zone plus grande.')
-                map.removeLayer(rowPreviewRect)
-                rowPreviewRect = null
+                cancelDrawRowMode()
                 return
             }
             
@@ -4157,8 +4159,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const confirmed = confirm(\`🎯 CRÉATION RANGÉE\n\nDimensions: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nModules: \${cols} colonnes × \${rows} lignes = \${totalModules} modules\n\nCréer cette rangée?\`)
             
             if (!confirmed) {
-                map.removeLayer(rowPreviewRect)
-                rowPreviewRect = null
+                cancelDrawRowMode()
                 return
             }
             
@@ -4224,24 +4225,44 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             modules.push(...generatedModules)
             nextModuleNum = moduleNum
             
-            // Nettoyer
-            map.removeLayer(rowPreviewRect)
-            rowPreviewRect = null
-            
-            // Réactiver Leaflet
-            map.dragging.enable()
-            map.doubleClickZoom.enable()
-            map.off('mousedown', onRowMouseDown)
-            map.off('mousemove', onRowMouseMove)
-            map.off('mouseup', onRowMouseUp)
-            
-            placementMode = 'manual'
+            // Nettoyer mode dessin
+            cancelDrawRowMode()
             
             // Render
             renderModules()
             updateStats()
             
             alert(\`✅ \${generatedModules.length} modules créés!\n\nRectangle: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nGrille: \${cols} × \${rows}\`)
+        }
+        
+        function onEscapeKey(e) {
+            if (e.key === 'Escape' && placementMode === 'drawRow') {
+                cancelDrawRowMode()
+                alert('❌ Mode dessin rangée annulé')
+            }
+        }
+        
+        function cancelDrawRowMode() {
+            // Nettoyer preview rectangle
+            if (rowPreviewRect) {
+                map.removeLayer(rowPreviewRect)
+                rowPreviewRect = null
+            }
+            
+            // Réactiver Leaflet
+            map.dragging.enable()
+            map.doubleClickZoom.enable()
+            
+            // Retirer event listeners
+            map.off('mousedown', onRowMouseDown)
+            map.off('mousemove', onRowMouseMove)
+            map.off('mouseup', onRowMouseUp)
+            document.removeEventListener('keydown', onEscapeKey)
+            
+            // Reset variables
+            isDrawingRow = false
+            rowStartLatLng = null
+            placementMode = 'manual'
         }
         
         function clearModules() {
