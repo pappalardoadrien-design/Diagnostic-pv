@@ -4095,7 +4095,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             nextModuleNum = moduleNum
             renderModules()
             updateStats()
-            alert(\`OK: \${modules.length} modules places!\n\${stringsConfig.map(c => \`String \${c.stringNum}: \${c.modulesCount} modules\`).join('\\n')}\`)
+            const stringsDetail = stringsConfig.map(c => "String " + c.stringNum + ": " + c.modulesCount + " modules").join("\n")
+            alert("OK: " + modules.length + " modules places!\n\n" + stringsDetail)
         }
         
         function placeModuleManual() {
