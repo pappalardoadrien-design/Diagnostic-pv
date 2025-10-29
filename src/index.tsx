@@ -3450,7 +3450,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         </button>
                         <div id="stringsSummary" class="p-2 bg-black rounded text-xs text-gray-400 hidden">
                             <div class="font-bold text-yellow-400 mb-1">Config actuelle:</div>
-                            <div id="stringsSummaryText">2 strings × 10 modules = 20 total</div>
+                            <div id="stringsSummaryText">2 strings x 10 modules = 20 total</div>
                         </div>
                         <button id="saveConfigBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold">
                             <i class="fas fa-check mr-1"></i>Sauvegarder Config
@@ -3821,9 +3821,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         roof_area_sqm: roofArea
                     })
                 })
-                alert('✅ Contour toiture sauvegardé!')
+                alert('OK: Contour toiture sauvegarde!')
             } catch (error) {
-                alert('❌ Erreur sauvegarde: ' + error.message)
+                alert('ERREUR: Sauvegarde - ' + error.message)
             }
         }
         
@@ -3907,7 +3907,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('stringsSummary').classList.remove('hidden')
             
             closeStringsModal()
-            alert(\`✅ Configuration appliquée: \${total} modules répartis sur \${stringsConfig.length} strings\`)
+            alert(\`OK: Configuration appliquee - \${total} modules repartis sur \${stringsConfig.length} strings\`)
         }
         
         function closeStringsModal() {
@@ -3928,9 +3928,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 })
-                alert('✅ Configuration électrique sauvegardée!')
+                alert('OK: Configuration electrique sauvegardee!')
             } catch (error) {
-                alert('❌ Erreur: ' + error.message)
+                alert('ERREUR: ' + error.message)
             }
         }
         
@@ -3939,7 +3939,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function placeModulesAuto() {
             if (!roofPolygon) {
-                alert('⚠️ Dessinez d\\'abord le contour de toiture!')
+                alert("ATTENTION: Dessinez d'abord le contour de toiture!")
                 return
             }
             
@@ -3949,7 +3949,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             let useCustomConfig = stringsConfig.length === stringCount && stringsConfig.length > 0
             
             if (!useCustomConfig) {
-                alert('⚠️ Configurez d\\'abord les strings avec le bouton "Configurer Strings"!')
+                alert("ATTENTION: Configurez d'abord les strings avec le bouton 'Configurer Strings'!")
                 return
             }
             
@@ -4008,7 +4008,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             nextModuleNum = moduleNum
             renderModules()
             updateStats()
-            alert(\`✅ \${modules.length} modules placés!\n\${stringsConfig.map(c => \`String \${c.stringNum}: \${c.modulesCount} modules\`).join('\\n')}\`)
+            alert(\`OK: \${modules.length} modules places!\n\${stringsConfig.map(c => \`String \${c.stringNum}: \${c.modulesCount} modules\`).join('\\n')}\`)
         }
         
         function placeModuleManual() {
@@ -4069,12 +4069,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         function drawRowMode() {
             if (!roofPolygon) {
-                alert('⚠️ Dessinez d\'abord le contour de toiture!')
+                alert("ATTENTION: Dessinez d'abord le contour de toiture!")
                 return
             }
             
             if (stringsConfig.length === 0) {
-                alert('⚠️ Configurez d\'abord les strings!')
+                alert("ATTENTION: Configurez d'abord les strings!")
                 return
             }
             
@@ -4082,7 +4082,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             isDrawingRow = false
             rowStartLatLng = null
             
-            alert('🎨 MODE DESSIN RANGÉE\n\n1️⃣ Cliquez sur point de départ\n2️⃣ Glissez la souris\n3️⃣ Relâchez pour créer rangée\n\n💡 Appuyez sur ESC pour annuler')
+            alert('MODE DESSIN RANGEE\\n\\n1. Cliquez sur point de depart\\n2. Glissez la souris\\n3. Relachez pour creer rangee\\n\\nAppuyez sur ESC pour annuler')
             
             // Désactiver événements Leaflet par défaut
             map.dragging.disable()
@@ -4144,19 +4144,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const moduleWidth = 1.7 + 0.02  // 1.7m + 2cm espacement
             const moduleHeight = 1.0 + 0.02 // 1.0m + 2cm espacement
             
-            // Calculer nombre de modules (colonnes × lignes)
+            // Calculer nombre de modules (colonnes x lignes)
             const cols = Math.floor(widthMeters / moduleWidth)
             const rows = Math.floor(heightMeters / moduleHeight)
             const totalModules = cols * rows
             
             if (totalModules === 0) {
-                alert('⚠️ Rectangle trop petit! Dessinez une zone plus grande.')
+                alert('ATTENTION: Rectangle trop petit! Dessinez une zone plus grande.')
                 cancelDrawRowMode()
                 return
             }
             
             // Confirmation
-            const confirmed = confirm(\`🎯 CRÉATION RANGÉE\n\nDimensions: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nModules: \${cols} colonnes × \${rows} lignes = \${totalModules} modules\n\nCréer cette rangée?\`)
+            const confirmed = confirm(\`CREATION RANGEE\n\nDimensions: \${widthMeters.toFixed(1)}m x \${heightMeters.toFixed(1)}m\nModules: \${cols} colonnes x \${rows} lignes = \${totalModules} modules\n\nCreer cette rangee?\`)
             
             if (!confirmed) {
                 cancelDrawRowMode()
@@ -4232,13 +4232,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             renderModules()
             updateStats()
             
-            alert(\`✅ \${generatedModules.length} modules créés!\n\nRectangle: \${widthMeters.toFixed(1)}m × \${heightMeters.toFixed(1)}m\nGrille: \${cols} × \${rows}\`)
+            alert(\`OK: \${generatedModules.length} modules crees!\n\nRectangle: \${widthMeters.toFixed(1)}m x \${heightMeters.toFixed(1)}m\nGrille: \${cols} x \${rows}\`)
         }
         
         function onEscapeKey(e) {
             if (e.key === 'Escape' && placementMode === 'drawRow') {
                 cancelDrawRowMode()
-                alert('❌ Mode dessin rangée annulé')
+                alert('Mode dessin rangee annule')
             }
         }
         
@@ -4370,11 +4370,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Sauvegarder toiture
                 if (roofPolygon) await saveRoofPolygon()
                 
-                alert(\`✅ Sauvegarde complète réussie!\n\${modules.length} modules | Surface: \${roofArea.toFixed(2)} m²\`)
+                alert(\`OK: Sauvegarde complete reussie!\n\${modules.length} modules | Surface: \${roofArea.toFixed(2)} m2\`)
                 
                 await loadModules()
             } catch (error) {
-                alert('❌ Erreur sauvegarde: ' + error.message)
+                alert('ERREUR: Sauvegarde - ' + error.message)
             }
         }
         
