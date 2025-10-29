@@ -3797,8 +3797,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 roofPolygon = e.layer
                 drawnItems.addLayer(roofPolygon)
                 
+                // S'assurer que le polygone est fermé pour Turf.js
                 const geoJSON = roofPolygon.toGeoJSON()
-                roofArea = turf.area(geoJSON)
+                const coords = geoJSON.geometry.coordinates[0]
+                const firstPoint = coords[0]
+                const lastPoint = coords[coords.length - 1]
+                
+                // Fermer le polygone si nécessaire
+                if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+                    coords.push([...firstPoint])
+                }
+                
+                try {
+                    roofArea = turf.area(geoJSON)
+                } catch (error) {
+                    console.warn('Erreur calcul surface Turf.js:', error)
+                    roofArea = 0
+                }
                 
                 document.getElementById('roofArea').textContent = roofArea.toFixed(2) + ' m²'
                 document.getElementById('roofInfo').classList.remove('hidden')
@@ -3915,11 +3930,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         async function saveElectricalConfig() {
+            // Validation des champs
+            const inverterEl = document.getElementById('inverterCount')
+            const junctionBoxEl = document.getElementById('junctionBoxCount')
+            const stringEl = document.getElementById('stringCount')
+            const modulesPerStringEl = document.getElementById('modulesPerString')
+            
+            if (!inverterEl || !junctionBoxEl || !stringEl || !modulesPerStringEl) {
+                alert('ERREUR: Champs de configuration manquants')
+                return
+            }
+            
             const config = {
-                inverter_count: parseInt(document.getElementById('inverterCount').value),
-                junction_box_count: parseInt(document.getElementById('junctionBoxCount').value),
-                string_count: parseInt(document.getElementById('stringCount').value),
-                modules_per_string: parseInt(document.getElementById('modulesPerString').value)
+                inverter_count: parseInt(inverterEl.value) || 0,
+                junction_box_count: parseInt(junctionBoxEl.value) || 0,
+                string_count: parseInt(stringEl.value) || 0,
+                modules_per_string: parseInt(modulesPerStringEl.value) || 0
             }
             
             try {
