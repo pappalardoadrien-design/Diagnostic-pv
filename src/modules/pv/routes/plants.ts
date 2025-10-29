@@ -386,8 +386,8 @@ plantsRouter.post('/:plantId/zones/:zoneId/modules', async (c: Context) => {
         INSERT INTO pv_modules (
           zone_id, module_identifier, string_number, position_in_string,
           pos_x_meters, pos_y_meters, width_meters, height_meters, 
-          rotation, power_wp, brand, model, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          rotation, power_wp, module_status, status_comment, brand, model, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         zoneId,
         m.module_identifier,
@@ -399,6 +399,8 @@ plantsRouter.post('/:plantId/zones/:zoneId/modules', async (c: Context) => {
         m.height_meters || 1.0,
         m.rotation || 0,
         m.power_wp || 450,
+        m.module_status || 'pending',
+        m.status_comment || null,
         m.brand || null,
         m.model || null,
         m.notes || null
@@ -472,6 +474,119 @@ plantsRouter.delete('/:plantId/zones/:zoneId/modules/:moduleId', async (c: Conte
     console.error('Erreur suppression module:', error)
     return c.json({ 
       error: 'Erreur suppression module',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// GET /api/pv/plants/:plantId/zones/:zoneId/modules - Liste modules d'une zone
+plantsRouter.get('/:plantId/zones/:zoneId/modules', async (c: Context) => {
+  const { env } = c
+  const zoneId = c.req.param('zoneId')
+  
+  try {
+    const modules = await env.DB.prepare(`
+      SELECT * FROM pv_modules 
+      WHERE zone_id = ?
+      ORDER BY string_number, position_in_string
+    `).bind(zoneId).all()
+    
+    return c.json({ 
+      success: true,
+      modules: modules.results || []
+    })
+  } catch (error: any) {
+    console.error('Erreur liste modules:', error)
+    return c.json({ 
+      error: 'Erreur chargement modules',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// DELETE /api/pv/plants/:plantId/zones/:zoneId/modules - Supprimer tous modules zone
+plantsRouter.delete('/:plantId/zones/:zoneId/modules', async (c: Context) => {
+  const { env } = c
+  const zoneId = c.req.param('zoneId')
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM pv_modules WHERE zone_id = ?
+    `).bind(zoneId).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Tous les modules supprimés'
+    })
+  } catch (error: any) {
+    console.error('Erreur suppression modules:', error)
+    return c.json({ 
+      error: 'Erreur suppression modules',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// PUT /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId/status - MAJ statut module
+plantsRouter.put('/:plantId/zones/:zoneId/modules/:moduleId/status', async (c: Context) => {
+  const { env } = c
+  const moduleId = c.req.param('moduleId')
+  const { module_status, status_comment } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE pv_modules 
+      SET module_status = ?, status_comment = ?
+      WHERE id = ?
+    `).bind(
+      module_status || 'pending',
+      status_comment || null,
+      moduleId
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Statut mis à jour'
+    })
+  } catch (error: any) {
+    console.error('Erreur mise à jour statut:', error)
+    return c.json({ 
+      error: 'Erreur mise à jour statut',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// PUT /api/pv/plants/:plantId/zones/:zoneId/background - Upload image fond zone
+plantsRouter.put('/:plantId/zones/:zoneId/background', async (c: Context) => {
+  const { env } = c
+  const zoneId = c.req.param('zoneId')
+  const { image_url, image_type, width_meters, height_meters } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE pv_zones 
+      SET background_image_url = ?, 
+          background_image_type = ?,
+          width_meters = ?,
+          height_meters = ?
+      WHERE id = ?
+    `).bind(
+      image_url || null,
+      image_type || 'upload',
+      width_meters || 50.0,
+      height_meters || 30.0,
+      zoneId
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Image fond mise à jour'
+    })
+  } catch (error: any) {
+    console.error('Erreur mise à jour image fond:', error)
+    return c.json({ 
+      error: 'Erreur mise à jour image fond',
       details: error.message 
     }, 500)
   }

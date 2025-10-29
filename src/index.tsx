@@ -2699,6 +2699,650 @@ app.get('/pv/plants', (c) => {
 })
 
 // ============================================================================
+// ROUTE PV CARTOGRAPHY - Canvas Editor (PHASE 2b)
+// ============================================================================
+app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
+  const plantId = c.req.param('plantId')
+  const zoneId = c.req.param('zoneId')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Canvas Editor - Zone PV</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <style>
+            /* CSS identique Module EL pour status modules */
+            .module-rect.ok { fill: #22c55e; }
+            .module-rect.inequality { fill: #eab308; }
+            .module-rect.microcracks { fill: #f97316; }
+            .module-rect.dead { fill: #ef4444; }
+            .module-rect.string_open { fill: #3b82f6; }
+            .module-rect.not_connected { fill: #6b7280; }
+            .module-rect.pending { fill: #e5e7eb; stroke: #9ca3af; stroke-dasharray: 2,2; }
+            
+            @keyframes pulse-danger {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+            
+            .module-rect.dead {
+                animation: pulse-danger 2s infinite;
+            }
+            
+            #canvas { 
+                border: 2px solid #9333ea; 
+                cursor: crosshair;
+                max-width: 100%;
+                display: block;
+            }
+            
+            .mode-btn.active {
+                background-color: #9333ea !important;
+            }
+        </style>
+    </head>
+    <body class="bg-black text-white min-h-screen">
+        <!-- Header Navigation -->
+        <div class="bg-gray-900 border-b-2 border-purple-400 p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex gap-3">
+                    <a href="/pv/plant/${plantId}" class="text-purple-400 hover:text-purple-300 font-bold">
+                        <i class="fas fa-arrow-left mr-2"></i>RETOUR ZONE
+                    </a>
+                    <h1 id="zoneTitle" class="text-xl font-black">Zone...</h1>
+                </div>
+                <div class="flex gap-3">
+                    <button id="saveBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-black">
+                        <i class="fas fa-save mr-2"></i>ENREGISTRER
+                    </button>
+                    <button id="exportBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">
+                        <i class="fas fa-file-pdf mr-2"></i>EXPORT PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container mx-auto px-4 py-6">
+            <!-- Toolbar -->
+            <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-4 mb-6">
+                <div class="flex flex-wrap gap-3 items-center">
+                    <!-- Mode Placement -->
+                    <div class="flex gap-2">
+                        <button id="modeManualBtn" class="mode-btn active bg-purple-600 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-mouse-pointer mr-2"></i>MANUEL
+                        </button>
+                        <button id="modeGridBtn" class="mode-btn bg-gray-600 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-th mr-2"></i>GRILLE AUTO
+                        </button>
+                    </div>
+                    
+                    <!-- Upload Image Fond -->
+                    <div>
+                        <label class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold cursor-pointer">
+                            <i class="fas fa-image mr-2"></i>IMAGE FOND
+                            <input type="file" id="uploadBackground" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                    
+                    <!-- Rotation -->
+                    <div class="flex gap-2 items-center">
+                        <button id="rotateBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-redo mr-2"></i>ROTATION
+                        </button>
+                        <span id="rotationLabel" class="px-3 py-2 bg-gray-800 rounded font-bold">0°</span>
+                    </div>
+                    
+                    <!-- Config Grille -->
+                    <div class="flex gap-2 items-center border-l-2 border-gray-600 pl-3">
+                        <label class="text-sm font-bold">Lignes:</label>
+                        <input type="number" id="gridRows" value="10" min="1" max="50" 
+                               class="w-16 bg-black border border-gray-600 rounded px-2 py-1 text-center font-bold">
+                        <label class="text-sm font-bold">Cols:</label>
+                        <input type="number" id="gridCols" value="10" min="1" max="50" 
+                               class="w-16 bg-black border border-gray-600 rounded px-2 py-1 text-center font-bold">
+                        <button id="applyGridBtn" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-bold">
+                            APPLIQUER
+                        </button>
+                    </div>
+                    
+                    <!-- Reset -->
+                    <button id="clearBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold ml-auto">
+                        <i class="fas fa-trash mr-2"></i>EFFACER TOUT
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-4 mb-6">
+                <canvas id="canvas" width="1200" height="800"></canvas>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-7 gap-3">
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-purple-400">
+                    <div class="text-xl font-black text-purple-400" id="statsTotal">0</div>
+                    <div class="text-xs text-gray-400">Total</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-green-400">
+                    <div class="text-xl font-black text-green-400" id="statsOk">0</div>
+                    <div class="text-xs text-gray-400">🟢 OK</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-yellow-400">
+                    <div class="text-xl font-black text-yellow-400" id="statsInequality">0</div>
+                    <div class="text-xs text-gray-400">🟡 Inégalité</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-orange-400">
+                    <div class="text-xl font-black text-orange-400" id="statsMicrocracks">0</div>
+                    <div class="text-xs text-gray-400">🟠 Fissures</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-red-400">
+                    <div class="text-xl font-black text-red-400" id="statsDead">0</div>
+                    <div class="text-xs text-gray-400">🔴 HS</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-blue-400">
+                    <div class="text-xl font-black text-blue-400" id="statsStringOpen">0</div>
+                    <div class="text-xs text-gray-400">🔵 String</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-3 text-center border border-gray-400">
+                    <div class="text-xl font-black text-gray-400" id="statsPending">0</div>
+                    <div class="text-xs text-gray-400">⚪ Pending</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Statut Module (IDENTIQUE Module EL) -->
+        <div id="moduleModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-md w-full">
+                <h3 id="modalTitle" class="text-xl font-black mb-4 text-center">MODULE M000</h3>
+                
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <button class="module-status-btn bg-green-600 hover:bg-green-700 p-3 rounded font-bold" data-status="ok">
+                        🟢 OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
+                    </button>
+                    <button class="module-status-btn bg-yellow-600 hover:bg-yellow-700 p-3 rounded font-bold" data-status="inequality">
+                        🟡 Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
+                    </button>
+                    <button class="module-status-btn bg-orange-600 hover:bg-orange-700 p-3 rounded font-bold" data-status="microcracks">
+                        🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
+                    </button>
+                    <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
+                        🔴 HS<br><span class="text-sm font-normal">Module défaillant</span>
+                    </button>
+                    <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
+                        🔵 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
+                    </button>
+                    <button class="module-status-btn bg-gray-600 hover:bg-gray-700 p-3 rounded font-bold" data-status="not_connected">
+                        ⚫ Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-2">Commentaire (optionnel) :</label>
+                    <input type="text" id="moduleComment" 
+                           class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                           placeholder="Détails du défaut...">
+                </div>
+                
+                <div class="flex gap-3">
+                    <button id="saveStatusBtn" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded font-black">
+                        ENREGISTRER
+                    </button>
+                    <button id="cancelStatusBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                        ANNULER
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        // VARIABLES GLOBALES
+        const plantId = '${plantId}'
+        const zoneId = '${zoneId}'
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        let modules = []
+        let zoneData = null
+        let backgroundImage = null
+        let placementMode = 'manual'
+        let currentRotation = 0
+        let selectedModule = null
+        let nextModuleNum = 1
+        
+        // DIMENSIONS MODULE (pixels, ratio 1.7:1)
+        const MODULE_WIDTH_PX = 51
+        const MODULE_HEIGHT_PX = 30
+        const SCALE = 30 // 30 px = 1 m
+        
+        // COULEURS STATUS (IDENTIQUE Module EL)
+        const STATUS_COLORS = {
+            ok: '#22c55e',
+            inequality: '#eab308',
+            microcracks: '#f97316',
+            dead: '#ef4444',
+            string_open: '#3b82f6',
+            not_connected: '#6b7280',
+            pending: '#e5e7eb'
+        }
+        
+        // ========================================================================
+        // INIT
+        // ========================================================================
+        async function init() {
+            await loadZone()
+            await loadModules()
+            render()
+            setupEventListeners()
+        }
+        
+        async function loadZone() {
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}\`)
+                const data = await response.json()
+                zoneData = data.zone
+                
+                document.getElementById('zoneTitle').textContent = zoneData.zone_name
+                
+                if (zoneData.background_image_url) {
+                    backgroundImage = new Image()
+                    backgroundImage.src = zoneData.background_image_url
+                    backgroundImage.onload = () => render()
+                }
+            } catch (error) {
+                console.error('Erreur chargement zone:', error)
+            }
+        }
+        
+        async function loadModules() {
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`)
+                const data = await response.json()
+                modules = data.modules || []
+                
+                if (modules.length > 0) {
+                    nextModuleNum = Math.max(...modules.map(m => {
+                        const match = m.module_identifier.match(/\\d+/)
+                        return match ? parseInt(match[0]) : 0
+                    })) + 1
+                }
+                
+                updateStats()
+            } catch (error) {
+                console.error('Erreur chargement modules:', error)
+            }
+        }
+        
+        // ========================================================================
+        // RENDER
+        // ========================================================================
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            
+            // Fond noir
+            ctx.fillStyle = '#000'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            
+            // Image fond si chargée
+            if (backgroundImage) {
+                ctx.globalAlpha = 0.6
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height)
+                ctx.globalAlpha = 1.0
+            }
+            
+            // Modules
+            modules.forEach(module => {
+                drawModule(module)
+            })
+        }
+        
+        function drawModule(module) {
+            const x = module.pos_x_meters * SCALE
+            const y = module.pos_y_meters * SCALE
+            const width = module.width_meters * SCALE
+            const height = module.height_meters * SCALE
+            
+            ctx.save()
+            ctx.translate(x + width/2, y + height/2)
+            ctx.rotate(module.rotation * Math.PI / 180)
+            
+            // Rectangle module avec couleur status
+            ctx.fillStyle = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
+            ctx.fillRect(-width/2, -height/2, width, height)
+            
+            // Border
+            ctx.strokeStyle = '#000'
+            ctx.lineWidth = 2
+            ctx.strokeRect(-width/2, -height/2, width, height)
+            
+            // Identifiant module
+            ctx.fillStyle = '#000'
+            ctx.font = 'bold 11px Arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(module.module_identifier, 0, 0)
+            
+            ctx.restore()
+        }
+        
+        // ========================================================================
+        // INTERACTIONS
+        // ========================================================================
+        function setupEventListeners() {
+            // Canvas clic
+            canvas.addEventListener('click', handleCanvasClick)
+            
+            // Modes
+            document.getElementById('modeManualBtn').addEventListener('click', () => setMode('manual'))
+            document.getElementById('modeGridBtn').addEventListener('click', () => setMode('grid'))
+            
+            // Rotation
+            document.getElementById('rotateBtn').addEventListener('click', rotateNext)
+            
+            // Grille
+            document.getElementById('applyGridBtn').addEventListener('click', applyGrid)
+            
+            // Upload fond
+            document.getElementById('uploadBackground').addEventListener('change', handleImageUpload)
+            
+            // Clear
+            document.getElementById('clearBtn').addEventListener('click', clearAll)
+            
+            // Save
+            document.getElementById('saveBtn').addEventListener('click', saveModules)
+            
+            // Export
+            document.getElementById('exportBtn').addEventListener('click', exportPDF)
+            
+            // Modal status
+            document.querySelectorAll('.module-status-btn').forEach(btn => {
+                btn.addEventListener('click', () => selectStatus(btn.dataset.status))
+            })
+            document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
+        }
+        
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect()
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width)
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height)
+            
+            const clickedModule = findModuleAt(x, y)
+            if (clickedModule) {
+                openStatusModal(clickedModule)
+            } else if (placementMode === 'manual') {
+                addModule(x / SCALE, y / SCALE)
+            }
+        }
+        
+        function findModuleAt(x, y) {
+            return modules.find(m => {
+                const mx = m.pos_x_meters * SCALE
+                const my = m.pos_y_meters * SCALE
+                const mw = m.width_meters * SCALE
+                const mh = m.height_meters * SCALE
+                
+                // Vérifier rotation
+                const centerX = mx + mw/2
+                const centerY = my + mh/2
+                const angle = -m.rotation * Math.PI / 180
+                
+                const dx = x - centerX
+                const dy = y - centerY
+                const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle)
+                const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle)
+                
+                return Math.abs(rotatedX) <= mw/2 && Math.abs(rotatedY) <= mh/2
+            })
+        }
+        
+        function addModule(xMeters, yMeters) {
+            const newModule = {
+                zone_id: parseInt(zoneId),
+                module_identifier: \`M\${nextModuleNum}\`,
+                string_number: 1,
+                position_in_string: modules.length + 1,
+                pos_x_meters: xMeters,
+                pos_y_meters: yMeters,
+                width_meters: 1.7,
+                height_meters: 1.0,
+                rotation: currentRotation,
+                power_wp: 450,
+                module_status: 'pending',
+                status_comment: null
+            }
+            
+            modules.push(newModule)
+            nextModuleNum++
+            render()
+            updateStats()
+        }
+        
+        function applyGrid() {
+            const rows = parseInt(document.getElementById('gridRows').value)
+            const cols = parseInt(document.getElementById('gridCols').value)
+            const spacing = 0.02 // 2cm
+            
+            modules = []
+            nextModuleNum = 1
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    modules.push({
+                        zone_id: parseInt(zoneId),
+                        module_identifier: \`M\${nextModuleNum}\`,
+                        string_number: Math.floor((nextModuleNum - 1) / cols) + 1,
+                        position_in_string: ((nextModuleNum - 1) % cols) + 1,
+                        pos_x_meters: col * (1.7 + spacing),
+                        pos_y_meters: row * (1.0 + spacing),
+                        width_meters: 1.7,
+                        height_meters: 1.0,
+                        rotation: currentRotation,
+                        power_wp: 450,
+                        module_status: 'pending',
+                        status_comment: null
+                    })
+                    nextModuleNum++
+                }
+            }
+            
+            render()
+            updateStats()
+        }
+        
+        function rotateNext() {
+            currentRotation = (currentRotation + 90) % 360
+            document.getElementById('rotationLabel').textContent = currentRotation + '°'
+        }
+        
+        function setMode(mode) {
+            placementMode = mode
+            document.getElementById('modeManualBtn').classList.toggle('active', mode === 'manual')
+            document.getElementById('modeGridBtn').classList.toggle('active', mode === 'grid')
+            
+            if (mode === 'manual') {
+                document.getElementById('modeManualBtn').classList.replace('bg-gray-600', 'bg-purple-600')
+                document.getElementById('modeGridBtn').classList.replace('bg-purple-600', 'bg-gray-600')
+            } else {
+                document.getElementById('modeGridBtn').classList.replace('bg-gray-600', 'bg-purple-600')
+                document.getElementById('modeManualBtn').classList.replace('bg-purple-600', 'bg-gray-600')
+            }
+        }
+        
+        function clearAll() {
+            if (confirm('Effacer tous les modules ?')) {
+                modules = []
+                nextModuleNum = 1
+                render()
+                updateStats()
+            }
+        }
+        
+        // ========================================================================
+        // MODAL STATUS
+        // ========================================================================
+        function openStatusModal(module) {
+            selectedModule = module
+            document.getElementById('modalTitle').textContent = module.module_identifier
+            document.getElementById('moduleComment').value = module.status_comment || ''
+            document.getElementById('moduleModal').classList.remove('hidden')
+        }
+        
+        function closeModal() {
+            document.getElementById('moduleModal').classList.add('hidden')
+            selectedModule = null
+        }
+        
+        function selectStatus(status) {
+            if (!selectedModule) return
+            
+            selectedModule.module_status = status
+            selectedModule.status_comment = document.getElementById('moduleComment').value || null
+            
+            closeModal()
+            render()
+            updateStats()
+        }
+        
+        // ========================================================================
+        // UPLOAD IMAGE
+        // ========================================================================
+        async function handleImageUpload(e) {
+            const file = e.target.files[0]
+            if (!file) return
+            
+            const reader = new FileReader()
+            reader.onload = async (event) => {
+                backgroundImage = new Image()
+                backgroundImage.src = event.target.result
+                backgroundImage.onload = () => {
+                    render()
+                    saveBackgroundImage(event.target.result)
+                }
+            }
+            reader.readAsDataURL(file)
+        }
+        
+        async function saveBackgroundImage(dataUrl) {
+            try {
+                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/background\`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_url: dataUrl,
+                        image_type: 'upload',
+                        width_meters: 50,
+                        height_meters: 30
+                    })
+                })
+            } catch (error) {
+                console.error('Erreur sauvegarde image:', error)
+            }
+        }
+        
+        // ========================================================================
+        // SAVE
+        // ========================================================================
+        async function saveModules() {
+            try {
+                // Supprimer modules existants
+                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
+                    method: 'DELETE'
+                })
+                
+                if (modules.length === 0) {
+                    alert('Aucun module à sauvegarder')
+                    return
+                }
+                
+                // Créer nouveaux modules
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ modules })
+                })
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                    alert(\`\${data.added} module(s) sauvegardé(s) avec succès!\`)
+                    await loadModules()
+                } else {
+                    alert('Erreur: ' + data.error)
+                }
+            } catch (error) {
+                alert('Erreur sauvegarde: ' + error.message)
+            }
+        }
+        
+        // ========================================================================
+        // EXPORT PDF
+        // ========================================================================
+        function exportPDF() {
+            const { jsPDF } = window.jspdf
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            })
+            
+            // Page 1: Plan
+            doc.setFontSize(16)
+            doc.text(\`Plan Calepinage - \${zoneData.zone_name}\`, 10, 10)
+            
+            const canvasDataUrl = canvas.toDataURL('image/png')
+            doc.addImage(canvasDataUrl, 'PNG', 10, 20, 277, 165)
+            
+            // Page 2: Tableau
+            doc.addPage()
+            doc.setFontSize(14)
+            doc.text('LISTE MODULES', 10, 10)
+            
+            doc.setFontSize(9)
+            let y = 20
+            modules.forEach((m, i) => {
+                doc.text(\`\${m.module_identifier} | String \${m.string_number} | Pos \${m.position_in_string} | Status: \${m.module_status}\`, 10, y)
+                if (m.status_comment) {
+                    y += 4
+                    doc.setFontSize(8)
+                    doc.text(\`   → \${m.status_comment}\`, 10, y)
+                    doc.setFontSize(9)
+                }
+                y += 5
+                if (y > 190) {
+                    doc.addPage()
+                    y = 10
+                }
+            })
+            
+            doc.save(\`calepinage_\${zoneData.zone_name}_\${Date.now()}.pdf\`)
+        }
+        
+        // ========================================================================
+        // STATS
+        // ========================================================================
+        function updateStats() {
+            document.getElementById('statsTotal').textContent = modules.length
+            document.getElementById('statsOk').textContent = modules.filter(m => m.module_status === 'ok').length
+            document.getElementById('statsInequality').textContent = modules.filter(m => m.module_status === 'inequality').length
+            document.getElementById('statsMicrocracks').textContent = modules.filter(m => m.module_status === 'microcracks').length
+            document.getElementById('statsDead').textContent = modules.filter(m => m.module_status === 'dead').length
+            document.getElementById('statsStringOpen').textContent = modules.filter(m => m.module_status === 'string_open').length
+            document.getElementById('statsPending').textContent = modules.filter(m => m.module_status === 'pending').length
+        }
+        
+        // INIT
+        init()
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
 // ROUTE PV CARTOGRAPHY - Détail Centrale (PHASE 2a)
 // ============================================================================
 app.get('/pv/plant/:id', async (c) => {
@@ -3028,10 +3672,10 @@ app.get('/pv/plant/:id', async (c) => {
                     </div>
                     
                     <div class="pt-4 border-t border-gray-700">
-                        <button onclick="viewZoneModules(\${zone.id})" 
-                                class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold" disabled>
-                            <i class="fas fa-th mr-1"></i>VOIR MODULES (Phase 2b)
-                        </button>
+                        <a href="/pv/plant/\${plantId}/zone/\${zone.id}/editor" 
+                           class="block w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-center">
+                            <i class="fas fa-pen-ruler mr-2"></i>ÉDITER PLAN
+                        </a>
                     </div>
                 </div>
             \`).join('')
