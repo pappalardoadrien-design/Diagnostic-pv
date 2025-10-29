@@ -3509,6 +3509,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         </div>
                     </div>
                 </div>
+
+                <!-- Progression Strings (Visual Feedback) -->
+                <div id="stringsProgressPanel" class="bg-gray-900 rounded-lg border-2 border-yellow-400 p-4 hidden">
+                    <h3 class="text-sm font-black mb-3 text-yellow-400">
+                        <i class="fas fa-tasks mr-1"></i>PROGRESSION STRINGS
+                    </h3>
+                    <div id="stringsProgressContainer" class="space-y-2">
+                        <!-- Généré dynamiquement par updateStringsProgress() -->
+                    </div>
+                </div>
             </div>
 
             <!-- CENTER: Carte Leaflet -->
@@ -3677,6 +3687,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             await loadModules()
             setupEventListeners()
             updateStats()
+            updateStringsProgress()  // Initialiser progression
         }
         
         async function loadPlantData() {
@@ -3788,6 +3799,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 renderModules()
+                updateStats()
+                updateStringsProgress()  // Mettre à jour progression après chargement
             } catch (error) {
                 console.error('Erreur chargement modules:', error)
             }
@@ -3911,18 +3924,17 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             stringsConfig.forEach((config, index) => {
                 const div = document.createElement('div')
                 div.className = 'flex items-center gap-3 p-3 bg-gray-800 rounded border border-gray-600'
-                div.innerHTML = \`
-                    <div class="flex-1">
-                        <label class="block text-sm font-bold text-yellow-400 mb-1">String \${config.stringNum}</label>
-                        <input type="number" 
-                               class="string-modules-input w-full bg-gray-700 border border-gray-500 rounded px-3 py-2 text-center font-bold text-white" 
-                               data-index="\${index}"
-                               min="1" 
-                               max="50" 
-                               value="\${config.modulesCount}">
-                    </div>
-                    <div class="text-2xl font-black text-gray-400">\${config.modulesCount}</div>
-                \`
+                div.innerHTML = 
+                    '<div class="flex-1">' +
+                        '<label class="block text-sm font-bold text-yellow-400 mb-1">String ' + config.stringNum + '</label>' +
+                        '<input type="number" ' + 
+                               'class="string-modules-input w-full bg-gray-700 border border-gray-500 rounded px-3 py-2 text-center font-bold text-white" ' + 
+                               'data-index="' + index + '" ' +
+                               'min="1" ' +
+                               'max="50" ' +
+                               'value="' + config.modulesCount + '">' +
+                    '</div>' +
+                    '<div class="text-2xl font-black text-gray-400">' + config.modulesCount + '</div>'
                 container.appendChild(div)
             })
             
@@ -3953,12 +3965,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         function applyStringsConfig() {
             // Update summary display
             const total = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
-            const summaryText = stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ') + \` (Total: \${total})\`
+            const summaryText = stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') + ' (Total: ' + total + ')'
             document.getElementById('stringsSummaryText').textContent = summaryText
             document.getElementById('stringsSummary').classList.remove('hidden')
             
             closeStringsModal()
-            alert(\`OK: Configuration appliquee - \${total} modules repartis sur \${stringsConfig.length} strings\`)
+            alert('OK: Configuration appliquee - ' + total + ' modules repartis sur ' + stringsConfig.length + ' strings')
         }
         
         function closeStringsModal() {
@@ -4006,11 +4018,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     body: JSON.stringify(config)
                 })
                 
-                const summary = stringsConfig.length > 0 
-                    ? stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ')
-                    : 'Config uniforme: ' + stringCount + ' strings x ' + modulesPerString + ' modules'
-                
-                alert('OK: Configuration electrique sauvegardee!\n\n' + summary)
+                const summary = stringsConfig.length > 0 ? stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') : 'Config uniforme: ' + stringCount + ' strings x ' + modulesPerString + ' modules'
+                alert('OK: Configuration electrique sauvegardee!' + String.fromCharCode(10,10) + summary)
             } catch (error) {
                 alert('ERREUR: ' + error.message)
             }
@@ -4095,13 +4104,27 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             nextModuleNum = moduleNum
             renderModules()
             updateStats()
-            const stringsDetail = stringsConfig.map(c => "String " + c.stringNum + ": " + c.modulesCount + " modules").join("\n")
-            alert("OK: " + modules.length + " modules places!\n\n" + stringsDetail)
+            updateStringsProgress()  // Mettre à jour progression
+            const stringsDetail = stringsConfig.map(c => "String " + c.stringNum + ": " + c.modulesCount + " modules").join(String.fromCharCode(10))
+            alert('OK: ' + modules.length + ' modules places!' + String.fromCharCode(10,10) + stringsDetail)
         }
         
         function placeModuleManual() {
+            // VALIDATION STRICTE : Config obligatoire
+            if (stringsConfig.length === 0) {
+                alert('⚠️ CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d\'abord les strings avant placement!')
+                return
+            }
+            
+            // VALIDATION STRICTE : Vérifier limite
+            const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
+            if (modules.length >= totalConfigured) {
+                alert('🛑 LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
+                return
+            }
+            
             placementMode = 'manual'
-            alert('Cliquez sur la carte pour placer des modules individuellement')
+            alert('Cliquez sur la carte pour placer des modules individuellement' + String.fromCharCode(10,10) + 'Restant: ' + (totalConfigured - modules.length) + '/' + totalConfigured + ' modules')
             
             map.once('click', (e) => {
                 if (placementMode !== 'manual') return
@@ -4149,9 +4172,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 nextModuleNum++
                 renderModules()
                 updateStats()
+                updateStringsProgress()  // Mettre à jour progression
                 
-                // Continuer placement
-                placeModuleManual()
+                // Continuer placement si pas limite atteinte
+                const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
+                if (modules.length < totalConfigured) {
+                    placeModuleManual()
+                } else {
+                    alert('✅ LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Tous les modules configurés ont été placés (' + totalConfigured + '/' + totalConfigured + ')')
+                }
             })
         }
         
@@ -4161,8 +4190,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 return
             }
             
+            // VALIDATION STRICTE : Config obligatoire
             if (stringsConfig.length === 0) {
-                alert("ATTENTION: Configurez d'abord les strings!")
+                alert('⚠️ CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d\'abord les strings avant placement!')
+                return
+            }
+            
+            // VALIDATION STRICTE : Vérifier limite
+            const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
+            if (modules.length >= totalConfigured) {
+                alert('🛑 LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
                 return
             }
             
@@ -4170,7 +4207,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             isDrawingRow = false
             rowStartLatLng = null
             
-            alert("MODE DESSIN RANGEE\n\n1. Cliquez sur point de depart\n2. Glissez la souris\n3. Relachez pour creer rangee\n\nAppuyez sur ESC pour annuler")
+            alert('MODE DESSIN RANGEE' + String.fromCharCode(10,10) + '1. Cliquez sur point de depart' + String.fromCharCode(10) + '2. Glissez la souris' + String.fromCharCode(10) + '3. Relachez pour creer rangee' + String.fromCharCode(10,10) + 'Appuyez sur ESC pour annuler')
             
             // Désactiver événements Leaflet par défaut
             map.dragging.disable()
@@ -4244,7 +4281,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             // Confirmation
-            const confirmed = confirm(\`CREATION RANGEE\n\nDimensions: \${widthMeters.toFixed(1)}m x \${heightMeters.toFixed(1)}m\nModules: \${cols} colonnes x \${rows} lignes = \${totalModules} modules\n\nCreer cette rangee?\`)
+            const confirmMsg = 'CREATION RANGEE' + String.fromCharCode(10,10) + 'Dimensions: ' + widthMeters.toFixed(1) + 'm x ' + heightMeters.toFixed(1) + 'm' + String.fromCharCode(10) + 'Modules: ' + cols + ' colonnes x ' + rows + ' lignes = ' + totalModules + ' modules' + String.fromCharCode(10,10) + 'Creer cette rangee?'
+            const confirmed = confirm(confirmMsg)
             
             if (!confirmed) {
                 cancelDrawRowMode()
@@ -4336,8 +4374,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             renderModules()
             console.log('🔷 Appel updateStats...')
             updateStats()
+            updateStringsProgress()  // Mettre à jour progression
             
-            alert(\`OK: \${generatedModules.length} modules crees!\n\nRectangle: \${widthMeters.toFixed(1)}m x \${heightMeters.toFixed(1)}m\nGrille: \${cols} x \${rows}\`)
+            const rectInfo = 'Rectangle: ' + widthMeters.toFixed(1) + 'm x ' + heightMeters.toFixed(1) + 'm' + String.fromCharCode(10) + 'Grille: ' + cols + ' x ' + rows; alert('OK: ' + generatedModules.length + ' modules crees!' + String.fromCharCode(10,10) + rectInfo)
         }
         
         function onEscapeKey(e) {
@@ -4376,6 +4415,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 nextModuleNum = 1
                 renderModules()
                 updateStats()
+                updateStringsProgress()  // Mettre à jour progression
             }
         }
         
@@ -4389,9 +4429,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             renderModules()
             updateStats()
+            updateStringsProgress()  // Mettre à jour progression
             
             if (removed > 0) {
-                alert(\`Nettoyage termine: \${removed} modules sans GPS supprimes\`)
+                alert('Nettoyage termine: ' + removed + ' modules sans GPS supprimes')
             } else {
                 alert('Aucun module invalide trouve')
             }
@@ -4432,7 +4473,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     weight: 2,
                     fillColor: color,
                     fillOpacity: 0.7,
-                    className: \`module-\${module.module_status}\`
+                    className: \`module-\${module.module_status}\`,
+                    interactive: true  // Capturer explicitement les clics
                 })
                 
                 // Ajouter label texte au centre du module
@@ -4442,7 +4484,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         html: \`<div style="background: rgba(0,0,0,0.7); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">\${module.module_identifier}</div>\`,
                         iconSize: [30, 12],
                         iconAnchor: [15, 6]
-                    })
+                    }),
+                    interactive: false  // Ne pas capturer les clics (laisser passer au rectangle en dessous)
                 })
                 
                 rect.bindPopup(\`
@@ -4488,6 +4531,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         async function saveAll() {
             try {
+                // PHASE 3 : VALIDATION COHERENCE avant sauvegarde
+                if (stringsConfig.length > 0) {
+                    const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
+                    
+                    if (modules.length !== totalConfigured) {
+                        const warningMsg = String.fromCharCode(0x26A0) + ' INCOHERENCE DETECTEE' + String.fromCharCode(10,10) + 
+                            'Configures: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 
+                            'Places: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 
+                            'Sauvegarder quand meme? (NON recommande)'
+                        
+                        const proceed = confirm(warningMsg)
+                        if (!proceed) {
+                            alert('Sauvegarde annulee. Ajustez vos modules ou config strings.')
+                            return
+                        }
+                    }
+                }
+                
                 // Sauvegarder modules
                 await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
                     method: 'DELETE'
@@ -4513,7 +4574,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Sauvegarder toiture
                 if (roofPolygon) await saveRoofPolygon()
                 
-                alert(\`OK: Sauvegarde complete reussie!\n\${modules.length} modules | Surface: \${roofArea.toFixed(2)} m2\`)
+                const saveMsg = 'OK: Sauvegarde complete reussie!' + String.fromCharCode(10) + modules.length + ' modules | Surface: ' + roofArea.toFixed(2) + ' m2'
+                alert(saveMsg)
                 
                 await loadModules()
             } catch (error) {
@@ -4625,6 +4687,84 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('statsNotConnected').textContent = notConnected
             document.getElementById('statsPending').textContent = pending
             document.getElementById('statsPending2').textContent = pending
+        }
+        
+        // ================================================================
+        // PROGRESSION STRINGS (VISUAL FEEDBACK)
+        // ================================================================
+        function updateStringsProgress() {
+            const panel = document.getElementById('stringsProgressPanel')
+            const container = document.getElementById('stringsProgressContainer')
+            
+            // Masquer si pas de config
+            if (stringsConfig.length === 0) {
+                panel.classList.add('hidden')
+                return
+            }
+            
+            // Afficher panneau
+            panel.classList.remove('hidden')
+            
+            // Calculer progression par string
+            const stringProgress = stringsConfig.map(config => {
+                const stringModules = modules.filter(m => m.string_number === config.stringNum)
+                const placed = stringModules.length
+                const total = config.modulesCount
+                const percentage = total > 0 ? (placed / total * 100) : 0
+                
+                let status = ''
+                let statusColor = ''
+                if (placed === total) {
+                    status = String.fromCharCode(0x2705) + ' COMPLET'  // ✅
+                    statusColor = 'text-green-400'
+                } else if (placed > total) {
+                    status = String.fromCharCode(0x26A0) + ' DEPASSEMENT'  // ⚠
+                    statusColor = 'text-red-400'
+                } else if (placed > 0) {
+                    status = String.fromCharCode(0x23F3) + ' EN COURS'  // ⏳
+                    statusColor = 'text-yellow-400'
+                } else {
+                    status = String.fromCharCode(0x274C) + ' VIDE'  // ❌
+                    statusColor = 'text-gray-400'
+                }
+                
+                return { stringNum: config.stringNum, placed, total, percentage, status, statusColor }
+            })
+            
+            // Générer HTML
+            container.innerHTML = stringProgress.map(p => 
+                '<div class="bg-black rounded p-2 text-xs">' +
+                    '<div class="flex justify-between items-center mb-1">' +
+                        '<span class="font-bold text-white">String ' + p.stringNum + '</span>' +
+                        '<span class="' + p.statusColor + ' font-bold">' + p.status + '</span>' +
+                    '</div>' +
+                    '<div class="flex justify-between items-center mb-1">' +
+                        '<span class="text-gray-400">' + p.placed + '/' + p.total + ' modules</span>' +
+                        '<span class="text-gray-400">' + p.percentage.toFixed(0) + '%</span>' +
+                    '</div>' +
+                    '<div class="w-full bg-gray-700 rounded-full h-2">' +
+                        '<div class="bg-yellow-400 h-2 rounded-full transition-all" style="width: ' + Math.min(p.percentage, 100) + '%"></div>' +
+                    '</div>' +
+                '</div>'
+            ).join('')
+            
+            // Total global
+            const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
+            const totalPlaced = modules.length
+            const globalPercentage = totalConfigured > 0 ? (totalPlaced / totalConfigured * 100) : 0
+            
+            container.innerHTML += 
+                '<div class="bg-yellow-900/30 border border-yellow-400 rounded p-2 text-xs mt-2">' +
+                    '<div class="flex justify-between items-center mb-1">' +
+                        '<span class="font-black text-yellow-400">TOTAL GLOBAL</span>' +
+                        '<span class="font-black text-yellow-400">' + totalPlaced + '/' + totalConfigured + '</span>' +
+                    '</div>' +
+                    '<div class="w-full bg-gray-700 rounded-full h-3">' +
+                        '<div class="bg-yellow-400 h-3 rounded-full transition-all font-bold text-center text-black text-xs leading-3" style="width: ' + Math.min(globalPercentage, 100) + '%">' +
+                            (globalPercentage > 20 ? globalPercentage.toFixed(0) + '%' : '') +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
         }
         
         // ================================================================
