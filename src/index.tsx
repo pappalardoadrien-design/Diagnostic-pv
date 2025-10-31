@@ -4789,7 +4789,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         '<span class="text-gray-400">' + p.percentage.toFixed(0) + '%</span>' +
                     '</div>' +
                     '<div class="w-full bg-gray-700 rounded-full h-2">' +
-                        '<div class="bg-yellow-400 h-2 rounded-full transition-all" style="width: ' + Math.min(p.percentage, 100) + '%"></div>' +
+                        '<div class="bg-yellow-400 h-2 rounded-full transition-all" style="width: ' + Math.min(p.percentage, 100) + String.fromCharCode(37) + '"></div>' +
                     '</div>' +
                 '</div>'
             ).join('')
@@ -4806,8 +4806,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         '<span class="font-black text-yellow-400">' + totalPlaced + '/' + totalConfigured + '</span>' +
                     '</div>' +
                     '<div class="w-full bg-gray-700 rounded-full h-3">' +
-                        '<div class="bg-yellow-400 h-3 rounded-full transition-all font-bold text-center text-black text-xs leading-3" style="width: ' + Math.min(globalPercentage, 100) + '%">' +
-                            (globalPercentage > 20 ? globalPercentage.toFixed(0) + '%' : '') +
+                        '<div class="bg-yellow-400 h-3 rounded-full transition-all font-bold text-center text-black text-xs leading-3" style="width: ' + Math.min(globalPercentage, 100) + String.fromCharCode(37) + '">' +
+                            (globalPercentage > 20 ? globalPercentage.toFixed(0) + String.fromCharCode(37) : '') +
                         '</div>' +
                     '</div>' +
                 '</div>'
