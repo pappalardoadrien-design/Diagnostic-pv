@@ -3711,11 +3711,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 zoneData = data.zone
                 document.getElementById('zoneTitle').textContent = zoneData.zone_name
                 
-                // Charger config électrique
-                if (zoneData.inverter_count) document.getElementById('inverterCount').value = zoneData.inverter_count
-                if (zoneData.junction_box_count) document.getElementById('junctionBoxCount').value = zoneData.junction_box_count
-                if (zoneData.string_count) document.getElementById('stringCount').value = zoneData.string_count
-                if (zoneData.modules_per_string) document.getElementById('modulesPerString').value = zoneData.modules_per_string
+                // Charger config électrique (avec vérification DOM)
+                const inverterCountEl = document.getElementById('inverterCount')
+                const junctionBoxCountEl = document.getElementById('junctionBoxCount')
+                const stringCountEl = document.getElementById('stringCount')
+                const modulesPerStringEl = document.getElementById('modulesPerString')
+                
+                if (zoneData.inverter_count && inverterCountEl) inverterCountEl.value = zoneData.inverter_count
+                if (zoneData.junction_box_count && junctionBoxCountEl) junctionBoxCountEl.value = zoneData.junction_box_count
+                if (zoneData.string_count && stringCountEl) stringCountEl.value = zoneData.string_count
+                if (zoneData.modules_per_string && modulesPerStringEl) modulesPerStringEl.value = zoneData.modules_per_string
                 
                 // Charger config strings non réguliers
                 if (zoneData.strings_config && zoneData.strings_config !== 'null') {
@@ -4829,16 +4834,26 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Mettre à jour stringsConfig
             stringsConfig = stringsDetected
             
-            // Mettre à jour les champs du formulaire
-            document.getElementById('stringCount').value = stringNumbers.length
+            // Mettre à jour les champs du formulaire (avec vérification DOM)
+            const stringCountEl = document.getElementById('stringCount')
+            const modulesPerStringEl = document.getElementById('modulesPerString')
+            const inverterCountEl = document.getElementById('inverterCount')
+            const junctionBoxCountEl = document.getElementById('junctionBoxCount')
+            
+            if (!stringCountEl || !modulesPerStringEl || !inverterCountEl || !junctionBoxCountEl) {
+                console.warn('⚠️ Formulaire pas encore chargé - skip MAJ DOM')
+                return
+            }
+            
+            stringCountEl.value = stringNumbers.length
             const avgModulesPerString = Math.round(modules.length / stringNumbers.length)
-            document.getElementById('modulesPerString').value = avgModulesPerString
+            modulesPerStringEl.value = avgModulesPerString
             
             // Estimation onduleurs et BJ
             const estimatedInverters = Math.ceil(modules.length / 30) // ~30 modules par onduleur
             const estimatedJunctionBoxes = stringNumbers.length // 1 BJ par string
-            document.getElementById('inverterCount').value = estimatedInverters
-            document.getElementById('junctionBoxCount').value = estimatedJunctionBoxes
+            inverterCountEl.value = estimatedInverters
+            junctionBoxCountEl.value = estimatedJunctionBoxes
             
             console.log('🔄 AUTO-CONFIG depuis modules:', {
                 strings: stringNumbers.length,
@@ -4904,11 +4919,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 stringsConfig.push({ stringNum: i, modulesCount: modulesForThisString })
             }
             
-            // Mettre à jour formulaire
-            document.getElementById('stringCount').value = calculatedStrings
-            document.getElementById('modulesPerString').value = baseModulesPerString
-            document.getElementById('inverterCount').value = Math.ceil(totalModules / 30)
-            document.getElementById('junctionBoxCount').value = calculatedStrings
+            // Mettre à jour formulaire (avec vérification DOM)
+            const stringCountEl = document.getElementById('stringCount')
+            const modulesPerStringEl = document.getElementById('modulesPerString')
+            const inverterCountEl = document.getElementById('inverterCount')
+            const junctionBoxCountEl = document.getElementById('junctionBoxCount')
+            
+            if (stringCountEl) stringCountEl.value = calculatedStrings
+            if (modulesPerStringEl) modulesPerStringEl.value = baseModulesPerString
+            if (inverterCountEl) inverterCountEl.value = Math.ceil(totalModules / 30)
+            if (junctionBoxCountEl) junctionBoxCountEl.value = calculatedStrings
             
             // Rafraîchir affichage
             renderModules()
