@@ -3479,11 +3479,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             </button>
                             <span id="rotationLabel" class="flex-1 px-3 py-2 bg-black rounded text-center font-bold">0°</span>
                         </div>
-                        <button id="clearModulesBtn" class="w-full bg-red-600 hover:bg-red-700 py-2 rounded font-bold text-sm mt-3">
-                            <i class="fas fa-trash mr-1"></i>Effacer Modules
+                        <button id="validateCalepinageBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-sm mt-3">
+                            <i class="fas fa-check-circle mr-1"></i>Valider Calepinage
                         </button>
                         <button id="redistributeStringsBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
                             <i class="fas fa-exchange-alt mr-1"></i>Redistribuer Strings
+                        </button>
+                        <button id="clearModulesBtn" class="w-full bg-red-600 hover:bg-red-700 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-trash mr-1"></i>Effacer Modules
                         </button>
                     </div>
                 </div>
@@ -4547,21 +4550,85 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         function cleanInvalidModules() {
-            const before = modules.length
-            modules = modules.filter(m => m.latitude !== null && m.longitude !== null && m.latitude && m.longitude)
-            const after = modules.length
-            const removed = before - after
+            if (!roofPolygon) {
+                alert('⚠️ Aucune toiture dessinée - impossible de valider les modules')
+                return
+            }
             
-            console.log('🧹 Nettoyage: ' + removed + ' modules invalides supprimés (' + after + ' restants)')
+            const before = modules.length
+            
+            // Préparer polygone Turf.js
+            const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
+            if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                coords.push([...coords[0]])
+            }
+            const poly = turf.polygon([coords])
+            
+            // Filtrer modules invalides
+            const validModules = []
+            const invalidModules = []
+            
+            modules.forEach(m => {
+                // Check 1: GPS valide
+                if (!m.latitude || !m.longitude) {
+                    invalidModules.push({ module: m, reason: 'GPS invalide' })
+                    return
+                }
+                
+                // Check 2: Centre dans polygone
+                const centerPoint = turf.point([m.longitude, m.latitude])
+                if (!turf.booleanPointInPolygon(centerPoint, poly)) {
+                    invalidModules.push({ module: m, reason: 'Hors toiture (centre)' })
+                    return
+                }
+                
+                // Check 3: Les 4 coins dans polygone (validation stricte)
+                const moduleWidth = m.width_meters || 1.7
+                const moduleHeight = m.height_meters || 1.0
+                
+                const halfLatModule = (moduleHeight / 2) / 111320
+                const halfLngModule = (moduleWidth / 2) / (111320 * Math.cos(m.latitude * Math.PI / 180))
+                
+                const topLeft = turf.point([m.longitude - halfLngModule, m.latitude + halfLatModule])
+                const topRight = turf.point([m.longitude + halfLngModule, m.latitude + halfLatModule])
+                const bottomLeft = turf.point([m.longitude - halfLngModule, m.latitude - halfLatModule])
+                const bottomRight = turf.point([m.longitude + halfLngModule, m.latitude - halfLatModule])
+                
+                const allCornersInside = 
+                    turf.booleanPointInPolygon(topLeft, poly) &&
+                    turf.booleanPointInPolygon(topRight, poly) &&
+                    turf.booleanPointInPolygon(bottomLeft, poly) &&
+                    turf.booleanPointInPolygon(bottomRight, poly)
+                
+                if (!allCornersInside) {
+                    invalidModules.push({ module: m, reason: 'Hors toiture (coins)' })
+                    return
+                }
+                
+                // Module valide
+                validModules.push(m)
+            })
+            
+            modules = validModules
+            const removed = before - modules.length
+            
+            console.log('🧹 Nettoyage: ' + removed + ' modules invalides supprimés (' + modules.length + ' restants)')
+            console.log('📋 Détail modules supprimés:', invalidModules)
             
             renderModules()
             updateStats()
-            updateStringsProgress()  // Mettre à jour progression
+            updateStringsProgress()
             
             if (removed > 0) {
-                alert('Nettoyage termine: ' + removed + ' modules sans GPS supprimes')
+                const msg = '🧹 NETTOYAGE TERMINÉ' + String.fromCharCode(10,10) +
+                    removed + ' modules supprimés' + String.fromCharCode(10) +
+                    modules.length + ' modules valides restants' + String.fromCharCode(10,10) +
+                    'Raisons:' + String.fromCharCode(10) +
+                    '  - GPS invalide: ' + invalidModules.filter(i => i.reason === 'GPS invalide').length + String.fromCharCode(10) +
+                    '  - Hors toiture: ' + invalidModules.filter(i => i.reason.startsWith('Hors')).length
+                alert(msg)
             } else {
-                alert('Aucun module invalide trouve')
+                alert('✅ Aucun module invalide trouvé' + String.fromCharCode(10) + 'Tous les modules sont correctement positionnés')
             }
         }
         
@@ -4604,13 +4671,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     interactive: true  // Capturer explicitement les clics
                 })
                 
-                // Ajouter label texte au centre du module
+                // Ajouter label texte au centre du module (format: S1-P15)
+                const labelText = 'S' + module.string_number + '-P' + (module.position_in_string < 10 ? '0' : '') + module.position_in_string
                 const moduleLabel = L.marker([module.latitude, module.longitude], {
                     icon: L.divIcon({
                         className: 'module-label',
-                        html: '<div style="background: rgba(0,0,0,0.7); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">' + module.module_identifier + '</div>',
-                        iconSize: [30, 12],
-                        iconAnchor: [15, 6]
+                        html: '<div style="background: rgba(0,0,0,0.85); color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; white-space: nowrap; border: 1px solid rgba(255,255,255,0.3);">' + labelText + '</div>',
+                        iconSize: [45, 16],
+                        iconAnchor: [22, 8]
                     }),
                     interactive: false  // Ne pas capturer les clics (laisser passer au rectangle en dessous)
                 })
@@ -4951,7 +5019,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Capture carte
             await new Promise(r => setTimeout(r, 500))
             const mapElement = document.getElementById('map')
-            const canvas = await html2canvas(mapElement, { useCORS: true, scale: 2 })
+            const canvas = await html2canvas(mapElement, { useCORS: true, scale: 3, logging: false })
             const imgData = canvas.toDataURL('image/png')
             doc.addImage(imgData, 'PNG', 20, 30, 170, 120)
             
@@ -5366,6 +5434,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 currentRotation = (currentRotation + 90) % 360
                 document.getElementById('rotationLabel').textContent = currentRotation + '°'
             })
+            document.getElementById('validateCalepinageBtn').addEventListener('click', cleanInvalidModules)
             document.getElementById('clearModulesBtn').addEventListener('click', clearModules)
             document.getElementById('redistributeStringsBtn').addEventListener('click', redistributeStrings)
             document.getElementById('saveAllBtn').addEventListener('click', saveAll)
