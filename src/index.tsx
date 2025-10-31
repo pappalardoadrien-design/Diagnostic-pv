@@ -3482,6 +3482,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="clearModulesBtn" class="w-full bg-red-600 hover:bg-red-700 py-2 rounded font-bold text-sm mt-3">
                             <i class="fas fa-trash mr-1"></i>Effacer Modules
                         </button>
+                        <button id="redistributeStringsBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-exchange-alt mr-1"></i>Redistribuer Strings
+                        </button>
                     </div>
                 </div>
 
@@ -4049,12 +4052,30 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             let totalModules = 0
             let useCustomConfig = stringsConfig.length === stringCount && stringsConfig.length > 0
             
+            // MODE INTELLIGENT : Si pas de config, créer distribution uniforme
             if (!useCustomConfig) {
-                alert("ATTENTION: Configurez d'abord les strings avec le bouton Configurer Strings!")
-                return
+                console.log('⚠️ Aucune config custom - création distribution uniforme')
+                
+                // Calculer nombre optimal de modules par string (20-30 modules recommandés)
+                const targetModulesPerString = 25
+                const calculatedStrings = Math.ceil(totalModules / targetModulesPerString)
+                
+                // Créer distribution uniforme
+                const baseModulesPerString = Math.floor(totalModules / calculatedStrings)
+                const remainder = totalModules % calculatedStrings
+                
+                stringsConfig = []
+                for (let i = 1; i <= calculatedStrings; i++) {
+                    // Les premiers strings prennent 1 module de plus si reste
+                    const modulesForThisString = baseModulesPerString + (i <= remainder ? 1 : 0)
+                    stringsConfig.push({ stringNum: i, modulesCount: modulesForThisString })
+                }
+                
+                console.log('✅ Distribution auto créée:', stringsConfig)
+                alert('📊 DISTRIBUTION AUTO CRÉÉE:\n\n' + calculatedStrings + ' strings détectés\n' + baseModulesPerString + '-' + (baseModulesPerString + 1) + ' modules/string\nTotal: ' + totalModules + ' modules\n\nVous pourrez ajuster après placement!')
+            } else {
+                totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             }
-            
-            totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             
             const moduleWidth = 1.7
             const moduleHeight = 1.0
@@ -4830,6 +4851,74 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
+        // REDISTRIBUTION STRINGS
+        // ================================================================
+        function redistributeStrings() {
+            if (modules.length === 0) {
+                alert('⚠️ Aucun module à redistribuer!')
+                return
+            }
+            
+            const totalModules = modules.length
+            
+            // Calculer distribution optimale (20-30 modules/string)
+            const targetModulesPerString = 25
+            const calculatedStrings = Math.ceil(totalModules / targetModulesPerString)
+            
+            const msg = '🔄 REDISTRIBUTION AUTOMATIQUE\n\n' +
+                'Total modules: ' + totalModules + '\n' +
+                'Strings détectés: ' + calculatedStrings + '\n' +
+                'Modules/string: ~' + Math.round(totalModules / calculatedStrings) + '\n\n' +
+                'Confirmer redistribution?'
+            
+            if (!confirm(msg)) return
+            
+            // Créer nouvelle distribution uniforme
+            const baseModulesPerString = Math.floor(totalModules / calculatedStrings)
+            const remainder = totalModules % calculatedStrings
+            
+            let currentStringNum = 1
+            let positionInString = 1
+            
+            modules.forEach((module, index) => {
+                // Calculer limite du string actuel
+                const limitForThisString = baseModulesPerString + (currentStringNum <= remainder ? 1 : 0)
+                
+                // Assigner string et position
+                module.string_number = currentStringNum
+                module.position_in_string = positionInString
+                
+                positionInString++
+                
+                // Passer au string suivant si limite atteinte
+                if (positionInString > limitForThisString) {
+                    currentStringNum++
+                    positionInString = 1
+                }
+            })
+            
+            // Mettre à jour stringsConfig
+            stringsConfig = []
+            for (let i = 1; i <= calculatedStrings; i++) {
+                const modulesForThisString = baseModulesPerString + (i <= remainder ? 1 : 0)
+                stringsConfig.push({ stringNum: i, modulesCount: modulesForThisString })
+            }
+            
+            // Mettre à jour formulaire
+            document.getElementById('stringCount').value = calculatedStrings
+            document.getElementById('modulesPerString').value = baseModulesPerString
+            document.getElementById('inverterCount').value = Math.ceil(totalModules / 30)
+            document.getElementById('junctionBoxCount').value = calculatedStrings
+            
+            // Rafraîchir affichage
+            renderModules()
+            updateStringsProgress()
+            
+            console.log('✅ Redistribution terminée:', stringsConfig)
+            alert('✅ Redistribution réussie!\n\n' + calculatedStrings + ' strings créés\nN' + String.fromCharCode(39) + 'oubliez pas de SAUVEGARDER!')
+        }
+        
+        // ================================================================
         // PROGRESSION STRINGS (VISUAL FEEDBACK)
         // ================================================================
         function updateStringsProgress() {
@@ -4929,6 +5018,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 document.getElementById('rotationLabel').textContent = currentRotation + '°'
             })
             document.getElementById('clearModulesBtn').addEventListener('click', clearModules)
+            document.getElementById('redistributeStringsBtn').addEventListener('click', redistributeStrings)
             document.getElementById('saveAllBtn').addEventListener('click', saveAll)
             document.getElementById('exportBtn').addEventListener('click', exportPDF)
             
