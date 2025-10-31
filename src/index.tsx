@@ -4061,7 +4061,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const spacing = 0.02
             
             const bounds = roofPolygon.getBounds()
-            const center = bounds.getCenter()
+            
+            // AMÉLIORATION : Aligner grille sur coin nord-ouest du polygone (au lieu de centrer)
+            const startLat = bounds.getNorth() // Latitude maximale (nord)
+            const startLng = bounds.getWest()  // Longitude minimale (ouest)
+            
+            console.log('📐 Bounds polygone:', {
+                north: bounds.getNorth(),
+                south: bounds.getSouth(),
+                east: bounds.getEast(),
+                west: bounds.getWest()
+            })
+            console.log('📍 Point de départ grille (NW):', startLat, startLng)
             
             modules = []
             let moduleNum = 1
@@ -4072,11 +4083,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const cols = stringConfig.modulesCount
                 
                 for (let col = 0; col < cols; col++) {
-                    const latOffset = (currentRow * (moduleHeight + spacing)) / 111320
-                    const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(center.lat * Math.PI / 180))
+                    // Calculer position depuis le coin nord-ouest
+                    const latOffset = -(currentRow * (moduleHeight + spacing)) / 111320 // Négatif car on descend vers le sud
+                    const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(startLat * Math.PI / 180))
                     
-                    const moduleLat = center.lat + latOffset - (stringCount * moduleHeight / 2 / 111320)
-                    const moduleLng = center.lng + lngOffset - (cols * moduleWidth / 2 / (111320 * Math.cos(center.lat * Math.PI / 180)))
+                    const moduleLat = startLat + latOffset
+                    const moduleLng = startLng + lngOffset
                     
                     const point = turf.point([moduleLng, moduleLat])
                     const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
@@ -4419,13 +4431,37 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             placementMode = 'manual'
         }
         
-        function clearModules() {
+        async function clearModules() {
+            console.log('🗑️ clearModules() appelé - Modules actuels:', modules.length)
+            
             if (confirm('Effacer tous les modules ?')) {
-                modules = []
-                nextModuleNum = 1
-                renderModules()
-                updateStats()
-                updateStringsProgress()  // Mettre à jour progression
+                console.log('✅ Confirmation utilisateur - Effacement en cours...')
+                
+                try {
+                    // Supprimer de la DB
+                    console.log('🔥 DELETE API call...')
+                    await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
+                        method: 'DELETE'
+                    })
+                    console.log('✅ DELETE API success')
+                    
+                    // Supprimer localement
+                    modules = []
+                    nextModuleNum = 1
+                    
+                    // Re-render
+                    renderModules()
+                    updateStats()
+                    updateStringsProgress()
+                    
+                    console.log('✅ Modules effacés - Nouveau total:', modules.length)
+                    alert('OK: Tous les modules ont été effacés')
+                } catch (error) {
+                    console.error('❌ Erreur effacement modules:', error)
+                    alert('ERREUR: Impossible d\'effacer les modules - ' + error.message)
+                }
+            } else {
+                console.log('❌ Annulation utilisateur')
             }
         }
         
