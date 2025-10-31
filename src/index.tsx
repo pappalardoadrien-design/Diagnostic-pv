@@ -4072,7 +4072,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 console.log('✅ Distribution auto créée:', stringsConfig)
-                alert('📊 DISTRIBUTION AUTO CRÉÉE:\n\n' + calculatedStrings + ' strings détectés\n' + baseModulesPerString + '-' + (baseModulesPerString + 1) + ' modules/string\nTotal: ' + totalModules + ' modules\n\nVous pourrez ajuster après placement!')
+                alert('📊 DISTRIBUTION AUTO CRÉÉE:' + String.fromCharCode(10,10) + calculatedStrings + ' strings détectés' + String.fromCharCode(10) + baseModulesPerString + '-' + (baseModulesPerString + 1) + ' modules/string' + String.fromCharCode(10) + 'Total: ' + totalModules + ' modules' + String.fromCharCode(10,10) + 'Vous pourrez ajuster après placement!')
             } else {
                 totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             }
@@ -4865,10 +4865,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const targetModulesPerString = 25
             const calculatedStrings = Math.ceil(totalModules / targetModulesPerString)
             
-            const msg = '🔄 REDISTRIBUTION AUTOMATIQUE\n\n' +
-                'Total modules: ' + totalModules + '\n' +
-                'Strings détectés: ' + calculatedStrings + '\n' +
-                'Modules/string: ~' + Math.round(totalModules / calculatedStrings) + '\n\n' +
+            const msg = '🔄 REDISTRIBUTION AUTOMATIQUE' + String.fromCharCode(10,10) +
+                'Total modules: ' + totalModules + String.fromCharCode(10) +
+                'Strings détectés: ' + calculatedStrings + String.fromCharCode(10) +
+                'Modules/string: ~' + Math.round(totalModules / calculatedStrings) + String.fromCharCode(10,10) +
                 'Confirmer redistribution?'
             
             if (!confirm(msg)) return
@@ -4915,7 +4915,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateStringsProgress()
             
             console.log('✅ Redistribution terminée:', stringsConfig)
-            alert('✅ Redistribution réussie!\n\n' + calculatedStrings + ' strings créés\nN' + String.fromCharCode(39) + 'oubliez pas de SAUVEGARDER!')
+            alert('✅ Redistribution réussie!' + String.fromCharCode(10,10) + calculatedStrings + ' strings créés' + String.fromCharCode(10) + 'N' + String.fromCharCode(39) + 'oubliez pas de SAUVEGARDER!')
         }
         
         // ================================================================
