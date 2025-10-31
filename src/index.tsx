@@ -4074,54 +4074,102 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             console.log('📍 Point de départ grille (NW):', startLat, startLng)
             
+            // Préparer polygone Turf.js
+            const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
+            if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                coords.push([...coords[0]])
+            }
+            const poly = turf.polygon([coords])
+            
             modules = []
             let moduleNum = 1
             let currentRow = 0
+            let modulesPlacedInString = 0
+            let currentStringIndex = 0
+            let currentStringConfig = stringsConfig[currentStringIndex]
             
-            // Placer modules string par string (config non régulière)
-            stringsConfig.forEach((stringConfig, stringIndex) => {
-                const cols = stringConfig.modulesCount
+            console.log('🎯 Début placement intelligent - Total à placer:', totalModules)
+            
+            // REMPLISSAGE INTELLIGENT RANGÉE PAR RANGÉE
+            const maxRows = 100 // Limite sécurité
+            
+            while (moduleNum <= totalModules && currentRow < maxRows) {
+                let col = 0
+                let modulesInRow = 0
+                const rowLat = startLat - (currentRow * (moduleHeight + spacing)) / 111320
                 
-                for (let col = 0; col < cols; col++) {
-                    // Calculer position depuis le coin nord-ouest
-                    const latOffset = -(currentRow * (moduleHeight + spacing)) / 111320 // Négatif car on descend vers le sud
-                    const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(startLat * Math.PI / 180))
+                // Si on a terminé le string actuel, passer au suivant
+                if (currentStringConfig && modulesPlacedInString >= currentStringConfig.modulesCount) {
+                    currentStringIndex++
+                    currentStringConfig = stringsConfig[currentStringIndex]
+                    modulesPlacedInString = 0
+                    console.log('✅ String ' + (currentStringIndex) + ' terminé, passage au string ' + (currentStringIndex + 1))
+                }
+                
+                if (!currentStringConfig) break // Plus de strings à placer
+                
+                // Parcourir la rangée de gauche à droite
+                while (modulesInRow < 200) { // Limite sécurité colonnes
+                    const moduleLng = startLng + (col * (moduleWidth + spacing)) / (111320 * Math.cos(rowLat * Math.PI / 180))
                     
-                    const moduleLat = startLat + latOffset
-                    const moduleLng = startLng + lngOffset
+                    // Vérifier les 4 coins + centre du module
+                    const halfLatModule = (moduleHeight / 2) / 111320
+                    const halfLngModule = (moduleWidth / 2) / (111320 * Math.cos(rowLat * Math.PI / 180))
                     
-                    const point = turf.point([moduleLng, moduleLat])
-                    const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
-                    // Fermer le polygone pour Turf.js
-                    if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
-                        coords.push([...coords[0]])
-                    }
-                    const poly = turf.polygon([coords])
+                    const centerPoint = turf.point([moduleLng, rowLat])
+                    const topLeft = turf.point([moduleLng - halfLngModule, rowLat + halfLatModule])
+                    const topRight = turf.point([moduleLng + halfLngModule, rowLat + halfLatModule])
+                    const bottomLeft = turf.point([moduleLng - halfLngModule, rowLat - halfLatModule])
+                    const bottomRight = turf.point([moduleLng + halfLngModule, rowLat - halfLatModule])
                     
-                    if (turf.booleanPointInPolygon(point, poly)) {
+                    // Module valide si TOUS les coins sont dans le polygone
+                    const allCornersInside = 
+                        turf.booleanPointInPolygon(centerPoint, poly) &&
+                        turf.booleanPointInPolygon(topLeft, poly) &&
+                        turf.booleanPointInPolygon(topRight, poly) &&
+                        turf.booleanPointInPolygon(bottomLeft, poly) &&
+                        turf.booleanPointInPolygon(bottomRight, poly)
+                    
+                    if (allCornersInside && modulesPlacedInString < currentStringConfig.modulesCount) {
                         modules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
-                            module_identifier: \`M\${moduleNum}\`,
-                            latitude: moduleLat,
+                            module_identifier: 'M' + moduleNum,
+                            latitude: rowLat,
                             longitude: moduleLng,
                             pos_x_meters: col * (moduleWidth + spacing),
                             pos_y_meters: currentRow * (moduleHeight + spacing),
                             width_meters: moduleWidth,
                             height_meters: moduleHeight,
                             rotation: currentRotation,
-                            string_number: stringConfig.stringNum,
-                            position_in_string: col + 1,
+                            string_number: currentStringConfig.stringNum,
+                            position_in_string: modulesPlacedInString + 1,
                             power_wp: 450,
                             module_status: 'pending',
                             status_comment: null
                         })
                         moduleNum++
+                        modulesPlacedInString++
+                        modulesInRow++
                     }
+                    
+                    col++
+                    
+                    // Si on sort complètement du polygone, passer rangée suivante
+                    if (moduleLng > bounds.getEast()) break
                 }
                 
-                currentRow++ // Passer à la ligne suivante pour le prochain string
-            })
+                currentRow++
+                console.log('📏 Rangée ' + currentRow + ' : ' + modulesInRow + ' modules placés')
+                
+                // Si aucun module placé dans cette rangée, on a fini
+                if (modulesInRow === 0) {
+                    console.log('⚠️ Aucun module dans rangée ' + currentRow + ' - fin placement')
+                    break
+                }
+            }
+            
+            console.log('✅ Placement terminé : ' + modules.length + ' modules sur ' + totalModules + ' demandés')
             
             nextModuleNum = moduleNum
             renderModules()
