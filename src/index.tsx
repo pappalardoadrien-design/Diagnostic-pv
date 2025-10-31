@@ -4180,21 +4180,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         function placeModuleManual() {
-            // VALIDATION STRICTE : Config obligatoire
-            if (stringsConfig.length === 0) {
-                alert(String.fromCharCode(0x26A0) + ' CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d' + String.fromCharCode(39) + 'abord les strings avant placement!')
-                return
-            }
+            // MODE HYBRIDE : Config optionnelle + auto-configuration
+            const totalConfigured = stringsConfig.length > 0 ? stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0) : Infinity
             
-            // VALIDATION STRICTE : Vérifier limite
-            const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
-            if (modules.length >= totalConfigured) {
-                alert('🛑 LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
+            // Si config existe, valider limite
+            if (stringsConfig.length > 0 && modules.length >= totalConfigured) {
+                alert(String.fromCharCode(0x1F6D1) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
                 return
             }
             
             placementMode = 'manual'
-            alert('Cliquez sur la carte pour placer des modules individuellement' + String.fromCharCode(10,10) + 'Restant: ' + (totalConfigured - modules.length) + '/' + totalConfigured + ' modules')
+            const msg = stringsConfig.length > 0 
+                ? 'Cliquez sur la carte pour placer des modules' + String.fromCharCode(10,10) + 'Restant: ' + (totalConfigured - modules.length) + '/' + totalConfigured + ' modules'
+                : 'Cliquez sur la carte pour placer des modules' + String.fromCharCode(10,10) + 'Mode libre : La config se mettra à jour automatiquement'
+            alert(msg)
             
             map.once('click', (e) => {
                 if (placementMode !== 'manual') return
@@ -4242,14 +4241,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 nextModuleNum++
                 renderModules()
                 updateStats()
+                
+                // SYNC BIDIRECTIONNELLE : Mettre à jour config auto si mode libre
+                if (stringsConfig.length === 0) {
+                    autoConfigureFromModules()
+                }
+                
                 updateStringsProgress()  // Mettre à jour progression
                 
-                // Continuer placement si pas limite atteinte
-                const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
-                if (modules.length < totalConfigured) {
+                // Continuer placement
+                const totalConfigured = stringsConfig.length > 0 ? stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0) : Infinity
+                if (stringsConfig.length === 0 || modules.length < totalConfigured) {
                     placeModuleManual()
                 } else {
-                    alert('✅ LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Tous les modules configurés ont été placés (' + totalConfigured + '/' + totalConfigured + ')')
+                    alert(String.fromCharCode(0x2705) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Tous les modules configurés ont été placés (' + totalConfigured + '/' + totalConfigured + ')')
                 }
             })
         }
@@ -4260,16 +4265,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 return
             }
             
-            // VALIDATION STRICTE : Config obligatoire
-            if (stringsConfig.length === 0) {
-                alert(String.fromCharCode(0x26A0) + ' CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d' + String.fromCharCode(39) + 'abord les strings avant placement!')
-                return
-            }
+            // MODE HYBRIDE : Config optionnelle + auto-configuration
+            const totalConfigured = stringsConfig.length > 0 ? stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0) : Infinity
             
-            // VALIDATION STRICTE : Vérifier limite
-            const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
-            if (modules.length >= totalConfigured) {
-                alert('🛑 LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
+            // Si config existe, valider limite
+            if (stringsConfig.length > 0 && modules.length >= totalConfigured) {
+                alert(String.fromCharCode(0x1F6D1) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
                 return
             }
             
@@ -4444,6 +4445,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             renderModules()
             console.log('🔷 Appel updateStats...')
             updateStats()
+            
+            // SYNC BIDIRECTIONNELLE : Mettre à jour config auto si mode libre
+            if (stringsConfig.length === 0) {
+                autoConfigureFromModules()
+            }
+            
             updateStringsProgress()  // Mettre à jour progression
             
             const rectInfo = 'Rectangle: ' + widthMeters.toFixed(1) + 'm x ' + heightMeters.toFixed(1) + 'm' + String.fromCharCode(10) + 'Grille: ' + cols + ' x ' + rows; alert('OK: ' + generatedModules.length + ' modules crees!' + String.fromCharCode(10,10) + rectInfo)
@@ -4781,6 +4788,45 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('statsNotConnected').textContent = notConnected
             document.getElementById('statsPending').textContent = pending
             document.getElementById('statsPending2').textContent = pending
+        }
+        
+        // ================================================================
+        // AUTO-CONFIGURATION DEPUIS MODULES (SYNC BIDIRECTIONNELLE)
+        // ================================================================
+        function autoConfigureFromModules() {
+            if (modules.length === 0) return
+            
+            // Détecter nombre de strings uniques
+            const stringNumbers = [...new Set(modules.map(m => m.string_number))].sort((a, b) => a - b)
+            
+            // Compter modules par string
+            const stringsDetected = stringNumbers.map(stringNum => {
+                const modulesInString = modules.filter(m => m.string_number === stringNum).length
+                return { stringNum, modulesCount: modulesInString }
+            })
+            
+            // Mettre à jour stringsConfig
+            stringsConfig = stringsDetected
+            
+            // Mettre à jour les champs du formulaire
+            document.getElementById('stringCount').value = stringNumbers.length
+            const avgModulesPerString = Math.round(modules.length / stringNumbers.length)
+            document.getElementById('modulesPerString').value = avgModulesPerString
+            
+            // Estimation onduleurs et BJ
+            const estimatedInverters = Math.ceil(modules.length / 30) // ~30 modules par onduleur
+            const estimatedJunctionBoxes = stringNumbers.length // 1 BJ par string
+            document.getElementById('inverterCount').value = estimatedInverters
+            document.getElementById('junctionBoxCount').value = estimatedJunctionBoxes
+            
+            console.log('🔄 AUTO-CONFIG depuis modules:', {
+                strings: stringNumbers.length,
+                modulesPerString: avgModulesPerString,
+                totalModules: modules.length,
+                inverters: estimatedInverters,
+                junctionBoxes: estimatedJunctionBoxes,
+                stringsConfig: stringsConfig
+            })
         }
         
         // ================================================================
