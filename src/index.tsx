@@ -4458,7 +4458,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     alert('OK: Tous les modules ont été effacés')
                 } catch (error) {
                     console.error('❌ Erreur effacement modules:', error)
-                    alert('ERREUR: Impossible d\'effacer les modules - ' + error.message)
+                    alert('ERREUR: Impossible d' + String.fromCharCode(39) + 'effacer les modules - ' + error.message)
                 }
             } else {
                 console.log('❌ Annulation utilisateur')
