@@ -4715,78 +4715,407 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         async function exportPDF() {
             const { jsPDF } = window.jspdf
-            const doc = new jsPDF('landscape', 'mm', 'a3')
+            const doc = new jsPDF('portrait', 'mm', 'a4')
             
-            // PAGE 1: Plan
-            doc.setFontSize(18)
+            // Calculs statistiques
+            const total = modules.length
+            const ok = modules.filter(m => m.module_status === 'ok').length
+            const inequality = modules.filter(m => m.module_status === 'inequality').length
+            const microcracks = modules.filter(m => m.module_status === 'microcracks').length
+            const dead = modules.filter(m => m.module_status === 'dead').length
+            const stringOpen = modules.filter(m => m.module_status === 'string_open').length
+            const notConnected = modules.filter(m => m.module_status === 'not_connected').length
+            const pending = modules.filter(m => m.module_status === 'pending').length
+            const defects = total - ok - pending
+            
+            const stringCount = parseInt(document.getElementById('stringCount').value) || 0
+            const inverterCount = parseInt(document.getElementById('inverterCount').value) || 0
+            const junctionBoxCount = parseInt(document.getElementById('junctionBoxCount').value) || 0
+            
+            const powerKwc = (total * 0.45).toFixed(2)
+            const lossKwh = (dead * 300 + stringOpen * 200 + microcracks * 50 + inequality * 25).toFixed(0)
+            const lossEur = (lossKwh * 0.18).toFixed(0)
+            
+            // ========================================
+            // PAGE 1: PAGE DE GARDE
+            // ========================================
+            doc.setFillColor(147, 51, 234)
+            doc.rect(0, 0, 210, 60, 'F')
+            
+            doc.setTextColor(255, 255, 255)
+            doc.setFontSize(24)
             doc.setFont('helvetica', 'bold')
-            doc.text('PLAN CARTOGRAPHIQUE PHOTOVOLTAÏQUE', 15, 20)
+            doc.text('DIAGPV', 105, 25, { align: 'center' })
+            
+            doc.setFontSize(18)
+            doc.text('RAPPORT D' + String.fromCharCode(39) + 'AUDIT PHOTOVOLTAÏQUE', 105, 40, { align: 'center' })
+            
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(14)
+            doc.setFont('helvetica', 'bold')
+            doc.text('INFORMATIONS CENTRALE', 20, 80)
             
             doc.setFontSize(11)
             doc.setFont('helvetica', 'normal')
-            doc.text(\`Centrale: \${plantData.plant_name}\`, 15, 30)
-            doc.text(\`Zone: \${zoneData.zone_name}\`, 15, 36)
-            doc.text(\`Date: \${new Date().toLocaleDateString('fr-FR')}\`, 15, 42)
+            doc.text('Client:', 20, 90)
+            doc.text(plantData.client_name || 'Non renseigné', 60, 90)
             
-            // Capture carte
-            await new Promise(r => setTimeout(r, 1000))
-            const mapElement = document.getElementById('map')
-            const canvas = await html2canvas(mapElement, { useCORS: true })
-            const imgData = canvas.toDataURL('image/png')
-            doc.addImage(imgData, 'PNG', 15, 50, 270, 140)
+            doc.text('Centrale:', 20, 98)
+            doc.text(plantData.plant_name || 'Centrale PV', 60, 98)
             
-            // Specs
+            doc.text('Zone:', 20, 106)
+            doc.text(zoneData.zone_name || 'Zone 1', 60, 106)
+            
+            doc.text('Puissance:', 20, 114)
+            doc.text(powerKwc + ' kWc', 60, 114)
+            
+            doc.setFontSize(14)
+            doc.setFont('helvetica', 'bold')
+            doc.text('INFORMATIONS AUDIT', 20, 130)
+            
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'normal')
+            doc.text('Date audit:', 20, 140)
+            doc.text(new Date().toLocaleDateString('fr-FR'), 60, 140)
+            
+            doc.text('Auditeur:', 20, 148)
+            doc.text('DiagPV - Audit Professionnel', 60, 148)
+            
+            doc.text('Référence:', 20, 156)
+            doc.text('DIAGPV-2025-' + Date.now().toString().slice(-6), 60, 156)
+            
+            doc.setFillColor(220, 38, 38)
+            doc.roundedRect(20, 170, 170, 15, 3, 3, 'F')
+            doc.setTextColor(255, 255, 255)
             doc.setFontSize(12)
             doc.setFont('helvetica', 'bold')
-            doc.text('CARACTÉRISTIQUES TECHNIQUES', 15, 200)
+            doc.text('CONFIDENTIEL - USAGE INTERNE UNIQUEMENT', 105, 179, { align: 'center' })
+            
+            doc.setTextColor(150, 150, 150)
+            doc.setFontSize(9)
+            doc.setFont('helvetica', 'normal')
+            doc.text('DiagPV - Expert Audit Photovoltaïque', 105, 280, { align: 'center' })
+            doc.text('www.diagnostic-photovoltaique.fr', 105, 285, { align: 'center' })
+            
+            // ========================================
+            // PAGE 2: SYNTHÈSE EXÉCUTIVE
+            // ========================================
+            doc.addPage()
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(16)
+            doc.setFont('helvetica', 'bold')
+            doc.text('SYNTHÈSE EXÉCUTIVE', 20, 20)
+            
+            doc.setLineWidth(0.5)
+            doc.line(20, 23, 190, 23)
+            
+            // KPIs principaux
+            doc.setFontSize(12)
+            doc.text('ÉTAT GÉNÉRAL DE LA CENTRALE', 20, 35)
+            
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'normal')
+            
+            const okPercent = ((ok / total) * 100).toFixed(1)
+            const defectsPercent = ((defects / total) * 100).toFixed(1)
+            
+            doc.text('Modules OK:', 25, 45)
+            doc.setFont('helvetica', 'bold')
+            doc.text(ok + '/' + total + '  (' + okPercent + String.fromCharCode(37) + ')', 80, 45)
+            
+            doc.setFont('helvetica', 'normal')
+            doc.text('Modules défectueux:', 25, 53)
+            doc.setFont('helvetica', 'bold')
+            doc.text(defects + '/' + total + '  (' + defectsPercent + String.fromCharCode(37) + ')', 80, 53)
+            
+            // Répartition défauts
+            doc.setFontSize(12)
+            doc.setFont('helvetica', 'bold')
+            doc.text('RÉPARTITION DES DÉFAUTS', 20, 70)
             
             doc.setFontSize(10)
             doc.setFont('helvetica', 'normal')
-            const stringCount = parseInt(document.getElementById('stringCount').value)
-            const inverterCount = parseInt(document.getElementById('inverterCount').value)
-            const junctionBoxCount = parseInt(document.getElementById('junctionBoxCount').value)
             
-            doc.text(\`Modules: \${modules.length} | Puissance: \${(modules.length * 450 / 1000).toFixed(2)} kWc\`, 20, 210)
-            doc.text(\`Onduleurs: \${inverterCount} | Boîtes Jonction: \${junctionBoxCount} | Strings: \${stringCount}\`, 20, 216)
-            
-            // Configuration strings détaillée
-            if (stringsConfig.length > 0) {
-                const stringsDetail = stringsConfig.map(c => \`S\${c.stringNum}=\${c.modulesCount}\`).join(', ')
-                doc.text(\`Configuration Strings: \${stringsDetail}\`, 20, 222)
-                doc.text(\`Surface toiture: \${roofArea.toFixed(2)} m² | Azimut: \${zoneData.azimuth}° | Inclinaison: \${zoneData.tilt}°\`, 20, 228)
-            } else {
-                doc.text(\`Surface toiture: \${roofArea.toFixed(2)} m² | Azimut: \${zoneData.azimuth}° | Inclinaison: \${zoneData.tilt}°\`, 20, 222)
+            if (dead > 0) {
+                doc.setFillColor(239, 68, 68)
+                doc.circle(25, 79, 2, 'F')
+                doc.text('Modules HS:', 30, 80)
+                doc.setFont('helvetica', 'bold')
+                doc.text(dead + '  (' + ((dead/total)*100).toFixed(1) + String.fromCharCode(37) + ')  CRITIQUE', 70, 80)
             }
             
-            // PAGE 2: Liste modules
-            doc.addPage()
-            doc.setFontSize(14)
+            if (stringOpen > 0) {
+                doc.setFillColor(59, 130, 246)
+                doc.circle(25, 87, 2, 'F')
+                doc.setFont('helvetica', 'normal')
+                doc.text('String ouvert:', 30, 88)
+                doc.setFont('helvetica', 'bold')
+                doc.text(stringOpen + '  (' + ((stringOpen/total)*100).toFixed(1) + String.fromCharCode(37) + ')  MAJEUR', 70, 88)
+            }
+            
+            if (microcracks > 0) {
+                doc.setFillColor(249, 115, 22)
+                doc.circle(25, 95, 2, 'F')
+                doc.setFont('helvetica', 'normal')
+                doc.text('Microfissures:', 30, 96)
+                doc.setFont('helvetica', 'bold')
+                doc.text(microcracks + '  (' + ((microcracks/total)*100).toFixed(1) + String.fromCharCode(37) + ')  MINEUR', 70, 96)
+            }
+            
+            if (inequality > 0) {
+                doc.setFillColor(234, 179, 8)
+                doc.circle(25, 103, 2, 'F')
+                doc.setFont('helvetica', 'normal')
+                doc.text('Inégalités:', 30, 104)
+                doc.setFont('helvetica', 'bold')
+                doc.text(inequality + '  (' + ((inequality/total)*100).toFixed(1) + String.fromCharCode(37) + ')  SURVEILLANCE', 70, 104)
+            }
+            
+            // Impact financier
+            doc.setFontSize(12)
             doc.setFont('helvetica', 'bold')
-            doc.text('LISTE DÉTAILLÉE DES MODULES', 15, 20)
+            doc.text('IMPACT ESTIMÉ', 20, 120)
+            
+            doc.setFontSize(10)
+            doc.setFont('helvetica', 'normal')
+            doc.text('Perte production:', 25, 130)
+            doc.setFont('helvetica', 'bold')
+            doc.text(lossKwh + ' kWh/an', 80, 130)
+            
+            doc.setFont('helvetica', 'normal')
+            doc.text('Perte financière:', 25, 138)
+            doc.setFont('helvetica', 'bold')
+            doc.text(lossEur + ' EUR/an (0.18 EUR/kWh)', 80, 138)
+            
+            // État strings
+            doc.setFontSize(12)
+            doc.setFont('helvetica', 'bold')
+            doc.text('ÉTAT DES STRINGS', 20, 155)
             
             doc.setFontSize(9)
             doc.setFont('helvetica', 'normal')
-            let y = 30
             
-            modules.forEach(m => {
-                const emoji = {ok:'🟢',inequality:'🟡',microcracks:'🟠',dead:'🔴',string_open:'🔵',not_connected:'⚫',pending:'⚪'}[m.module_status]
-                doc.text(\`\${m.module_identifier} | S\${m.string_number} P\${m.position_in_string} | \${emoji} \${m.module_status}\`, 15, y)
+            let yString = 165
+            const stringNumbers = [...new Set(modules.map(m => m.string_number))].sort((a, b) => a - b)
+            
+            stringNumbers.forEach(stringNum => {
+                const stringModules = modules.filter(m => m.string_number === stringNum)
+                const stringOk = stringModules.filter(m => m.module_status === 'ok').length
+                const stringTotal = stringModules.length
+                const stringDefects = stringModules.filter(m => m.module_status !== 'ok' && m.module_status !== 'pending')
                 
-                if (m.status_comment) {
-                    y += 4
-                    doc.setFontSize(8)
-                    doc.text(\`   → \${m.status_comment}\`, 15, y)
-                    doc.setFontSize(9)
+                doc.text('String ' + stringNum + ':', 25, yString)
+                doc.text(stringOk + '/' + stringTotal + ' OK', 50, yString)
+                
+                if (stringDefects.length > 0) {
+                    const defectList = stringDefects.map(m => m.module_identifier).slice(0, 3).join(', ')
+                    doc.setFont('helvetica', 'bold')
+                    doc.text(stringDefects.length + ' défaut' + (stringDefects.length > 1 ? 's' : ''), 80, yString)
+                    doc.setFont('helvetica', 'normal')
+                    doc.text('(' + defectList + (stringDefects.length > 3 ? '...' : '') + ')', 105, yString)
                 }
                 
-                y += 5
-                if (y > 280) {
-                    doc.addPage()
-                    y = 20
+                yString += 6
+            })
+            
+            // Priorité intervention
+            doc.setFillColor(220, 38, 38)
+            doc.roundedRect(20, yString + 5, 170, 25, 3, 3, 'F')
+            doc.setTextColor(255, 255, 255)
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'bold')
+            doc.text('PRIORITÉ INTERVENTION: ' + (dead > 0 ? 'P1 - URGENT' : defects > 0 ? 'P2 - COURT TERME' : 'P3 - SURVEILLANCE'), 105, yString + 13, { align: 'center' })
+            
+            doc.setFontSize(9)
+            doc.setFont('helvetica', 'normal')
+            if (dead > 0) {
+                doc.text('→ Remplacer ' + dead + ' module' + (dead > 1 ? 's' : '') + ' HS immédiatement', 105, yString + 20, { align: 'center' })
+            } else if (stringOpen > 0) {
+                doc.text('→ Vérifier connexions électriques (' + stringOpen + ' string' + (stringOpen > 1 ? 's' : '') + ' ouvert' + (stringOpen > 1 ? 's' : '') + ')', 105, yString + 20, { align: 'center' })
+            } else if (defects > 0) {
+                doc.text('→ Surveillance et maintenance préventive', 105, yString + 20, { align: 'center' })
+            }
+            
+            // ========================================
+            // PAGE 3: CARTOGRAPHIE
+            // ========================================
+            doc.addPage()
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(16)
+            doc.setFont('helvetica', 'bold')
+            doc.text('CARTOGRAPHIE CENTRALE', 20, 20)
+            
+            doc.setLineWidth(0.5)
+            doc.line(20, 23, 190, 23)
+            
+            // Capture carte
+            await new Promise(r => setTimeout(r, 500))
+            const mapElement = document.getElementById('map')
+            const canvas = await html2canvas(mapElement, { useCORS: true, scale: 2 })
+            const imgData = canvas.toDataURL('image/png')
+            doc.addImage(imgData, 'PNG', 20, 30, 170, 120)
+            
+            // Légende
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'bold')
+            doc.text('LÉGENDE:', 20, 160)
+            
+            doc.setFontSize(9)
+            const legendItems = [
+                { color: [34, 197, 94], label: 'Module OK' },
+                { color: [234, 179, 8], label: 'Inégalité (surveillance)' },
+                { color: [249, 115, 22], label: 'Microfissures (intervention 6 mois)' },
+                { color: [239, 68, 68], label: 'Module HS (intervention immédiate)' },
+                { color: [59, 130, 246], label: 'String ouvert (vérification électrique)' },
+                { color: [107, 114, 128], label: 'Non connecté' }
+            ]
+            
+            let yLegend = 168
+            legendItems.forEach(item => {
+                doc.setFillColor(item.color[0], item.color[1], item.color[2])
+                doc.circle(25, yLegend, 2, 'F')
+                doc.setFont('helvetica', 'normal')
+                doc.text(item.label, 30, yLegend + 1)
+                yLegend += 7
+            })
+            
+            // Plan calepinage
+            doc.setFontSize(11)
+            doc.setFont('helvetica', 'bold')
+            doc.text('PLAN DE CALEPINAGE', 20, yLegend + 10)
+            
+            doc.setFontSize(9)
+            doc.setFont('helvetica', 'normal')
+            let yCalep = yLegend + 18
+            
+            doc.text('Onduleur' + (inverterCount > 1 ? 's' : '') + ': ' + inverterCount, 25, yCalep)
+            yCalep += 6
+            doc.text('Boîtes Jonction: ' + junctionBoxCount, 25, yCalep)
+            yCalep += 6
+            doc.text('Strings: ' + stringCount, 25, yCalep)
+            yCalep += 6
+            
+            stringNumbers.forEach(stringNum => {
+                const stringModules = modules.filter(m => m.string_number === stringNum)
+                const firstModule = stringModules[0]
+                const lastModule = stringModules[stringModules.length - 1]
+                if (firstModule && lastModule) {
+                    doc.text('  String ' + stringNum + ': ' + firstModule.module_identifier + ' → ' + lastModule.module_identifier + ' (' + stringModules.length + ' modules)', 30, yCalep)
+                    yCalep += 6
                 }
             })
             
-            doc.save(\`cartographie_\${zoneData.zone_name}_\${Date.now()}.pdf\`)
+            yCalep += 3
+            doc.setFont('helvetica', 'bold')
+            doc.text('TOTAL: ' + total + ' modules × 450Wc = ' + powerKwc + ' kWc', 25, yCalep)
+            
+            // ========================================
+            // PAGES 4+: DÉFAUTS PAR STRING
+            // ========================================
+            stringNumbers.forEach(stringNum => {
+                const stringModules = modules.filter(m => m.string_number === stringNum)
+                const stringDefects = stringModules.filter(m => m.module_status !== 'ok' && m.module_status !== 'pending')
+                
+                if (stringDefects.length > 0) {
+                    doc.addPage()
+                    doc.setTextColor(0, 0, 0)
+                    doc.setFontSize(14)
+                    doc.setFont('helvetica', 'bold')
+                    doc.text('STRING ' + stringNum + ' - ' + stringModules.length + ' MODULES', 20, 20)
+                    
+                    doc.setLineWidth(0.5)
+                    doc.line(20, 23, 190, 23)
+                    
+                    doc.setFontSize(11)
+                    doc.text('État: ' + (stringModules.length - stringDefects.length) + '/' + stringModules.length + ' OK (' + (((stringModules.length - stringDefects.length) / stringModules.length) * 100).toFixed(1) + String.fromCharCode(37) + ')', 20, 32)
+                    doc.text('Défauts: ' + stringDefects.length, 20, 40)
+                    
+                    let yDefect = 50
+                    stringDefects.forEach(defect => {
+                        if (yDefect > 270) {
+                            doc.addPage()
+                            yDefect = 20
+                        }
+                        
+                        const statusLabels = {
+                            dead: 'MODULE HS (CRITIQUE)',
+                            string_open: 'STRING OUVERT (MAJEUR)',
+                            microcracks: 'MICROFISSURES (MINEUR)',
+                            inequality: 'INÉGALITÉ (SURVEILLANCE)',
+                            not_connected: 'NON CONNECTÉ'
+                        }
+                        
+                        const statusColors = {
+                            dead: [239, 68, 68],
+                            string_open: [59, 130, 246],
+                            microcracks: [249, 115, 22],
+                            inequality: [234, 179, 8],
+                            not_connected: [107, 114, 128]
+                        }
+                        
+                        doc.setFillColor(statusColors[defect.module_status][0], statusColors[defect.module_status][1], statusColors[defect.module_status][2])
+                        doc.circle(22, yDefect, 2, 'F')
+                        
+                        doc.setFontSize(10)
+                        doc.setFont('helvetica', 'bold')
+                        doc.text(defect.module_identifier + ' - ' + statusLabels[defect.module_status], 27, yDefect + 1)
+                        
+                        doc.setFontSize(9)
+                        doc.setFont('helvetica', 'normal')
+                        yDefect += 7
+                        doc.text('Position: String ' + defect.string_number + ', Position ' + defect.position_in_string, 27, yDefect)
+                        yDefect += 5
+                        doc.text('GPS: ' + defect.latitude.toFixed(7) + '°N, ' + defect.longitude.toFixed(7) + '°E', 27, yDefect)
+                        
+                        if (defect.status_comment) {
+                            yDefect += 5
+                            doc.text('Commentaire: ' + defect.status_comment, 27, yDefect)
+                        }
+                        
+                        yDefect += 10
+                    })
+                }
+            })
+            
+            // ========================================
+            // DERNIÈRE PAGE: LISTE COMPLÈTE
+            // ========================================
+            doc.addPage()
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(14)
+            doc.setFont('helvetica', 'bold')
+            doc.text('ANNEXE - LISTE COMPLÈTE MODULES', 20, 20)
+            
+            doc.setLineWidth(0.5)
+            doc.line(20, 23, 190, 23)
+            
+            doc.setFontSize(8)
+            doc.setFont('helvetica', 'normal')
+            let yList = 30
+            
+            modules.forEach(m => {
+                if (yList > 280) {
+                    doc.addPage()
+                    yList = 20
+                }
+                
+                const statusEmoji = {ok:'OK',inequality:'INEG',microcracks:'MICRO',dead:'HS',string_open:'OPEN',not_connected:'NC',pending:'PEND'}[m.module_status]
+                doc.text(m.module_identifier + ' | S' + m.string_number + 'P' + m.position_in_string + ' | ' + statusEmoji, 20, yList)
+                yList += 5
+            })
+            
+            // Footer sur toutes pages
+            const pageCount = doc.internal.getNumberOfPages()
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i)
+                doc.setFontSize(8)
+                doc.setTextColor(128, 128, 128)
+                doc.text('DiagPV - Rapport Audit PV - ' + (plantData.plant_name || 'Centrale'), 20, 287)
+                doc.text('Page ' + i + '/' + pageCount, 180, 287)
+                doc.text('Confidentiel - ' + new Date().toLocaleDateString('fr-FR'), 105, 287, { align: 'center' })
+            }
+            
+            doc.save('DiagPV_' + (zoneData.zone_name || 'Zone') + '_' + Date.now() + '.pdf')
         }
         
         // ================================================================
