@@ -3133,7 +3133,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                 for (let col = 0; col < cols; col++) {
                     modules.push({
                         zone_id: parseInt(zoneId),
-                        module_identifier: \`M\${nextModuleNum}\`,
+                        module_identifier: 'M' + nextModuleNum,
                         string_number: Math.floor((nextModuleNum - 1) / cols) + 1,
                         position_in_string: ((nextModuleNum - 1) % cols) + 1,
                         pos_x_meters: col * (1.7 + spacing),
@@ -4224,7 +4224,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 modules.push({
                     id: null,
                     zone_id: parseInt(zoneId),
-                    module_identifier: \`M\${nextModuleNum}\`,
+                    module_identifier: 'M' + nextModuleNum,
                     latitude: e.latlng.lat,
                     longitude: e.latlng.lng,
                     pos_x_meters: 0,
@@ -4405,7 +4405,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         generatedModules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
-                            module_identifier: \`M\${moduleNum}\`,
+                            module_identifier: 'M' + moduleNum,
                             latitude: moduleLat,
                             longitude: moduleLng,
                             pos_x_meters: 0,
@@ -4519,7 +4519,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const after = modules.length
             const removed = before - after
             
-            console.log(\`🧹 Nettoyage: \${removed} modules invalides supprimés (\${after} restants)\`)
+            console.log('🧹 Nettoyage: ' + removed + ' modules invalides supprimés (' + after + ' restants)')
             
             renderModules()
             updateStats()
@@ -4551,7 +4551,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     return
                 }
                 
-                console.log(\`🎨 Render module \${index + 1}:\`, module.module_identifier, 'at', module.latitude, module.longitude)
+                console.log('🎨 Render module ' + (index + 1) + ':', module.module_identifier, 'at', module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
                 const latOffset = module.height_meters / 111320 / 2
@@ -4567,7 +4567,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     weight: 2,
                     fillColor: color,
                     fillOpacity: 0.7,
-                    className: \`module-\${module.module_status}\`,
+                    className: 'module-' + module.module_status,
                     interactive: true  // Capturer explicitement les clics
                 })
                 
@@ -4575,18 +4575,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const moduleLabel = L.marker([module.latitude, module.longitude], {
                     icon: L.divIcon({
                         className: 'module-label',
-                        html: \`<div style="background: rgba(0,0,0,0.7); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">\${module.module_identifier}</div>\`,
+                        html: '<div style="background: rgba(0,0,0,0.7); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">' + module.module_identifier + '</div>',
                         iconSize: [30, 12],
                         iconAnchor: [15, 6]
                     }),
                     interactive: false  // Ne pas capturer les clics (laisser passer au rectangle en dessous)
                 })
                 
-                rect.bindPopup(\`
-                    <strong>\${module.module_identifier}</strong><br>
-                    String \${module.string_number} | Pos \${module.position_in_string}<br>
-                    Statut: \${module.module_status}
-                \`)
+                rect.bindPopup(
+                    '<strong>' + module.module_identifier + '</strong><br>' +
+                    'String ' + module.string_number + ' | Pos ' + module.position_in_string + '<br>' +
+                    'Statut: ' + module.module_status
+                )
                 
                 rect.on('click', () => openStatusModal(module))
                 rect.addTo(drawnItems)
