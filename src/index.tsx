@@ -4786,7 +4786,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     '</div>' +
                     '<div class="flex justify-between items-center mb-1">' +
                         '<span class="text-gray-400">' + p.placed + '/' + p.total + ' modules</span>' +
-                        '<span class="text-gray-400">' + p.percentage.toFixed(0) + '%</span>' +
+                        '<span class="text-gray-400">' + p.percentage.toFixed(0) + String.fromCharCode(37) + '</span>' +
                     '</div>' +
                     '<div class="w-full bg-gray-700 rounded-full h-2">' +
                         '<div class="bg-yellow-400 h-2 rounded-full transition-all" style="width: ' + Math.min(p.percentage, 100) + String.fromCharCode(37) + '"></div>' +
