@@ -607,7 +607,13 @@ plantsRouter.put('/:plantId/zones/:zoneId/config', async (c: Context) => {
   } = await c.req.json()
   
   try {
-    await env.DB.prepare(`
+    console.log('🔧 UPDATE config zone:', zoneId)
+    console.log('📊 Données reçues:', { inverter_count, junction_box_count, string_count, modules_per_string, strings_config })
+    
+    const stringsConfigJson = strings_config ? JSON.stringify(strings_config) : null
+    console.log('💾 strings_config JSON:', stringsConfigJson)
+    
+    const result = await env.DB.prepare(`
       UPDATE pv_zones 
       SET inverter_count = ?, 
           junction_box_count = ?, 
@@ -620,16 +626,18 @@ plantsRouter.put('/:plantId/zones/:zoneId/config', async (c: Context) => {
       junction_box_count || 0, 
       string_count || 0, 
       modules_per_string || 0,
-      strings_config ? JSON.stringify(strings_config) : null,
+      stringsConfigJson,
       zoneId
     ).run()
+    
+    console.log('✅ UPDATE result:', result)
     
     return c.json({ 
       success: true,
       message: 'Configuration électrique mise à jour'
     })
   } catch (error: any) {
-    console.error('Erreur mise à jour config:', error)
+    console.error('❌ Erreur mise à jour config:', error)
     return c.json({ 
       error: 'Erreur mise à jour configuration',
       details: error.message 

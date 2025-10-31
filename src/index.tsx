@@ -3810,8 +3810,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // DESSIN TOITURE
         // ================================================================
         function enableRoofDrawing() {
-            if (drawControl) map.removeControl(drawControl)
+            console.log('🖊️ enableRoofDrawing() appelé')
+            console.log('🗺️ map:', map)
+            console.log('✏️ drawControl existant:', drawControl)
             
+            if (drawControl) {
+                console.log('🗑️ Suppression ancien drawControl')
+                map.removeControl(drawControl)
+            }
+            
+            console.log('🆕 Création nouveau L.Control.Draw')
             drawControl = new L.Control.Draw({
                 draw: {
                     polygon: {
@@ -3828,7 +3836,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 edit: { featureGroup: drawnItems, remove: true }
             })
             
+            console.log('➕ Ajout drawControl à la carte')
             map.addControl(drawControl)
+            console.log('✅ enableRoofDrawing() terminé - Contrôle ajouté')
             
             map.on(L.Draw.Event.CREATED, async (e) => {
                 if (roofPolygon) drawnItems.removeLayer(roofPolygon)
@@ -4112,7 +4122,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         function placeModuleManual() {
             // VALIDATION STRICTE : Config obligatoire
             if (stringsConfig.length === 0) {
-                alert('⚠️ CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d\'abord les strings avant placement!')
+                alert(String.fromCharCode(0x26A0) + ' CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d' + String.fromCharCode(39) + 'abord les strings avant placement!')
                 return
             }
             
@@ -4192,7 +4202,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // VALIDATION STRICTE : Config obligatoire
             if (stringsConfig.length === 0) {
-                alert('⚠️ CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d\'abord les strings avant placement!')
+                alert(String.fromCharCode(0x26A0) + ' CONFIGURATION OBLIGATOIRE' + String.fromCharCode(10,10) + 'Configurez d' + String.fromCharCode(39) + 'abord les strings avant placement!')
                 return
             }
             
