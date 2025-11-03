@@ -6012,6 +6012,84 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 yList += 5
             })
             
+            // ========================================
+            // PAGE FINALE: PLAN CARTOGRAPHIQUE
+            // ========================================
+            doc.addPage()
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(16)
+            doc.setFont('helvetica', 'bold')
+            doc.text('PLAN CARTOGRAPHIQUE DE LA CENTRALE', 20, 20)
+            
+            doc.setLineWidth(0.5)
+            doc.line(20, 23, 190, 23)
+            
+            // Capture carte avec html2canvas
+            const mapElement = document.getElementById('map')
+            
+            try {
+                const canvas = await html2canvas(mapElement, {
+                    useCORS: true,
+                    allowTaint: false,
+                    backgroundColor: '#ffffff',
+                    scale: 2 // Haute qualité
+                })
+                
+                const imgData = canvas.toDataURL('image/jpeg', 0.9)
+                
+                // Ajouter image carte (format paysage dans portrait)
+                const imgWidth = 170
+                const imgHeight = (canvas.height * imgWidth) / canvas.width
+                const maxHeight = 240
+                
+                const finalHeight = Math.min(imgHeight, maxHeight)
+                const finalWidth = (canvas.width * finalHeight) / canvas.height
+                
+                doc.addImage(imgData, 'JPEG', 20, 35, finalWidth, finalHeight)
+                
+                // Légende couleurs
+                doc.setFontSize(10)
+                doc.setFont('helvetica', 'bold')
+                doc.text('LÉGENDE STATUTS MODULES:', 20, finalHeight + 50)
+                
+                doc.setFont('helvetica', 'normal')
+                let yLegend = finalHeight + 60
+                
+                doc.setFillColor(34, 197, 94)  // Vert
+                doc.rect(20, yLegend - 3, 5, 5, 'F')
+                doc.text('OK: Aucun défaut', 30, yLegend)
+                
+                doc.setFillColor(234, 179, 8)  // Jaune
+                doc.rect(80, yLegend - 3, 5, 5, 'F')
+                doc.text('Inégalité', 90, yLegend)
+                
+                yLegend += 8
+                doc.setFillColor(249, 115, 22)  // Orange
+                doc.rect(20, yLegend - 3, 5, 5, 'F')
+                doc.text('Microfissures', 30, yLegend)
+                
+                doc.setFillColor(239, 68, 68)  // Rouge
+                doc.rect(80, yLegend - 3, 5, 5, 'F')
+                doc.text('Module HS', 90, yLegend)
+                
+                yLegend += 8
+                doc.setFillColor(59, 130, 246)  // Bleu
+                doc.rect(20, yLegend - 3, 5, 5, 'F')
+                doc.text('String ouvert', 30, yLegend)
+                
+                doc.setFillColor(107, 114, 128)  // Gris
+                doc.rect(80, yLegend - 3, 5, 5, 'F')
+                doc.text('Non connecté', 90, yLegend)
+                
+                console.log('✅ Plan cartographique ajouté au PDF')
+            } catch (error) {
+                console.error('❌ Erreur capture carte:', error)
+                doc.setFontSize(12)
+                doc.setFont('helvetica', 'italic')
+                doc.setTextColor(200, 0, 0)
+                doc.text('Erreur lors de la capture du plan cartographique', 20, 40)
+            }
+            
             // Footer sur toutes pages
             const pageCount = doc.internal.getNumberOfPages()
             for (let i = 1; i <= pageCount; i++) {
