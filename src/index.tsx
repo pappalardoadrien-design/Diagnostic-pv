@@ -3363,6 +3363,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+        <script src="https://unpkg.com/leaflet-path-transform@2.1.3/dist/L.Path.Transform.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -3377,6 +3378,38 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             .module-not_connected { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
             .module-pending { background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border: 2px dashed #9ca3af !important; }
             @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+            
+            /* Rectangle Module Group Styles */
+            .module-rectangle {
+                cursor: move;
+                stroke-dasharray: 5, 5;
+                stroke-width: 3px !important;
+            }
+            .module-rectangle:hover {
+                stroke-width: 4px !important;
+                opacity: 0.9;
+            }
+            .leaflet-path-transform-handler {
+                fill: #fbbf24 !important;
+                stroke: #ffffff !important;
+                stroke-width: 2px;
+            }
+            .rectangle-grid-line {
+                stroke: #ffffff;
+                stroke-width: 1px;
+                opacity: 0.3;
+                pointer-events: none;
+            }
+            .rectangle-info-overlay {
+                background: rgba(0, 0, 0, 0.85);
+                color: white;
+                padding: 10px;
+                border-radius: 6px;
+                font-size: 11px;
+                border: 2px solid #fbbf24;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                pointer-events: none;
+            }
             
             /* Fix z-index modal au-dessus de Leaflet */
             #statusModal { z-index: 9999 !important; }
@@ -3421,6 +3454,57 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <div id="roofInfo" class="mt-3 p-3 bg-black rounded text-sm hidden">
                         <div class="text-gray-400">Surface toiture:</div>
                         <div id="roofArea" class="text-2xl font-black text-yellow-400">-- m²</div>
+                    </div>
+                </div>
+
+                <!-- Étape 1B : Rectangle Modules (SolarEdge Style) -->
+                <div class="bg-gray-900 rounded-lg border-2 border-orange-400 p-4">
+                    <h3 class="text-lg font-black mb-3 text-orange-400">
+                        <i class="fas fa-th mr-2"></i>RECTANGLE MODULES
+                    </h3>
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Rangées</label>
+                                <input type="number" id="rectRows" min="1" max="50" value="5"
+                                       class="w-full bg-black border border-gray-600 rounded px-2 py-1 text-center font-bold text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Colonnes</label>
+                                <input type="number" id="rectCols" min="1" max="50" value="24"
+                                       class="w-full bg-black border border-gray-600 rounded px-2 py-1 text-center font-bold text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">String Départ</label>
+                            <input type="number" id="rectString" min="1" max="50" value="1"
+                                   class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold">
+                        </div>
+                        <div class="p-2 bg-black rounded text-xs">
+                            <div class="text-gray-400">Total modules:</div>
+                            <div id="rectTotal" class="text-lg font-black text-orange-400">120</div>
+                        </div>
+                        <button id="createRectangleBtn" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded font-bold">
+                            <i class="fas fa-plus-square mr-2"></i>CRÉER RECTANGLE
+                        </button>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="showRectGrid" checked class="w-4 h-4">
+                                <label for="showRectGrid" class="text-gray-400">Afficher grille</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="showRectLabels" checked class="w-4 h-4">
+                                <label for="showRectLabels" class="text-gray-400">Afficher labels</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="showRectInfo" checked class="w-4 h-4">
+                                <label for="showRectInfo" class="text-gray-400">Info rectangle</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="rectanglesList" class="mt-3 space-y-2 hidden">
+                        <div class="text-xs font-bold text-orange-400 mb-1">RECTANGLES CRÉÉS:</div>
+                        <div id="rectanglesContainer" class="space-y-2"></div>
                     </div>
                 </div>
 
@@ -3672,6 +3756,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let isDrawingRow = false
         let rowStartLatLng = null
         let rowPreviewRect = null
+        
+        // Variables pour rectangles modules (SolarEdge style)
+        let moduleRectangles = [] // Array de RectangleModuleGroup
+        let showRectGrid = true
+        let showRectLabels = true
+        let showRectInfo = true
         
         const STATUS_COLORS = {
             ok: '#22c55e',
