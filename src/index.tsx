@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import pvModule from './modules/pv/routes/plants'
+import openSolarModule from './opensolar'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -32,6 +33,18 @@ app.route('/api/el', elModule)
 // MODULE PV CARTOGRAPHY - ARCHITECTURE MODULAIRE (NOUVEAU - NON-DESTRUCTIF)
 // ============================================================================
 app.route('/api/pv/plants', pvModule)
+
+// ============================================================================
+// MODULE OPENSOLAR DXF IMPORT - ISOLÉ (Point 5.0 - Module autonome)
+// ============================================================================
+// Module complètement isolé pour import DXF OpenSolar
+// Routes:
+// - GET /opensolar → Interface HTML upload DXF
+// - POST /api/opensolar/parse-dxf → Parser fichier DXF
+// - POST /api/opensolar/import-modules → Importer modules dans DB
+// - GET /api/opensolar/test → Test endpoint
+// ============================================================================
+app.route('/api/opensolar', openSolarModule)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
@@ -3828,6 +3841,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const sw = bounds.getSouthWest()
                 const se = bounds.getSouthEast()
                 
+                // Calculer dimensions réelles du module en coordonnées GPS
+                const zoom = map.getZoom()
+                const centerLat = bounds.getCenter().lat
+                
+                // Formule Leaflet: mètres par pixel
+                const metersPerPixel = 156543.03392 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, zoom)
+                const pixelsPerMeter = 1 / metersPerPixel
+                
+                // Dimensions module en pixels
+                const moduleWidthPixels = 1.7 * pixelsPerMeter
+                const moduleHeightPixels = 1.0 * pixelsPerMeter
+                
+                console.log('📏 Module:', moduleWidthPixels.toFixed(1) + 'px × ' + moduleHeightPixels.toFixed(1) + 'px')
+                
                 // Generate grid with bilinear interpolation
                 this.modules = []
                 let globalPosition = 0
@@ -3837,9 +3864,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const positionInString = (globalPosition % 24) + 1
                     
                     for (let col = 0; col < this.cols; col++) {
-                        // Ratios for bilinear interpolation
-                        const rowRatio = this.rows > 1 ? row / (this.rows - 1) : 0
-                        const colRatio = this.cols > 1 ? col / (this.cols - 1) : 0
+                        // Ratios for bilinear interpolation (CENTER of each module)
+                        const rowRatio = this.rows > 1 ? (row + 0.5) / this.rows : 0.5
+                        const colRatio = this.cols > 1 ? (col + 0.5) / this.cols : 0.5
                         
                         // Interpolate top edge
                         const topLat = nw.lat + (ne.lat - nw.lat) * colRatio
@@ -3849,16 +3876,33 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         const bottomLat = sw.lat + (se.lat - sw.lat) * colRatio
                         const bottomLng = sw.lng + (se.lng - sw.lng) * colRatio
                         
-                        // Final position (interpolate vertically)
-                        const lat = topLat + (bottomLat - topLat) * rowRatio
-                        const lng = topLng + (bottomLng - topLng) * rowRatio
+                        // Final CENTER position (interpolate vertically)
+                        const centerLat = topLat + (bottomLat - topLat) * rowRatio
+                        const centerLng = topLng + (bottomLng - topLng) * rowRatio
+                        
+                        // Convertir centre en pixels
+                        const centerPoint = map.latLngToContainerPoint([centerLat, centerLng])
+                        
+                        // Calculer coins du module en pixels
+                        const moduleTopLeft = L.point(
+                            centerPoint.x - moduleWidthPixels / 2,
+                            centerPoint.y - moduleHeightPixels / 2
+                        )
+                        const moduleBottomRight = L.point(
+                            centerPoint.x + moduleWidthPixels / 2,
+                            centerPoint.y + moduleHeightPixels / 2
+                        )
+                        
+                        // Convertir coins en GPS
+                        const moduleNW = map.containerPointToLatLng(moduleTopLeft)
+                        const moduleSE = map.containerPointToLatLng(moduleBottomRight)
                         
                         this.modules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
                             module_identifier: 'S' + currentString + '-P' + (positionInString < 10 ? '0' : '') + positionInString,
-                            latitude: lat,
-                            longitude: lng,
+                            latitude: centerLat,
+                            longitude: centerLng,
                             pos_x_meters: col * 1.7,
                             pos_y_meters: row * 1.0,
                             width_meters: 1.7,
@@ -3869,7 +3913,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             power_wp: 450,
                             module_status: 'pending',
                             status_comment: null,
-                            rectangleId: this.id
+                            rectangleId: this.id,
+                            // Ajouter bounds GPS du module individuel
+                            moduleBounds: [[moduleNW.lat, moduleNW.lng], [moduleSE.lat, moduleSE.lng]]
                         })
                         
                         globalPosition++
@@ -3886,7 +3932,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     this.updateInfoOverlay()
                 }
                 
-                console.log('✅ Rectangle', this.id, ':', this.modules.length, 'modules générés')
+                console.log('✅ Rectangle', this.id, ':', this.modules.length, 'modules générés avec dimensions réelles')
             }
             
             drawGrid() {
@@ -4961,15 +5007,52 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const cols = parseInt(document.getElementById('rectCols').value) || 24
             const stringStart = parseInt(document.getElementById('rectString').value) || 1
             
-            // Get initial bounds (center of map)
-            const center = map.getCenter()
-            const latOffset = 0.0005
-            const lngOffset = 0.001
+            // *** NOUVELLE MÉTHODE PIXEL-BASED (comme SolarEdge) ***
+            const moduleWidth = 1.7   // m
+            const moduleHeight = 1.0  // m
+            const spacing = 0.02      // m entre modules
             
-            const bounds = [
-                [center.lat - latOffset, center.lng - lngOffset],
-                [center.lat + latOffset, center.lng + lngOffset]
-            ]
+            const totalWidthMeters = cols * moduleWidth + (cols - 1) * spacing
+            const totalHeightMeters = rows * moduleHeight + (rows - 1) * spacing
+            
+            console.log('📐 Rectangle réel:', totalWidthMeters.toFixed(1) + 'm × ' + totalHeightMeters.toFixed(1) + 'm')
+            
+            // Convertir mètres → pixels selon zoom actuel
+            const zoom = map.getZoom()
+            const center = map.getCenter()
+            
+            // Formule Leaflet: mètres par pixel selon zoom
+            const metersPerPixel = 156543.03392 * Math.cos(center.lat * Math.PI / 180) / Math.pow(2, zoom)
+            const pixelsPerMeter = 1 / metersPerPixel
+            
+            console.log('🔍 Zoom:', zoom, '| Pixels/mètre:', pixelsPerMeter.toFixed(2))
+            
+            // Taille rectangle en pixels
+            const totalWidthPixels = totalWidthMeters * pixelsPerMeter
+            const totalHeightPixels = totalHeightMeters * pixelsPerMeter
+            
+            console.log('📏 Pixels:', totalWidthPixels.toFixed(0) + 'px × ' + totalHeightPixels.toFixed(0) + 'px')
+            
+            // Convertir centre map en pixels
+            const centerPoint = map.latLngToContainerPoint(center)
+            
+            // Calculer coins du rectangle en pixels
+            const topLeftPoint = L.point(
+                centerPoint.x - totalWidthPixels / 2,
+                centerPoint.y - totalHeightPixels / 2
+            )
+            const bottomRightPoint = L.point(
+                centerPoint.x + totalWidthPixels / 2,
+                centerPoint.y + totalHeightPixels / 2
+            )
+            
+            // Convertir pixels → LatLng
+            const topLeft = map.containerPointToLatLng(topLeftPoint)
+            const bottomRight = map.containerPointToLatLng(bottomRightPoint)
+            
+            const bounds = [topLeft, bottomRight]
+            
+            console.log('📍 Bounds GPS:', bounds)
             
             // Create rectangle
             const id = moduleRectangles.length + 1
@@ -5131,13 +5214,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log('🎨 Render module ' + (index + 1) + ':', module.module_identifier, 'at', module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
-                const latOffset = module.height_meters / 111320 / 2
-                const lngOffset = module.width_meters / (111320 * Math.cos(module.latitude * Math.PI / 180)) / 2
-                
-                const bounds = [
-                    [module.latitude - latOffset, module.longitude - lngOffset],
-                    [module.latitude + latOffset, module.longitude + lngOffset]
-                ]
+                // *** NOUVEAU : Utiliser moduleBounds si disponible (depuis rectangles), sinon calculer ***
+                let bounds
+                if (module.moduleBounds) {
+                    // Bounds déjà calculés avec dimensions pixel-based réelles
+                    bounds = module.moduleBounds
+                } else {
+                    // Calcul classique GPS pour modules placés manuellement
+                    const latOffset = module.height_meters / 111320 / 2
+                    const lngOffset = module.width_meters / (111320 * Math.cos(module.latitude * Math.PI / 180)) / 2
+                    
+                    bounds = [
+                        [module.latitude - latOffset, module.longitude - lngOffset],
+                        [module.latitude + latOffset, module.longitude + lngOffset]
+                    ]
+                }
                 
                 const rect = L.rectangle(bounds, {
                     color: color,
@@ -5150,15 +5241,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Ajouter label texte au centre du module (format: S1-P15)
                 const labelText = 'S' + module.string_number + '-P' + (module.position_in_string < 10 ? '0' : '') + module.position_in_string
-                const moduleLabel = L.marker([module.latitude, module.longitude], {
-                    icon: L.divIcon({
-                        className: 'module-label',
-                        html: '<div style="background: rgba(0,0,0,0.85); color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; white-space: nowrap; border: 1px solid rgba(255,255,255,0.3);">' + labelText + '</div>',
-                        iconSize: [45, 16],
-                        iconAnchor: [22, 8]
-                    }),
-                    interactive: false  // Ne pas capturer les clics (laisser passer au rectangle en dessous)
-                })
+                
+                // Seulement afficher labels si showRectLabels est true (pour rectangles) ou si pas dans rectangle
+                const shouldShowLabel = !module.rectangleId || showRectLabels
+                
+                if (shouldShowLabel) {
+                    const moduleLabel = L.marker([module.latitude, module.longitude], {
+                        icon: L.divIcon({
+                            className: 'module-label',
+                            html: '<div style="background: rgba(0,0,0,0.85); color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; white-space: nowrap; border: 1px solid rgba(255,255,255,0.3);">' + labelText + '</div>',
+                            iconSize: [45, 16],
+                            iconAnchor: [22, 8]
+                        }),
+                        interactive: false  // Ne pas capturer les clics (laisser passer au rectangle en dessous)
+                    })
+                    moduleLabel.addTo(drawnItems)
+                }
                 
                 rect.bindPopup(
                     '<strong>' + module.module_identifier + '</strong><br>' +
@@ -5168,7 +5266,6 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 rect.on('click', () => openStatusModal(module))
                 rect.addTo(drawnItems)
-                moduleLabel.addTo(drawnItems)
             })
         }
         
@@ -6406,6 +6503,232 @@ app.get('/pv/plant/:id', async (c) => {
 
         // Init
         loadPlantDetail()
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// OPENSOLAR DXF IMPORT - PAGE INTERFACE
+// ============================================================================
+app.get('/opensolar', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>OpenSolar DXF Import | DiagPV</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            #map { height: 500px; width: 100%; }
+            .status-pending { background: #6b7280; }
+            .status-ok { background: #10b981; }
+            .status-warning { background: #f59e0b; }
+            .status-critical { background: #ef4444; }
+        </style>
+    </head>
+    <body class="bg-gray-900 text-white">
+        <div class="container mx-auto p-8">
+            <header class="mb-8">
+                <h1 class="text-4xl font-black text-orange-400 mb-2">
+                    <i class="fas fa-file-import mr-3"></i>
+                    OpenSolar DXF Import
+                </h1>
+                <p class="text-gray-400">Module isolé pour import de fichiers DXF OpenSolar</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Upload Section -->
+                <div class="bg-gray-800 rounded-lg p-6 border-2 border-orange-400">
+                    <h2 class="text-2xl font-bold mb-4 text-orange-400">
+                        <i class="fas fa-upload mr-2"></i>Upload DXF
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm mb-2">Zone ID (référence GPS)</label>
+                            <input type="number" id="zoneId" 
+                                   class="w-full bg-gray-900 border border-gray-600 rounded px-4 py-2"
+                                   placeholder="ex: 1" value="1">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm mb-2">Fichier DXF OpenSolar</label>
+                            <input type="file" id="dxfFile" accept=".dxf"
+                                   class="w-full bg-gray-900 border border-gray-600 rounded px-4 py-2">
+                        </div>
+
+                        <button id="parseBtn" 
+                                class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded">
+                            <i class="fas fa-cogs mr-2"></i>Parser DXF
+                        </button>
+
+                        <button id="importBtn" disabled
+                                class="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-600 text-white font-bold py-3 rounded">
+                            <i class="fas fa-database mr-2"></i>Importer dans DB
+                        </button>
+                    </div>
+
+                    <div id="status" class="mt-4 p-4 bg-gray-900 rounded text-sm">
+                        <p class="text-gray-500">En attente de fichier DXF...</p>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="bg-gray-800 rounded-lg p-6 border-2 border-blue-400">
+                    <h2 class="text-2xl font-bold mb-4 text-blue-400">
+                        <i class="fas fa-chart-bar mr-2"></i>Résultats
+                    </h2>
+                    
+                    <div id="stats" class="space-y-2 mb-4">
+                        <p class="text-gray-500">Aucune donnée</p>
+                    </div>
+
+                    <div id="modulesList" class="bg-gray-900 rounded p-4 max-h-96 overflow-y-auto">
+                        <p class="text-gray-500 text-sm">Liste des modules apparaîtra ici</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Visualization -->
+            <div class="mt-6 bg-gray-800 rounded-lg p-6 border-2 border-purple-400">
+                <h2 class="text-2xl font-bold mb-4 text-purple-400">
+                    <i class="fas fa-map mr-2"></i>Visualisation Carte
+                </h2>
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <script>
+            // Init Leaflet map
+            const map = L.map('map').setView([48.8566, 2.3522], 13)
+            L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                maxZoom: 22,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: 'Google Satellite'
+            }).addTo(map)
+
+            let parsedModules = []
+            const markers = L.layerGroup().addTo(map)
+
+            // Parse DXF
+            document.getElementById('parseBtn').addEventListener('click', async () => {
+                const file = document.getElementById('dxfFile').files[0]
+                const zoneId = parseInt(document.getElementById('zoneId').value)
+
+                if (!file) {
+                    alert('Sélectionnez un fichier DXF')
+                    return
+                }
+
+                const status = document.getElementById('status')
+                status.innerHTML = '<p class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-2"></i>Parsing en cours...</p>'
+
+                try {
+                    const content = await file.text()
+                    
+                    const response = await fetch('/api/opensolar/parse-dxf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dxfContent: content, zoneId })
+                    })
+
+                    const data = await response.json()
+
+                    if (data.error) {
+                        throw new Error(data.error)
+                    }
+
+                    parsedModules = data.modules
+                    
+                    // Afficher stats
+                    document.getElementById('stats').innerHTML = \`
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <p class="text-3xl font-bold text-orange-400">\${data.stats.totalModules}</p>
+                                <p class="text-xs text-gray-400">Modules</p>
+                            </div>
+                            <div>
+                                <p class="text-3xl font-bold text-blue-400">\${data.stats.strings}</p>
+                                <p class="text-xs text-gray-400">Strings</p>
+                            </div>
+                            <div>
+                                <p class="text-3xl font-bold text-green-400">\${data.stats.totalPower}</p>
+                                <p class="text-xs text-gray-400">Wc</p>
+                            </div>
+                        </div>
+                    \`
+
+                    // Afficher liste modules
+                    const modulesList = data.modules.map(m => \`
+                        <div class="mb-2 p-2 bg-gray-800 rounded text-xs">
+                            <span class="font-bold text-orange-400">\${m.module_identifier}</span>
+                            <span class="text-gray-400">| \${m.latitude.toFixed(6)}, \${m.longitude.toFixed(6)}</span>
+                        </div>
+                    \`).join('')
+                    document.getElementById('modulesList').innerHTML = modulesList
+
+                    // Afficher sur carte
+                    markers.clearLayers()
+                    data.modules.forEach(m => {
+                        const marker = L.circleMarker([m.latitude, m.longitude], {
+                            radius: 8,
+                            fillColor: '#f97316',
+                            color: '#fff',
+                            weight: 2,
+                            fillOpacity: 0.8
+                        }).bindPopup(\`
+                            <b>\${m.module_identifier}</b><br>
+                            String \${m.string_number} | Pos \${m.position_in_string}<br>
+                            \${m.power_wp}Wc
+                        \`)
+                        markers.addLayer(marker)
+                    })
+
+                    // Center map
+                    if (data.modules.length > 0) {
+                        map.setView([data.modules[0].latitude, data.modules[0].longitude], 20)
+                    }
+
+                    status.innerHTML = '<p class="text-green-400"><i class="fas fa-check mr-2"></i>Parsing réussi!</p>'
+                    document.getElementById('importBtn').disabled = false
+
+                } catch (error) {
+                    status.innerHTML = \`<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur: \${error.message}</p>\`
+                }
+            })
+
+            // Import to DB
+            document.getElementById('importBtn').addEventListener('click', async () => {
+                const zoneId = parseInt(document.getElementById('zoneId').value)
+                const status = document.getElementById('status')
+
+                status.innerHTML = '<p class="text-yellow-400"><i class="fas fa-spinner fa-spin mr-2"></i>Import en cours...</p>'
+
+                try {
+                    const response = await fetch('/api/opensolar/import-modules', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ zoneId, modules: parsedModules })
+                    })
+
+                    const data = await response.json()
+
+                    if (data.error) {
+                        throw new Error(data.error)
+                    }
+
+                    status.innerHTML = \`<p class="text-green-400"><i class="fas fa-check-double mr-2"></i>\${data.insertedCount} modules importés!</p>\`
+
+                } catch (error) {
+                    status.innerHTML = \`<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur: \${error.message}</p>\`
+                }
+            })
         </script>
     </body>
     </html>
