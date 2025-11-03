@@ -3292,48 +3292,6 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
         }
         
         // ========================================================================
-        // EXPORT PDF
-        // ========================================================================
-        function exportPDF() {
-            const { jsPDF } = window.jspdf
-            const doc = new jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: 'a4'
-            })
-            
-            // Page 1: Plan
-            doc.setFontSize(16)
-            doc.text(\`Plan Calepinage - \${zoneData.zone_name}\`, 10, 10)
-            
-            const canvasDataUrl = canvas.toDataURL('image/png')
-            doc.addImage(canvasDataUrl, 'PNG', 10, 20, 277, 165)
-            
-            // Page 2: Tableau
-            doc.addPage()
-            doc.setFontSize(14)
-            doc.text('LISTE MODULES', 10, 10)
-            
-            doc.setFontSize(9)
-            let y = 20
-            modules.forEach((m, i) => {
-                doc.text(\`\${m.module_identifier} | String \${m.string_number} | Pos \${m.position_in_string} | Status: \${m.module_status}\`, 10, y)
-                if (m.status_comment) {
-                    y += 4
-                    doc.setFontSize(8)
-                    doc.text(\`   → \${m.status_comment}\`, 10, y)
-                    doc.setFontSize(9)
-                }
-                y += 5
-                if (y > 190) {
-                    doc.addPage()
-                    y = 10
-                }
-            })
-            
-            doc.save(\`calepinage_\${zoneData.zone_name}_\${Date.now()}.pdf\`)
-        }
-        
         // ========================================================================
         // STATS
         // ========================================================================
