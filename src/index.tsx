@@ -3456,6 +3456,39 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         <div class="container mx-auto px-4 py-6 grid grid-cols-4 gap-6">
             <!-- LEFT SIDEBAR: Configuration -->
             <div class="col-span-1 space-y-4">
+                <!-- Étape 0 : Structures (NOUVEAU - Modélisation centrale) -->
+                <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-4">
+                    <h3 class="text-lg font-black mb-3 text-purple-400">
+                        <i class="fas fa-building mr-2"></i>ÉTAPE 0 : STRUCTURES
+                    </h3>
+                    <p class="text-xs text-gray-400 mb-3">Modéliser la centrale</p>
+                    
+                    <div class="space-y-2">
+                        <button id="drawBuildingBtn" class="w-full bg-gray-600 hover:bg-gray-500 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-building mr-2"></i>🏢 Bâtiment
+                        </button>
+                        <button id="drawCarportBtn" class="w-full bg-yellow-600 hover:bg-yellow-500 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-parking mr-2"></i>🅿️ Ombrière Parking
+                        </button>
+                        <button id="drawGroundBtn" class="w-full bg-green-600 hover:bg-green-500 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-sun mr-2"></i>🌾 Champ au Sol
+                        </button>
+                        <button id="drawTechnicalBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-tools mr-2"></i>📏 Zone Technique
+                        </button>
+                    </div>
+                    
+                    <div id="structuresList" class="mt-4 space-y-2 hidden">
+                        <div class="text-xs font-bold text-purple-400 mb-2">STRUCTURES CRÉÉES:</div>
+                        <div id="structuresContainer" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                    </div>
+                    
+                    <div class="mt-3 p-2 bg-black rounded text-xs">
+                        <div class="text-gray-400">Total surface:</div>
+                        <div id="totalStructuresArea" class="text-lg font-black text-purple-400">0 m²</div>
+                    </div>
+                </div>
+                
                 <!-- Étape 1 : Dessin -->
                 <div class="bg-gray-900 rounded-lg border-2 border-yellow-400 p-4">
                     <h3 class="text-lg font-black mb-3 text-yellow-400">
@@ -3773,6 +3806,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let rowStartLatLng = null
         let rowPreviewRect = null
         
+        // Variables pour structures (bâtiments/ombrières/champs) - NOUVEAU
+        let structures = [] // Array de structures: {id, type, name, layer, area}
+        let structuresLayer = new L.FeatureGroup() // Calque structures (sous modules)
+        let currentDrawingStructureType = null // Type structure en cours de dessin
+        let structureDrawControl = null // Contrôle dessin Leaflet
+        
         // Variables pour rectangles modules (SolarEdge style)
         let moduleRectangles = [] // Array de RectangleModuleGroup
         let showRectGrid = true
@@ -4066,12 +4105,217 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
+        // GESTION STRUCTURES (Bâtiments/Ombrières/Champs) - NOUVEAU
+        // ================================================================
+        
+        async function loadStructures() {
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/structures\`)
+                const data = await response.json()
+                
+                if (data.success && data.structures) {
+                    structures = data.structures
+                    
+                    // Afficher chaque structure sur la carte
+                    structures.forEach(structure => {
+                        displayStructure(structure)
+                    })
+                    
+                    updateStructuresUI()
+                    console.log('✅ Structures chargées:', structures.length)
+                }
+            } catch (error) {
+                console.error('Erreur chargement structures:', error)
+            }
+        }
+        
+        function displayStructure(structure) {
+            const geometry = typeof structure.geometry === 'string' ? JSON.parse(structure.geometry) : structure.geometry
+            
+            // Créer polygon Leaflet
+            const coords = geometry.coordinates[0].map(coord => [coord[0], coord[1]])
+            
+            const layer = L.polygon(coords, {
+                color: structure.stroke_color || '#6b7280',
+                weight: 2,
+                fillColor: structure.fill_color || '#d1d5db',
+                fillOpacity: structure.opacity || 0.3,
+                className: 'structure-layer'
+            })
+            
+            // Tooltip avec nom structure
+            layer.bindTooltip(structure.structure_name, {
+                permanent: false,
+                direction: 'center',
+                className: 'structure-tooltip'
+            })
+            
+            // Ajouter au calque structures
+            layer.addTo(structuresLayer)
+            
+            // Stocker référence layer dans structure
+            structure.layer = layer
+        }
+        
+        function startDrawingStructure(type) {
+            currentDrawingStructureType = type
+            
+            // Activer dessin polygon Leaflet
+            if (!structureDrawControl) {
+                structureDrawControl = new L.Draw.Polygon(map, {
+                    shapeOptions: {
+                        color: type === 'building' ? '#6b7280' : type === 'carport' ? '#f59e0b' : '#22c55e',
+                        fillColor: type === 'building' ? '#d1d5db' : type === 'carport' ? '#fbbf24' : '#86efac',
+                        fillOpacity: 0.3
+                    }
+                })
+            }
+            
+            structureDrawControl.enable()
+            
+            // Écouter fin de dessin
+            map.once('draw:created', handleStructureDrawn)
+        }
+        
+        async function handleStructureDrawn(e) {
+            const layer = e.layer
+            const latlngs = layer.getLatLngs()[0]
+            
+            // Calculer surface
+            const area = L.GeometryUtil.geodesicArea(latlngs)
+            
+            // Demander nom structure
+            const typeLabels = {
+                'building': 'Bâtiment',
+                'carport': 'Ombrière',
+                'ground': 'Champ',
+                'technical': 'Zone Technique'
+            }
+            
+            const defaultName = typeLabels[currentDrawingStructureType] + ' ' + (structures.length + 1)
+            const name = prompt('Nom de la structure:', defaultName)
+            
+            if (!name) {
+                console.log('❌ Création structure annulée')
+                return
+            }
+            
+            // Préparer geometry GeoJSON
+            const coordinates = latlngs.map(ll => [ll.lat, ll.lng])
+            coordinates.push(coordinates[0]) // Fermer polygon
+            
+            const geometry = {
+                type: 'Polygon',
+                coordinates: [coordinates]
+            }
+            
+            // Couleurs par type
+            const colors = {
+                'building': { fill: '#d1d5db', stroke: '#6b7280' },
+                'carport': { fill: '#fbbf24', stroke: '#f59e0b' },
+                'ground': { fill: '#86efac', stroke: '#22c55e' },
+                'technical': { fill: '#60a5fa', stroke: '#3b82f6' }
+            }
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/structures\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        structure_type: currentDrawingStructureType,
+                        structure_name: name,
+                        geometry: geometry,
+                        area_sqm: area,
+                        fill_color: colors[currentDrawingStructureType].fill,
+                        stroke_color: colors[currentDrawingStructureType].stroke,
+                        opacity: 0.3
+                    })
+                })
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                    // Recharger structures
+                    await loadStructures()
+                    alert('✅ Structure créée: ' + name + ' (' + Math.round(area) + ' m²)')
+                }
+            } catch (error) {
+                console.error('Erreur création structure:', error)
+                alert('❌ Erreur création structure')
+            }
+            
+            currentDrawingStructureType = null
+        }
+        
+        async function deleteStructure(structureId) {
+            if (!confirm('Supprimer cette structure ?')) return
+            
+            try {
+                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/structures/\${structureId}\`, {
+                    method: 'DELETE'
+                })
+                
+                // Retirer de la carte
+                const structure = structures.find(s => s.id === structureId)
+                if (structure && structure.layer) {
+                    structuresLayer.removeLayer(structure.layer)
+                }
+                
+                // Retirer de l'array
+                structures = structures.filter(s => s.id !== structureId)
+                
+                updateStructuresUI()
+                alert('✅ Structure supprimée')
+            } catch (error) {
+                console.error('Erreur suppression structure:', error)
+                alert('❌ Erreur suppression')
+            }
+        }
+        
+        function updateStructuresUI() {
+            const container = document.getElementById('structuresContainer')
+            const list = document.getElementById('structuresList')
+            
+            if (structures.length === 0) {
+                list.classList.add('hidden')
+                return
+            }
+            
+            list.classList.remove('hidden')
+            
+            // Icônes par type
+            const icons = {
+                'building': '🏢',
+                'carport': '🅿️',
+                'ground': '🌾',
+                'technical': '📏'
+            }
+            
+            container.innerHTML = structures.map(s => \`
+                <div class="bg-black rounded p-2 text-xs flex justify-between items-center">
+                    <div>
+                        <div class="font-bold text-white">\${icons[s.structure_type]} \${s.structure_name}</div>
+                        <div class="text-gray-400">\${Math.round(s.area_sqm)} m²</div>
+                    </div>
+                    <button onclick="deleteStructure(\${s.id})" class="text-red-400 hover:text-red-300 px-2">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            \`).join('')
+            
+            // Mettre à jour surface totale
+            const totalArea = structures.reduce((sum, s) => sum + s.area_sqm, 0)
+            document.getElementById('totalStructuresArea').textContent = Math.round(totalArea) + ' m²'
+        }
+        
+        // ================================================================
         // INIT
         // ================================================================
         async function init() {
             await loadPlantData()
             await loadZoneData()
             initMap()
+            await loadStructures() // NOUVEAU: Charger structures
             await loadModules()
             setupEventListeners()
             updateStats()
@@ -4149,7 +4393,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map)
             
-            map.addLayer(drawnItems)
+            // NOUVEAU: Ajouter calques hiérarchiques (structures sous modules)
+            map.addLayer(structuresLayer)  // Calque 1: Structures (fond)
+            map.addLayer(drawnItems)        // Calque 2: Modules + annotations
             L.control.scale({ metric: true, imperial: false }).addTo(map)
             
             // Charger contour toiture existant
@@ -6011,6 +6257,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // EVENT LISTENERS
         // ================================================================
         function setupEventListeners() {
+            // STRUCTURES (Bâtiments/Ombrières/Champs) - NOUVEAU
+            document.getElementById('drawBuildingBtn').addEventListener('click', () => startDrawingStructure('building'))
+            document.getElementById('drawCarportBtn').addEventListener('click', () => startDrawingStructure('carport'))
+            document.getElementById('drawGroundBtn').addEventListener('click', () => startDrawingStructure('ground'))
+            document.getElementById('drawTechnicalBtn').addEventListener('click', () => startDrawingStructure('technical'))
+            
             document.getElementById('drawRoofBtn').addEventListener('click', enableRoofDrawing)
             document.getElementById('clearRoofBtn').addEventListener('click', clearRoof)
             document.getElementById('saveConfigBtn').addEventListener('click', saveElectricalConfig)
@@ -6110,6 +6362,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         window.cleanInvalidModules = cleanInvalidModules
         window.deleteRectangle = deleteRectangle
         window.duplicateRectangle = duplicateRectangle
+        window.deleteStructure = deleteStructure // NOUVEAU: Structures
         window.debugModules = () => {
             console.log('📊 Modules totaux:', modules.length)
             console.log('❌ Modules invalides:', modules.filter(m => !m.latitude || !m.longitude).length)

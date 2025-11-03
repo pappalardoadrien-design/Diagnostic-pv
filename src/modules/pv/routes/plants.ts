@@ -5,12 +5,20 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import structuresRouter from './structures'
 
 type Bindings = {
   DB: D1Database
+  KV: KVNamespace
+  R2: R2Bucket
 }
 
 const plantsRouter = new Hono<{ Bindings: Bindings }>()
+
+// ============================================================================
+// ROUTES STRUCTURES (Modélisation bâtiments/ombrières/champs)
+// ============================================================================
+plantsRouter.route('/:plantId/zones/:zoneId/structures', structuresRouter)
 
 // ============================================================================
 // CENTRALES PV
