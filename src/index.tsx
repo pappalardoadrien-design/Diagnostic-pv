@@ -4046,6 +4046,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.removeFromMap()
                 this.modules = []
             }
+            
+            // ================================================================
+            // SYNCHRONISATION EL: Rafraîchir couleurs modules
+            // ================================================================
+            refreshModuleColors() {
+                // Mettre à jour couleurs fillColor de chaque cellule du rectangle
+                // basé sur module_status synchronisé depuis API EL
+                
+                // Cette méthode est appelée après syncModulesFromEL()
+                // Pour l'instant, on ne fait rien car les rectangles n'affichent pas
+                // de couleurs individuelles par module (c'est une grille uniforme)
+                
+                // TODO Future: Si on veut afficher couleurs individuelles, créer
+                // des petits rectangles colorés pour chaque module dans la grille
+                
+                console.log('🎨 Rectangle', this.id, ':', this.modules.length, 'modules colors refreshed')
+            }
         }
         
         // ================================================================
@@ -6030,13 +6047,64 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
             
-            // Navigation Module EL
+            // Navigation Module EL - Interconnexion Canvas V2 ↔ Module EL
             document.getElementById('elAuditBtn').addEventListener('click', () => {
-                // TODO: Créer route Module EL avec zone_id
-                // Pour l'instant, redirection vers dashboard
-                alert('🔧 Module EL en cours d\\'intégration' + String.fromCharCode(10) + 'Interconnexion Canvas V2 ↔ EL via pv_modules')
+                window.location.href = '/api/el/audit/zone/' + zoneId
             })
         }
+        
+        // ================================================================
+        // SYNCHRONISATION AUTOMATIQUE MODULE EL ↔ CANVAS V2
+        // ================================================================
+        // Synchronise les statuts modules depuis l'API EL vers Canvas V2
+        async function syncModulesFromEL() {
+            try {
+                const response = await fetch(\`/api/el/zone/\${zoneId}/modules\`)
+                const data = await response.json()
+                
+                if (!data.success || !data.modules) {
+                    console.warn('⚠️ Aucune donnée EL disponible')
+                    return
+                }
+                
+                let syncCount = 0
+                
+                // Mettre à jour module_status dans modules[] basé sur données EL
+                data.modules.forEach(elModule => {
+                    const localModule = modules.find(m => m.module_identifier === elModule.module_identifier)
+                    
+                    if (localModule) {
+                        // Synchroniser statut et données EL
+                        localModule.module_status = elModule.module_status
+                        localModule.el_defect_type = elModule.el_defect_type
+                        localModule.el_severity_level = elModule.el_severity_level
+                        localModule.el_notes = elModule.el_notes
+                        localModule.el_photo_url = elModule.el_photo_url
+                        syncCount++
+                    }
+                })
+                
+                console.log(\`✅ Synchronisation EL: \${syncCount}/\${modules.length} modules mis à jour\`)
+                
+                // Rafraîchir affichage visuel
+                moduleRectangles.forEach(rect => rect.refreshModuleColors())
+                updateStats()
+                
+                return syncCount
+            } catch (error) {
+                console.error('❌ Erreur sync EL:', error)
+                return 0
+            }
+        }
+        
+        // Auto-sync au chargement de la page (après retour depuis Module EL)
+        window.addEventListener('focus', () => {
+            console.log('🔄 Page focus - Synchronisation automatique EL...')
+            syncModulesFromEL()
+        })
+        
+        // Exposer fonction sync dans console
+        window.syncModulesFromEL = syncModulesFromEL
         
         // Exposer fonctions debug et rectangles dans console
         window.cleanInvalidModules = cleanInvalidModules

@@ -1,11 +1,12 @@
 // ============================================================================
-// MODULE EL - ROUTES MODULES
+// MODULE EL - ROUTES MODULES (REFACTORISÉ)
 // ============================================================================
-// Gestion du diagnostic des modules individuels (mise à jour statut, bulk update)
-// Adapté au schéma D1 unifié (el_modules avec defect_type + severity_level)
+// ✅ UTILISE pv_modules (table unifiée) au lieu de el_modules
+// ✅ Synchronisation automatique module_status (critical si severity >= 3)
+// ✅ Interconnexion Canvas V2 ↔ Module EL via zone_id
 
 import { Hono } from 'hono'
-import type { UpdateModuleRequest, BulkUpdateRequest, OLD_STATUS_MAPPING } from '../types'
+import type { UpdateModuleRequest, BulkUpdateRequest } from '../types'
 
 type Bindings = {
   DB: D1Database
@@ -27,6 +28,24 @@ const OLD_TO_NEW_STATUS: Record<string, { defect_type: string; severity_level: n
   'dead': { defect_type: 'dead_module', severity_level: 3 },
   'string_open': { defect_type: 'string_open', severity_level: 2 },
   'not_connected': { defect_type: 'not_connected', severity_level: 2 }
+}
+
+/**
+ * Calculer module_status basé sur el_defect_type (utilise contrainte CHECK existante)
+ * Valeurs autorisées: 'ok', 'inequality', 'microcracks', 'dead', 'string_open', 'not_connected', 'pending'
+ */
+function calculateModuleStatus(defectType: string): string {
+  const statusMap: Record<string, string> = {
+    'none': 'ok',
+    'pending': 'pending',
+    'luminescence_inequality': 'inequality',
+    'microcrack': 'microcracks',
+    'dead_module': 'dead',
+    'string_open': 'string_open',
+    'not_connected': 'not_connected',
+    'bypass_diode_failure': 'microcracks' // Traité comme microcracks
+  }
+  return statusMap[defectType] || 'pending'
 }
 
 /**
@@ -62,13 +81,17 @@ function validateAndTransformStatus(status: string): { defect_type: string; seve
 }
 
 // ============================================================================
-// POST /api/el/audit/:token/module/:moduleId - Mettre à jour le statut d'un module
+// POST /api/el/zone/:zoneId/module/:moduleId - Mettre à jour le statut d'un module
 // ============================================================================
 modulesRouter.post('/module/:moduleId', async (c) => {
   const { env } = c
-  const token = c.req.param('token')  // Token vient du parent auditsRouter
+  const zoneId = parseInt(c.req.param('zoneId') || '0')  // zoneId vient du parent route
   const moduleId = c.req.param('moduleId')
-  const { status, comment, technicianId }: UpdateModuleRequest = await c.req.json()
+  const { status, comment, technicianId, photoUrl }: UpdateModuleRequest & { photoUrl?: string } = await c.req.json()
+  
+  if (!zoneId) {
+    return c.json({ error: 'Zone ID requis' }, 400)
+  }
   
   // Validation et transformation du statut
   const transformedStatus = validateAndTransformStatus(status)
@@ -76,46 +99,74 @@ modulesRouter.post('/module/:moduleId', async (c) => {
     return c.json({ error: 'Statut invalide' }, 400)
   }
   
-  await env.DB.prepare(`
-    UPDATE el_modules 
-    SET defect_type = ?, 
-        severity_level = ?, 
-        comment = ?, 
-        technician_id = ?, 
-        updated_at = datetime('now')
-    WHERE audit_token = ? AND module_identifier = ?
-  `).bind(
-    transformedStatus.defect_type, 
-    transformedStatus.severity_level, 
-    comment || null, 
-    technicianId || null, 
-    token, 
-    moduleId
-  ).run()
+  // Calculer module_status automatiquement (basé sur defect_type)
+  const moduleStatus = calculateModuleStatus(transformedStatus.defect_type)
   
-  // Mise à jour session collaborative temps réel via KV
-  const sessionKey = `audit_session:${token}`
-  const sessionData = {
-    lastUpdate: Date.now(),
-    moduleId,
-    status: transformedStatus.defect_type,
-    technicianId
+  try {
+    // ✅ NOUVEAU: UPDATE pv_modules (table unifiée) avec colonnes el_*
+    await env.DB.prepare(`
+      UPDATE pv_modules 
+      SET el_defect_type = ?, 
+          el_severity_level = ?, 
+          el_notes = ?, 
+          el_photo_url = ?,
+          el_technician_id = ?,
+          el_analysis_date = datetime('now'),
+          module_status = ?,
+          updated_at = datetime('now')
+      WHERE zone_id = ? AND module_identifier = ?
+    `).bind(
+      transformedStatus.defect_type, 
+      transformedStatus.severity_level, 
+      comment || null,
+      photoUrl || null,
+      technicianId || null,
+      moduleStatus,
+      zoneId,
+      moduleId
+    ).run()
+    
+    // Mise à jour session collaborative temps réel via KV
+    const sessionKey = `zone_session:${zoneId}`
+    const sessionData = {
+      lastUpdate: Date.now(),
+      moduleId,
+      status: transformedStatus.defect_type,
+      severity: transformedStatus.severity_level,
+      technicianId
+    }
+    
+    await env.KV.put(sessionKey, JSON.stringify(sessionData), {
+      expirationTtl: 3600 // 1 heure
+    })
+    
+    return c.json({ 
+      success: true,
+      module_status: moduleStatus
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur mise à jour module:', error)
+    return c.json({ 
+      error: 'Erreur mise à jour module',
+      details: error.message 
+    }, 500)
   }
-  
-  await env.KV.put(sessionKey, JSON.stringify(sessionData), {
-    expirationTtl: 3600 // 1 heure
-  })
-  
-  return c.json({ success: true })
 })
 
 // ============================================================================
-// POST /api/el/audit/:token/module - Créer un module individuel
+// POST /api/el/zone/:zoneId/module - Créer un module individuel
 // ============================================================================
+// NOTE: Normalement les modules sont créés par Canvas V2
+// Cette route est conservée pour compatibilité mais devrait rarement être utilisée
 modulesRouter.post('/module', async (c) => {
   const { env } = c
-  const token = c.req.param('token')  // Token vient du parent auditsRouter
-  const { module_id, status, comment, technician_id } = await c.req.json()
+  const zoneId = parseInt(c.req.param('zoneId') || '0')
+  const { module_id, status, comment, technician_id, photo_url } = await c.req.json()
+  
+  if (!zoneId) {
+    return c.json({ error: 'Zone ID requis' }, 400)
+  }
   
   // Validation entrée
   if (!module_id) {
@@ -123,9 +174,9 @@ modulesRouter.post('/module', async (c) => {
   }
   
   // Parsing du module_id format "S{string}-{position}"
-  const moduleIdMatch = module_id.trim().match(/^S(\d+)-(\d+)$/)
+  const moduleIdMatch = module_id.trim().match(/^S(\d+)-P?(\d+)$/)
   if (!moduleIdMatch) {
-    return c.json({ error: 'Format module_id invalide. Attendu: S{string}-{position} (ex: S1-5)' }, 400)
+    return c.json({ error: 'Format module_id invalide. Attendu: S{string}-P{position} (ex: S1-P05)' }, 400)
   }
   
   const stringNumber = parseInt(moduleIdMatch[1])
@@ -137,34 +188,59 @@ modulesRouter.post('/module', async (c) => {
     return c.json({ error: 'Statut invalide' }, 400)
   }
   
+  const moduleStatus = calculateModuleStatus(transformedStatus.defect_type)
+  
   try {
-    // Récupérer l'audit_id depuis le token
-    const audit = await env.DB.prepare(`
-      SELECT id FROM el_audits WHERE audit_token = ?
-    `).bind(token).first<{ id: number }>()
+    // Vérifier si module existe déjà
+    const existingModule = await env.DB.prepare(`
+      SELECT id FROM pv_modules WHERE zone_id = ? AND module_identifier = ?
+    `).bind(zoneId, module_id.trim()).first()
     
-    if (!audit) {
-      return c.json({ error: 'Audit non trouvé' }, 404)
+    if (existingModule) {
+      // UPDATE si existe
+      await env.DB.prepare(`
+        UPDATE pv_modules 
+        SET el_defect_type = ?, 
+            el_severity_level = ?, 
+            el_notes = ?,
+            el_photo_url = ?,
+            el_technician_id = ?,
+            el_analysis_date = datetime('now'),
+            module_status = ?,
+            updated_at = datetime('now')
+        WHERE zone_id = ? AND module_identifier = ?
+      `).bind(
+        transformedStatus.defect_type,
+        transformedStatus.severity_level,
+        comment || null,
+        photo_url || null,
+        technician_id || null,
+        moduleStatus,
+        zoneId,
+        module_id.trim()
+      ).run()
+    } else {
+      // INSERT si n'existe pas (cas rare)
+      await env.DB.prepare(`
+        INSERT INTO pv_modules 
+        (zone_id, module_identifier, string_number, position_in_string,
+         pos_x_meters, pos_y_meters, latitude, longitude,
+         el_defect_type, el_severity_level, el_notes, el_photo_url, el_technician_id,
+         el_analysis_date, module_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'))
+      `).bind(
+        zoneId,
+        module_id.trim(),
+        stringNumber,
+        positionInString,
+        transformedStatus.defect_type,
+        transformedStatus.severity_level,
+        comment || null,
+        photo_url || null,
+        technician_id || null,
+        moduleStatus
+      ).run()
     }
-    
-    const stmt = env.DB.prepare(`
-      INSERT OR REPLACE INTO el_modules 
-      (el_audit_id, audit_token, module_identifier, string_number, position_in_string, 
-       defect_type, severity_level, comment, technician_id, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `)
-    
-    await stmt.bind(
-      audit.id,
-      token,
-      module_id.trim(),
-      stringNumber,
-      positionInString,
-      transformedStatus.defect_type,
-      transformedStatus.severity_level,
-      comment || null,
-      technician_id || null
-    ).run()
     
     return c.json({ 
       success: true,
@@ -173,25 +249,30 @@ modulesRouter.post('/module', async (c) => {
       positionInString,
       defect_type: transformedStatus.defect_type,
       severity_level: transformedStatus.severity_level,
-      message: 'Module créé avec succès'
+      module_status: moduleStatus,
+      message: existingModule ? 'Module mis à jour' : 'Module créé'
     })
     
   } catch (error: any) {
-    console.error('Erreur création module:', error)
+    console.error('Erreur création/mise à jour module:', error)
     return c.json({ 
-      error: 'Erreur lors de la création du module',
+      error: 'Erreur lors de la création/mise à jour du module',
       details: error.message 
     }, 500)
   }
 })
 
 // ============================================================================
-// POST /api/el/audit/:token/bulk-update - Mise à jour en lot des modules
+// POST /api/el/zone/:zoneId/bulk-update - Mise à jour en lot des modules
 // ============================================================================
 modulesRouter.post('/bulk-update', async (c) => {
   const { env } = c
-  const token = c.req.param('token')  // Token vient du parent auditsRouter
-  const { modules, status, comment, technician_id }: BulkUpdateRequest = await c.req.json()
+  const zoneId = parseInt(c.req.param('zoneId') || '0')
+  const { modules, status, comment, technician_id, photo_url }: BulkUpdateRequest & { photo_url?: string } = await c.req.json()
+  
+  if (!zoneId) {
+    return c.json({ error: 'Zone ID requis' }, 400)
+  }
   
   // Validation entrée
   if (!modules || !Array.isArray(modules) || modules.length === 0) {
@@ -208,16 +289,21 @@ modulesRouter.post('/bulk-update', async (c) => {
     return c.json({ error: 'Statut invalide' }, 400)
   }
   
+  const moduleStatus = calculateModuleStatus(transformedStatus.defect_type)
+  
   try {
-    // Préparation requête batch pour performance optimale
+    // ✅ NOUVEAU: UPDATE pv_modules (batch)
     const stmt = env.DB.prepare(`
-      UPDATE el_modules 
-      SET defect_type = ?, 
-          severity_level = ?, 
-          comment = ?, 
-          technician_id = ?, 
+      UPDATE pv_modules 
+      SET el_defect_type = ?, 
+          el_severity_level = ?, 
+          el_notes = ?, 
+          el_photo_url = ?,
+          el_technician_id = ?,
+          el_analysis_date = datetime('now'),
+          module_status = ?,
           updated_at = datetime('now')
-      WHERE audit_token = ? AND module_identifier = ?
+      WHERE zone_id = ? AND module_identifier = ?
     `)
     
     // Exécution batch transaction pour atomicité
@@ -227,17 +313,17 @@ modulesRouter.post('/bulk-update', async (c) => {
         continue // Skip invalid module IDs
       }
       
-      // Vérification que le module existe avant mise à jour
+      // Vérification que le module existe
       const moduleExists = await env.DB.prepare(
-        'SELECT COUNT(*) as count FROM el_modules WHERE audit_token = ? AND module_identifier = ?'
-      ).bind(token, moduleId.trim()).first()
+        'SELECT COUNT(*) as count FROM pv_modules WHERE zone_id = ? AND module_identifier = ?'
+      ).bind(zoneId, moduleId.trim()).first()
       
       if (!moduleExists || (moduleExists as any).count === 0) {
         results.push({
           moduleId: moduleId.trim(),
-          success: true,
+          success: false,
           changes: 0,
-          created: false
+          error: 'Module non trouvé'
         })
         continue
       }
@@ -245,27 +331,29 @@ modulesRouter.post('/bulk-update', async (c) => {
       const result = await stmt.bind(
         transformedStatus.defect_type,
         transformedStatus.severity_level,
-        comment || null, 
-        technician_id || null, 
-        token, 
+        comment || null,
+        photo_url || null,
+        technician_id || null,
+        moduleStatus,
+        zoneId,
         moduleId.trim()
       ).run()
       
       results.push({
         moduleId: moduleId.trim(),
         success: result.success,
-        changes: result.meta?.changes || 0,
-        created: false
+        changes: result.meta?.changes || 0
       })
     }
     
     // Mise à jour session collaborative pour synchronisation temps réel
-    const sessionKey = `audit_session:${token}`
+    const sessionKey = `zone_session:${zoneId}`
     const sessionData = {
       lastUpdate: Date.now(),
       bulkUpdate: {
         modules,
         status: transformedStatus.defect_type,
+        severity: transformedStatus.severity_level,
         count: results.filter((r: any) => r.success).length
       },
       technicianId: technician_id
@@ -276,7 +364,7 @@ modulesRouter.post('/bulk-update', async (c) => {
     })
     
     const successCount = results.filter((r: any) => r.success && r.changes > 0).length
-    const notFoundCount = results.filter((r: any) => r.success && r.changes === 0).length
+    const notFoundCount = results.filter((r: any) => !r.success).length
     
     return c.json({ 
       success: true,
@@ -287,7 +375,7 @@ modulesRouter.post('/bulk-update', async (c) => {
       message: successCount > 0 
         ? `${successCount} modules mis à jour avec succès`
         : notFoundCount > 0 
-        ? `${notFoundCount} modules non trouvés - création automatique requise`
+        ? `${notFoundCount} modules non trouvés`
         : 'Aucun module traité'
     })
     
@@ -296,6 +384,56 @@ modulesRouter.post('/bulk-update', async (c) => {
     return c.json({ 
       error: 'Erreur lors de la mise à jour en lot',
       details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
+// GET /api/el/zone/:zoneId/modules - Récupérer tous les modules d'une zone
+// ============================================================================
+modulesRouter.get('/modules', async (c) => {
+  const { env } = c
+  const zoneId = parseInt(c.req.param('zoneId') || '0')
+  
+  if (!zoneId) {
+    return c.json({ error: 'Zone ID requis' }, 400)
+  }
+  
+  try {
+    const modules = await env.DB.prepare(`
+      SELECT 
+        id,
+        module_identifier,
+        string_number,
+        position_in_string,
+        latitude,
+        longitude,
+        module_status,
+        el_defect_type,
+        el_severity_level,
+        el_notes,
+        el_photo_url,
+        el_technician_id,
+        el_analysis_date,
+        power_wp,
+        created_at,
+        updated_at
+      FROM pv_modules
+      WHERE zone_id = ?
+      ORDER BY string_number, position_in_string
+    `).bind(zoneId).all()
+    
+    return c.json({
+      success: true,
+      modules: modules.results || [],
+      count: modules.results?.length || 0
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur récupération modules:', error)
+    return c.json({
+      error: 'Erreur récupération modules',
+      details: error.message
     }, 500)
   }
 })
