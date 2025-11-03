@@ -3440,6 +3440,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <h1 id="zoneTitle" class="text-xl font-black">Chargement...</h1>
                 </div>
                 <div class="flex gap-3">
+                    <button id="elAuditBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold" title="Audit Électroluminescence">
+                        <i class="fas fa-bolt mr-2"></i>AUDIT EL
+                    </button>
                     <button id="saveAllBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-black">
                         <i class="fas fa-save mr-2"></i>ENREGISTRER TOUT
                     </button>
@@ -6026,6 +6029,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 btn.addEventListener('click', () => selectStatus(btn.dataset.status))
             })
             document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
+            
+            // Navigation Module EL
+            document.getElementById('elAuditBtn').addEventListener('click', () => {
+                // TODO: Créer route Module EL avec zone_id
+                // Pour l'instant, redirection vers dashboard
+                alert('🔧 Module EL en cours d\\'intégration' + String.fromCharCode(10) + 'Interconnexion Canvas V2 ↔ EL via pv_modules')
+            })
         }
         
         // Exposer fonctions debug et rectangles dans console
