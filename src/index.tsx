@@ -3774,6 +3774,232 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
+        // CLASSE RECTANGLE MODULE GROUP (SOLAREDGE STYLE)
+        // ================================================================
+        class RectangleModuleGroup {
+            constructor(id, rows, cols, stringStart, initialBounds) {
+                this.id = id
+                this.rows = rows
+                this.cols = cols
+                this.stringStart = stringStart
+                this.modules = []
+                this.gridLines = []
+                this.infoMarker = null
+                
+                // Créer rectangle Leaflet
+                this.rectangle = L.rectangle(initialBounds, {
+                    color: '#f97316',
+                    weight: 3,
+                    fillColor: 'transparent',
+                    className: 'module-rectangle',
+                    draggable: false
+                })
+                
+                // Enable transform (resize/rotate)
+                if (this.rectangle.transform) {
+                    this.rectangle.transform.enable({
+                        rotation: true,
+                        scaling: true,
+                        uniformScaling: false
+                    })
+                    
+                    // Event listeners
+                    this.rectangle.on('transformed', () => this.regenerateModules())
+                } else {
+                    console.warn('⚠️ Leaflet Transform not loaded - drag to move only')
+                }
+                
+                this.rectangle.on('drag', () => this.regenerateModules())
+                
+                // Générer modules initiaux
+                this.regenerateModules()
+            }
+            
+            regenerateModules() {
+                console.log('🔄 Régénération modules rectangle', this.id)
+                
+                // Clear old modules/grid
+                this.clearVisuals()
+                
+                // Get rectangle bounds
+                const bounds = this.rectangle.getBounds()
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                // Generate grid with bilinear interpolation
+                this.modules = []
+                let globalPosition = 0
+                
+                for (let row = 0; row < this.rows; row++) {
+                    const currentString = this.stringStart + Math.floor(globalPosition / 24)
+                    const positionInString = (globalPosition % 24) + 1
+                    
+                    for (let col = 0; col < this.cols; col++) {
+                        // Ratios for bilinear interpolation
+                        const rowRatio = this.rows > 1 ? row / (this.rows - 1) : 0
+                        const colRatio = this.cols > 1 ? col / (this.cols - 1) : 0
+                        
+                        // Interpolate top edge
+                        const topLat = nw.lat + (ne.lat - nw.lat) * colRatio
+                        const topLng = nw.lng + (ne.lng - nw.lng) * colRatio
+                        
+                        // Interpolate bottom edge
+                        const bottomLat = sw.lat + (se.lat - sw.lat) * colRatio
+                        const bottomLng = sw.lng + (se.lng - sw.lng) * colRatio
+                        
+                        // Final position (interpolate vertically)
+                        const lat = topLat + (bottomLat - topLat) * rowRatio
+                        const lng = topLng + (bottomLng - topLng) * rowRatio
+                        
+                        this.modules.push({
+                            id: null,
+                            zone_id: parseInt(zoneId),
+                            module_identifier: 'S' + currentString + '-P' + (positionInString < 10 ? '0' : '') + positionInString,
+                            latitude: lat,
+                            longitude: lng,
+                            pos_x_meters: col * 1.7,
+                            pos_y_meters: row * 1.0,
+                            width_meters: 1.7,
+                            height_meters: 1.0,
+                            rotation: 0,
+                            string_number: currentString,
+                            position_in_string: positionInString,
+                            power_wp: 450,
+                            module_status: 'pending',
+                            status_comment: null,
+                            rectangleId: this.id
+                        })
+                        
+                        globalPosition++
+                    }
+                }
+                
+                // Draw grid if enabled
+                if (showRectGrid) {
+                    this.drawGrid()
+                }
+                
+                // Update info overlay
+                if (showRectInfo) {
+                    this.updateInfoOverlay()
+                }
+                
+                console.log('✅ Rectangle', this.id, ':', this.modules.length, 'modules générés')
+            }
+            
+            drawGrid() {
+                const bounds = this.rectangle.getBounds()
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                // Horizontal lines
+                for (let i = 0; i <= this.rows; i++) {
+                    const ratio = this.rows > 0 ? i / this.rows : 0
+                    
+                    const startLat = nw.lat + (sw.lat - nw.lat) * ratio
+                    const startLng = nw.lng + (sw.lng - nw.lng) * ratio
+                    
+                    const endLat = ne.lat + (se.lat - ne.lat) * ratio
+                    const endLng = ne.lng + (se.lng - ne.lng) * ratio
+                    
+                    const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
+                        color: '#ffffff',
+                        weight: 1,
+                        opacity: 0.3,
+                        className: 'rectangle-grid-line',
+                        interactive: false
+                    })
+                    
+                    line.addTo(drawnItems)
+                    this.gridLines.push(line)
+                }
+                
+                // Vertical lines
+                for (let i = 0; i <= this.cols; i++) {
+                    const ratio = this.cols > 0 ? i / this.cols : 0
+                    
+                    const startLat = nw.lat + (ne.lat - nw.lat) * ratio
+                    const startLng = nw.lng + (ne.lng - nw.lng) * ratio
+                    
+                    const endLat = sw.lat + (se.lat - sw.lat) * ratio
+                    const endLng = sw.lng + (se.lng - sw.lng) * ratio
+                    
+                    const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
+                        color: '#ffffff',
+                        weight: 1,
+                        opacity: 0.3,
+                        className: 'rectangle-grid-line',
+                        interactive: false
+                    })
+                    
+                    line.addTo(drawnItems)
+                    this.gridLines.push(line)
+                }
+            }
+            
+            updateInfoOverlay() {
+                if (this.infoMarker) {
+                    drawnItems.removeLayer(this.infoMarker)
+                }
+                
+                const center = this.rectangle.getBounds().getCenter()
+                const totalModules = this.rows * this.cols
+                const powerKwc = (totalModules * 0.45).toFixed(2)
+                const stringEnd = this.stringStart + Math.floor((totalModules - 1) / 24)
+                
+                const html = '<div class="rectangle-info-overlay">' +
+                    '<strong>' + this.rows + ' lignes × ' + this.cols + ' modules</strong><br>' +
+                    'Strings ' + this.stringStart + '-' + stringEnd + ' | ' + totalModules + ' modules<br>' +
+                    powerKwc + ' kWc | Rectangle #' + this.id +
+                    '</div>'
+                
+                this.infoMarker = L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'rectangle-info-marker',
+                        html: html,
+                        iconSize: [200, 60],
+                        iconAnchor: [100, 30]
+                    }),
+                    interactive: false
+                })
+                
+                this.infoMarker.addTo(drawnItems)
+            }
+            
+            clearVisuals() {
+                // Remove grid lines
+                this.gridLines.forEach(line => drawnItems.removeLayer(line))
+                this.gridLines = []
+                
+                // Remove info marker
+                if (this.infoMarker) {
+                    drawnItems.removeLayer(this.infoMarker)
+                    this.infoMarker = null
+                }
+            }
+            
+            addToMap() {
+                this.rectangle.addTo(drawnItems)
+                if (showRectGrid) this.drawGrid()
+                if (showRectInfo) this.updateInfoOverlay()
+            }
+            
+            removeFromMap() {
+                drawnItems.removeLayer(this.rectangle)
+                this.clearVisuals()
+            }
+            
+            destroy() {
+                this.removeFromMap()
+                this.modules = []
+            }
+        }
+        
+        // ================================================================
         // INIT
         // ================================================================
         async function init() {
@@ -4723,6 +4949,167 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
+        // GESTION RECTANGLES MODULES
+        // ================================================================
+        function createModuleRectangle() {
+            if (!roofPolygon) {
+                alert('⚠️ Dessinez d' + String.fromCharCode(39) + 'abord la toiture !')
+                return
+            }
+            
+            const rows = parseInt(document.getElementById('rectRows').value) || 5
+            const cols = parseInt(document.getElementById('rectCols').value) || 24
+            const stringStart = parseInt(document.getElementById('rectString').value) || 1
+            
+            // Get initial bounds (center of map)
+            const center = map.getCenter()
+            const latOffset = 0.0005
+            const lngOffset = 0.001
+            
+            const bounds = [
+                [center.lat - latOffset, center.lng - lngOffset],
+                [center.lat + latOffset, center.lng + lngOffset]
+            ]
+            
+            // Create rectangle
+            const id = moduleRectangles.length + 1
+            const rect = new RectangleModuleGroup(id, rows, cols, stringStart, bounds)
+            rect.addToMap()
+            
+            moduleRectangles.push(rect)
+            
+            // Update UI
+            updateRectanglesList()
+            applyRectanglesToModules()
+            
+            alert('✅ Rectangle créé: ' + (rows * cols) + ' modules' + String.fromCharCode(10) + 'Déplacez et redimensionnez avec les poignées')
+        }
+        
+        function applyRectanglesToModules() {
+            // Collect all modules from all rectangles
+            modules = []
+            
+            moduleRectangles.forEach(rect => {
+                modules = modules.concat(rect.modules)
+            })
+            
+            console.log('📦 Modules totaux depuis rectangles:', modules.length)
+            
+            renderModules()
+            updateStats()
+            updateStringsProgress()
+        }
+        
+        function deleteRectangle(id) {
+            const index = moduleRectangles.findIndex(r => r.id === id)
+            if (index === -1) return
+            
+            if (!confirm('Supprimer ce rectangle et ses ' + (moduleRectangles[index].rows * moduleRectangles[index].cols) + ' modules ?')) {
+                return
+            }
+            
+            moduleRectangles[index].destroy()
+            moduleRectangles.splice(index, 1)
+            
+            updateRectanglesList()
+            applyRectanglesToModules()
+        }
+        
+        function duplicateRectangle(id) {
+            const source = moduleRectangles.find(r => r.id === id)
+            if (!source) return
+            
+            const newStringStart = source.stringStart + Math.ceil((source.rows * source.cols) / 24)
+            
+            const sourceBounds = source.rectangle.getBounds()
+            const newBounds = [
+                [sourceBounds.getSouth() - 0.0003, sourceBounds.getWest()],
+                [sourceBounds.getNorth() - 0.0003, sourceBounds.getEast()]
+            ]
+            
+            const newId = moduleRectangles.length + 1
+            const rect = new RectangleModuleGroup(newId, source.rows, source.cols, newStringStart, newBounds)
+            rect.addToMap()
+            
+            moduleRectangles.push(rect)
+            
+            updateRectanglesList()
+            applyRectanglesToModules()
+            
+            alert('✅ Rectangle dupliqué' + String.fromCharCode(10) + 'String départ: ' + newStringStart)
+        }
+        
+        function updateRectanglesList() {
+            const container = document.getElementById('rectanglesContainer')
+            const listDiv = document.getElementById('rectanglesList')
+            
+            if (moduleRectangles.length === 0) {
+                listDiv.classList.add('hidden')
+                return
+            }
+            
+            listDiv.classList.remove('hidden')
+            
+            let html = ''
+            moduleRectangles.forEach(rect => {
+                const totalModules = rect.rows * rect.cols
+                const powerKwc = (totalModules * 0.45).toFixed(1)
+                const stringEnd = rect.stringStart + Math.floor((totalModules - 1) / 24)
+                
+                html += '<div class="p-2 bg-black rounded border border-orange-600">' +
+                    '<div class="flex justify-between items-center mb-1">' +
+                    '<span class="font-bold text-orange-400">Rectangle ' + rect.id + '</span>' +
+                    '<div class="flex gap-1">' +
+                    '<button onclick="duplicateRectangle(' + rect.id + ')" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs" title="Dupliquer">' +
+                    '<i class="fas fa-copy"></i>' +
+                    '</button>' +
+                    '<button onclick="deleteRectangle(' + rect.id + ')" class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs" title="Supprimer">' +
+                    '<i class="fas fa-trash"></i>' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="text-xs text-gray-400">' +
+                    rect.rows + ' × ' + rect.cols + ' = ' + totalModules + ' modules<br>' +
+                    'Strings ' + rect.stringStart + '-' + stringEnd + ' | ' + powerKwc + ' kWc' +
+                    '</div>' +
+                    '</div>'
+            })
+            
+            container.innerHTML = html
+        }
+        
+        function toggleRectGridVisibility() {
+            showRectGrid = document.getElementById('showRectGrid').checked
+            moduleRectangles.forEach(rect => {
+                rect.clearVisuals()
+                if (showRectGrid) rect.drawGrid()
+                if (showRectInfo) rect.updateInfoOverlay()
+            })
+        }
+        
+        function toggleRectLabelsVisibility() {
+            showRectLabels = document.getElementById('showRectLabels').checked
+            renderModules()
+        }
+        
+        function toggleRectInfoVisibility() {
+            showRectInfo = document.getElementById('showRectInfo').checked
+            moduleRectangles.forEach(rect => {
+                if (rect.infoMarker) {
+                    drawnItems.removeLayer(rect.infoMarker)
+                    rect.infoMarker = null
+                }
+                if (showRectInfo) rect.updateInfoOverlay()
+            })
+        }
+        
+        function updateRectTotal() {
+            const rows = parseInt(document.getElementById('rectRows').value) || 0
+            const cols = parseInt(document.getElementById('rectCols').value) || 0
+            document.getElementById('rectTotal').textContent = rows * cols
+        }
+        
+        // ================================================================
         // RENDU MODULES
         // ================================================================
         function renderModules() {
@@ -5530,18 +5917,34 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('saveAllBtn').addEventListener('click', saveAll)
             document.getElementById('exportBtn').addEventListener('click', exportPDF)
             
+            // Rectangle Modules (SolarEdge style)
+            document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
+            document.getElementById('rectRows').addEventListener('input', updateRectTotal)
+            document.getElementById('rectCols').addEventListener('input', updateRectTotal)
+            document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
+            document.getElementById('showRectLabels').addEventListener('change', toggleRectLabelsVisibility)
+            document.getElementById('showRectInfo').addEventListener('change', toggleRectInfoVisibility)
+            
             document.querySelectorAll('.status-btn').forEach(btn => {
                 btn.addEventListener('click', () => selectStatus(btn.dataset.status))
             })
             document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
         }
         
-        // Exposer fonctions debug dans console
+        // Exposer fonctions debug et rectangles dans console
         window.cleanInvalidModules = cleanInvalidModules
+        window.deleteRectangle = deleteRectangle
+        window.duplicateRectangle = duplicateRectangle
         window.debugModules = () => {
             console.log('📊 Modules totaux:', modules.length)
             console.log('❌ Modules invalides:', modules.filter(m => !m.latitude || !m.longitude).length)
             console.log('✅ Modules valides:', modules.filter(m => m.latitude && m.longitude).length)
+        }
+        window.debugRectangles = () => {
+            console.log('📦 Rectangles:', moduleRectangles.length)
+            moduleRectangles.forEach(r => {
+                console.log('  Rectangle', r.id, ':', r.rows, 'x', r.cols, '=', r.modules.length, 'modules')
+            })
         }
         
         // INIT
