@@ -529,14 +529,24 @@ auditsRouter.delete('/:token', async (c) => {
 auditsRouter.post('/:token/module/:moduleId', async (c) => {
   const { env } = c
   const token = c.req.param('token')
-  const moduleId = c.req.param('moduleId') // Garde en string (module_identifier, pas id)
+  const moduleId = c.req.param('moduleId')
   
   try {
-    // Support ancien format (status, comment) ET nouveau format (defect_type, notes)
-    const body = await c.req.json()
+    // Parse body
+    let body
+    try {
+      body = await c.req.json()
+    } catch (e) {
+      return c.json({ error: 'JSON invalide', details: String(e) }, 400)
+    }
+    
     const status = body.status || body.defect_type
     const comment = body.comment || body.notes
     const technicianId = body.technicianId || body.technician_id
+    
+    if (!status) {
+      return c.json({ error: 'Champ status requis' }, 400)
+    }
     
     // Mapping ancien statut → nouveau defect_type
     const statusMap: Record<string, string> = {
@@ -547,7 +557,6 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
       'string_open': 'string_open',
       'not_connected': 'not_connected',
       'pending': 'pending',
-      // Accepter aussi nouveaux formats directement
       'none': 'none',
       'luminescence_inequality': 'luminescence_inequality',
       'microcrack': 'microcrack',
@@ -556,11 +565,10 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
     
     const defect_type = statusMap[status]
     if (!defect_type) {
-      console.error('❌ Statut invalide:', status)
-      return c.json({ error: 'Statut invalide: ' + status }, 400)
+      return c.json({ error: `Statut invalide: ${status}` }, 400)
     }
     
-    // Calculer severity_level automatiquement
+    // Calculer severity_level
     const severityMap: Record<string, number> = {
       'none': 0,
       'luminescence_inequality': 1,
@@ -572,30 +580,48 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
     }
     const severity_level = severityMap[defect_type] || 0
     
-    console.log('✅ Mapping OK:', { status, defect_type, severity_level, comment, technicianId })
-    
-    // Mise à jour module (utilise module_identifier comme clé, pas id)
-    const result = await env.DB.prepare(`
-      UPDATE el_modules 
-      SET defect_type = ?,
-          severity_level = ?,
-          comment = ?,
-          technician_id = ?,
-          updated_at = datetime('now')
-      WHERE audit_token = ? AND module_identifier = ?
-    `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
-    
-    console.log('📊 Résultat UPDATE:', result.meta)
-    
-    if (result.meta.changes === 0) {
-      return c.json({ error: 'Module non trouvé: ' + moduleId }, 404)
+    // Mise à jour module
+    let result
+    try {
+      result = await env.DB.prepare(`
+        UPDATE el_modules 
+        SET defect_type = ?,
+            severity_level = ?,
+            comment = ?,
+            technician_id = ?,
+            updated_at = datetime('now')
+        WHERE audit_token = ? AND module_identifier = ?
+      `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
+    } catch (dbError: any) {
+      return c.json({ 
+        error: 'Erreur DB UPDATE', 
+        details: dbError?.message || String(dbError),
+        query: { token, moduleId, defect_type, severity_level }
+      }, 500)
     }
     
-    return c.json({ success: true, moduleId, defect_type, status })
+    if (!result || !result.meta || result.meta.changes === 0) {
+      return c.json({ 
+        error: `Module non trouvé: ${moduleId}`,
+        token,
+        moduleId 
+      }, 404)
+    }
+    
+    return c.json({ 
+      success: true, 
+      moduleId, 
+      defect_type, 
+      status,
+      changes: result.meta.changes 
+    })
     
   } catch (error: any) {
-    console.error('Erreur mise à jour module:', error)
-    return c.json({ error: 'Erreur serveur', details: error.message }, 500)
+    return c.json({ 
+      error: 'Erreur serveur inconnue', 
+      details: error?.message || String(error),
+      stack: error?.stack?.split('\n').slice(0, 3).join('\n')
+    }, 500)
   }
 })
 
