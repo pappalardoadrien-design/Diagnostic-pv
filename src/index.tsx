@@ -1334,9 +1334,9 @@ function generatePhysicalModulesGrid(modules: any[]) {
   const minRow = Math.min(...sortedModules.map(m => m.physical_row || 0))
   const minCol = Math.min(...sortedModules.map(m => m.physical_col || 0))
 
-  // Créer une grille vide
+  // Créer une grille vide (String 1 en HAUT = index 0)
   const grid = []
-  for (let row = maxRow; row >= minRow; row--) { // De haut en bas (inversion visuelle)
+  for (let row = minRow; row <= maxRow; row++) { // Row 1 → index 0 (TOP), Row 10 → index 9 (BOTTOM)
     const gridRow = []
     for (let col = minCol; col <= maxCol; col++) {
       gridRow.push(null)
@@ -1348,7 +1348,7 @@ function generatePhysicalModulesGrid(modules: any[]) {
   sortedModules.forEach(module => {
     const row = module.physical_row || 0
     const col = module.physical_col || 0
-    const gridRowIndex = maxRow - row  // Inversion pour affichage correct
+    const gridRowIndex = row - minRow  // Row 1 → index 0 (TOP), Row 10 → index 9 (BOTTOM)
     const gridColIndex = col - minCol
     
     if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
