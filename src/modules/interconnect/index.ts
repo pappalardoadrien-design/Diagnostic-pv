@@ -42,13 +42,14 @@ interconnectModule.post('/link-audit-plant', async (c) => {
     // 2. Si pas de plantId fourni, créer centrale automatiquement
     if (!finalPlantId && createPlant) {
       const plantResult = await env.DB.prepare(`
-        INSERT INTO pv_plants (plant_name, location, client_name, total_modules)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO pv_plants (plant_name, address, city, module_count, notes)
+        VALUES (?, ?, ?, ?, ?)
       `).bind(
         audit.project_name,
         audit.location || 'À définir',
-        audit.client_name,
-        audit.total_modules || 0
+        audit.client_name || '',
+        audit.total_modules || 0,
+        `Centrale créée automatiquement depuis audit EL ${audit.audit_token}`
       ).run()
       
       finalPlantId = plantResult.meta.last_row_id
@@ -93,9 +94,9 @@ interconnectModule.get('/audit/:token/plant', async (c) => {
       SELECT 
         p.id AS plant_id,
         p.plant_name,
-        p.location,
+        p.address || ', ' || p.city AS location,
         p.total_power_kwp,
-        p.total_modules,
+        p.module_count AS total_modules,
         p.latitude,
         p.longitude
       FROM el_audits ea
