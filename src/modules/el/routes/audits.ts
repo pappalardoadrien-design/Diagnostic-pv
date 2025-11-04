@@ -580,7 +580,7 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
     }
     const severity_level = severityMap[defect_type] || 0
     
-    // Mise à jour module
+    // Mise à jour module (sans technician_id pour éviter contrainte FK)
     let result
     try {
       result = await env.DB.prepare(`
@@ -588,10 +588,9 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
         SET defect_type = ?,
             severity_level = ?,
             comment = ?,
-            technician_id = ?,
             updated_at = datetime('now')
         WHERE audit_token = ? AND module_identifier = ?
-      `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
+      `).bind(defect_type, severity_level, comment || null, token, moduleId).run()
     } catch (dbError: any) {
       return c.json({ 
         error: 'Erreur DB UPDATE', 
