@@ -5,6 +5,7 @@ import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import pvModule from './modules/pv/routes/plants'
 import openSolarModule from './opensolar'
+import interconnectModule from './modules/interconnect'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
