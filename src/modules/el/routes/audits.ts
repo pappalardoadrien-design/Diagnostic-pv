@@ -556,6 +556,7 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
     
     const defect_type = statusMap[status]
     if (!defect_type) {
+      console.error('❌ Statut invalide:', status)
       return c.json({ error: 'Statut invalide: ' + status }, 400)
     }
     
@@ -571,6 +572,8 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
     }
     const severity_level = severityMap[defect_type] || 0
     
+    console.log('✅ Mapping OK:', { status, defect_type, severity_level, comment, technicianId })
+    
     // Mise à jour module (utilise module_identifier comme clé, pas id)
     const result = await env.DB.prepare(`
       UPDATE el_modules 
@@ -581,6 +584,8 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
           updated_at = datetime('now')
       WHERE audit_token = ? AND module_identifier = ?
     `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
+    
+    console.log('📊 Résultat UPDATE:', result.meta)
     
     if (result.meta.changes === 0) {
       return c.json({ error: 'Module non trouvé: ' + moduleId }, 404)

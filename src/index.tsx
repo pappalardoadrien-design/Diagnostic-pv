@@ -1306,8 +1306,8 @@ app.get('/audit/:token', async (c) => {
             </div>
         </div>
         
-        <script src="/static/diagpv-audit.js"></script>
-        <script src="/static/diagpv-measures.js"></script>
+        <script src="/static/diagpv-audit.js?v=20251104-2"></script>
+        <script src="/static/diagpv-measures.js?v=20251104-2"></script>
     </body>
     </html>
   `)

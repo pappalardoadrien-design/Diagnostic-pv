@@ -576,7 +576,9 @@ class DiagPVAudit {
             })
 
             if (!response.ok) {
-                throw new Error('Erreur mise à jour module')
+                const errorData = await response.text()
+                logAudit('❌ Erreur HTTP', response.status, errorData)
+                throw new Error(`Erreur mise à jour module (${response.status}): ${errorData}`)
             }
 
             // Mise à jour locale immédiate
