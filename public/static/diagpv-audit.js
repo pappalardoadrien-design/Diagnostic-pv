@@ -577,9 +577,15 @@ class DiagPVAudit {
 
             if (!response.ok) {
                 let errorData
+                let fullError
                 try {
-                    const errorJson = await response.json()
-                    errorData = errorJson.error || errorJson.details || JSON.stringify(errorJson)
+                    fullError = await response.json()
+                    console.error('❌ Erreur complète:', fullError)
+                    errorData = fullError.error || fullError.details || JSON.stringify(fullError)
+                    // Afficher TOUS les détails
+                    if (fullError.details) errorData += ` | Détails: ${fullError.details}`
+                    if (fullError.query) errorData += ` | Query: ${JSON.stringify(fullError.query)}`
+                    if (fullError.stack) errorData += ` | Stack: ${fullError.stack}`
                 } catch {
                     errorData = await response.text()
                 }
