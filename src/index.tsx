@@ -58,6 +58,7 @@ app.route('/api/interconnect', interconnectModule)
 // - GET /api/sync/audit/:token/sync-status → État synchronisation
 // ============================================================================
 app.route('/api/sync', syncModule)
+app.route('/api/sync', syncModule)
 
 // ============================================================================
 // MODULE OPENSOLAR DXF IMPORT - ISOLÉ (Point 5.0 - Module autonome)
@@ -7075,22 +7076,6 @@ app.get('/opensolar', (c) => {
                     const data = await response.json()
 
                     if (data.error) {
-                        throw new Error(data.error)
-                    }
-
-                    status.innerHTML = \`<p class="text-green-400"><i class="fas fa-check-double mr-2"></i>\${data.insertedCount} modules importés!</p>\`
-
-                } catch (error) {
-                    status.innerHTML = \`<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur: \${error.message}</p>\`
-                }
-            })
-        </script>
-    </body>
-    </html>
-  `)
-})
-
-export default app
                         throw new Error(data.error)
                     }
 
