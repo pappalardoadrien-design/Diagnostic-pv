@@ -584,21 +584,21 @@ auditsRouter.get('/:token/report', async (c) => {
       const minRow = Math.min(...sortedModules.map(m => m.physical_row || 0))
       const minCol = Math.min(...sortedModules.map(m => m.physical_col || 0))
 
-      // Créer grille vide
+      // Créer grille vide (String 1 en HAUT = index 0, String max en BAS = dernier index)
       const grid: (ELModule | null)[][] = []
-      for (let row = maxRow; row >= minRow; row--) {
+      for (let row = minRow; row <= maxRow; row++) { // Row 1 → 2 → ... → 11
         const gridRow: (ELModule | null)[] = []
         for (let col = minCol; col <= maxCol; col++) {
           gridRow.push(null)
         }
-        grid.push(gridRow)
+        grid.push(gridRow) // grid[0] = Row 1 (HAUT), grid[10] = Row 11 (BAS)
       }
 
       // Placer les modules dans la grille
       sortedModules.forEach(module => {
         const row = module.physical_row || 0
         const col = module.physical_col || 0
-        const gridRowIndex = maxRow - row
+        const gridRowIndex = row - minRow // Row 1 → index 0 (HAUT), Row 11 → index 10 (BAS)
         const gridColIndex = col - minCol
         
         if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
