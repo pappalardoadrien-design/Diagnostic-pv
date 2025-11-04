@@ -1079,7 +1079,7 @@ app.get('/audit/:token', async (c) => {
                             🟠 Fissures
                         </button>
                         <button class="bulk-action-btn bg-red-600 hover:bg-red-700 p-2 rounded font-bold text-sm" data-status="dead" title="Marquer comme HS">
-                            🔴 HS
+                            🔴 Impact Cellulaire
                         </button>
                         <button class="bulk-action-btn bg-blue-600 hover:bg-blue-700 p-2 rounded font-bold text-sm" data-status="string_open" title="Marquer comme string ouvert">
                             🔵 String
@@ -1112,7 +1112,7 @@ app.get('/audit/:token', async (c) => {
                         🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        🔴 HS<br><span class="text-sm font-normal">Module défaillant</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
                     </button>
                     <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
                         🔵 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
@@ -2065,7 +2065,7 @@ function getStatusLabel(status: string): string {
     'ok': '🟢 OK',
     'inequality': '🟡 Inégalité',
     'microcracks': '🟠 Microfissures',
-    'dead': '🔴 HS',
+    'dead': '🔴 Impact Cellulaire',
     'string_open': '🔵 String ouvert',
     'not_connected': '⚫ Non raccordé'
   }
@@ -2855,7 +2855,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-red-400">
                     <div class="text-xl font-black text-red-400" id="statsDead">0</div>
-                    <div class="text-xs text-gray-400">🔴 HS</div>
+                    <div class="text-xs text-gray-400">🔴 Impact Cellulaire</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-blue-400">
                     <div class="text-xl font-black text-blue-400" id="statsStringOpen">0</div>
@@ -2884,7 +2884,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                         🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        🔴 HS<br><span class="text-sm font-normal">Module défaillant</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
                     </button>
                     <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
                         🔵 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
@@ -3597,7 +3597,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <span id="statsOk" class="font-bold text-green-400">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>🔴 HS:</span>
+                            <span>🔴 Impact Cellulaire:</span>
                             <span id="statsDead" class="font-bold text-red-400">0</span>
                         </div>
                         <div class="flex justify-between">
@@ -3644,7 +3644,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-red-400">
                         <div class="text-xl font-black text-red-400" id="statsDead2">0</div>
-                        <div class="text-xs">🔴 HS</div>
+                        <div class="text-xs">🔴 Impact Cellulaire</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-blue-400">
                         <div class="text-xl font-black text-blue-400" id="statsStringOpen">0</div>
@@ -3678,7 +3678,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        🔴 HS<br><span class="text-sm font-normal">Défaillant</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaillant</span>
                     </button>
                     <button class="status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
                         🔵 String ouvert<br><span class="text-sm font-normal">Sous-string</span>

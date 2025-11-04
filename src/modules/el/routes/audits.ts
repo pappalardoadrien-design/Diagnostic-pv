@@ -523,6 +523,47 @@ auditsRouter.delete('/:token', async (c) => {
 })
 
 // ============================================================================
+// ============================================================================
+// POST /api/el/audit/:token/module/:moduleId - Mettre à jour module individuel
+// ============================================================================
+auditsRouter.post('/:token/module/:moduleId', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const moduleId = parseInt(c.req.param('moduleId'))
+  
+  try {
+    const { defect_type, severity_level, notes } = await c.req.json()
+    
+    // Validation defect_type
+    const validDefects = ['none', 'luminescence_inequality', 'microcrack', 'dead_module', 'string_open', 'not_connected', 'pending']
+    if (!validDefects.includes(defect_type)) {
+      return c.json({ error: 'Type de défaut invalide' }, 400)
+    }
+    
+    // Mise à jour module
+    const result = await env.DB.prepare(`
+      UPDATE el_modules 
+      SET defect_type = ?,
+          severity_level = ?,
+          notes = ?,
+          analysis_date = datetime('now'),
+          updated_at = datetime('now')
+      WHERE id = ? AND audit_token = ?
+    `).bind(defect_type, severity_level || 0, notes || null, moduleId, token).run()
+    
+    if (result.meta.changes === 0) {
+      return c.json({ error: 'Module non trouvé' }, 404)
+    }
+    
+    return c.json({ success: true, moduleId, defect_type })
+    
+  } catch (error: any) {
+    console.error('Erreur mise à jour module:', error)
+    return c.json({ error: 'Erreur serveur', details: error.message }, 500)
+  }
+})
+
+// ============================================================================
 // GET /api/el/audit/:token/report - Générer rapport PDF de l'audit
 // ============================================================================
 auditsRouter.get('/:token/report', async (c) => {
@@ -653,7 +694,7 @@ auditsRouter.get('/:token/report', async (c) => {
           </div>
           <div class="legend-item">
             <div class="legend-box" style="background: #fecaca;"></div>
-            <span>🔴 HS - À REMPLACER</span>
+            <span>🔴 Impact Cellulaire - À REMPLACER</span>
           </div>
           <div class="legend-item">
             <div class="legend-box" style="background: #dbeafe;"></div>
