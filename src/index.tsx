@@ -35,6 +35,19 @@ app.route('/api/el', elModule)
 app.route('/api/pv/plants', pvModule)
 
 // ============================================================================
+// MODULE INTERCONNECT - Liaison entre modules (EL ↔ PV Carto)
+// ============================================================================
+// Permet navigation cohérente entre audits EL et centrales PV
+// Routes:
+// - POST /api/interconnect/link-audit-plant → Lier audit EL à centrale PV
+// - GET /api/interconnect/audit/:token/plant → Obtenir centrale liée
+// - GET /api/interconnect/plant/:plantId/audits → Audits EL d'une centrale
+// - POST /api/interconnect/link-audit-zone → Lier audit à zone spécifique
+// - GET /api/interconnect/audit/:token/zones → Zones liées à audit
+// ============================================================================
+app.route('/api/interconnect', interconnectModule)
+
+// ============================================================================
 // MODULE OPENSOLAR DXF IMPORT - ISOLÉ (Point 5.0 - Module autonome)
 // ============================================================================
 // Module complètement isolé pour import DXF OpenSolar
@@ -1014,8 +1027,11 @@ app.get('/audit/:token', async (c) => {
                     <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold flex items-center border-2 border-orange-400 shadow-lg" title="Accéder au tableau de bord - Vue d'ensemble audits">
                         <i class="fas fa-tachometer-alt mr-2 text-lg"></i>TABLEAU DE BORD
                     </a>
-                    <a href="/pv/plants" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold flex items-center" title="Cartographie centrales PV">
+                    <button id="pvCartoBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold flex items-center" style="display:none;" title="Cartographie PV de cette centrale">
                         <i class="fas fa-solar-panel mr-1"></i>PV CARTO
+                    </button>
+                    <a href="/pv/plants" class="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded font-bold flex items-center" title="Liste toutes centrales PV">
+                        <i class="fas fa-list mr-1"></i>CENTRALES
                     </a>
                     <button id="multiSelectToggleBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold border-2 border-yellow-400" title="Activer la sélection multiple pour gagner du temps sur les modules défectueux">
                         <i class="fas fa-check-square mr-1"></i>SÉLECTION MULTIPLE
@@ -1308,6 +1324,38 @@ app.get('/audit/:token', async (c) => {
         
         <script src="/static/diagpv-audit.js?v=20251104-2"></script>
         <script src="/static/diagpv-measures.js?v=20251104-2"></script>
+        <script>
+        // ============================================================================
+        // Interconnexion Module EL → PV Carto
+        // ============================================================================
+        const AUDIT_TOKEN = '${token}'
+        
+        async function loadPlantLink() {
+            try {
+                const response = await fetch(\`/api/interconnect/audit/\${AUDIT_TOKEN}/plant\`)
+                const data = await response.json()
+                
+                if (data.linked && data.plant) {
+                    const btn = document.getElementById('pvCartoBtn')
+                    if (btn) {
+                        btn.style.display = 'flex'
+                        btn.onclick = () => {
+                            window.location.href = \`/pv/plants/\${data.plant.plant_id}\`
+                        }
+                        btn.title = \`Cartographie PV: \${data.plant.plant_name || 'Centrale liée'}\`
+                        console.log('✅ Centrale PV liée:', data.plant.plant_name)
+                    }
+                }
+            } catch (error) {
+                console.log('ℹ️ Aucune centrale PV liée à cet audit')
+            }
+        }
+        
+        // Charger lien après initialisation
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(loadPlantLink, 500)
+        })
+        </script>
     </body>
     </html>
   `)
