@@ -6,6 +6,7 @@ import elModule from './modules/el'
 import pvModule from './modules/pv/routes/plants'
 import openSolarModule from './opensolar'
 import interconnectModule from './modules/interconnect'
+import syncModule from './modules/interconnect/sync'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -47,6 +48,16 @@ app.route('/api/pv/plants', pvModule)
 // - GET /api/interconnect/audit/:token/zones → Zones liées à audit
 // ============================================================================
 app.route('/api/interconnect', interconnectModule)
+
+// ============================================================================
+// MODULE SYNC - Synchronisation automatique EL ↔ PV Carto
+// ============================================================================
+// Synchronise modules et défauts entre Module EL et PV Cartography
+// Routes:
+// - POST /api/sync/sync-audit-to-plant → Sync auto audit EL → centrale PV
+// - GET /api/sync/audit/:token/sync-status → État synchronisation
+// ============================================================================
+app.route('/api/sync', syncModule)
 
 // ============================================================================
 // MODULE OPENSOLAR DXF IMPORT - ISOLÉ (Point 5.0 - Module autonome)
@@ -652,17 +663,7 @@ app.get('/el', (c) => {
                     <i class="fas fa-moon text-4xl text-green-400 mr-4"></i>
                     <h1 class="text-4xl font-black">MODULE EL - ÉLECTROLUMINESCENCE</h1>
                 </div>
-                <p class="text-xl text-gray-300">Interface Terrain Nocturne - Audit Photovoltaïque</p>
-                <p class="text-lg text-blue-400 mt-2">
-                    <i class="fas fa-globe mr-2"></i>
-                    www.diagnosticphotovoltaique.fr
-                </p>
-            </header>
-            
-            <!-- Interface création audit (contenu identique à l'ancienne page /) -->
-            <div class="max-w-4xl mx-auto">
-                <div class="bg-gray-900 rounded-lg p-8 border-2 border-green-400">
-                    <h2 class="text-2xl font-black mb-6 text-center">
+                <p class="text-xl text-gray-300">Interface Terrfont-black mb-6 text-center">
                         <i class="fas fa-plus-circle mr-2 text-green-400"></i>
                         NOUVEL AUDIT ÉLECTROLUMINESCENCE
                     </h2>
@@ -1341,7 +1342,7 @@ app.get('/audit/:token', async (c) => {
                     if (btn) {
                         btn.style.display = 'flex'
                         btn.onclick = () => {
-                            window.location.href = \`/pv/plants/\${data.plant.plant_id}\`
+                            window.location.href = \`/pv/plant/\${data.plant.plant_id}\`
                         }
                         btn.title = \`Cartographie PV: \${data.plant.plant_name || 'Centrale liée'}\`
                         console.log('✅ Centrale PV liée:', data.plant.plant_name)
@@ -1583,6 +1584,19 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                 background: white;
                 margin: 25px 0;
                 page-break-inside: avoid;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                overflow: hidden;
+                border: 1px solid #e5e7eb;
+            }
+            
+            .section h3 {
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                color: white;
+                margin: 0;
+                padding: 20px 25px;
+                font-size: 1.25rem;
+             page-break-inside: avoid;
                 border-radius: 12px;
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                 overflow: hidden;
@@ -2629,17 +2643,7 @@ app.get('/pv/plants', (c) => {
                             <p class="text-sm text-gray-400">
                                 <i class="fas \${typeIcons[plant.plant_type] || 'fa-solar-panel'} mr-1"></i>
                                 \${typeLabels[plant.plant_type] || plant.plant_type}
-                            </p>
-                        </div>
-                        <button onclick="deletePlant(\${plant.id})" 
-                                class="text-red-400 hover:text-red-300" title="Supprimer">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="grid grid-cols-3 gap-3 mb-4 text-center">
-                        <div>
-                            <div class="text-2xl font-bold text-blue-400">\${plant.zone_count || 0}</div>
+        bold text-blue-400">\${plant.zone_count || 0}</div>
                             <div class="text-xs text-gray-500">Zones</div>
                         </div>
                         <div>
@@ -2955,6 +2959,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                         ENREGISTRER
                     </button>
                     <button id="cancelStatusBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                        ANNULER
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        // VARIABLES GLOBALES
+        const plantId = '${plantId}'
+        const zoneId = '${zoneId}'
+        const canvas = document.getElementById('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        let modules = []
+        let zoneData = null
+        let backgroundImage = null
+        let placementMode = 'manual'
+        let currentRotati font-black">
                         ANNULER
                     </button>
                 </div>
@@ -4674,17 +4696,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     body: JSON.stringify(config)
                 })
                 
-                const summary = stringsConfig.length > 0 ? stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') : 'Config uniforme: ' + stringCount + ' strings x ' + modulesPerString + ' modules'
-                alert('OK: Configuration electrique sauvegardee!' + String.fromCharCode(10,10) + summary)
-            } catch (error) {
-                alert('ERREUR: ' + error.message)
-            }
-        }
-        
-        // ================================================================
-        // PLACEMENT MODULES
-        // ================================================================
-        function placeModulesAuto() {
+                const summary = stringsConfig.length > 0 ? stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') : 'Conf{
             if (!roofPolygon) {
                 alert("ATTENTION: Dessinez d'abord le contour de toiture!")
                 return
@@ -7063,6 +7075,22 @@ app.get('/opensolar', (c) => {
                     const data = await response.json()
 
                     if (data.error) {
+                        throw new Error(data.error)
+                    }
+
+                    status.innerHTML = \`<p class="text-green-400"><i class="fas fa-check-double mr-2"></i>\${data.insertedCount} modules importés!</p>\`
+
+                } catch (error) {
+                    status.innerHTML = \`<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur: \${error.message}</p>\`
+                }
+            })
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+export default app
                         throw new Error(data.error)
                     }
 
