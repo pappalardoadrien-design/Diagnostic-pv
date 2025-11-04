@@ -576,9 +576,8 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
       UPDATE el_modules 
       SET defect_type = ?,
           severity_level = ?,
-          notes = ?,
+          comment = ?,
           technician_id = ?,
-          analysis_date = datetime('now'),
           updated_at = datetime('now')
       WHERE audit_token = ? AND module_identifier = ?
     `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
