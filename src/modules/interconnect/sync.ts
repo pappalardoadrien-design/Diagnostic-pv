@@ -131,55 +131,39 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
       `).bind(zoneId, elModule.module_identifier).first()
       
       if (!existingModule) {
-        // Créer module PV
+        // Créer module PV (colonnes réelles)
         await env.DB.prepare(`
           INSERT INTO pv_modules (
             zone_id,
-            plant_id,
             module_identifier,
             string_number,
             position_in_string,
-            physical_row,
-            physical_col,
-            x_position,
-            y_position,
-            el_module_id,
-            el_audit_token,
-            defect_type,
-            defect_severity
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            pos_x_meters,
+            pos_y_meters,
+            azimuth,
+            tilt,
+            notes
+          ) VALUES (?, ?, ?, ?, ?, ?, 180, 30, ?)
         `).bind(
           zoneId,
-          plantId,
           elModule.module_identifier,
           elModule.string_number,
           elModule.position_in_string,
-          elModule.physical_row,
-          elModule.physical_col,
           elModule.physical_col * 2, // Espacement 2m
           elModule.physical_row * 1, // Espacement 1m
-          elModule.id,
-          auditToken,
-          elModule.defect_type,
-          elModule.severity_level
+          `EL: ${elModule.defect_type} (sév ${elModule.severity_level}) | ${elModule.comment || ''} | Token: ${auditToken}`
         ).run()
         
         createdCount++
       } else {
-        // Mettre à jour défauts
+        // Mettre à jour défauts (via notes)
         await env.DB.prepare(`
           UPDATE pv_modules 
-          SET defect_type = ?,
-              defect_severity = ?,
-              el_module_id = ?,
-              el_audit_token = ?,
+          SET notes = ?,
               updated_at = datetime('now')
           WHERE id = ?
         `).bind(
-          elModule.defect_type,
-          elModule.severity_level,
-          elModule.id,
-          auditToken,
+          `EL: ${elModule.defect_type} (sévérité ${elModule.severity_level}) - ${elModule.comment || ''}`,
           existingModule.id
         ).run()
         
