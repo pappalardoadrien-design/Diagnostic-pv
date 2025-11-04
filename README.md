@@ -421,37 +421,186 @@ curl http://localhost:3000
 - **Validation** complète inputs utilisateur
 - **Logging** détaillé pour debug production
 
-## 📋 Roadmap Modules Futurs
+## 🗺️ ROADMAP STRATÉGIQUE
 
-### Module I-V (Courbes I-V) - Priorité 1
-- Mesures électriques complètes
-- Analyse courbes caractéristiques
-- Détection anomalies automatique
-- Comparaison courbes référence
+### 📄 Documents Stratégiques
+- **`ROADMAP_PRAGMATIQUE.md`** - Roadmap complète 4 phases (18-24 mois) avec validation économique
+- **`DECISION_STRATEGIQUE.md`** - Guide décision développement (5 options comparées)
 
-### Module Thermique - Priorité 2
-- Import images thermographie
-- Analyse points chauds
-- Corrélation avec défauts EL
-- Rapports thermographiques
+### 🎯 Phase 0 : CONSOLIDATION (Novembre 2025 - 2 semaines)
+**Budget :** 0€ (travail interne)  
+**Objectif :** UNE version opérationnelle unique
 
-### Module Contrôles Visuels - Priorité 3
-- Checklist contrôles normatifs
-- Upload photos défauts
-- Annotations images
-- Conformité NF C 15-100
+- [x] ✅ Fix cartographie (String 1 en haut)
+- [x] ✅ Migration base unifiée (pv_modules multi-modules)
+- [ ] 🔄 Archiver anciennes versions (webapp standalone, etc.)
+- [ ] 🔄 Tester audit JALIBAT complet (import JSON → rapport PDF)
+- [ ] 🔄 Documenter fonctionnalités existantes (README + captures)
 
-### Module Expertise Post-Sinistre - Priorité 4
-- Analyse causes sinistre
-- Évaluation dommages
-- Préconisations réparations
-- Rapports expertise judiciaire
+**Livrable :** Module EL 100% opérationnel dans diagnostic-hub
 
-### Module Isolation - Priorité 5
-- Tests isolation DC/AC
-- Mesures résistance isolement
-- Historique tests
-- Alarmes dégradation
+---
+
+### 🛠️ Phase 1 : MVP TERRAIN + RAPPORTS (Décembre 2025 - Mars 2026)
+**Durée :** 3 mois | **Budget :** 0-15k€ (Solo OU Offshore)  
+**Objectif :** Outil utilisable en autonomie sur chantier
+
+**Fonctionnalités prioritaires :**
+- [ ] Interface tactile mobile-first (tablette/smartphone)
+- [ ] Mode hors-ligne (PWA + synchronisation auto)
+- [ ] Rapport PDF professionnel normé ISO 17025
+- [ ] Gestion audits basique (liste, recherche, duplication)
+- [ ] Authentification simple (email/mot de passe)
+
+**Critères succès :**
+- ✅ Utilisé pour 100% des audits terrain
+- ✅ Gain temps ≥30 min/audit vs process manuel
+- ✅ 3-5 clients externes testent et valident
+- ✅ Temps gagné mesuré et documenté
+
+**Options développement :**
+| Option | Budget | Délai | Recommandation |
+|--------|--------|-------|----------------|
+| **Solo** | 0€ | 4 mois | ✅ Si temps 15h/semaine + compétences JS |
+| **Offshore** | 12-15k€ | 2-3 mois | ✅ Si cash dispo + urgence saison 2026 |
+| **Stagiaire** | 3,6k€ | 6 mois | ⚠️ Si encadrement 10-15h/semaine |
+| **CTO** | 0€ (20% equity) | 4 mois | ✅ Si associé long terme trouvé |
+
+**Gate de validation :** Outil utilisé 100% terrain AVANT Phase 2
+
+---
+
+### 📈 Phase 2 : MULTI-MODULES (Avril - Juin 2026)
+**Durée :** 3 mois | **Budget :** 10-30k€  
+**Objectif :** Courbes IV + Thermographie = rapport combiné
+
+**Fonctionnalités :**
+- [ ] Module Courbes I-V (Isc, Voc, Pmax, Fill Factor, détection anomalies)
+- [ ] Module Thermographie IR (points chauds, ΔT >10°C, corrélation EL)
+- [ ] Rapport multi-modules unifié avec corrélations
+- [ ] Préconisations croisées hiérarchisées (kWh/€ impact)
+
+**Critères succès :**
+- ✅ 3 audits complets (EL+IV+Thermo) réalisés clients
+- ✅ Rapport combiné validé avec corrélations pertinentes
+- ✅ Clients acceptent +30% tarif pour audit multi-modules
+- ✅ Revenue mensuel ≥2k€ (24k€ ARR)
+
+**⚠️ Point de décision critique :**
+- Évaluer limites Cloudflare Workers (CPU timeout PDF, IA détection)
+- Si limites atteintes → Planifier migration AWS/Node.js (Phase 3bis)
+
+**Gate de validation :** 5 clients payent premium AVANT Phase 3
+
+---
+
+### 🤝 Phase 3 : COLLABORATION (Juillet - Octobre 2026)
+**Durée :** 4 mois | **Budget :** 20-50k€  
+**Objectif :** 2-5 utilisateurs (toi + techniciens terrain)
+
+**Fonctionnalités :**
+- [ ] Multi-utilisateurs (Admin, Technicien, Lecteur)
+- [ ] Collaboration temps réel (WebSocket ou polling)
+- [ ] Gestion équipe (dashboard, assignation missions)
+- [ ] Notifications et commentaires modules
+
+**Critères succès :**
+- ✅ 2-5 techniciens utilisent l'outil quotidiennement
+- ✅ Taux adoption >80% (tous les audits dans l'outil)
+- ✅ Coordination améliorée : 20% temps gagné vs Excel
+- ✅ Revenue mensuel ≥5k€ (60k€ ARR)
+
+**⚠️ Architecture :**
+- Si WebSocket nécessaire → **Migration AWS obligatoire** (20k€ refonte)
+- Cloudflare : Polling simple (5-10s latence acceptable)
+
+**Gate de validation :** 50 audits/mois, 5k€ MRR AVANT Phase 4
+
+---
+
+### 🚀 Phase 4 : SCALE & INTELLIGENCE (2027 - 12 mois)
+**Durée :** 12 mois | **Budget :** 300-500k€ (levée fonds OU revenus)  
+**Objectif :** Plateforme SaaS avec IA, marketplace, formations
+
+**⚠️ PRÉ-REQUIS OBLIGATOIRES (sinon NE PAS démarrer) :**
+- ✅ Revenue récurrent >10k€ MRR (120k€ ARR)
+- ✅ 50+ clients actifs payants
+- ✅ NPS >40, churn <5%/mois
+- ✅ Équipe : CTO + 2 dev + 1 product owner
+
+**Composantes :**
+- [ ] IA Prédictive Picsellia (détection auto défauts EL >95%, 4 mois, 100-150k€)
+- [ ] Analytics Avancées (LSTM prédiction dégradation, 3 mois, 50-80k€)
+- [ ] Marketplace Partenaires (multi-tenants, commissions, 4 mois, 80-120k€)
+- [ ] Formations RNCP Certifiantes (e-learning, parcours, 6 mois, 50-100k€)
+
+**Architecture Phase 4 :**
+- Migration AWS Kubernetes (EKS + RDS PostgreSQL + S3 + GPU)
+- Microservices (Audits, Reports, AI/ML + 10 autres)
+- Infrastructure : 1000€/mois (vs 10€ Cloudflare Phase 1-3)
+
+**Gate de validation :** Levée fonds 500k€ OU revenus accumulés
+
+---
+
+### 📊 COMPARAISON COÛTS CLOUDFLARE vs AWS
+
+| Phase | Infrastructure | Coût mensuel | Coût annuel | Note |
+|-------|----------------|--------------|-------------|------|
+| **Phase 1-3** | Cloudflare Workers + D1 + KV | 10€ | 120€ | ✅ Optimal MVP |
+| **Phase 4** | AWS EKS + RDS + S3 + GPU | 1000€ | 12 000€ | ⚠️ Uniquement si revenue >10k€ MRR |
+
+**→ Facteur coût : AWS = 100x plus cher que Cloudflare**
+
+---
+
+### 🚦 FEUX ROUGES : QUAND ARRÊTER
+
+**STOP immédiat si :**
+- ❌ Phase 1 prend >6 mois → Revoir scope ou stratégie dev
+- ❌ Outil non utilisé après 3 mois disponible → Problème UX/valeur
+- ❌ Budget épuisé avant Phase 1 terminée → Sous-estimation coûts
+- ❌ Aucun client externe intéressé après 6 mois → Pas de marché
+
+**→ Dans ces cas : PAUSE, pivoter ou abandonner (pas de sunk cost fallacy)**
+
+---
+
+### 📋 PROCHAINES ACTIONS IMMÉDIATES (CETTE SEMAINE)
+
+**1. Décision stratégique développement (2h) :**
+- [ ] Définir budget disponible RÉEL : _____€
+- [ ] Temps hebdo dispo : _____h/semaine
+- [ ] Compétences code actuelles : Aucune / Basiques / Intermédiaires
+- [ ] Objectif timeline : Outil opérationnel avant _____/_____
+- [ ] **CHOISIR 1 OPTION** : Solo / Offshore / Stagiaire / CTO / No-Code
+
+**2. Nettoyage codebase (1h) :**
+- [ ] Archiver anciennes versions (webapp, diagpv-audit-complete, etc.)
+- [ ] Confirmer diagnostic-hub version unique de référence
+
+**3. Tests audit JALIBAT complet (2h) :**
+- [ ] Importer JSON JALIBAT dans diagnostic-hub
+- [ ] Vérifier cartographie String 1→10 correcte
+- [ ] Générer rapport PDF complet
+- [ ] Identifier bugs bloquants éventuels
+
+**4. Documentation utilisateur (3h) :**
+- [ ] Guide pas-à-pas avec captures d'écran
+- [ ] Vidéo screencast 5 min (Loom gratuit)
+- [ ] Partager avec 2-3 collègues pour feedback
+
+**5. Validation économique (1h) :**
+- [ ] Calculer coût actuel par audit (temps × taux horaire)
+- [ ] Estimer gain temps outil (30-60 min ?)
+- [ ] Calculer ROI : Si 45 min × 20 audits/mois × 80€/h = 1200€/mois gagné
+
+---
+
+### 📄 Documentation Complète
+- **`ROADMAP_PRAGMATIQUE.md`** - Roadmap détaillée 25 pages avec budgets, risques, stratégies low-cost
+- **`DECISION_STRATEGIQUE.md`** - Guide décision 10 pages avec comparaison 5 options développement
+- **`README.md`** - Vue d'ensemble projet et état actuel (ce document)
 
 ## 📞 Support et Contact
 
