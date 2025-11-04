@@ -529,33 +529,65 @@ auditsRouter.delete('/:token', async (c) => {
 auditsRouter.post('/:token/module/:moduleId', async (c) => {
   const { env } = c
   const token = c.req.param('token')
-  const moduleId = parseInt(c.req.param('moduleId'))
+  const moduleId = c.req.param('moduleId') // Garde en string (module_identifier, pas id)
   
   try {
-    const { defect_type, severity_level, notes } = await c.req.json()
+    // Support ancien format (status, comment) ET nouveau format (defect_type, notes)
+    const body = await c.req.json()
+    const status = body.status || body.defect_type
+    const comment = body.comment || body.notes
+    const technicianId = body.technicianId || body.technician_id
     
-    // Validation defect_type
-    const validDefects = ['none', 'luminescence_inequality', 'microcrack', 'dead_module', 'string_open', 'not_connected', 'pending']
-    if (!validDefects.includes(defect_type)) {
-      return c.json({ error: 'Type de défaut invalide' }, 400)
+    // Mapping ancien statut → nouveau defect_type
+    const statusMap: Record<string, string> = {
+      'ok': 'none',
+      'inequality': 'luminescence_inequality',
+      'microcracks': 'microcrack',
+      'dead': 'dead_module',
+      'string_open': 'string_open',
+      'not_connected': 'not_connected',
+      'pending': 'pending',
+      // Accepter aussi nouveaux formats directement
+      'none': 'none',
+      'luminescence_inequality': 'luminescence_inequality',
+      'microcrack': 'microcrack',
+      'dead_module': 'dead_module'
     }
     
-    // Mise à jour module
+    const defect_type = statusMap[status]
+    if (!defect_type) {
+      return c.json({ error: 'Statut invalide: ' + status }, 400)
+    }
+    
+    // Calculer severity_level automatiquement
+    const severityMap: Record<string, number> = {
+      'none': 0,
+      'luminescence_inequality': 1,
+      'microcrack': 2,
+      'dead_module': 3,
+      'string_open': 3,
+      'not_connected': 2,
+      'pending': 0
+    }
+    const severity_level = severityMap[defect_type] || 0
+    
+    // Mise à jour module (utilise module_identifier comme clé, pas id)
     const result = await env.DB.prepare(`
       UPDATE el_modules 
       SET defect_type = ?,
           severity_level = ?,
           notes = ?,
+          technician_id = ?,
           analysis_date = datetime('now'),
           updated_at = datetime('now')
-      WHERE id = ? AND audit_token = ?
-    `).bind(defect_type, severity_level || 0, notes || null, moduleId, token).run()
+      WHERE audit_token = ? AND module_identifier = ?
+    `).bind(defect_type, severity_level, comment || null, technicianId || null, token, moduleId).run()
     
     if (result.meta.changes === 0) {
-      return c.json({ error: 'Module non trouvé' }, 404)
+      return c.json({ error: 'Module non trouvé: ' + moduleId }, 404)
     }
     
-    return c.json({ success: true, moduleId, defect_type })
+    return c.json({ success: true, moduleId, defect_type, status })
     
   } catch (error: any) {
     console.error('Erreur mise à jour module:', error)
