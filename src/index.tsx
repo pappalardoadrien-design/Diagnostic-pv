@@ -3528,7 +3528,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <span class="text-sm bg-green-600 px-3 py-1 rounded font-bold"> VERSION PRO</span>
                     <h1 id="zoneTitle" class="text-xl font-black">Chargement...</h1>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-3 items-center">
+                    <!-- Logo Feedgy avec lien -->
+                    <a href="https://feedgy.com" target="_blank" rel="noopener noreferrer" class="hover:opacity-80 transition-opacity" title="Powered by Feedgy">
+                        <img src="https://page.gensparksite.com/v1/base64_upload/175856b0873d8c9a25cc1d8ba948ea3e" alt="Feedgy" class="h-8">
+                    </a>
                     <button id="elAuditBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold" title="Audit Électroluminescence">
                         <i class="fas fa-bolt mr-2"></i>AUDIT EL
                     </button>
@@ -4057,17 +4061,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     '<p class="text-sm mb-2">' + this.rows + ' lignes x ' + this.cols + ' colonnes = <strong>' + (this.rows * this.cols) + ' modules</strong></p>' +
                     '<p class="text-xs text-gray-400 mb-3">Strings ' + this.stringStart + '-' + (this.stringStart + Math.floor((this.rows * this.cols - 1) / 24)) + '</p>' +
                     '<div class="space-y-2">' +
+                        '<button onclick="resetRectangleRotation(' + this.id + ')" class="w-full bg-orange-600 hover:bg-orange-700 py-2 px-3 rounded text-sm font-bold">' +
+                            '<i class="fas fa-undo mr-1"></i>Réinitialiser Rotation' +
+                        '</button>' +
                         '<button onclick="duplicateRectangle(' + this.id + ')" class="w-full bg-green-600 hover:bg-green-700 py-2 px-3 rounded text-sm font-bold">' +
-                            'Dupliquer' +
+                            '<i class="fas fa-copy mr-1"></i>Dupliquer' +
                         '</button>' +
                         '<button onclick="deleteRectangle(' + this.id + ')" class="w-full bg-red-600 hover:bg-red-700 py-2 px-3 rounded text-sm font-bold">' +
-                            'Supprimer' +
+                            '<i class="fas fa-trash mr-1"></i>Supprimer' +
                         '</button>' +
                     '</div>' +
                     '<div class="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-400">' +
-                        '<p class="font-bold text-blue-400 mb-1">Mode edition :</p>' +
-                        '<p>Clic sur bouton MODIFIER pour activer</p>' +
-                        '<p>Puis glissez les poignees blanches</p>' +
+                        '<p class="font-bold text-blue-400 mb-1">💡 Mode édition:</p>' +
+                        '<p>• Clic rectangle → handles apparaissent</p>' +
+                        '<p>• Drag coins blancs → resize</p>' +
+                        '<p>• Drag centre bleu → rotation</p>' +
                     '</div>' +
                     '</div>'
                 
@@ -4618,6 +4626,35 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Stocker angle rotation pour régénération modules
                 this.currentRotation = angleDegrees
+            }
+            
+            // ================================================================
+            // RÉINITIALISER ROTATION
+            // ================================================================
+            resetRotation() {
+                console.log("🔄 Réinitialisation rotation rectangle", this.id)
+                
+                // Si polygon rotatif existe, le supprimer et restaurer rectangle
+                if (this.rotatedPolygon) {
+                    drawnItems.removeLayer(this.rotatedPolygon)
+                    this.rotatedPolygon = null
+                    this.rectangle.addTo(drawnItems)
+                }
+                
+                // Réinitialiser angle
+                this.currentRotation = 0
+                
+                // Cacher et recréer handles
+                this.hideHandles()
+                
+                // Régénérer modules sans rotation
+                this.regenerateModules()
+                applyRectanglesToModules()
+                
+                // Mettre à jour style rectangle
+                this.rectangle.setStyle({ weight: 4, color: '#3b82f6' })
+                
+                console.log("✅ Rotation réinitialisée - rectangle restauré")
             }
             
             // ================================================================
@@ -6278,6 +6315,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             applyRectanglesToModules()
             
             alert("Rectangle duplique" + String.fromCharCode(10) + "String depart: " + newStringStart)
+        }
+        
+        function resetRectangleRotation(id) {
+            const rect = moduleRectangles.find(r => r.id === id)
+            if (!rect) return
+            
+            if (rect.currentRotation === 0 && !rect.rotatedPolygon) {
+                alert("Ce rectangle n'a pas de rotation active")
+                return
+            }
+            
+            if (confirm("Réinitialiser la rotation du rectangle ?" + String.fromCharCode(10) + "Les modules seront repositionnés")) {
+                rect.resetRotation()
+                alert("Rotation réinitialisée !" + String.fromCharCode(10) + "Modules repositionnés sans rotation")
+            }
         }
         
         function updateRectanglesList() {
