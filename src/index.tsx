@@ -6096,7 +6096,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 rect.addToMap()
                 moduleRectangles.push(rect)
                 
-                console.log("✅ Rectangle créé: " + cols + "×" + rows + " = " + totalModules + " modules")
+                console.log("Rectangle cree: " + cols + "x" + rows + " = " + totalModules + " modules")
                 
                 updateRectanglesList()
                 applyRectanglesToModules()
@@ -6111,22 +6111,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 alert(
-                    "✅ IMPORT 242 MODULES TERMINÉ" + String.fromCharCode(10,10) +
-                    "📦 1 rectangle créé:" + String.fromCharCode(10) +
-                    "   • " + cols + " colonnes × " + rows + " rangées" + String.fromCharCode(10) +
-                    "   • Orientation LANDSCAPE (1.7m × 1.13m)" + String.fromCharCode(10,10) +
-                    "📊 Total: " + totalModules + " modules" + String.fromCharCode(10) +
-                    "📏 Dimensions: " + rectWidthMeters.toFixed(1) + "m × " + rectHeightMeters.toFixed(1) + "m" + String.fromCharCode(10) +
-                    "📏 Échelle: " + (scaleFactor * 100).toFixed(1) + "%"  + String.fromCharCode(10,10) +
-                    "🎯 PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
+                    "IMPORT 242 MODULES TERMINE" + String.fromCharCode(10,10) +
+                    "1 rectangle cree:" + String.fromCharCode(10) +
+                    "   - " + cols + " colonnes x " + rows + " rangees" + String.fromCharCode(10) +
+                    "   - Orientation LANDSCAPE (1.7m x 1.13m)" + String.fromCharCode(10,10) +
+                    "Total: " + totalModules + " modules" + String.fromCharCode(10) +
+                    "Dimensions: " + rectWidthMeters.toFixed(1) + "m x " + rectHeightMeters.toFixed(1) + "m" + String.fromCharCode(10) +
+                    "Echelle: " + (scaleFactor * 100).toFixed(1) + "%"  + String.fromCharCode(10,10) +
+                    "PROCHAINE ETAPE:" + String.fromCharCode(10) +
                     "Ajustez visuellement le rectangle pour" + String.fromCharCode(10) +
-                    "correspondre à la photo satellite !" + String.fromCharCode(10,10) +
-                    "→ Voir panneau 'ALIGNEMENT VISUEL' à gauche"
+                    "correspondre a la photo satellite !" + String.fromCharCode(10,10) +
+                    "Voir panneau ALIGNEMENT VISUEL a gauche"
                 )
                 
             } catch (error) {
-                console.error("❌ Erreur import 242:", error)
-                alert("❌ ERREUR IMPORT 242" + String.fromCharCode(10,10) + error.message)
+                console.error("Erreur import 242:", error)
+                alert("ERREUR IMPORT 242" + String.fromCharCode(10,10) + error.message)
             }
         }
         
