@@ -1044,7 +1044,7 @@ app.get('/audit/:token', async (c) => {
                         <div class="flex items-center space-x-4 text-sm">
                             <span>Progression: <span id="progress" class="text-green-400 font-black">0/0</span></span>
                             <span>Techniciens: <span id="technicians" class="text-blue-400">0/4</span></span>
-                            <span id="technicianIcons">👤</span>
+                            <span id="technicianIcons"></span>
                         </div>
                     </div>
                 </div>
@@ -1112,22 +1112,22 @@ app.get('/audit/:token', async (c) => {
                 <div class="mt-4 pt-4 border-t border-orange-400">
                     <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
                         <button class="bulk-action-btn bg-green-600 hover:bg-green-700 p-2 rounded font-bold text-sm" data-status="ok" title="Marquer comme OK">
-                            🟢 OK
+                            OK
                         </button>
                         <button class="bulk-action-btn bg-yellow-600 hover:bg-yellow-700 p-2 rounded font-bold text-sm" data-status="inequality" title="Marquer comme inégalité">
-                            🟡 Inégalité
+                            Inegalite
                         </button>
                         <button class="bulk-action-btn bg-orange-600 hover:bg-orange-700 p-2 rounded font-bold text-sm" data-status="microcracks" title="Marquer comme microfissures">
-                            🟠 Fissures
+                            Fissures
                         </button>
                         <button class="bulk-action-btn bg-red-600 hover:bg-red-700 p-2 rounded font-bold text-sm" data-status="dead" title="Marquer comme HS">
-                            🔴 Impact Cellulaire
+                            Impact Cellulaire
                         </button>
                         <button class="bulk-action-btn bg-blue-600 hover:bg-blue-700 p-2 rounded font-bold text-sm" data-status="string_open" title="Marquer comme string ouvert">
-                            🔵 String
+                            String
                         </button>
                         <button class="bulk-action-btn bg-gray-600 hover:bg-gray-700 p-2 rounded font-bold text-sm" data-status="not_connected" title="Marquer comme non raccordé">
-                            ⚫ Non raccordé
+                            Non raccorde
                         </button>
                     </div>
                 </div>
@@ -6000,15 +6000,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 )
                 
             } catch (error) {
-                console.error("❌ Erreur import:", error)
-                alert("❌ ERREUR IMPORT" + String.fromCharCode(10,10) + error.message)
+                console.error("Erreur import:", error)
+                alert("ERREUR IMPORT" + String.fromCharCode(10,10) + error.message)
             }
         }
         
         // NOUVELLE FONCTION: Import 242 modules en 1 seul array rectangulaire
         async function import242SingleArray() {
             if (!roofPolygon) {
-                alert("⚠️ Créez d'abord un polygone de toiture (Étape 0)")
+                alert("Creez d'abord un polygone de toiture (Etape 0)")
                 return
             }
             
@@ -6017,14 +6017,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             try {
-                console.log("🚀 Import 242 modules (1 array) démarré...")
+                console.log("Import 242 modules (1 array) demarre...")
                 
                 // Configuration: 1 seul rectangle de 22×11 = 242 modules
                 const rows = 11
                 const cols = 22
                 const totalModules = rows * cols
                 
-                console.log("📐 Configuration: " + cols + " colonnes × " + rows + " rangées = " + totalModules + " modules")
+                console.log("Configuration: " + cols + " colonnes x " + rows + " rangees = " + totalModules + " modules")
                 
                 // Paramètres globaux
                 const roofBounds = roofPolygon.getBounds()
@@ -6048,20 +6048,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
                 const roofHeightMeters = roofHeightDegrees * 110574
                 
-                console.log("📏 Toiture: " + roofWidthMeters.toFixed(1) + "m × " + roofHeightMeters.toFixed(1) + "m")
+                console.log("Toiture: " + roofWidthMeters.toFixed(1) + "m x " + roofHeightMeters.toFixed(1) + "m")
                 
                 // Calculer dimensions nécessaires pour l'array
                 const arrayWidthNeeded = cols * moduleWidth + (cols - 1) * spacing
                 const arrayHeightNeeded = rows * moduleHeight + (rows - 1) * spacing
                 
-                console.log("📏 Array nécessaire: " + arrayWidthNeeded.toFixed(1) + "m × " + arrayHeightNeeded.toFixed(1) + "m")
+                console.log("Array necessaire: " + arrayWidthNeeded.toFixed(1) + "m x " + arrayHeightNeeded.toFixed(1) + "m")
                 
                 // ÉCHELLE ADAPTATIVE (92% de la toiture)
                 const widthScale = (roofWidthMeters * 0.92) / arrayWidthNeeded
                 const heightScale = (roofHeightMeters * 0.92) / arrayHeightNeeded
                 const scaleFactor = Math.min(widthScale, heightScale, 1.0)
                 
-                console.log("📊 Scale factor: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
+                console.log("Scale factor: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
                 
                 // Calculer dimensions finales avec scale
                 const rectWidthMeters = arrayWidthNeeded * scaleFactor
@@ -6140,9 +6140,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 rect.rectangle.transform.rotate(newAngle)
                 rect.regenerateModules()
                 applyRectanglesToModules()
-                console.log("🔄 Rectangle", id, "rotation:", newAngle + "°")
+                console.log("Rectangle", id, "rotation:", newAngle + "deg")
             } else {
-                alert("⚠️ Rotation non disponible - Leaflet Transform non chargé")
+                alert("Rotation non disponible - Leaflet Transform non charge")
             }
         }
         
@@ -6182,7 +6182,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateRectanglesList()
             applyRectanglesToModules()
             
-            alert("✅ Rectangle dupliqué" + String.fromCharCode(10) + "String départ: " + newStringStart)
+            alert("Rectangle duplique" + String.fromCharCode(10) + "String depart: " + newStringStart)
         }
         
         function updateRectanglesList() {
