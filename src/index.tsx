@@ -3978,9 +3978,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Créer rectangle Leaflet
                 this.rectangle = L.rectangle(initialBounds, {
-                    color: "#f97316",
-                    weight: 3,
-                    fillColor: "transparent",
+                    color: "#3b82f6",
+                    weight: 4,
+                    fillColor: "#3b82f6",
+                    fillOpacity: 0.3,
                     className: "module-rectangle",
                     draggable: false
                 })
@@ -4224,8 +4225,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
                         color: "#ffffff",
-                        weight: 1,
-                        opacity: 0.3,
+                        weight: 2,
+                        opacity: 0.9,
                         className: "rectangle-grid-line",
                         interactive: false
                     })
@@ -4246,8 +4247,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
                         color: "#ffffff",
-                        weight: 1,
-                        opacity: 0.3,
+                        weight: 2,
+                        opacity: 0.9,
                         className: "rectangle-grid-line",
                         interactive: false
                     })
@@ -5872,8 +5873,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // ÉCHELLE ADAPTATIVE pour meilleur fit visuel
                 // Si toiture assez grande: échelle 1:1 (modules taille réelle 1.7m x 1.0m)
                 // Si toiture trop petite: réduction proportionnelle
-                const widthScale = (roofWidthMeters * 0.92) / totalWidthNeeded
-                const heightScale = (roofHeightMeters * 0.92) / totalHeightNeeded
+                const widthScale = roofWidthMeters / totalWidthNeeded
+                const heightScale = roofHeightMeters / totalHeightNeeded
                 const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Max échelle réelle
                 
                 console.log("STATS Dimensions toiture: " + roofWidthMeters.toFixed(1) + "m x " + roofHeightMeters.toFixed(1) + "m")
@@ -6057,8 +6058,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log("Array necessaire: " + arrayWidthNeeded.toFixed(1) + "m x " + arrayHeightNeeded.toFixed(1) + "m")
                 
                 // ÉCHELLE ADAPTATIVE (92% de la toiture)
-                const widthScale = (roofWidthMeters * 0.92) / arrayWidthNeeded
-                const heightScale = (roofHeightMeters * 0.92) / arrayHeightNeeded
+                const widthScale = roofWidthMeters / arrayWidthNeeded
+                const heightScale = roofHeightMeters / arrayHeightNeeded
                 const scaleFactor = Math.min(widthScale, heightScale, 1.0)
                 
                 console.log("Scale factor: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
