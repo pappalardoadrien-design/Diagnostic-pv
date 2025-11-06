@@ -3612,6 +3612,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="importModulesBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold text-sm">
                             <i class="fas fa-download mr-2"></i>IMPORTER TOUT JALIBAT (10 STRINGS)
                         </button>
+                        <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
+                            <i class="fas fa-info-circle mr-1"></i><strong>Astuce:</strong> Après import, ajustez position/rotation des rectangles pour alignement visuel sur satellite
+                        </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectGrid" checked class="w-4 h-4">
@@ -3723,6 +3726,33 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <span id="statsPending" class="font-bold text-gray-400">0</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- Aide Alignement Visuel -->
+                <div id="alignmentHelp" class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-lg border-2 border-orange-400 p-4 hidden">
+                    <h3 class="text-sm font-black mb-2 text-orange-300">
+                        <i class="fas fa-crosshairs mr-1"></i>🎯 ALIGNEMENT VISUEL
+                    </h3>
+                    <div class="space-y-2 text-xs text-orange-100">
+                        <div class="bg-black bg-opacity-40 p-2 rounded">
+                            <div class="font-bold text-orange-300 mb-1">📍 DÉPLACER:</div>
+                            <div>Clic LONG sur rectangle → Glisser</div>
+                        </div>
+                        <div class="bg-black bg-opacity-40 p-2 rounded">
+                            <div class="font-bold text-orange-300 mb-1">↔️ REDIMENSIONNER:</div>
+                            <div>Utiliser poignées jaunes (coins/bords)</div>
+                        </div>
+                        <div class="bg-black bg-opacity-40 p-2 rounded">
+                            <div class="font-bold text-orange-300 mb-1">🔄 ROTATION:</div>
+                            <div>Bouton ↻ dans liste rectangles</div>
+                        </div>
+                        <div class="bg-orange-500 text-black p-2 rounded font-bold text-center mt-3">
+                            💡 Alignez avec la photo satellite !
+                        </div>
+                    </div>
+                    <button id="hideAlignmentHelp" class="w-full bg-gray-700 hover:bg-gray-600 py-1 rounded text-xs mt-2">
+                        Masquer
+                    </button>
                 </div>
 
                 <!-- Synchronisation EL -->
@@ -5836,11 +5866,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const totalWidthNeeded = string1Width + (4 * standardWidth) + (4 * rectSpacing)
                 const totalHeightNeeded = 2 * rectHeight + 1 * rectSpacing
                 
-                // ÉCHELLE 1:1 - Pas de réduction artificielle
-                // Les modules sont affichés à leur taille réelle (1.7m × 1.0m chacun)
-                const widthScale = (roofWidthMeters * 0.95) / totalWidthNeeded
-                const heightScale = (roofHeightMeters * 0.95) / totalHeightNeeded
-                const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Utiliser échelle réelle si possible
+                // ÉCHELLE ADAPTATIVE pour meilleur fit visuel
+                // Si toiture assez grande: échelle 1:1 (modules taille réelle 1.7m × 1.0m)
+                // Si toiture trop petite: réduction proportionnelle
+                const widthScale = (roofWidthMeters * 0.92) / totalWidthNeeded
+                const heightScale = (roofHeightMeters * 0.92) / totalHeightNeeded
+                const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Max échelle réelle
+                
+                console.log("📊 Dimensions toiture: " + roofWidthMeters.toFixed(1) + "m × " + roofHeightMeters.toFixed(1) + "m")
+                console.log("📊 Dimensions nécessaires: " + totalWidthNeeded.toFixed(1) + "m × " + totalHeightNeeded.toFixed(1) + "m")
+                console.log("📊 Scale factor appliqué: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
                 
                 console.log(\`🔬 Scale factor: \${scaleFactor.toFixed(3)} (total needed: \${totalWidthNeeded.toFixed(1)}m × \${totalHeightNeeded.toFixed(1)}m)\`)
                 
@@ -5868,7 +5903,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const rectHeightDegrees = rectHeightMeters / 110574
                     
                     // Position depuis le coin NORD-OUEST (haut-gauche) de la toiture avec marge
-                    const marginMeters = roofWidthMeters * 0.075  // Marge 7.5% du bord
+                    const marginMeters = roofWidthMeters * 0.04  // Marge 4% du bord (réduite)
                     const marginLatDegrees = marginMeters / 110574
                     const marginLngDegrees = marginMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
                     
@@ -5937,15 +5972,28 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 const totalGeneratedModules = moduleRectangles.reduce((sum, rect) => sum + rect.modules.length, 0)
                 
+                // Afficher panneau aide alignement
+                const helpPanel = document.getElementById('alignmentHelp')
+                if (helpPanel) {
+                    helpPanel.classList.remove('hidden')
+                    // Scroll vers le panneau
+                    setTimeout(() => {
+                        helpPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                    }, 500)
+                }
+                
                 alert(
                     "✅ IMPORT GLOBAL JALIBAT TERMINÉ" + String.fromCharCode(10,10) +
-                    "📦 10 rectangles créés:" + String.fromCharCode(10) +
+                    "📦 10 rectangles créés (grille 5×2):" + String.fromCharCode(10) +
                     "   • String 1: 2×13 = 26 modules" + String.fromCharCode(10) +
-                    "   • Strings 2-10: 2×12 = 24 modules chacun" + String.fromCharCode(10,10) +
-                    "📊 Total modules importés: " + totalModulesCount + String.fromCharCode(10) +
-                    "📊 Total modules générés: " + totalGeneratedModules + String.fromCharCode(10) +
-                    "✅ Statuts EL mappés: " + totalMappedCount + "/" + totalGeneratedModules + String.fromCharCode(10,10) +
-                    "💡 Ajustez positions/rotations avec clic long + glisser"
+                    "   • Strings 2-10: 2×12 = 24 modules" + String.fromCharCode(10,10) +
+                    "📊 Total: " + totalGeneratedModules + " modules" + String.fromCharCode(10) +
+                    "✅ Statuts EL: " + totalMappedCount + "/" + totalGeneratedModules + String.fromCharCode(10) +
+                    "📏 Échelle: " + (scaleFactor * 100).toFixed(1) + "% (taille réelle)" + String.fromCharCode(10,10) +
+                    "🎯 PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
+                    "Ajustez visuellement les rectangles pour" + String.fromCharCode(10) +
+                    "correspondre à la photo satellite !" + String.fromCharCode(10,10) +
+                    "→ Voir panneau 'ALIGNEMENT VISUEL' à gauche"
                 )
                 
             } catch (error) {
@@ -6919,6 +6967,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
             document.getElementById('showRectLabels').addEventListener('change', toggleRectLabelsVisibility)
+            document.getElementById('hideAlignmentHelp').addEventListener('click', () => {
+                document.getElementById('alignmentHelp').classList.add('hidden')
+            })
             document.getElementById('showRectInfo').addEventListener('change', toggleRectInfoVisibility)
             
             document.querySelectorAll('.status-btn').forEach(btn => {
