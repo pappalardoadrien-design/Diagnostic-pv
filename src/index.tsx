@@ -3642,29 +3642,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="createRectangleBtn" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded font-bold">
                             <i class="fas fa-plus-square mr-2"></i>CRÉER RECTANGLE
                         </button>
-                        <button id="importModulesBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold text-sm">
-                            <i class="fas fa-download mr-2"></i>IMPORTER TOUT JALIBAT (10 STRINGS)
-                        </button>
                         <button id="import242SingleBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
-                            <i class="fas fa-th mr-2"></i>IMPORTER 242 MODULES (1 ARRAY)
-                        </button>
-                        <button id="editRectanglesBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-bold text-sm mt-2">
-                            <i class="fas fa-edit mr-2"></i>MODIFIER RECTANGLES
+                            <i class="fas fa-download mr-2"></i>IMPORTER CONFIGURATION
                         </button>
                         <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
-                            <i class="fas fa-info-circle mr-1"></i><strong>Astuce:</strong> Cliquez sur MODIFIER pour activer les poignees de redimensionnement
+                            <i class="fas fa-info-circle mr-1"></i><strong>Mode edition:</strong> Glissez les coins pour redimensionner, le centre pour pivoter
                         </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="showRectGrid" checked class="w-4 h-4">
+                                <input type="checkbox" id="showRectGrid" class="w-4 h-4">
                                 <label for="showRectGrid" class="text-gray-400">Afficher grille</label>
                             </div>
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="showRectLabels" checked class="w-4 h-4">
+                                <input type="checkbox" id="showRectLabels" class="w-4 h-4">
                                 <label for="showRectLabels" class="text-gray-400">Afficher labels</label>
                             </div>
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="showRectInfo" checked class="w-4 h-4">
+                                <input type="checkbox" id="showRectInfo" class="w-4 h-4">
                                 <label for="showRectInfo" class="text-gray-400">Info rectangle</label>
                             </div>
                         </div>
@@ -3985,9 +3979,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         // Variables pour rectangles modules (SolarEdge style)
         let moduleRectangles = [] // Array de RectangleModuleGroup
-        let showRectGrid = true
-        let showRectLabels = true
-        let showRectInfo = true
+        let showRectGrid = false      // Grille désactivée par défaut (vue épurée)
+        let showRectLabels = false    // Labels désactivés par défaut
+        let showRectInfo = false      // Info overlay désactivé par défaut
         
         const STATUS_COLORS = {
             ok: "#22c55e",
@@ -4035,7 +4029,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 })
                 
                 // Event listeners pour édition
+                this.rectangle.on('dragstart', () => {
+                    // Désactiver interactions carte pendant déplacement rectangle
+                    map.dragging.disable()
+                    map.doubleClickZoom.disable()
+                    map.scrollWheelZoom.disable()
+                })
+                
                 this.rectangle.on('dragend', () => {
+                    // Réactiver interactions carte après déplacement
+                    map.dragging.enable()
+                    map.doubleClickZoom.enable()
+                    map.scrollWheelZoom.enable()
+                    
                     this.regenerateModules()
                     applyRectanglesToModules()
                 })
@@ -4368,6 +4374,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 })
                 
                 // Event listeners pour resize (drag des coins)
+                // Désactiver carte au début du drag
+                this.handles.nw.on('dragstart', () => { map.dragging.disable(); map.doubleClickZoom.disable(); map.scrollWheelZoom.disable() })
+                this.handles.ne.on('dragstart', () => { map.dragging.disable(); map.doubleClickZoom.disable(); map.scrollWheelZoom.disable() })
+                this.handles.sw.on('dragstart', () => { map.dragging.disable(); map.doubleClickZoom.disable(); map.scrollWheelZoom.disable() })
+                this.handles.se.on('dragstart', () => { map.dragging.disable(); map.doubleClickZoom.disable(); map.scrollWheelZoom.disable() })
+                
                 this.handles.nw.on('drag', (e) => this.onCornerDrag('nw', e.target.getLatLng()))
                 this.handles.ne.on('drag', (e) => this.onCornerDrag('ne', e.target.getLatLng()))
                 this.handles.sw.on('drag', (e) => this.onCornerDrag('sw', e.target.getLatLng()))
@@ -4376,10 +4388,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Event listeners pour rotation (clic + move souris)
                 this.handles.rotate.on('mousedown', (e) => this.onRotationStart(e))
                 
-                this.handles.nw.on('dragend', () => this.onTransformEnd())
-                this.handles.ne.on('dragend', () => this.onTransformEnd())
-                this.handles.sw.on('dragend', () => this.onTransformEnd())
-                this.handles.se.on('dragend', () => this.onTransformEnd())
+                // Réactiver carte à la fin du drag
+                this.handles.nw.on('dragend', () => { map.dragging.enable(); map.doubleClickZoom.enable(); map.scrollWheelZoom.enable(); this.onTransformEnd() })
+                this.handles.ne.on('dragend', () => { map.dragging.enable(); map.doubleClickZoom.enable(); map.scrollWheelZoom.enable(); this.onTransformEnd() })
+                this.handles.sw.on('dragend', () => { map.dragging.enable(); map.doubleClickZoom.enable(); map.scrollWheelZoom.enable(); this.onTransformEnd() })
+                this.handles.se.on('dragend', () => { map.dragging.enable(); map.doubleClickZoom.enable(); map.scrollWheelZoom.enable(); this.onTransformEnd() })
                 
                 console.log("✅ Handles créés pour rectangle", this.id)
             }
@@ -4486,6 +4499,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rotationStartAngle = this.calculateAngle(center, mouseLatLng)
                 this.rotationCenter = center
                 
+                // CRITIQUE: Désactiver drag de la carte pendant rotation
+                map.dragging.disable()
+                map.doubleClickZoom.disable()
+                map.scrollWheelZoom.disable()
+                
                 // Changer curseur
                 this.handles.rotate.getElement().style.cursor = 'grabbing'
                 
@@ -4495,6 +4513,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Empêcher propagation
                 L.DomEvent.stopPropagation(e.originalEvent)
+                L.DomEvent.preventDefault(e.originalEvent)
             }
             
             onRotationMove(e) {
@@ -4513,6 +4532,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 this.isRotating = false
                 this.handles.rotate.getElement().style.cursor = 'grab'
+                
+                // CRITIQUE: Réactiver drag de la carte après rotation
+                map.dragging.enable()
+                map.doubleClickZoom.enable()
+                map.scrollWheelZoom.enable()
                 
                 // Retirer listeners globaux
                 map.off('mousemove', this.onRotationMove, this)
@@ -6072,240 +6096,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateStringsProgress()
         }
         
-        async function importExistingModules() {
-            if (!roofPolygon) {
-                alert("ATTENTION Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
-                return
-            }
-            
-            if (moduleRectangles.length > 0 && !confirm("ATTENTION Des rectangles existent déjà. Les remplacer par l" + String.fromCharCode(39) + "import ?")) {
-                return
-            }
-            
-            try {
-                console.log(" Import GLOBAL - Toutes les zones du plant JALIBAT...")
-                
-                // NOUVEAU: Récupérer TOUTES les zones du plant (14 à 23 = Strings 1-10)
-                const allZones = [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]  // Zone IDs pour JALIBAT
-                const allModulesByZone = {}
-                let totalModulesCount = 0
-                
-                // Récupérer modules de chaque zone en parallèle
-                const promises = allZones.map(zoneId => 
-                    fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`)
-                        .then(r => r.json())
-                        .then(data => ({ zoneId, modules: data.modules || [] }))
-                )
-                
-                const results = await Promise.all(promises)
-                
-                results.forEach(result => {
-                    allModulesByZone[result.zoneId] = result.modules
-                    totalModulesCount += result.modules.length
-                    console.log(\` Zone \${result.zoneId}: \${result.modules.length} modules\`)
-                })
-                
-                console.log(" TOTAL modules trouvés:", totalModulesCount)
-                
-                if (totalModulesCount === 0) {
-                    alert("ATTENTION Aucun module trouvé en base de données pour ce plant")
-                    return
-                }
-                
-                // Configuration JALIBAT: 10 strings
-                // String 1 (zone 14) = 26 modules
-                // Strings 2-10 (zones 15-23) = 24 modules chacun
-                const stringConfigs = [
-                    { zoneId: 14, stringNum: 1, rows: 2, cols: 13 },  // 26 modules = 2x13
-                    { zoneId: 15, stringNum: 2, rows: 2, cols: 12 },  // 24 modules = 2x12
-                    { zoneId: 16, stringNum: 3, rows: 2, cols: 12 },
-                    { zoneId: 17, stringNum: 4, rows: 2, cols: 12 },
-                    { zoneId: 18, stringNum: 5, rows: 2, cols: 12 },
-                    { zoneId: 19, stringNum: 6, rows: 2, cols: 12 },
-                    { zoneId: 20, stringNum: 7, rows: 2, cols: 12 },
-                    { zoneId: 21, stringNum: 8, rows: 2, cols: 12 },
-                    { zoneId: 22, stringNum: 9, rows: 2, cols: 12 },
-                    { zoneId: 23, stringNum: 10, rows: 2, cols: 12 }
-                ]
-                
-                console.log(" Configuration JALIBAT: 10 rectangles (String 1=26, Strings 2-10=24)")
-                
-                // Paramètres globaux
-                const roofBounds = roofPolygon.getBounds()
-                const roofCenter = roofBounds.getCenter()
-                const zoom = map.getZoom()
-                const moduleWidth = 1.7
-                const moduleHeight = 1.0
-                const spacing = 0.01  // Espacement réduit entre modules
-                const rectSpacing = 0.3  // Espacement réduit entre rectangles (mètres)
-                
-                const metersPerPixel = 156543.03392 * Math.cos(roofCenter.lat * Math.PI / 180) / Math.pow(2, zoom)
-                const pixelsPerMeter = 1 / metersPerPixel
-                
-                // Calculer dimensions réelles du polygone de toiture
-                const roofNorth = roofBounds.getNorth()
-                const roofSouth = roofBounds.getSouth()
-                const roofEast = roofBounds.getEast()
-                const roofWest = roofBounds.getWest()
-                
-                // Calcul taille toiture en mètres (approximation)
-                const roofWidthDegrees = roofEast - roofWest
-                const roofHeightDegrees = roofNorth - roofSouth
-                const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
-                const roofHeightMeters = roofHeightDegrees * 110574
-                
-                console.log(\`Tech Toiture: \${roofWidthMeters.toFixed(1)}m x \${roofHeightMeters.toFixed(1)}m\`)
-                
-                // Calculer dimensions totales nécessaires pour grille 5x2
-                const rectsPerRow = 5
-                const rectsPerCol = 2
-                
-                // Dimensions réelles par type de rectangle
-                const string1Width = 13 * moduleWidth + (13 - 1) * spacing  // 26 modules = 2x13
-                const standardWidth = 12 * moduleWidth + (12 - 1) * spacing  // 24 modules = 2x12
-                const rectHeight = 2 * moduleHeight + (2 - 1) * spacing
-                
-                // Largeur totale RÉELLE nécessaire = 1 String 1 + 4 Strings standard + 4 espacements
-                const totalWidthNeeded = string1Width + (4 * standardWidth) + (4 * rectSpacing)
-                const totalHeightNeeded = 2 * rectHeight + 1 * rectSpacing
-                
-                // ÉCHELLE ADAPTATIVE pour meilleur fit visuel
-                // Si toiture assez grande: échelle 1:1 (modules taille réelle 1.7m x 1.0m)
-                // Si toiture trop petite: réduction proportionnelle
-                const widthScale = roofWidthMeters / totalWidthNeeded
-                const heightScale = roofHeightMeters / totalHeightNeeded
-                const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Max échelle réelle
-                
-                console.log("STATS Dimensions toiture: " + roofWidthMeters.toFixed(1) + "m x " + roofHeightMeters.toFixed(1) + "m")
-                console.log("STATS Dimensions nécessaires: " + totalWidthNeeded.toFixed(1) + "m x " + totalHeightNeeded.toFixed(1) + "m")
-                console.log("STATS Scale factor appliqué: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
-                
-                console.log(\` Scale factor: \${scaleFactor.toFixed(3)} (total needed: \${totalWidthNeeded.toFixed(1)}m x \${totalHeightNeeded.toFixed(1)}m)\`)
-                
-                // Positionner les rectangles en grille 5x2 avec mise à l'échelle
-                let currentX = 0  // Offset horizontal en mètres
-                let currentY = 0  // Offset vertical en mètres
-                let rectIndex = 0
-                
-                console.log("Centre Création des 10 rectangles...")
-                
-                stringConfigs.forEach((config, idx) => {
-                    const existingModules = allModulesByZone[config.zoneId] || []
-                    
-                    if (existingModules.length === 0) {
-                        console.warn(\`ATTENTION Aucun module pour zone \${config.zoneId}\`)
-                        return
-                    }
-                    
-                    // Calculer dimensions du rectangle AVEC mise à l'échelle
-                    const rectWidthMeters = (config.cols * moduleWidth + (config.cols - 1) * spacing) * scaleFactor
-                    const rectHeightMeters = (config.rows * moduleHeight + (config.rows - 1) * spacing) * scaleFactor
-                    
-                    // Convertir dimensions en degrés GPS (méthode directe)
-                    const rectWidthDegrees = rectWidthMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
-                    const rectHeightDegrees = rectHeightMeters / 110574
-                    
-                    // Position depuis le coin NORD-OUEST (haut-gauche) de la toiture avec marge
-                    const marginMeters = roofWidthMeters * 0.04  // Marge 4% du bord (réduite)
-                    const marginLatDegrees = marginMeters / 110574
-                    const marginLngDegrees = marginMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
-                    
-                    // Point de départ (coin NW avec marge)
-                    const startLat = roofNorth - marginLatDegrees
-                    const startLng = roofWest + marginLngDegrees
-                    
-                    // Convertir offsets en degrés (currentX/Y sont déjà en mètres avec scaleFactor appliqué)
-                    const offsetLatDegrees = currentY / 110574
-                    const offsetLngDegrees = currentX / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
-                    
-                    // Calculer position finale du rectangle (en degrés GPS)
-                    const topLeft = L.latLng(
-                        startLat - offsetLatDegrees,
-                        startLng + offsetLngDegrees
-                    )
-                    const bottomRight = L.latLng(
-                        startLat - offsetLatDegrees - rectHeightDegrees,
-                        startLng + offsetLngDegrees + rectWidthDegrees
-                    )
-                    const bounds = [topLeft, bottomRight]
-                    
-                    // Créer rectangle
-                    const rectId = moduleRectangles.length + 1
-                    const rect = new RectangleModuleGroup(rectId, config.rows, config.cols, config.stringNum, bounds)
-                    rect.addToMap()
-                    moduleRectangles.push(rect)
-                    
-                    console.log(\`✅ Rectangle \${rectId} créé: String \${config.stringNum} (\${config.rows}x\${config.cols}) - Position: X=\${currentX.toFixed(1)}m Y=\${currentY.toFixed(1)}m\`)
-                    
-                    // Mapper statuts EL
-                    rect.modules.forEach(newModule => {
-                        const existingModule = existingModules.find(m => 
-                            m.string_number === newModule.string_number && 
-                            m.position_in_string === newModule.position_in_string
-                        )
-                        
-                        if (existingModule) {
-                            newModule.module_status = existingModule.module_status || 'pending'
-                            newModule.el_defect_type = existingModule.el_defect_type
-                            newModule.el_severity_level = existingModule.el_severity_level
-                            newModule.el_notes = existingModule.el_notes
-                            newModule.status_comment = existingModule.status_comment
-                        }
-                    })
-                    
-                    // Calculer position suivante (grille 5x2) avec mise à l'échelle
-                    rectIndex++
-                    if (rectIndex % rectsPerRow === 0) {
-                        // Passer à la rangée suivante
-                        currentX = 0
-                        currentY += rectHeightMeters + (rectSpacing * scaleFactor)
-                    } else {
-                        // Avancer horizontalement (utiliser la largeur RÉELLE du rectangle actuel)
-                        currentX += rectWidthMeters + (rectSpacing * scaleFactor)
-                    }
-                })
-                
-                updateRectanglesList()
-                applyRectanglesToModules()
-                
-                // Compter statuts mappés
-                const totalMappedCount = moduleRectangles.reduce((sum, rect) => {
-                    return sum + rect.modules.filter(m => m.module_status !== 'pending').length
-                }, 0)
-                
-                const totalGeneratedModules = moduleRectangles.reduce((sum, rect) => sum + rect.modules.length, 0)
-                
-                // Afficher panneau aide alignement
-                const helpPanel = document.getElementById('alignmentHelp')
-                if (helpPanel) {
-                    helpPanel.classList.remove('hidden')
-                    // Scroll vers le panneau
-                    setTimeout(() => {
-                        helpPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-                    }, 500)
-                }
-                
-                alert(
-                    "✅ IMPORT GLOBAL JALIBAT TERMINÉ" + String.fromCharCode(10,10) +
-                    " 10 rectangles créés (grille 5x2):" + String.fromCharCode(10) +
-                    "   • String 1: 2x13 = 26 modules" + String.fromCharCode(10) +
-                    "   • Strings 2-10: 2x12 = 24 modules" + String.fromCharCode(10,10) +
-                    "STATS Total: " + totalGeneratedModules + " modules" + String.fromCharCode(10) +
-                    "✅ Statuts EL: " + totalMappedCount + "/" + totalGeneratedModules + String.fromCharCode(10) +
-                    "Tech Échelle: " + (scaleFactor * 100).toFixed(1) + "% (taille réelle)" + String.fromCharCode(10,10) +
-                    "Centre PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
-                    "Ajustez visuellement les rectangles pour" + String.fromCharCode(10) +
-                    "correspondre à la photo satellite !" + String.fromCharCode(10,10) +
-                    " Voir panneau 'ALIGNEMENT VISUEL' à gauche"
-                )
-                
-            } catch (error) {
-                console.error("Erreur import:", error)
-                alert("ERREUR IMPORT" + String.fromCharCode(10,10) + error.message)
-            }
-        }
-        
-        // NOUVELLE FONCTION: Import 242 modules en 1 seul array rectangulaire
+        // Fonction import configuration modules sur carte satellite
         async function import242SingleArray() {
             if (!roofPolygon) {
                 alert("Creez d'abord un polygone de toiture (Etape 0)")
@@ -6394,6 +6185,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const rectId = moduleRectangles.length + 1
                 const rect = new RectangleModuleGroup(rectId, rows, cols, 1, bounds)
                 rect.addToMap()
+                
+                // Activer handles immédiatement pour manipulation
+                rect.showHandles()
+                
                 moduleRectangles.push(rect)
                 
                 console.log("Rectangle cree: " + cols + "x" + rows + " = " + totalModules + " modules")
@@ -7356,66 +7151,6 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
-        // EDITION RECTANGLES (Leaflet.draw Edit mode)
-        // ================================================================
-        let editControl = null
-        let isEditMode = false
-        
-        function enableRectangleEdit() {
-            if (moduleRectangles.length === 0) {
-                alert("Aucun rectangle a modifier. Creez ou importez d'abord des rectangles.")
-                return
-            }
-            
-            if (isEditMode) {
-                // Desactiver mode edition
-                if (editControl) {
-                    map.removeControl(editControl)
-                    editControl = null
-                }
-                isEditMode = false
-                document.getElementById('editRectanglesBtn').innerHTML = '<i class="fas fa-edit mr-2"></i>MODIFIER RECTANGLES'
-                document.getElementById('editRectanglesBtn').classList.remove('bg-red-600', 'hover:bg-red-700')
-                document.getElementById('editRectanglesBtn').classList.add('bg-yellow-600', 'hover:bg-yellow-700')
-                console.log("Mode edition desactive")
-            } else {
-                // Activer mode edition
-                editControl = new L.Control.Draw({
-                    draw: false,
-                    edit: {
-                        featureGroup: drawnItems,
-                        edit: true,
-                        remove: false
-                    }
-                })
-                map.addControl(editControl)
-                isEditMode = true
-                
-                document.getElementById('editRectanglesBtn').innerHTML = '<i class="fas fa-times mr-2"></i>TERMINER EDITION'
-                document.getElementById('editRectanglesBtn').classList.remove('bg-yellow-600', 'hover:bg-yellow-700')
-                document.getElementById('editRectanglesBtn').classList.add('bg-red-600', 'hover:bg-red-700')
-                
-                // Activer automatiquement le mode edit
-                setTimeout(() => {
-                    const editButton = document.querySelector('.leaflet-draw-edit-edit')
-                    if (editButton) {
-                        editButton.click()
-                        console.log("Mode edition active - Cliquez sur les rectangles pour voir les poignees")
-                    }
-                }, 100)
-            }
-            
-            // Event listener pour edition terminee
-            map.on(L.Draw.Event.EDITED, (e) => {
-                console.log("Rectangles modifies, regeneration modules...")
-                moduleRectangles.forEach(rect => {
-                    rect.regenerateModules()
-                })
-                applyRectanglesToModules()
-            })
-        }
-        
-        // ================================================================
         // EVENT LISTENERS
         // ================================================================
         function setupEventListeners() {
@@ -7450,9 +7185,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Rectangle Modules (SolarEdge style)
             document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
-            document.getElementById('importModulesBtn').addEventListener('click', importExistingModules)
             document.getElementById('import242SingleBtn').addEventListener('click', import242SingleArray)
-            document.getElementById('editRectanglesBtn').addEventListener('click', enableRectangleEdit)
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
