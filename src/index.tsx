@@ -3528,11 +3528,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <span class="text-sm bg-green-600 px-3 py-1 rounded font-bold"> VERSION PRO</span>
                     <h1 id="zoneTitle" class="text-xl font-black">Chargement...</h1>
                 </div>
-                <div class="flex gap-3 items-center">
-                    <!-- Logo Feedgy avec lien -->
-                    <a href="https://feedgy.com" target="_blank" rel="noopener noreferrer" class="hover:opacity-80 transition-opacity" title="Powered by Feedgy">
-                        <img src="https://page.gensparksite.com/v1/base64_upload/175856b0873d8c9a25cc1d8ba948ea3e" alt="Feedgy" class="h-8">
-                    </a>
+                <div class="flex gap-3">
                     <button id="elAuditBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold" title="Audit Électroluminescence">
                         <i class="fas fa-bolt mr-2"></i>AUDIT EL
                     </button>
