@@ -82,47 +82,68 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
       plantId = plant.id
     }
     
-    // 4. Créer/Mettre à jour zones (1 zone par string)
+    // 4. Créer/Mettre à jour zone UNIQUE pour tous les strings
     const stringNumbers = [...new Set(modules.results.map((m: any) => m.string_number))]
-    const zoneIds: Record<number, number> = {}
+    const totalStrings = stringNumbers.length
     
-    for (const stringNum of stringNumbers) {
-      // Vérifier si zone existe déjà
-      let zone = await env.DB.prepare(`
-        SELECT id FROM pv_zones 
-        WHERE plant_id = ? AND zone_name = ?
-      `).bind(plantId, `String ${stringNum}`).first()
+    // Calculer modules par string (moyenne ou mode)
+    const modulesPerStringArray = stringNumbers.map(sn => 
+      modules.results.filter((m: any) => m.string_number === sn).length
+    )
+    const avgModulesPerString = Math.round(
+      modulesPerStringArray.reduce((a, b) => a + b, 0) / totalStrings
+    )
+    
+    // Vérifier si zone unique existe déjà pour cette centrale
+    let zone = await env.DB.prepare(`
+      SELECT id FROM pv_zones 
+      WHERE plant_id = ? 
+      ORDER BY id ASC 
+      LIMIT 1
+    `).bind(plantId).first()
+    
+    let zoneId: number
+    
+    if (!zone) {
+      // Créer zone UNIQUE avec tous les strings
+      const zoneResult = await env.DB.prepare(`
+        INSERT INTO pv_zones (
+          plant_id, 
+          zone_name, 
+          zone_type, 
+          zone_order,
+          string_count,
+          modules_per_string,
+          inverter_count,
+          junction_box_count
+        ) VALUES (?, ?, 'roof', 1, ?, ?, 1, 0)
+      `).bind(
+        plantId,
+        audit.project_name || `Zone ${audit.client_name}`,
+        totalStrings,
+        avgModulesPerString
+      ).run()
       
-      if (!zone) {
-        // Créer zone
-        const zoneResult = await env.DB.prepare(`
-          INSERT INTO pv_zones (
-            plant_id, 
-            zone_name, 
-            zone_type, 
-            zone_order,
-            string_count,
-            modules_per_string
-          ) VALUES (?, ?, 'roof', ?, 1, ?)
-        `).bind(
-          plantId,
-          `String ${stringNum}`,
-          stringNum,
-          modules.results.filter((m: any) => m.string_number === stringNum).length
-        ).run()
-        
-        zoneIds[stringNum] = zoneResult.meta.last_row_id as number
-      } else {
-        zoneIds[stringNum] = zone.id as number
-      }
+      zoneId = zoneResult.meta.last_row_id as number
+    } else {
+      zoneId = zone.id as number
+      
+      // Mettre à jour config électrique si zone existe déjà
+      await env.DB.prepare(`
+        UPDATE pv_zones 
+        SET string_count = ?,
+            modules_per_string = ?,
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(totalStrings, avgModulesPerString, zoneId).run()
     }
     
-    // 5. Créer/Mettre à jour modules PV avec référence EL
+    // 5. Créer/Mettre à jour modules PV avec référence EL (TOUS dans la zone unique)
     let createdCount = 0
     let updatedCount = 0
     
     for (const elModule of modules.results as any[]) {
-      const zoneId = zoneIds[elModule.string_number]
+      // TOUS les modules vont dans la zone unique (pas de zoneId par string)
       
       // Vérifier si module PV existe déjà
       const existingModule = await env.DB.prepare(`
@@ -179,11 +200,13 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
     return c.json({
       success: true,
       plantId,
-      zonesCreated: Object.keys(zoneIds).length,
+      zoneId,
+      zonesCreated: zone ? 0 : 1,  // 1 zone créée ou 0 si existait déjà
+      stringCount: totalStrings,
       modulesCreated: createdCount,
       modulesUpdated: updatedCount,
       totalModules: modules.results.length,
-      message: 'Synchronisation réussie'
+      message: `Synchronisation réussie: ${totalStrings} strings, ${modules.results.length} modules dans 1 zone unique`
     })
     
   } catch (error: any) {
