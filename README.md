@@ -105,9 +105,19 @@ diagnostic-hub/
 
 #### 📍 Système GPS précis
 - Cartographie modules avec coordonnées latitude/longitude exactes
-- Base Google Satellite zoom 22 (haute résolution) via Leaflet.js
+- Base Esri Satellite zoom 22 (haute résolution) via Leaflet.js 1.9.4
 - Calculs géospatiaux Turf.js (GPS ↔ mètres, surface, point-in-polygon)
 - Support toiture, ombrière, champ au sol (14 à 50 000 modules)
+
+#### 🎮 Handles Interactifs - SolarEdge Style (NOUVEAU ✨)
+- **5 handles par rectangle**: 4 coins resize + 1 centre rotation
+- **Activation/désactivation**: Clic rectangle → orange + handles / Clic carte → désactivation
+- **Resize biaisé**: Drag coins blancs (12×12px) → redimensionnement depuis coin
+- **Rotation visuelle**: Drag centre bleu (20×20px) → rotation fluide selon angle souris
+- **Régénération auto**: Modules repositionnés après chaque transformation
+- **Optimisation performance**: Pas de régénération pendant drag (uniquement à dragend)
+- **Validation bounds**: Empêche inversion rectangle lors resize
+- **UX comparable**: SolarEdge Designer, OpenSolar, Huawei Fusion Solar
 
 #### ✏️ Workflow Canvas V2
 **ÉTAPE 1: Dessin Toiture**
@@ -195,24 +205,25 @@ diagnostic-hub/
 - `/PV_CARTOGRAPHY_COLOR_SYSTEM.md` - Référence 7 statuts couleurs
 - `/GOOGLE_MAPS_API_SETUP.md` - Guide création clé API
 
-### 📊 État Avancement Cartography (29/10/2025)
+### 📊 État Avancement Cartography (06/11/2025)
 
 **Phase 1 - Architecture Base**: ✅ **COMPLÉTÉ**
 - Tables D1 (pv_plants, pv_zones, pv_modules) avec GPS
 - Routes API CRUD centrales/zones/modules
 - Vue stats agrégation 7 statuts
 
-**Phase 2a - Canvas V2 GPS**: ✅ **95% COMPLÉTÉ**
-- ✅ Carte Leaflet + Google Satellite zoom 22
+**Phase 2a - Canvas V2 GPS**: ✅ **100% COMPLÉTÉ** 🎉
+- ✅ Carte Leaflet + Esri Satellite zoom 22
 - ✅ Dessin toiture GPS + calcul surface Turf.js
 - ✅ Modal annotation 7 statuts (couleurs exactes Module EL)
 - ✅ Placement manuel modules avec GPS lat/lng
 - ✅ Placement auto avec validation point-in-polygon
 - ✅ **Strings non réguliers** - Config individuelle par string (S1=26, S2=24, etc.)
+- ✅ **Handles interactifs** - 5 handles (resize + rotation) style SolarEdge
+- ✅ **Import 242 modules** - Rectangle single array 22×11
 - ✅ Export PDF (carte + stats + liste modules)
 - ✅ Sauvegarde/reload persistance DB
-- ⏳ **Tests locaux complets** (en cours)
-- ⏳ **Clé Google Maps API** (user à créer)
+- ⏳ **Tests utilisateur 5 audits** (validation terrain Phase 1B)
 
 **Phase 2b - Optimisations**: ⏳ **À VENIR**
 - Sauvegarde stringsConfig en DB (colonne JSON ou table)
@@ -236,6 +247,10 @@ diagnostic-hub/
 - **`PV_CARTOGRAPHY_TEST_GUIDE.md`** - Guide test complet strings non réguliers (scénarios, cas limites, bugs connus)
 - **`PV_CARTOGRAPHY_COLOR_SYSTEM.md`** - Référence 7 statuts avec hex codes, dégradés, animations
 - **`GOOGLE_MAPS_API_SETUP.md`** - Guide création clé Google Maps API + restrictions sécurité
+- **`HANDLES_INTERACTIFS.md`** - Architecture technique système handles (9.1 KB, 350 lignes)
+- **`TEST_HANDLES_INTERACTIFS.md`** - Plan validation 20 tests fonctionnels (11.8 KB)
+- **`GUIDE_RAPIDE_HANDLES.md`** - Guide utilisateur démarrage 2 minutes (8.1 KB)
+- **`RESUME_HANDLES_INTERACTIFS.md`** - Résumé exécutif Phase 1 MVP (10.6 KB)
 
 ## 📊 Architecture Données D1 Unifiée
 
@@ -283,8 +298,10 @@ diagnostic-hub/
 ### URLs de production
 - **Production**: https://925dfced.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
 - **Domaine principal**: https://diagnostic-hub.pages.dev
+- **Sandbox Dev**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev (test handles interactifs)
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
+- **Backup**: https://page.gensparksite.com/project_backups/diagnostic-hub-handles-interactifs-v1.tar.gz
 
 ### Plateforme
 - **Hébergement**: Cloudflare Pages (edge global)
