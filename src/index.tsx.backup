@@ -51,35 +51,35 @@ app.route('/api/el', elModule)
 app.route('/api/pv/plants', pvModule)
 
 // ============================================================================
-// MODULE INTERCONNECT - Liaison entre modules (EL  PV Carto)
+// MODULE INTERCONNECT - Liaison entre modules (EL ↔ PV Carto)
 // ============================================================================
 // Permet navigation cohérente entre audits EL et centrales PV
 // Routes:
-// - POST /api/interconnect/link-audit-plant  Lier audit EL à centrale PV
-// - GET /api/interconnect/audit/:token/plant  Obtenir centrale liée
-// - GET /api/interconnect/plant/:plantId/audits  Audits EL d'une centrale
-// - POST /api/interconnect/link-audit-zone  Lier audit à zone spécifique
-// - GET /api/interconnect/audit/:token/zones  Zones liées à audit
+// - POST /api/interconnect/link-audit-plant → Lier audit EL à centrale PV
+// - GET /api/interconnect/audit/:token/plant → Obtenir centrale liée
+// - GET /api/interconnect/plant/:plantId/audits → Audits EL d'une centrale
+// - POST /api/interconnect/link-audit-zone → Lier audit à zone spécifique
+// - GET /api/interconnect/audit/:token/zones → Zones liées à audit
 // ============================================================================
 app.route('/api/interconnect', interconnectModule)
 
 // ============================================================================
-// MODULE SYNC - Synchronisation automatique EL  PV Carto
+// MODULE SYNC - Synchronisation automatique EL ↔ PV Carto
 // ============================================================================
 // Synchronise modules et défauts entre Module EL et PV Cartography
 // Routes:
-// - POST /api/sync/sync-audit-to-plant  Sync auto audit EL  centrale PV
-// - GET /api/sync/audit/:token/sync-status  État synchronisation
+// - POST /api/sync/sync-audit-to-plant → Sync auto audit EL → centrale PV
+// - GET /api/sync/audit/:token/sync-status → État synchronisation
 // ============================================================================
 app.route('/api/sync', syncModule)
 
 // ============================================================================
-// MODULE SYNC-REVERSE - Synchronisation PV Carto  Audit EL
+// MODULE SYNC-REVERSE - Synchronisation PV Carto → Audit EL
 // ============================================================================
 // Crée des audits EL depuis modélisation PV Cartography
 // Routes:
-// - POST /api/sync-reverse/create-audit-from-plant  Créer audit depuis centrale PV
-// - GET /api/sync-reverse/plant/:plantId/can-create-audit  Vérifier si création possible
+// - POST /api/sync-reverse/create-audit-from-plant → Créer audit depuis centrale PV
+// - GET /api/sync-reverse/plant/:plantId/can-create-audit → Vérifier si création possible
 // ============================================================================
 app.route('/api/sync-reverse', syncReverseModule)
 
@@ -88,10 +88,10 @@ app.route('/api/sync-reverse', syncReverseModule)
 // ============================================================================
 // Module complètement isolé pour import DXF OpenSolar
 // Routes:
-// - GET /opensolar  Interface HTML upload DXF
-// - POST /api/opensolar/parse-dxf  Parser fichier DXF
-// - POST /api/opensolar/import-modules  Importer modules dans DB
-// - GET /api/opensolar/test  Test endpoint
+// - GET /opensolar → Interface HTML upload DXF
+// - POST /api/opensolar/parse-dxf → Parser fichier DXF
+// - POST /api/opensolar/import-modules → Importer modules dans DB
+// - GET /api/opensolar/test → Test endpoint
 // ============================================================================
 app.route('/api/opensolar', openSolarModule)
 
@@ -394,7 +394,7 @@ app.get('/', (c) => {
             transform: scale(1.02) !important;
         }
         .module-btn.selected-for-bulk::after {
-            content: "OK" !important;
+            content: "✓" !important;
             position: absolute !important;
             top: -5px !important;
             right: -5px !important;
@@ -966,7 +966,7 @@ app.get('/audit/:token', async (c) => {
             transform: scale(1.02) !important;
         }
         .module-btn.selected-for-bulk::after {
-            content: "OK" !important;
+            content: "✓" !important;
             position: absolute !important;
             top: -5px !important;
             right: -5px !important;
@@ -1145,22 +1145,22 @@ app.get('/audit/:token', async (c) => {
                 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <button class="module-status-btn bg-green-600 hover:bg-green-700 p-3 rounded font-bold" data-status="ok">
-                        OK OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
+                        🟢 OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
                     </button>
                     <button class="module-status-btn bg-yellow-600 hover:bg-yellow-700 p-3 rounded font-bold" data-status="inequality">
-                        Inegalite Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
+                        🟡 Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
                     </button>
                     <button class="module-status-btn bg-orange-600 hover:bg-orange-700 p-3 rounded font-bold" data-status="microcracks">
-                        Fissures Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
+                        🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        HS Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
                     </button>
                     <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
-                        String String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
+                        🔵 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
                     </button>
                     <button class="module-status-btn bg-gray-600 hover:bg-gray-700 p-3 rounded font-bold" data-status="not_connected">
-                        Non-connecte Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
+                        ⚫ Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
                     </button>
                 </div>
                 
@@ -1352,7 +1352,7 @@ app.get('/audit/:token', async (c) => {
         <script src="/static/diagpv-measures.js?v=20251104-2"></script>
         <script>
         // ============================================================================
-        // Interconnexion Module EL  PV Carto
+        // Interconnexion Module EL → PV Carto
         // ============================================================================
         const AUDIT_TOKEN = '${token}'
         
@@ -1410,7 +1410,7 @@ function generatePhysicalModulesGrid(modules: any[]) {
 
   // Créer une grille vide (String 1 en HAUT = index 0)
   const grid = []
-  for (let row = minRow; row <= maxRow; row++) { // Row 1  index 0 (TOP), Row 10  index 9 (BOTTOM)
+  for (let row = minRow; row <= maxRow; row++) { // Row 1 → index 0 (TOP), Row 10 → index 9 (BOTTOM)
     const gridRow = []
     for (let col = minCol; col <= maxCol; col++) {
       gridRow.push(null)
@@ -1422,7 +1422,7 @@ function generatePhysicalModulesGrid(modules: any[]) {
   sortedModules.forEach(module => {
     const row = module.physical_row || 0
     const col = module.physical_col || 0
-    const gridRowIndex = row - minRow  // Row 1  index 0 (TOP), Row 10  index 9 (BOTTOM)
+    const gridRowIndex = row - minRow  // Row 1 → index 0 (TOP), Row 10 → index 9 (BOTTOM)
     const gridColIndex = col - minCol
     
     if (grid[gridRowIndex] && grid[gridRowIndex][gridColIndex] !== undefined) {
@@ -1465,7 +1465,7 @@ function generatePhysicalModulesGrid(modules: any[]) {
   
   // Ajouter une vue par string aussi pour référence
   html += '<div style="margin-top: 30px;">'
-  html += '<h4 style="color: #374151; margin-bottom: 15px;">DOCS Vue par String (référence)</h4>'
+  html += '<h4 style="color: #374151; margin-bottom: 15px;">📋 Vue par String (référence)</h4>'
   
   // Grouper par string
   const modulesByString = {}
@@ -1866,9 +1866,9 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
     </head>
     <body>
         <div class="header">
-            <h1>Batiment DIAGNOSTIC PHOTOVOLTAÏQUE</h1>
+            <h1>🏢 DIAGNOSTIC PHOTOVOLTAÏQUE</h1>
             <p>www.diagnosticphotovoltaique.fr</p>
-            <h2>ELEC AUDIT ÉLECTROLUMINESCENCE ELEC</h2>
+            <h2>⚡ AUDIT ÉLECTROLUMINESCENCE ⚡</h2>
             
             <div class="client-info">
                 <p><strong>Client :</strong> ${audit.client_name}</p>
@@ -1881,12 +1881,12 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         </div>
         
         <div class="section">
-            <h3>STATS RÉSULTATS AUDIT ÉLECTROLUMINESCENCE</h3>
+            <h3>📊 RÉSULTATS AUDIT ÉLECTROLUMINESCENCE</h3>
             <div class="section-content">
                 <div class="stats">
                     <div class="stat-card stat-ok">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">OK</div>
+                            <div style="font-size: 2rem;">🟢</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Modules OK</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #22c55e;">${stats.ok} (${okPercentage}%)</div>
@@ -1896,7 +1896,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     
                     <div class="stat-card stat-inequality">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">Inegalite</div>
+                            <div style="font-size: 2rem;">🟡</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Inégalité cellules</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #eab308;">${stats.inequality} (${inequalityPercentage}%)</div>
@@ -1906,7 +1906,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     
                     <div class="stat-card stat-microcracks">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">Fissures</div>
+                            <div style="font-size: 2rem;">🟠</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Microfissures</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #f97316;">${stats.microcracks} (${microcracksPercentage}%)</div>
@@ -1916,7 +1916,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     
                     <div class="stat-card stat-dead">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">HS</div>
+                            <div style="font-size: 2rem;">🔴</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Modules HS</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #ef4444;">${stats.dead} (${deadPercentage}%)</div>
@@ -1926,7 +1926,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     
                     <div class="stat-card stat-string_open">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">String</div>
+                            <div style="font-size: 2rem;">🔵</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Strings ouverts</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${stats.string_open} (${stringOpenPercentage}%)</div>
@@ -1936,7 +1936,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                     
                     <div class="stat-card stat-not_connected">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="font-size: 2rem;">Non-connecte</div>
+                            <div style="font-size: 2rem;">⚫</div>
                             <div>
                                 <div style="font-weight: 600; font-size: 1.1rem;">Non raccordés</div>
                                 <div style="font-size: 1.5rem; font-weight: 700; color: #6b7280;">${stats.not_connected} (${notConnectedPercentage}%)</div>
@@ -1946,13 +1946,13 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
                 </div>
                 
                 <div class="total-summary">
-                    ELEC TOTAL MODULES AUDITÉS : ${stats.total} ELEC
+                    ⚡ TOTAL MODULES AUDITÉS : ${stats.total} ⚡
                 </div>
             </div>
         </div>
         
         <div class="section">
-            <h3>CARTE CARTOGRAPHIE MODULES</h3>
+            <h3>🗺️ CARTOGRAPHIE MODULES</h3>
             <div class="section-content">
                 
                 <!-- Légende des couleurs -->
@@ -1993,7 +1993,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         </div>
         
         <div class="section">
-            <h3>ATTENTION MODULES NON-CONFORMES</h3>
+            <h3>⚠️ MODULES NON-CONFORMES</h3>
             <div class="section-content">
                 <table>
                     <tr>
@@ -2018,26 +2018,26 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         
         ${measurements.length > 0 ? `
         <div class="section">
-            <h3>ELEC MESURES ÉLECTRIQUES PVSERV</h3>
+            <h3>⚡ MESURES ÉLECTRIQUES PVSERV</h3>
             <div class="section-content">
                 <div class="stats">
                     <div class="stat-card">
                         <div style="text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 5px;">STATS</div>
+                            <div style="font-size: 2rem; margin-bottom: 5px;">📊</div>
                             <div style="font-weight: 600;">Total mesures</div>
                             <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${measurements.length}</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div style="text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 5px;">ELEC</div>
+                            <div style="font-size: 2rem; margin-bottom: 5px;">⚡</div>
                             <div style="font-weight: 600;">FF moyen</div>
                             <div style="font-size: 1.5rem; font-weight: 700; color: #22c55e;">${(measurements.reduce((sum, m) => sum + parseFloat(m.ff || 0), 0) / measurements.length).toFixed(3)}</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div style="text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 5px;">CONNECT</div>
+                            <div style="font-size: 2rem; margin-bottom: 5px;">🔌</div>
                             <div style="font-weight: 600;">Rds moyen</div>
                             <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;">${(measurements.reduce((sum, m) => sum + parseFloat(m.rds || 0), 0) / measurements.length).toFixed(2)} Ω</div>
                         </div>
@@ -2083,7 +2083,7 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         ` : ''}
 
         <div class="signature-section">
-            <h3 style="color: #1e293b; margin: 0 0 15px 0; font-size: 1.25rem;"> SIGNATURE NUMÉRIQUE</h3>
+            <h3 style="color: #1e293b; margin: 0 0 15px 0; font-size: 1.25rem;">🔐 SIGNATURE NUMÉRIQUE</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; text-align: left; font-size: 0.9rem; color: #4b5563;">
                 <div><strong>Génération :</strong> Automatique DiagPV Audit</div>
                 <div><strong>Date :</strong> ${date}</div>
@@ -2093,12 +2093,12 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
         </div>
         
         <div class="instructions-box">
-            <h4>DOCS INSTRUCTIONS IMPRESSION COULEURS</h4>
+            <h4>📋 INSTRUCTIONS IMPRESSION COULEURS</h4>
             <p><strong>Pour imprimer les couleurs des modules :</strong></p>
             <div style="margin-left: 15px; line-height: 1.6;">
-                <p>• <strong>Chrome/Edge :</strong> Ctrl+P  Plus de paramètres  ✅ Graphiques d'arrière-plan</p>
-                <p>• <strong>Firefox :</strong> Ctrl+P  Plus de paramètres  ✅ Imprimer les arrière-plans</p>
-                <p>• <strong>Safari :</strong> Cmd+P  Safari  ✅ Imprimer les arrière-plans</p>
+                <p>• <strong>Chrome/Edge :</strong> Ctrl+P → Plus de paramètres → ✅ Graphiques d'arrière-plan</p>
+                <p>• <strong>Firefox :</strong> Ctrl+P → Plus de paramètres → ✅ Imprimer les arrière-plans</p>
+                <p>• <strong>Safari :</strong> Cmd+P → Safari → ✅ Imprimer les arrière-plans</p>
             </div>
         </div>
         
@@ -2149,12 +2149,12 @@ async function generateReportHTML(audit: any, modules: any[], stats: any, measur
 
 function getStatusLabel(status: string): string {
   const labels: { [key: string]: string } = {
-    'ok': 'OK OK',
-    'inequality': 'Inegalite Inégalité',
-    'microcracks': 'Fissures Microfissures',
-    'dead': 'HS Impact Cellulaire',
-    'string_open': 'String String ouvert',
-    'not_connected': 'Non-connecte Non raccordé'
+    'ok': '🟢 OK',
+    'inequality': '🟡 Inégalité',
+    'microcracks': '🟠 Microfissures',
+    'dead': '🔴 Impact Cellulaire',
+    'string_open': '🔵 String ouvert',
+    'not_connected': '⚫ Non raccordé'
   }
   return labels[status] || status
 }
@@ -2297,7 +2297,7 @@ app.get('/dashboard', (c) => {
             transform: scale(1.02) !important;
         }
         .module-btn.selected-for-bulk::after {
-            content: "OK" !important;
+            content: "✓" !important;
             position: absolute !important;
             top: -5px !important;
             right: -5px !important;
@@ -2920,27 +2920,27 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-green-400">
                     <div class="text-xl font-black text-green-400" id="statsOk">0</div>
-                    <div class="text-xs text-gray-400">OK OK</div>
+                    <div class="text-xs text-gray-400">🟢 OK</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-yellow-400">
                     <div class="text-xl font-black text-yellow-400" id="statsInequality">0</div>
-                    <div class="text-xs text-gray-400">Inegalite Inégalité</div>
+                    <div class="text-xs text-gray-400">🟡 Inégalité</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-orange-400">
                     <div class="text-xl font-black text-orange-400" id="statsMicrocracks">0</div>
-                    <div class="text-xs text-gray-400">Fissures Fissures</div>
+                    <div class="text-xs text-gray-400">🟠 Fissures</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-red-400">
                     <div class="text-xl font-black text-red-400" id="statsDead">0</div>
-                    <div class="text-xs text-gray-400">HS Impact Cellulaire</div>
+                    <div class="text-xs text-gray-400">🔴 Impact Cellulaire</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-blue-400">
                     <div class="text-xl font-black text-blue-400" id="statsStringOpen">0</div>
-                    <div class="text-xs text-gray-400">String String</div>
+                    <div class="text-xs text-gray-400">🔵 String</div>
                 </div>
                 <div class="bg-gray-900 rounded-lg p-3 text-center border border-gray-400">
                     <div class="text-xl font-black text-gray-400" id="statsPending">0</div>
-                    <div class="text-xs text-gray-400">Pending Pending</div>
+                    <div class="text-xs text-gray-400">⚪ Pending</div>
                 </div>
             </div>
         </div>
@@ -2952,22 +2952,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <button class="module-status-btn bg-green-600 hover:bg-green-700 p-3 rounded font-bold" data-status="ok">
-                        OK OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
+                        🟢 OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
                     </button>
                     <button class="module-status-btn bg-yellow-600 hover:bg-yellow-700 p-3 rounded font-bold" data-status="inequality">
-                        Inegalite Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
+                        🟡 Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
                     </button>
                     <button class="module-status-btn bg-orange-600 hover:bg-orange-700 p-3 rounded font-bold" data-status="microcracks">
-                        Fissures Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
+                        🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        HS Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
                     </button>
                     <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
-                        String String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
+                        🔵 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
                     </button>
                     <button class="module-status-btn bg-gray-600 hover:bg-gray-700 p-3 rounded font-bold" data-status="not_connected">
-                        Non-connecte Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
+                        ⚫ Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
                     </button>
                 </div>
                 
@@ -3492,7 +3492,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <a href="/pv/plant/${plantId}" class="text-purple-400 hover:text-purple-300 font-bold">
                         <i class="fas fa-arrow-left mr-2"></i>RETOUR
                     </a>
-                    <span class="text-sm bg-green-600 px-3 py-1 rounded font-bold"> VERSION PRO</span>
+                    <span class="text-sm bg-green-600 px-3 py-1 rounded font-bold">✨ VERSION PRO</span>
                     <h1 id="zoneTitle" class="text-xl font-black">Chargement...</h1>
                 </div>
                 <div class="flex gap-3">
@@ -3522,16 +3522,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     <div class="space-y-2">
                         <button id="drawBuildingBtn" class="w-full bg-gray-600 hover:bg-gray-500 py-2 rounded font-bold text-sm">
-                            <i class="fas fa-building mr-2"></i>Batiment Bâtiment
+                            <i class="fas fa-building mr-2"></i>🏢 Bâtiment
                         </button>
                         <button id="drawCarportBtn" class="w-full bg-yellow-600 hover:bg-yellow-500 py-2 rounded font-bold text-sm">
-                            <i class="fas fa-parking mr-2"></i>️ Ombrière Parking
+                            <i class="fas fa-parking mr-2"></i>🅿️ Ombrière Parking
                         </button>
                         <button id="drawGroundBtn" class="w-full bg-green-600 hover:bg-green-500 py-2 rounded font-bold text-sm">
-                            <i class="fas fa-sun mr-2"></i>Sol Champ au Sol
+                            <i class="fas fa-sun mr-2"></i>🌾 Champ au Sol
                         </button>
                         <button id="drawTechnicalBtn" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm">
-                            <i class="fas fa-tools mr-2"></i>Tech Zone Technique
+                            <i class="fas fa-tools mr-2"></i>📏 Zone Technique
                         </button>
                     </div>
                     
@@ -3591,15 +3591,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <div>
                             <label class="block text-xs text-gray-400 mb-1">Alignement</label>
                             <select id="rectAlignment" class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold text-sm">
-                                <option value="center">Centre Centre</option>
-                                <option value="north">Nord Nord (Haut)</option>
-                                <option value="south">Sud️ Sud (Bas)</option>
-                                <option value="east">Est️ Est (Droite)</option>
-                                <option value="west">Ouest️ Ouest (Gauche)</option>
+                                <option value="center">🎯 Centre</option>
+                                <option value="north">⬆️ Nord (Haut)</option>
+                                <option value="south">⬇️ Sud (Bas)</option>
+                                <option value="east">➡️ Est (Droite)</option>
+                                <option value="west">⬅️ Ouest (Gauche)</option>
                                 <option value="nw">↖️ Nord-Ouest</option>
-                                <option value="ne">NE️ Nord-Est</option>
-                                <option value="sw">SW️ Sud-Ouest</option>
-                                <option value="se">SE️ Sud-Est</option>
+                                <option value="ne">↗️ Nord-Est</option>
+                                <option value="sw">↙️ Sud-Ouest</option>
+                                <option value="se">↘️ Sud-Est</option>
                             </select>
                         </div>
                         <div class="p-2 bg-black rounded text-xs">
@@ -3717,15 +3717,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <span id="statsTotal" class="font-bold text-purple-400">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>OK OK:</span>
+                            <span>🟢 OK:</span>
                             <span id="statsOk" class="font-bold text-green-400">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>HS Impact Cellulaire:</span>
+                            <span>🔴 Impact Cellulaire:</span>
                             <span id="statsDead" class="font-bold text-red-400">0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span>Pending Pending:</span>
+                            <span>⚪ Pending:</span>
                             <span id="statsPending" class="font-bold text-gray-400">0</span>
                         </div>
                     </div>
@@ -3734,23 +3734,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 <!-- Aide Alignement Visuel -->
                 <div id="alignmentHelp" class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-lg border-2 border-orange-400 p-4 hidden">
                     <h3 class="text-sm font-black mb-2 text-orange-300">
-                        <i class="fas fa-crosshairs mr-1"></i>Centre ALIGNEMENT VISUEL
+                        <i class="fas fa-crosshairs mr-1"></i>🎯 ALIGNEMENT VISUEL
                     </h3>
                     <div class="space-y-2 text-xs text-orange-100">
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1"> DÉPLACER:</div>
-                            <div>Clic LONG sur rectangle  Glisser</div>
+                            <div class="font-bold text-orange-300 mb-1">📍 DÉPLACER:</div>
+                            <div>Clic LONG sur rectangle → Glisser</div>
                         </div>
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1">️ REDIMENSIONNER:</div>
+                            <div class="font-bold text-orange-300 mb-1">↔️ REDIMENSIONNER:</div>
                             <div>Utiliser poignées jaunes (coins/bords)</div>
                         </div>
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1"> ROTATION:</div>
+                            <div class="font-bold text-orange-300 mb-1">🔄 ROTATION:</div>
                             <div>Bouton ↻ dans liste rectangles</div>
                         </div>
                         <div class="bg-orange-500 text-black p-2 rounded font-bold text-center mt-3">
-                             Alignez avec la photo satellite !
+                            💡 Alignez avec la photo satellite !
                         </div>
                     </div>
                     <button id="hideAlignmentHelp" class="w-full bg-gray-700 hover:bg-gray-600 py-1 rounded text-xs mt-2">
@@ -3761,7 +3761,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 <!-- Synchronisation EL -->
                 <div class="bg-gray-900 rounded-lg border-2 border-cyan-400 p-4">
                     <h3 class="text-sm font-black mb-2 text-cyan-400">
-                        <i class="fas fa-sync-alt mr-1"></i>SYNC EL ️ CARTO
+                        <i class="fas fa-sync-alt mr-1"></i>SYNC EL ↔️ CARTO
                     </h3>
                     <div class="space-y-2">
                         <button id="syncELBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-bold text-sm">
@@ -3809,31 +3809,31 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-green-400">
                         <div class="text-xl font-black text-green-400" id="statsOk2">0</div>
-                        <div class="text-xs">OK OK</div>
+                        <div class="text-xs">🟢 OK</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-yellow-400">
                         <div class="text-xl font-black text-yellow-400" id="statsInequality">0</div>
-                        <div class="text-xs">Inegalite Inégal.</div>
+                        <div class="text-xs">🟡 Inégal.</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-orange-400">
                         <div class="text-xl font-black text-orange-400" id="statsMicrocracks">0</div>
-                        <div class="text-xs">Fissures Fissures</div>
+                        <div class="text-xs">🟠 Fissures</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-red-400">
                         <div class="text-xl font-black text-red-400" id="statsDead2">0</div>
-                        <div class="text-xs">HS Impact Cellulaire</div>
+                        <div class="text-xs">🔴 Impact Cellulaire</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-blue-400">
                         <div class="text-xl font-black text-blue-400" id="statsStringOpen">0</div>
-                        <div class="text-xs">String String</div>
+                        <div class="text-xs">🔵 String</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-gray-500">
                         <div class="text-xl font-black text-gray-400" id="statsNotConnected">0</div>
-                        <div class="text-xs">Non-connecte NC</div>
+                        <div class="text-xs">⚫ NC</div>
                     </div>
                     <div class="bg-gray-900 rounded-lg p-3 text-center border border-gray-400">
                         <div class="text-xl font-black text-gray-400" id="statsPending2">0</div>
-                        <div class="text-xs">Pending Pend.</div>
+                        <div class="text-xs">⚪ Pend.</div>
                     </div>
                 </div>
             </div>
@@ -3846,22 +3846,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <button class="status-btn bg-green-600 hover:bg-green-700 p-3 rounded font-bold" data-status="ok">
-                        OK OK<br><span class="text-sm font-normal">Aucun défaut</span>
+                        🟢 OK<br><span class="text-sm font-normal">Aucun défaut</span>
                     </button>
                     <button class="status-btn bg-yellow-600 hover:bg-yellow-700 p-3 rounded font-bold" data-status="inequality">
-                        Inegalite Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
+                        🟡 Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
                     </button>
                     <button class="status-btn bg-orange-600 hover:bg-orange-700 p-3 rounded font-bold" data-status="microcracks">
-                        Fissures Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
+                        🟠 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        HS Impact Cellulaire<br><span class="text-sm font-normal">Défaillant</span>
+                        🔴 Impact Cellulaire<br><span class="text-sm font-normal">Défaillant</span>
                     </button>
                     <button class="status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
-                        String String ouvert<br><span class="text-sm font-normal">Sous-string</span>
+                        🔵 String ouvert<br><span class="text-sm font-normal">Sous-string</span>
                     </button>
                     <button class="status-btn bg-gray-600 hover:bg-gray-700 p-3 rounded font-bold" data-status="not_connected">
-                        Non-connecte Non raccordé<br><span class="text-sm font-normal">NC</span>
+                        ⚫ Non raccordé<br><span class="text-sm font-normal">NC</span>
                     </button>
                 </div>
                 
@@ -3996,7 +3996,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     // Event listeners
                     this.rectangle.on('transformed', () => this.regenerateModules())
                 } else {
-                    console.warn('ATTENTION Leaflet Transform not loaded - drag to move only')
+                    console.warn('⚠️ Leaflet Transform not loaded - drag to move only')
                 }
                 
                 this.rectangle.on('drag', () => this.regenerateModules())
@@ -4024,7 +4024,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         isRotating = true
                         map.dragging.disable()
                         this.rectangle.dragging.disable()
-                        console.log(" Mode rotation activé (clic long)")
+                        console.log("🔄 Mode rotation activé (clic long)")
                     }, 500)
                 })
                 
@@ -4037,7 +4037,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         isRotating = false
                         map.dragging.enable()
                         this.rectangle.dragging.enable()
-                        console.log(" Mode rotation désactivé")
+                        console.log("🔄 Mode rotation désactivé")
                     }
                 })
                 
@@ -4064,27 +4064,27 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Ajouter popup avec contrôles
                 const popupContent = '<div class="p-3 bg-gray-900 text-white rounded">' +
-                    '<h3 class="font-bold text-lg mb-2 text-orange-400"> Rectangle #' + this.id + '</h3>' +
-                    '<p class="text-sm mb-2">' + this.rows + ' lignes x ' + this.cols + ' colonnes = <strong>' + (this.rows * this.cols) + ' modules</strong></p>' +
+                    '<h3 class="font-bold text-lg mb-2 text-orange-400">📦 Rectangle #' + this.id + '</h3>' +
+                    '<p class="text-sm mb-2">' + this.rows + ' lignes × ' + this.cols + ' colonnes = <strong>' + (this.rows * this.cols) + ' modules</strong></p>' +
                     '<p class="text-xs text-gray-400 mb-3">Strings ' + this.stringStart + '-' + (this.stringStart + Math.floor((this.rows * this.cols - 1) / 24)) + '</p>' +
                     '<div class="space-y-2">' +
                         '<button onclick="rotateRectangle(' + this.id + ', 15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
-                            ' Rotation +15°' +
+                            '🔄 Rotation +15°' +
                         '</button>' +
                         '<button onclick="rotateRectangle(' + this.id + ', -15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
                             '↩️ Rotation -15°' +
                         '</button>' +
                         '<button onclick="duplicateRectangle(' + this.id + ')" class="w-full bg-green-600 hover:bg-green-700 py-2 px-3 rounded text-sm font-bold">' +
-                            'DOCS Dupliquer' +
+                            '📋 Dupliquer' +
                         '</button>' +
                         '<button onclick="deleteRectangle(' + this.id + ')" class="w-full bg-red-600 hover:bg-red-700 py-2 px-3 rounded text-sm font-bold">' +
-                            '️ Supprimer' +
+                            '🗑️ Supprimer' +
                         '</button>' +
                     '</div>' +
                     '<div class="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-400">' +
-                        '<p class="font-bold text-yellow-400 mb-1"> Raccourcis :</p>' +
-                        '<p> Clic long + glisser : Rotation</p>' +
-                        '<p> Poignées : Redimensionner</p>' +
+                        '<p class="font-bold text-yellow-400 mb-1">💡 Raccourcis :</p>' +
+                        '<p>🔄 Clic long + glisser : Rotation</p>' +
+                        '<p>🔲 Poignées : Redimensionner</p>' +
                         '<p>✋ Clic court : Déplacer</p>' +
                     '</div>' +
                     '</div>'
@@ -4099,7 +4099,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             regenerateModules() {
-                console.log(" Régénération modules rectangle", this.id)
+                console.log("🔄 Régénération modules rectangle", this.id)
                 
                 // Clear old modules/grid
                 this.clearVisuals()
@@ -4123,7 +4123,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const moduleWidthPixels = 1.7 * pixelsPerMeter
                 const moduleHeightPixels = 1.0 * pixelsPerMeter
                 
-                console.log("Tech Module:", moduleWidthPixels.toFixed(1) + "px x " + moduleHeightPixels.toFixed(1) + "px")
+                console.log("📏 Module:", moduleWidthPixels.toFixed(1) + "px × " + moduleHeightPixels.toFixed(1) + "px")
                 
                 // Generate grid with bilinear interpolation
                 this.modules = []
@@ -4268,7 +4268,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const stringEnd = this.stringStart + Math.floor((totalModules - 1) / 24)
                 
                 const html = '<div class="rectangle-info-overlay">' +
-                    '<strong>' + this.rows + " lignes x " + this.cols + " modules</strong><br>" +
+                    '<strong>' + this.rows + " lignes × " + this.cols + " modules</strong><br>" +
                     'Strings ' + this.stringStart + "-" + stringEnd + " | " + totalModules + " modules<br>" +
                     powerKwc + " kWc | Rectangle #" + this.id +
                     '</div>'
@@ -4319,7 +4319,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // ================================================================
             refreshModuleColors() {
                 // Mettre à jour couleurs des modules affichés après sync EL
-                console.log(" Rectangle", this.id, ":", this.modules.length, "modules - refreshing colors...")
+                console.log("🎨 Rectangle", this.id, ":", this.modules.length, "modules - refreshing colors...")
                 
                 // Les modules sont affichés par renderModules() qui utilise déjà
                 // module_status pour déterminer la couleur
@@ -4529,10 +4529,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Icônes par type
             const icons = {
-                'building': "Batiment",
-                'carport': "️",
-                'ground': "Sol",
-                'technical': "Tech"
+                'building': "🏢",
+                'carport': "🅿️",
+                'ground': "🌾",
+                'technical': "📏"
             }
             
             container.innerHTML = structures.map(s => \`
@@ -4556,7 +4556,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // INIT
         // ================================================================
         async function init() {
-            console.log(" INIT STARTED")
+            console.log("🚀 INIT STARTED")
             try {
                 await loadPlantData()
                 console.log("✅ Plant data loaded")
@@ -4576,15 +4576,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // AUTO-LOAD JALIBAT: Si Plant 6 et zone 14-23, charger automatiquement les 10 strings
                 if (plantId === 6 && zoneId >= 14 && zoneId <= 23) {
-                    console.log(" JALIBAT Plant détecté - Auto-chargement des 10 strings...")
+                    console.log("🏭 JALIBAT Plant détecté - Auto-chargement des 10 strings...")
                     // Sync EL initial
                     await syncModulesFromEL()
                     // Charger rectangles si toiture existe (TOUJOURS, ignorer moduleRectangles.length)
                     if (roofPolygon) {
-                        console.log(" Toiture existante - Import automatique dans 2s...")
-                        console.log("ATTENTION Les rectangles existants seront remplacés")
+                        console.log("🔄 Toiture existante - Import automatique dans 2s...")
+                        console.log("⚠️ Les rectangles existants seront remplacés")
                         setTimeout(() => {
-                            console.log(" Déclenchement auto-import JALIBAT...")
+                            console.log("📥 Déclenchement auto-import JALIBAT...")
                             // Nettoyer rectangles existants
                             moduleRectangles.forEach(rect => {
                                 if (rect.rectangle) map.removeLayer(rect.rectangle)
@@ -4646,7 +4646,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             console.log("✅ Configuration strings chargée:", stringsConfig)
                         } else {
                             stringsConfig = []
-                            console.log("ATTENTION Configuration strings vide ou invalide")
+                            console.log("⚠️ Configuration strings vide ou invalide")
                         }
                     } catch (e) {
                         console.error('❌ Erreur parsing strings_config:', e)
@@ -4688,8 +4688,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Contrôle de basculement entre vues
             const baseLayers = {
-                '️ Satellite': satelliteLayer,
-                'CARTE Carte avec rues': streetLayer
+                '🛰️ Satellite': satelliteLayer,
+                '🗺️ Carte avec rues': streetLayer
             }
             L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map)
             
@@ -4720,7 +4720,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     .openPopup()
             })
             .addTo(map)
-            console.log(' Contrôle de recherche GPS/Adresse ajouté')
+            console.log('🔍 Contrôle de recherche GPS/Adresse ajouté')
             
             // Charger contour toiture existant
             if (zoneData.roof_polygon) {
@@ -4773,12 +4773,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // DESSIN TOITURE
         // ================================================================
         function enableRoofDrawing() {
-            console.log("️ enableRoofDrawing() appelé")
-            console.log("CARTE map:", map)
-            console.log(" map._container:", map ? map._container : 'undefined')
+            console.log("🖊️ enableRoofDrawing() appelé")
+            console.log("🗺️ map:", map)
+            console.log("📍 map._container:", map ? map._container : 'undefined')
             console.log("✏️ drawControl existant:", drawControl)
-            console.log(" drawnItems:", drawnItems)
-            console.log(" L.Control.Draw disponible:", typeof L.Control.Draw)
+            console.log("🎨 drawnItems:", drawnItems)
+            console.log("📦 L.Control.Draw disponible:", typeof L.Control.Draw)
             
             if (!map) {
                 console.error("❌ ERREUR: La carte n'est pas initialisée!")
@@ -4793,11 +4793,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             if (drawControl) {
-                console.log("️ Suppression ancien drawControl")
+                console.log("🗑️ Suppression ancien drawControl")
                 map.removeControl(drawControl)
             }
             
-            console.log(" Création nouveau L.Control.Draw")
+            console.log("🆕 Création nouveau L.Control.Draw")
             drawControl = new L.Control.Draw({
                 draw: {
                     polygon: {
@@ -4859,7 +4859,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // AUTO-IMPORT JALIBAT: Si Plant 6 après dessin toiture
                 if (plantId === 6 && zoneId >= 14 && zoneId <= 23) {
-                    console.log(" Toiture JALIBAT dessinée - Auto-import des 10 strings...")
+                    console.log("🏭 Toiture JALIBAT dessinée - Auto-import des 10 strings...")
                     setTimeout(() => {
                         importExistingModules()
                     }, 500)
@@ -4912,7 +4912,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     renderModules()
                     updateStats()
                     updateStringsProgress()
-                    console.log("️ Toiture et rectangles supprimés")
+                    console.log("🗑️ Toiture et rectangles supprimés")
                 }
             }
         }
@@ -5057,7 +5057,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // MODE INTELLIGENT : Si pas de config, créer distribution uniforme
             if (!useCustomConfig) {
-                console.log("ATTENTION Aucune config custom - création distribution uniforme")
+                console.log("⚠️ Aucune config custom - création distribution uniforme")
                 
                 // Calculer nombre optimal de modules par string (20-30 modules recommandés)
                 const targetModulesPerString = 25
@@ -5075,7 +5075,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 console.log("✅ Distribution auto créée:", stringsConfig)
-                alert("STATS DISTRIBUTION AUTO CRÉÉE:" + String.fromCharCode(10,10) + calculatedStrings + " strings détectés" + String.fromCharCode(10) + baseModulesPerString + "-" + (baseModulesPerString + 1) + " modules/string" + String.fromCharCode(10) + "Total: " + totalModules + " modules" + String.fromCharCode(10,10) + "Vous pourrez ajuster après placement!")
+                alert("📊 DISTRIBUTION AUTO CRÉÉE:" + String.fromCharCode(10,10) + calculatedStrings + " strings détectés" + String.fromCharCode(10) + baseModulesPerString + "-" + (baseModulesPerString + 1) + " modules/string" + String.fromCharCode(10) + "Total: " + totalModules + " modules" + String.fromCharCode(10,10) + "Vous pourrez ajuster après placement!")
             } else {
                 totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             }
@@ -5090,13 +5090,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const startLat = bounds.getNorth() // Latitude maximale (nord)
             const startLng = bounds.getWest()  // Longitude minimale (ouest)
             
-            console.log(" Bounds polygone:", {
+            console.log("📐 Bounds polygone:", {
                 north: bounds.getNorth(),
                 south: bounds.getSouth(),
                 east: bounds.getEast(),
                 west: bounds.getWest()
             })
-            console.log(" Point de départ grille (NW):", startLat, startLng)
+            console.log("📍 Point de départ grille (NW):", startLat, startLng)
             
             // Préparer polygone Turf.js
             const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
@@ -5112,7 +5112,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             let currentStringIndex = 0
             let currentStringConfig = stringsConfig[currentStringIndex]
             
-            console.log("Centre Début placement intelligent - Total à placer:", totalModules)
+            console.log("🎯 Début placement intelligent - Total à placer:", totalModules)
             
             // REMPLISSAGE INTELLIGENT RANGÉE PAR RANGÉE
             const maxRows = 100 // Limite sécurité
@@ -5184,11 +5184,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 currentRow++
-                console.log( "Tech Rangée " + currentRow + " : " + modulesInRow + " modules placés")
+                console.log( "📏 Rangée " + currentRow + " : " + modulesInRow + " modules placés")
                 
                 // Si aucun module placé dans cette rangée, on a fini
                 if (modulesInRow === 0) {
-                    console.log( "ATTENTION Aucun module dans rangée " + currentRow + " - fin placement")
+                    console.log( "⚠️ Aucun module dans rangée " + currentRow + " - fin placement")
                     break
                 }
             }
@@ -5452,23 +5452,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             // Debug logs
-            console.log(" Modules générés:", generatedModules.length)
-            console.log(" Premier module:", generatedModules[0])
-            console.log(" Total modules avant:", modules.length)
+            console.log("🔷 Modules générés:", generatedModules.length)
+            console.log("🔷 Premier module:", generatedModules[0])
+            console.log("🔷 Total modules avant:", modules.length)
             
             // Ajouter modules générés
             modules.push(...generatedModules)
             nextModuleNum = moduleNum
             
-            console.log(" Total modules après:", modules.length)
+            console.log("🔷 Total modules après:", modules.length)
             
             // Nettoyer mode dessin
             cancelDrawRowMode()
             
             // Render
-            console.log(" Appel renderModules...")
+            console.log("🔷 Appel renderModules...")
             renderModules()
-            console.log(" Appel updateStats...")
+            console.log("🔷 Appel updateStats...")
             updateStats()
             
             // SYNC BIDIRECTIONNELLE : Mettre à jour config auto si mode libre
@@ -5512,14 +5512,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         async function clearModules() {
-            console.log("️ clearModules() appelé - Modules actuels:", modules.length)
+            console.log("🗑️ clearModules() appelé - Modules actuels:", modules.length)
             
             if (confirm('Effacer tous les modules ?')) {
                 console.log("✅ Confirmation utilisateur - Effacement en cours...")
                 
                 try {
                     // Supprimer de la DB
-                    console.log(" DELETE API call...")
+                    console.log("🔥 DELETE API call...")
                     await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
                         method: "DELETE"
                     })
@@ -5547,7 +5547,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         function cleanInvalidModules() {
             if (!roofPolygon) {
-                alert("ATTENTION Aucune toiture dessinée - impossible de valider les modules")
+                alert("⚠️ Aucune toiture dessinée - impossible de valider les modules")
                 return
             }
             
@@ -5608,15 +5608,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             modules = validModules
             const removed = before - modules.length
             
-            console.log( " Nettoyage: " + removed + " modules invalides supprimés (" + modules.length + " restants)")
-            console.log("DOCS Détail modules supprimés:", invalidModules)
+            console.log( "🧹 Nettoyage: " + removed + " modules invalides supprimés (" + modules.length + " restants)")
+            console.log("📋 Détail modules supprimés:", invalidModules)
             
             renderModules()
             updateStats()
             updateStringsProgress()
             
             if (removed > 0) {
-                const msg = " NETTOYAGE TERMINÉ" + String.fromCharCode(10,10) +
+                const msg = "🧹 NETTOYAGE TERMINÉ" + String.fromCharCode(10,10) +
                     removed + " modules supprimés" + String.fromCharCode(10) +
                     modules.length + " modules valides restants" + String.fromCharCode(10,10) +
                     "Raisons:" + String.fromCharCode(10) +
@@ -5633,7 +5633,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function createModuleRectangle() {
             if (!roofPolygon) {
-                alert("ATTENTION Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
+                alert("⚠️ Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
                 return
             }
             
@@ -5650,10 +5650,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const totalWidthMeters = cols * moduleWidth + (cols - 1) * spacing
             const totalHeightMeters = rows * moduleHeight + (rows - 1) * spacing
             
-            console.log(" Rectangle réel:", totalWidthMeters.toFixed(1) + "m x " + totalHeightMeters.toFixed(1) + "m")
-            console.log(" Alignement:", alignment)
+            console.log("📐 Rectangle réel:", totalWidthMeters.toFixed(1) + "m × " + totalHeightMeters.toFixed(1) + "m")
+            console.log("📍 Alignement:", alignment)
             
-            // Convertir mètres  pixels selon zoom actuel
+            // Convertir mètres → pixels selon zoom actuel
             const zoom = map.getZoom()
             
             // *** NOUVEAU : Positionner selon alignement choisi ***
@@ -5664,22 +5664,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 case 'north':
                     anchorLat = roofBounds.getNorth()
                     anchorLng = (roofBounds.getWest() + roofBounds.getEast()) / 2
-                    console.log("Nord Alignement NORD")
+                    console.log("⬆️ Alignement NORD")
                     break
                 case 'south':
                     anchorLat = roofBounds.getSouth()
                     anchorLng = (roofBounds.getWest() + roofBounds.getEast()) / 2
-                    console.log("Sud️ Alignement SUD")
+                    console.log("⬇️ Alignement SUD")
                     break
                 case 'east':
                     anchorLat = (roofBounds.getNorth() + roofBounds.getSouth()) / 2
                     anchorLng = roofBounds.getEast()
-                    console.log("Est️ Alignement EST")
+                    console.log("➡️ Alignement EST")
                     break
                 case 'west':
                     anchorLat = (roofBounds.getNorth() + roofBounds.getSouth()) / 2
                     anchorLng = roofBounds.getWest()
-                    console.log("Ouest️ Alignement OUEST")
+                    console.log("⬅️ Alignement OUEST")
                     break
                 case 'nw':
                     anchorLat = roofBounds.getNorth()
@@ -5689,38 +5689,38 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 case 'ne':
                     anchorLat = roofBounds.getNorth()
                     anchorLng = roofBounds.getEast()
-                    console.log("NE️ Alignement NORD-EST")
+                    console.log("↗️ Alignement NORD-EST")
                     break
                 case 'sw':
                     anchorLat = roofBounds.getSouth()
                     anchorLng = roofBounds.getWest()
-                    console.log("SW️ Alignement SUD-OUEST")
+                    console.log("↙️ Alignement SUD-OUEST")
                     break
                 case 'se':
                     anchorLat = roofBounds.getSouth()
                     anchorLng = roofBounds.getEast()
-                    console.log("SE️ Alignement SUD-EST")
+                    console.log("↘️ Alignement SUD-EST")
                     break
                 default: // center
                     anchorLat = roofBounds.getCenter().lat
                     anchorLng = roofBounds.getCenter().lng
-                    console.log("Centre Alignement CENTRE")
+                    console.log("🎯 Alignement CENTRE")
             }
             
             const center = L.latLng(anchorLat, anchorLng)
-            console.log(" Point ancrage:", center.lat.toFixed(6) + ", " + center.lng.toFixed(6))
+            console.log("🏠 Point ancrage:", center.lat.toFixed(6) + ", " + center.lng.toFixed(6))
             
             // Formule Leaflet: mètres par pixel selon zoom
             const metersPerPixel = 156543.03392 * Math.cos(center.lat * Math.PI / 180) / Math.pow(2, zoom)
             const pixelsPerMeter = 1 / metersPerPixel
             
-            console.log(" Zoom:", zoom, "| Pixels/mètre:", pixelsPerMeter.toFixed(2))
+            console.log("🔍 Zoom:", zoom, "| Pixels/mètre:", pixelsPerMeter.toFixed(2))
             
             // Taille rectangle en pixels
             const totalWidthPixels = totalWidthMeters * pixelsPerMeter
             const totalHeightPixels = totalHeightMeters * pixelsPerMeter
             
-            console.log("Tech Pixels:", totalWidthPixels.toFixed(0) + "px x " + totalHeightPixels.toFixed(0) + "px")
+            console.log("📏 Pixels:", totalWidthPixels.toFixed(0) + "px × " + totalHeightPixels.toFixed(0) + "px")
             
             // Convertir centre map en pixels
             const centerPoint = map.latLngToContainerPoint(center)
@@ -5735,13 +5735,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 centerPoint.y + totalHeightPixels / 2
             )
             
-            // Convertir pixels  LatLng
+            // Convertir pixels → LatLng
             const topLeft = map.containerPointToLatLng(topLeftPoint)
             const bottomRight = map.containerPointToLatLng(bottomRightPoint)
             
             const bounds = [topLeft, bottomRight]
             
-            console.log(" Bounds GPS:", bounds)
+            console.log("📍 Bounds GPS:", bounds)
             
             // Create rectangle
             const id = moduleRectangles.length + 1
@@ -5765,7 +5765,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 modules = modules.concat(rect.modules)
             })
             
-            console.log(" Modules totaux depuis rectangles:", modules.length)
+            console.log("📦 Modules totaux depuis rectangles:", modules.length)
             
             renderModules()
             updateStats()
@@ -5774,16 +5774,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         async function importExistingModules() {
             if (!roofPolygon) {
-                alert("ATTENTION Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
+                alert("⚠️ Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
                 return
             }
             
-            if (moduleRectangles.length > 0 && !confirm("ATTENTION Des rectangles existent déjà. Les remplacer par l" + String.fromCharCode(39) + "import ?")) {
+            if (moduleRectangles.length > 0 && !confirm("⚠️ Des rectangles existent déjà. Les remplacer par l" + String.fromCharCode(39) + "import ?")) {
                 return
             }
             
             try {
-                console.log(" Import GLOBAL - Toutes les zones du plant JALIBAT...")
+                console.log("📥 Import GLOBAL - Toutes les zones du plant JALIBAT...")
                 
                 // NOUVEAU: Récupérer TOUTES les zones du plant (14 à 23 = Strings 1-10)
                 const allZones = [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]  // Zone IDs pour JALIBAT
@@ -5802,13 +5802,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 results.forEach(result => {
                     allModulesByZone[result.zoneId] = result.modules
                     totalModulesCount += result.modules.length
-                    console.log(\` Zone \${result.zoneId}: \${result.modules.length} modules\`)
+                    console.log(\`📦 Zone \${result.zoneId}: \${result.modules.length} modules\`)
                 })
                 
-                console.log(" TOTAL modules trouvés:", totalModulesCount)
+                console.log("📦 TOTAL modules trouvés:", totalModulesCount)
                 
                 if (totalModulesCount === 0) {
-                    alert("ATTENTION Aucun module trouvé en base de données pour ce plant")
+                    alert("⚠️ Aucun module trouvé en base de données pour ce plant")
                     return
                 }
                 
@@ -5816,8 +5816,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // String 1 (zone 14) = 26 modules
                 // Strings 2-10 (zones 15-23) = 24 modules chacun
                 const stringConfigs = [
-                    { zoneId: 14, stringNum: 1, rows: 2, cols: 13 },  // 26 modules = 2x13
-                    { zoneId: 15, stringNum: 2, rows: 2, cols: 12 },  // 24 modules = 2x12
+                    { zoneId: 14, stringNum: 1, rows: 2, cols: 13 },  // 26 modules = 2×13
+                    { zoneId: 15, stringNum: 2, rows: 2, cols: 12 },  // 24 modules = 2×12
                     { zoneId: 16, stringNum: 3, rows: 2, cols: 12 },
                     { zoneId: 17, stringNum: 4, rows: 2, cols: 12 },
                     { zoneId: 18, stringNum: 5, rows: 2, cols: 12 },
@@ -5828,7 +5828,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     { zoneId: 23, stringNum: 10, rows: 2, cols: 12 }
                 ]
                 
-                console.log(" Configuration JALIBAT: 10 rectangles (String 1=26, Strings 2-10=24)")
+                console.log("📐 Configuration JALIBAT: 10 rectangles (String 1=26, Strings 2-10=24)")
                 
                 // Paramètres globaux
                 const roofBounds = roofPolygon.getBounds()
@@ -5854,15 +5854,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
                 const roofHeightMeters = roofHeightDegrees * 110574
                 
-                console.log(\`Tech Toiture: \${roofWidthMeters.toFixed(1)}m x \${roofHeightMeters.toFixed(1)}m\`)
+                console.log(\`📏 Toiture: \${roofWidthMeters.toFixed(1)}m × \${roofHeightMeters.toFixed(1)}m\`)
                 
-                // Calculer dimensions totales nécessaires pour grille 5x2
+                // Calculer dimensions totales nécessaires pour grille 5×2
                 const rectsPerRow = 5
                 const rectsPerCol = 2
                 
                 // Dimensions réelles par type de rectangle
-                const string1Width = 13 * moduleWidth + (13 - 1) * spacing  // 26 modules = 2x13
-                const standardWidth = 12 * moduleWidth + (12 - 1) * spacing  // 24 modules = 2x12
+                const string1Width = 13 * moduleWidth + (13 - 1) * spacing  // 26 modules = 2×13
+                const standardWidth = 12 * moduleWidth + (12 - 1) * spacing  // 24 modules = 2×12
                 const rectHeight = 2 * moduleHeight + (2 - 1) * spacing
                 
                 // Largeur totale RÉELLE nécessaire = 1 String 1 + 4 Strings standard + 4 espacements
@@ -5870,30 +5870,30 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const totalHeightNeeded = 2 * rectHeight + 1 * rectSpacing
                 
                 // ÉCHELLE ADAPTATIVE pour meilleur fit visuel
-                // Si toiture assez grande: échelle 1:1 (modules taille réelle 1.7m x 1.0m)
+                // Si toiture assez grande: échelle 1:1 (modules taille réelle 1.7m × 1.0m)
                 // Si toiture trop petite: réduction proportionnelle
                 const widthScale = (roofWidthMeters * 0.92) / totalWidthNeeded
                 const heightScale = (roofHeightMeters * 0.92) / totalHeightNeeded
                 const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Max échelle réelle
                 
-                console.log("STATS Dimensions toiture: " + roofWidthMeters.toFixed(1) + "m x " + roofHeightMeters.toFixed(1) + "m")
-                console.log("STATS Dimensions nécessaires: " + totalWidthNeeded.toFixed(1) + "m x " + totalHeightNeeded.toFixed(1) + "m")
-                console.log("STATS Scale factor appliqué: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
+                console.log("📊 Dimensions toiture: " + roofWidthMeters.toFixed(1) + "m × " + roofHeightMeters.toFixed(1) + "m")
+                console.log("📊 Dimensions nécessaires: " + totalWidthNeeded.toFixed(1) + "m × " + totalHeightNeeded.toFixed(1) + "m")
+                console.log("📊 Scale factor appliqué: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
                 
-                console.log(\` Scale factor: \${scaleFactor.toFixed(3)} (total needed: \${totalWidthNeeded.toFixed(1)}m x \${totalHeightNeeded.toFixed(1)}m)\`)
+                console.log(\`🔬 Scale factor: \${scaleFactor.toFixed(3)} (total needed: \${totalWidthNeeded.toFixed(1)}m × \${totalHeightNeeded.toFixed(1)}m)\`)
                 
-                // Positionner les rectangles en grille 5x2 avec mise à l'échelle
+                // Positionner les rectangles en grille 5×2 avec mise à l'échelle
                 let currentX = 0  // Offset horizontal en mètres
                 let currentY = 0  // Offset vertical en mètres
                 let rectIndex = 0
                 
-                console.log("Centre Création des 10 rectangles...")
+                console.log("🎯 Création des 10 rectangles...")
                 
                 stringConfigs.forEach((config, idx) => {
                     const existingModules = allModulesByZone[config.zoneId] || []
                     
                     if (existingModules.length === 0) {
-                        console.warn(\`ATTENTION Aucun module pour zone \${config.zoneId}\`)
+                        console.warn(\`⚠️ Aucun module pour zone \${config.zoneId}\`)
                         return
                     }
                     
@@ -5935,7 +5935,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     rect.addToMap()
                     moduleRectangles.push(rect)
                     
-                    console.log(\`✅ Rectangle \${rectId} créé: String \${config.stringNum} (\${config.rows}x\${config.cols}) - Position: X=\${currentX.toFixed(1)}m Y=\${currentY.toFixed(1)}m\`)
+                    console.log(\`✅ Rectangle \${rectId} créé: String \${config.stringNum} (\${config.rows}×\${config.cols}) - Position: X=\${currentX.toFixed(1)}m Y=\${currentY.toFixed(1)}m\`)
                     
                     // Mapper statuts EL
                     rect.modules.forEach(newModule => {
@@ -5953,7 +5953,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         }
                     })
                     
-                    // Calculer position suivante (grille 5x2) avec mise à l'échelle
+                    // Calculer position suivante (grille 5×2) avec mise à l'échelle
                     rectIndex++
                     if (rectIndex % rectsPerRow === 0) {
                         // Passer à la rangée suivante
@@ -5987,16 +5987,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 alert(
                     "✅ IMPORT GLOBAL JALIBAT TERMINÉ" + String.fromCharCode(10,10) +
-                    " 10 rectangles créés (grille 5x2):" + String.fromCharCode(10) +
-                    "   • String 1: 2x13 = 26 modules" + String.fromCharCode(10) +
-                    "   • Strings 2-10: 2x12 = 24 modules" + String.fromCharCode(10,10) +
-                    "STATS Total: " + totalGeneratedModules + " modules" + String.fromCharCode(10) +
+                    "📦 10 rectangles créés (grille 5×2):" + String.fromCharCode(10) +
+                    "   • String 1: 2×13 = 26 modules" + String.fromCharCode(10) +
+                    "   • Strings 2-10: 2×12 = 24 modules" + String.fromCharCode(10,10) +
+                    "📊 Total: " + totalGeneratedModules + " modules" + String.fromCharCode(10) +
                     "✅ Statuts EL: " + totalMappedCount + "/" + totalGeneratedModules + String.fromCharCode(10) +
-                    "Tech Échelle: " + (scaleFactor * 100).toFixed(1) + "% (taille réelle)" + String.fromCharCode(10,10) +
-                    "Centre PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
+                    "📏 Échelle: " + (scaleFactor * 100).toFixed(1) + "% (taille réelle)" + String.fromCharCode(10,10) +
+                    "🎯 PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
                     "Ajustez visuellement les rectangles pour" + String.fromCharCode(10) +
                     "correspondre à la photo satellite !" + String.fromCharCode(10,10) +
-                    " Voir panneau 'ALIGNEMENT VISUEL' à gauche"
+                    "→ Voir panneau 'ALIGNEMENT VISUEL' à gauche"
                 )
                 
             } catch (error) {
@@ -6012,14 +6012,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 return
             }
             
-            if (!confirm("Importer 242 modules (22 cols x 11 rows) en 1 rectangle ? Cela va creer un array LANDSCAPE unique.")) {
+            if (!confirm("Importer 242 modules (22 cols × 11 rows) en 1 rectangle ?\n\nCela va créer un array LANDSCAPE unique.")) {
                 return
             }
             
             try {
                 console.log("Import 242 modules (1 array) demarre...")
                 
-                // Configuration: 1 seul rectangle de 22x11 = 242 modules
+                // Configuration: 1 seul rectangle de 22×11 = 242 modules
                 const rows = 11
                 const cols = 22
                 const totalModules = rows * cols
@@ -6215,7 +6215,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     '</div>' +
                     '</div>' +
                     '<div class="text-xs text-gray-400">' +
-                    rect.rows + ' x ' + rect.cols + ' = ' + totalModules + ' modules<br>' +
+                    rect.rows + ' × ' + rect.cols + ' = ' + totalModules + ' modules<br>' +
                     'Strings ' + rect.stringStart + '-' + stringEnd + ' | ' + powerKwc + ' kWc' +
                     '</div>' +
                     '</div>')
@@ -6259,7 +6259,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // RENDU MODULES
         // ================================================================
         function renderModules() {
-            console.log(" renderModules: Nombre de modules à afficher:", modules.length)
+            console.log("🎨 renderModules: Nombre de modules à afficher:", modules.length)
             
             drawnItems.eachLayer(layer => {
                 if (layer.options.className && layer.options.className.startsWith('module-')) {
@@ -6270,11 +6270,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             modules.forEach((module, index) => {
                 // Ignorer modules sans coordonnées GPS valides
                 if (!module.latitude || !module.longitude || module.latitude === null || module.longitude === null) {
-                    console.warn('ATTENTION Module ignoré (pas de GPS):', module.module_identifier)
+                    console.warn('⚠️ Module ignoré (pas de GPS):', module.module_identifier)
                     return
                 }
                 
-                console.log( " Render module " + (index + 1) + ":", module.module_identifier, "at", module.latitude, module.longitude)
+                console.log( "🎨 Render module " + (index + 1) + ":", module.module_identifier, "at", module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
                 // *** NOUVEAU : Utiliser moduleBounds si disponible (depuis rectangles), sinon calculer ***
@@ -6634,11 +6634,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.setFontSize(9)
             doc.setFont('helvetica', 'normal')
             if (dead > 0) {
-                doc.text( " Remplacer " + dead + " module" + (dead > 1 ? 's' : '') + " HS immédiatement", 105, yString + 20, { align: "center" })
+                doc.text( "→ Remplacer " + dead + " module" + (dead > 1 ? 's' : '') + " HS immédiatement", 105, yString + 20, { align: "center" })
             } else if (stringOpen > 0) {
-                doc.text( " Vérifier connexions électriques (" + stringOpen + " string" + (stringOpen > 1 ? 's' : '') + " ouvert" + (stringOpen > 1 ? 's' : '') + ")", 105, yString + 20, { align: "center" })
+                doc.text( "→ Vérifier connexions électriques (" + stringOpen + " string" + (stringOpen > 1 ? 's' : '') + " ouvert" + (stringOpen > 1 ? 's' : '') + ")", 105, yString + 20, { align: "center" })
             } else if (defects > 0) {
-                doc.text(' Surveillance et maintenance préventive', 105, yString + 20, { align: "center" })
+                doc.text('→ Surveillance et maintenance préventive', 105, yString + 20, { align: "center" })
             }
             
             // ========================================
@@ -6880,7 +6880,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const junctionBoxCountEl = document.getElementById('junctionBoxCount')
             
             if (!stringCountEl || !modulesPerStringEl || !inverterCountEl || !junctionBoxCountEl) {
-                console.warn('ATTENTION Formulaire pas encore chargé - skip MAJ DOM')
+                console.warn('⚠️ Formulaire pas encore chargé - skip MAJ DOM')
                 return
             }
             
@@ -6894,7 +6894,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             inverterCountEl.value = estimatedInverters
             junctionBoxCountEl.value = estimatedJunctionBoxes
             
-            console.log(" AUTO-CONFIG depuis modules:", {
+            console.log("🔄 AUTO-CONFIG depuis modules:", {
                 strings: stringNumbers.length,
                 modulesPerString: avgModulesPerString,
                 totalModules: modules.length,
@@ -6909,7 +6909,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function redistributeStrings() {
             if (modules.length === 0) {
-                alert("ATTENTION Aucun module à redistribuer!")
+                alert("⚠️ Aucun module à redistribuer!")
                 return
             }
             
@@ -6919,7 +6919,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const targetModulesPerString = 25
             const calculatedStrings = Math.ceil(totalModules / targetModulesPerString)
             
-            const msg = " REDISTRIBUTION AUTOMATIQUE" + String.fromCharCode(10,10) +
+            const msg = "🔄 REDISTRIBUTION AUTOMATIQUE" + String.fromCharCode(10,10) +
                 "Total modules: " + totalModules + String.fromCharCode(10) +
                 "Strings détectés: " + calculatedStrings + String.fromCharCode(10) +
                 "Modules/string: ~" + Math.round(totalModules / calculatedStrings) + String.fromCharCode(10,10) +
@@ -7106,14 +7106,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             document.getElementById('cancelStatusBtn').addEventListener('click', closeModal)
             
-            // Navigation Module EL - Interconnexion Canvas V2  Module EL
+            // Navigation Module EL - Interconnexion Canvas V2 ↔ Module EL
             document.getElementById('elAuditBtn').addEventListener('click', () => {
                 window.location.href = '/api/el/audit/zone/' + zoneId
             })
         }
         
         // ================================================================
-        // SYNCHRONISATION AUTOMATIQUE MODULE EL  CANVAS V2
+        // SYNCHRONISATION AUTOMATIQUE MODULE EL ↔ CANVAS V2
         // ================================================================
         // Synchronise les statuts modules depuis l'API EL vers Canvas V2
         async function syncModulesFromEL() {
@@ -7122,15 +7122,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             try {
                 // Mettre à jour UI
-                if (statusEl) statusEl.textContent = ' Synchronisation...'
+                if (statusEl) statusEl.textContent = '🔄 Synchronisation...'
                 if (statusEl) statusEl.className = 'font-bold text-cyan-400'
                 
                 const response = await fetch(\`/api/el/zone/\${zoneId}/modules\`)
                 const data = await response.json()
                 
                 if (!data.success || !data.modules) {
-                    console.warn('ATTENTION Aucune donnée EL disponible')
-                    if (statusEl) statusEl.textContent = 'ATTENTION Aucune donnée EL'
+                    console.warn('⚠️ Aucune donnée EL disponible')
+                    if (statusEl) statusEl.textContent = '⚠️ Aucune donnée EL'
                     if (statusEl) statusEl.className = 'font-bold text-yellow-400'
                     return 0
                 }
@@ -7175,7 +7175,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         // Auto-sync au chargement de la page (après retour depuis Module EL)
         window.addEventListener('focus', () => {
-            console.log(" Page focus - Synchronisation automatique EL...")
+            console.log("🔄 Page focus - Synchronisation automatique EL...")
             syncModulesFromEL()
         })
         
@@ -7188,7 +7188,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             autoSyncInterval = setInterval(() => {
                 const autoSyncCheckbox = document.getElementById('autoSyncEnabled')
                 if (autoSyncCheckbox && autoSyncCheckbox.checked) {
-                    console.log(" Auto-sync (30s)...")
+                    console.log("🔄 Auto-sync (30s)...")
                     syncModulesFromEL()
                 }
             }, 30000)  // 30 secondes
@@ -7200,7 +7200,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             if (autoSyncInterval) {
                 clearInterval(autoSyncInterval)
                 autoSyncInterval = null
-                console.log(" Auto-sync désactivé")
+                console.log("🛑 Auto-sync désactivé")
             }
         }
         
@@ -7223,7 +7223,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         const syncELBtn = document.getElementById('syncELBtn')
         if (syncELBtn) {
             syncELBtn.addEventListener('click', () => {
-                console.log(" Sync manuelle déclenchée")
+                console.log("🔄 Sync manuelle déclenchée")
                 syncModulesFromEL()
             })
         }
@@ -7239,12 +7239,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         window.duplicateRectangle = duplicateRectangle
         window.deleteStructure = deleteStructure // NOUVEAU: Structures
         window.debugModules = () => {
-            console.log("STATS Modules totaux:", modules.length)
+            console.log("📊 Modules totaux:", modules.length)
             console.log("❌ Modules invalides:", modules.filter(m => !m.latitude || !m.longitude).length)
             console.log("✅ Modules valides:", modules.filter(m => m.latitude && m.longitude).length)
         }
         window.debugRectangles = () => {
-            console.log(" Rectangles:", moduleRectangles.length)
+            console.log("📦 Rectangles:", moduleRectangles.length)
             moduleRectangles.forEach(r => {
                 console.log("  Rectangle", r.id, ":", r.rows, "x", r.cols, "=", r.modules.length, "modules")
             })
@@ -7617,7 +7617,7 @@ app.get('/pv/plant/:id', async (c) => {
                         </a>
                         <a href="/pv/plant/\${plantId}/zone/\${zone.id}/editor/v2" 
                            class="block bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-center text-sm">
-                             V2 PRO
+                            ✨ V2 PRO
                         </a>
                     </div>
                 </div>
