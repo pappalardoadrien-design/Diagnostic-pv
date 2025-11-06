@@ -3980,8 +3980,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rectangle = L.rectangle(initialBounds, {
                     color: "#3b82f6",
                     weight: 4,
-                    fillColor: "#3b82f6",
-                    fillOpacity: 0.3,
+                    fillColor: "transparent",
+                    fillOpacity: 0,
                     className: "module-rectangle",
                     draggable: true,
                     transform: true
