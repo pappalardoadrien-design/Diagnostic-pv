@@ -3987,32 +3987,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     transform: true
                 })
                 
-                // Enable transform (resize/rotate) - FORCER l'activation
-                if (typeof L.Path.Transform !== 'undefined') {
-                    this.rectangle.transform.enable({
-                        rotation: true,
-                        scaling: true,
-                        uniformScaling: false,
-                        handlerOptions: {
-                            radius: 8,
-                            fillColor: '#fff',
-                            color: '#3b82f6',
-                            fillOpacity: 1,
-                            maintainAspectRatio: false,
-                            centerScaling: false
-                        }
-                    })
-                    
-                    // Event listeners
-                    this.rectangle.on('transformed', () => {
-                        this.regenerateModules()
-                        applyRectanglesToModules()
-                    })
-                    
-                    console.log("Transform enabled for rectangle", this.id)
-                } else {
-                    console.error('ERREUR: Leaflet Path Transform non charge!')
-                }
+                // Event listener pour transform (sera activé dans addToMap)
+                this.rectangle.on('transformed', () => {
+                    this.regenerateModules()
+                    applyRectanglesToModules()
+                })
                 
                 this.rectangle.on('drag', () => this.regenerateModules())
                 
@@ -4315,6 +4294,33 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             addToMap() {
                 this.rectangle.addTo(drawnItems)
+                
+                // ACTIVER TRANSFORM APRES AJOUT A LA CARTE
+                setTimeout(() => {
+                    if (this.rectangle.transform && this.rectangle.transform.enable) {
+                        try {
+                            this.rectangle.transform.enable({
+                                rotation: true,
+                                scaling: true,
+                                uniformScaling: false,
+                                handlerOptions: {
+                                    radius: 8,
+                                    fillColor: '#fff',
+                                    color: '#3b82f6',
+                                    fillOpacity: 1,
+                                    maintainAspectRatio: false,
+                                    centerScaling: false
+                                }
+                            })
+                            console.log("Transform ACTIVE pour rectangle", this.id)
+                        } catch (e) {
+                            console.error("Erreur activation transform:", e)
+                        }
+                    } else {
+                        console.error("Transform non disponible sur rectangle", this.id)
+                    }
+                }, 100)
+                
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
             }
