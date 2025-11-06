@@ -3615,8 +3615,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="import242SingleBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
                             <i class="fas fa-th mr-2"></i>IMPORTER 242 MODULES (1 ARRAY)
                         </button>
+                        <button id="editRectanglesBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-edit mr-2"></i>MODIFIER RECTANGLES
+                        </button>
                         <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
-                            <i class="fas fa-info-circle mr-1"></i><strong>Astuce:</strong> Après import, ajustez position/rotation des rectangles pour alignement visuel sur satellite
+                            <i class="fas fa-info-circle mr-1"></i><strong>Astuce:</strong> Cliquez sur MODIFIER pour activer les poignees de redimensionnement
                         </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
@@ -3976,110 +3979,44 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.gridLines = []
                 this.infoMarker = null
                 
-                // Créer rectangle Leaflet
+                // Créer rectangle Leaflet EDITABLE
                 this.rectangle = L.rectangle(initialBounds, {
                     color: "#3b82f6",
                     weight: 4,
                     fillColor: "transparent",
                     fillOpacity: 0,
                     className: "module-rectangle",
-                    draggable: true,
-                    transform: true
+                    draggable: true
                 })
                 
-                // Event listener pour transform (sera activé dans addToMap)
-                this.rectangle.on('transformed', () => {
+                // Event listeners pour édition
+                this.rectangle.on('dragend', () => {
                     this.regenerateModules()
                     applyRectanglesToModules()
                 })
                 
-                this.rectangle.on('drag', () => this.regenerateModules())
-                
-                // NOUVEAU: Rotation avec clic long + mouvement souris
-                let isRotating = false
-                let rotationStartAngle = 0
-                let rotationStartMouseAngle = 0
-                let rotationTimeout = null
-                
-                this.rectangle.on('mousedown', (e) => {
-                    const center = this.rectangle.getBounds().getCenter()
-                    const mouseLatLng = e.latlng
-                    
-                    // Calculer angle initial de la souris par rapport au centre
-                    rotationStartMouseAngle = Math.atan2(
-                        mouseLatLng.lng - center.lng,
-                        mouseLatLng.lat - center.lat
-                    ) * 180 / Math.PI
-                    
-                    rotationStartAngle = this.rectangle.transform ? (this.rectangle.transform.getRotation() || 0) : 0
-                    
-                    // Démarrer timer pour clic long (500ms)
-                    rotationTimeout = setTimeout(() => {
-                        isRotating = true
-                        map.dragging.disable()
-                        this.rectangle.dragging.disable()
-                        console.log(" Mode rotation activé (clic long)")
-                    }, 500)
-                })
-                
-                this.rectangle.on('mouseup', () => {
-                    if (rotationTimeout) {
-                        clearTimeout(rotationTimeout)
-                        rotationTimeout = null
-                    }
-                    if (isRotating) {
-                        isRotating = false
-                        map.dragging.enable()
-                        this.rectangle.dragging.enable()
-                        console.log(" Mode rotation désactivé")
-                    }
-                })
-                
-                this.rectangle.on('mousemove', (e) => {
-                    if (isRotating && this.rectangle.transform) {
-                        const center = this.rectangle.getBounds().getCenter()
-                        const mouseLatLng = e.latlng
-                        
-                        // Calculer angle actuel de la souris
-                        const currentMouseAngle = Math.atan2(
-                            mouseLatLng.lng - center.lng,
-                            mouseLatLng.lat - center.lat
-                        ) * 180 / Math.PI
-                        
-                        // Calculer différence d'angle
-                        const angleDelta = currentMouseAngle - rotationStartMouseAngle
-                        const newAngle = rotationStartAngle + angleDelta
-                        
-                        this.rectangle.transform.rotate(newAngle)
-                        this.regenerateModules()
-                        applyRectanglesToModules()
-                    }
+                this.rectangle.on('edit', () => {
+                    this.regenerateModules()
+                    applyRectanglesToModules()
                 })
                 
                 // Ajouter popup avec contrôles
                 const popupContent = '<div class="p-3 bg-gray-900 text-white rounded">' +
-                    '<h3 class="font-bold text-lg mb-2 text-orange-400"> Rectangle #' + this.id + '</h3>' +
+                    '<h3 class="font-bold text-lg mb-2 text-blue-400">Rectangle #' + this.id + '</h3>' +
                     '<p class="text-sm mb-2">' + this.rows + ' lignes x ' + this.cols + ' colonnes = <strong>' + (this.rows * this.cols) + ' modules</strong></p>' +
                     '<p class="text-xs text-gray-400 mb-3">Strings ' + this.stringStart + '-' + (this.stringStart + Math.floor((this.rows * this.cols - 1) / 24)) + '</p>' +
                     '<div class="space-y-2">' +
-                        '<button onclick="rotateRectangle(' + this.id + ', 15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
-                            ' Rotation +15°' +
-                        '</button>' +
-                        '<button onclick="rotateRectangle(' + this.id + ', -15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
-                            '↩️ Rotation -15°' +
-                        '</button>' +
                         '<button onclick="duplicateRectangle(' + this.id + ')" class="w-full bg-green-600 hover:bg-green-700 py-2 px-3 rounded text-sm font-bold">' +
-                            'DOCS Dupliquer' +
+                            'Dupliquer' +
                         '</button>' +
                         '<button onclick="deleteRectangle(' + this.id + ')" class="w-full bg-red-600 hover:bg-red-700 py-2 px-3 rounded text-sm font-bold">' +
-                            '️ Supprimer' +
+                            'Supprimer' +
                         '</button>' +
                     '</div>' +
                     '<div class="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-400">' +
-                        '<p class="font-bold text-yellow-400 mb-1"> Raccourcis :</p>' +
-                        '<p> Clic long + glisser : Rotation</p>' +
-                        '<p> Poignées : Redimensionner</p>' +
-                        '<p>✋ Clic court : Déplacer</p>' +
+                        '<p class="font-bold text-blue-400 mb-1">Mode edition :</p>' +
+                        '<p>Clic sur bouton MODIFIER pour activer</p>' +
+                        '<p>Puis glissez les poignees blanches</p>' +
                     '</div>' +
                     '</div>'
                 
@@ -4294,33 +4231,6 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             addToMap() {
                 this.rectangle.addTo(drawnItems)
-                
-                // ACTIVER TRANSFORM APRES AJOUT A LA CARTE
-                setTimeout(() => {
-                    if (this.rectangle.transform && this.rectangle.transform.enable) {
-                        try {
-                            this.rectangle.transform.enable({
-                                rotation: true,
-                                scaling: true,
-                                uniformScaling: false,
-                                handlerOptions: {
-                                    radius: 8,
-                                    fillColor: '#fff',
-                                    color: '#3b82f6',
-                                    fillOpacity: 1,
-                                    maintainAspectRatio: false,
-                                    centerScaling: false
-                                }
-                            })
-                            console.log("Transform ACTIVE pour rectangle", this.id)
-                        } catch (e) {
-                            console.error("Erreur activation transform:", e)
-                        }
-                    } else {
-                        console.error("Transform non disponible sur rectangle", this.id)
-                    }
-                }, 100)
-                
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
             }
@@ -7077,6 +6987,66 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         // ================================================================
+        // EDITION RECTANGLES (Leaflet.draw Edit mode)
+        // ================================================================
+        let editControl = null
+        let isEditMode = false
+        
+        function enableRectangleEdit() {
+            if (moduleRectangles.length === 0) {
+                alert("Aucun rectangle a modifier. Creez ou importez d'abord des rectangles.")
+                return
+            }
+            
+            if (isEditMode) {
+                // Desactiver mode edition
+                if (editControl) {
+                    map.removeControl(editControl)
+                    editControl = null
+                }
+                isEditMode = false
+                document.getElementById('editRectanglesBtn').innerHTML = '<i class="fas fa-edit mr-2"></i>MODIFIER RECTANGLES'
+                document.getElementById('editRectanglesBtn').classList.remove('bg-red-600', 'hover:bg-red-700')
+                document.getElementById('editRectanglesBtn').classList.add('bg-yellow-600', 'hover:bg-yellow-700')
+                console.log("Mode edition desactive")
+            } else {
+                // Activer mode edition
+                editControl = new L.Control.Draw({
+                    draw: false,
+                    edit: {
+                        featureGroup: drawnItems,
+                        edit: true,
+                        remove: false
+                    }
+                })
+                map.addControl(editControl)
+                isEditMode = true
+                
+                document.getElementById('editRectanglesBtn').innerHTML = '<i class="fas fa-times mr-2"></i>TERMINER EDITION'
+                document.getElementById('editRectanglesBtn').classList.remove('bg-yellow-600', 'hover:bg-yellow-700')
+                document.getElementById('editRectanglesBtn').classList.add('bg-red-600', 'hover:bg-red-700')
+                
+                // Activer automatiquement le mode edit
+                setTimeout(() => {
+                    const editButton = document.querySelector('.leaflet-draw-edit-edit')
+                    if (editButton) {
+                        editButton.click()
+                        console.log("Mode edition active - Cliquez sur les rectangles pour voir les poignees")
+                    }
+                }, 100)
+            }
+            
+            // Event listener pour edition terminee
+            map.on(L.Draw.Event.EDITED, (e) => {
+                console.log("Rectangles modifies, regeneration modules...")
+                moduleRectangles.forEach(rect => {
+                    rect.regenerateModules()
+                })
+                applyRectanglesToModules()
+            })
+        }
+        
+        // ================================================================
         // EVENT LISTENERS
         // ================================================================
         function setupEventListeners() {
@@ -7113,6 +7083,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
             document.getElementById('importModulesBtn').addEventListener('click', importExistingModules)
             document.getElementById('import242SingleBtn').addEventListener('click', import242SingleArray)
+            document.getElementById('editRectanglesBtn').addEventListener('click', enableRectangleEdit)
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
