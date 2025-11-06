@@ -3482,6 +3482,39 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             /* Fix z-index modal au-dessus de Leaflet */
             #statusModal { z-index: 9999 !important; }
+            
+            /* Handles de transformation personnalisés */
+            .resize-handle {
+                width: 12px !important;
+                height: 12px !important;
+                background: white !important;
+                border: 2px solid #3b82f6 !important;
+                border-radius: 2px !important;
+                cursor: pointer !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+                z-index: 1000 !important;
+            }
+            .resize-handle:hover {
+                background: #3b82f6 !important;
+                transform: scale(1.3);
+            }
+            .rotation-handle {
+                width: 20px !important;
+                height: 20px !important;
+                background: #3b82f6 !important;
+                border: 3px solid white !important;
+                border-radius: 50% !important;
+                cursor: grab !important;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.4) !important;
+                z-index: 1001 !important;
+            }
+            .rotation-handle:hover {
+                background: #2563eb !important;
+                transform: scale(1.2);
+            }
+            .rotation-handle:active {
+                cursor: grabbing !important;
+            }
         </style>
     </head>
     <body class="bg-black text-white">
@@ -3978,6 +4011,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.modules = []
                 this.gridLines = []
                 this.infoMarker = null
+                this.handles = {
+                    nw: null,  // Nord-Ouest (haut-gauche)
+                    ne: null,  // Nord-Est (haut-droite)
+                    sw: null,  // Sud-Ouest (bas-gauche)
+                    se: null,  // Sud-Est (bas-droite)
+                    rotate: null  // Centre (rotation)
+                }
+                this.isRotating = false
+                this.rotationStartAngle = 0
+                this.rotationCenter = null
+                this.currentRotation = 0
+                this.rotatedPolygon = null
                 
                 // Créer rectangle Leaflet EDITABLE
                 this.rectangle = L.rectangle(initialBounds, {
@@ -4233,16 +4278,322 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rectangle.addTo(drawnItems)
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
+                
+                // Event listener pour activer handles au clic
+                this.rectangle.on('click', () => {
+                    // Désactiver handles des autres rectangles
+                    moduleRectangles.forEach(rect => {
+                        if (rect.id !== this.id) {
+                            rect.hideHandles()
+                        }
+                    })
+                    
+                    // Activer handles de ce rectangle
+                    this.showHandles()
+                })
             }
             
             removeFromMap() {
                 drawnItems.removeLayer(this.rectangle)
                 this.clearVisuals()
+                this.hideHandles()
+                
+                // Nettoyer polygon rotatif si existe
+                if (this.rotatedPolygon) {
+                    drawnItems.removeLayer(this.rotatedPolygon)
+                    this.rotatedPolygon = null
+                }
             }
             
             destroy() {
                 this.removeFromMap()
                 this.modules = []
+            }
+            
+            // ================================================================
+            // HANDLES INTERACTIFS (DRAG/RESIZE/ROTATE)
+            // ================================================================
+            
+            createHandles() {
+                const bounds = this.rectangle.getBounds()
+                const center = bounds.getCenter()
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                // Icône pour handles de resize (coins)
+                const resizeIcon = L.divIcon({
+                    className: 'resize-handle',
+                    html: '',
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
+                })
+                
+                // Icône pour handle de rotation (centre)
+                const rotateIcon = L.divIcon({
+                    className: 'rotation-handle',
+                    html: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:bold;">↻</div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+                
+                // Créer handles de resize pour chaque coin
+                this.handles.nw = L.marker(nw, { 
+                    icon: resizeIcon, 
+                    draggable: true,
+                    zIndexOffset: 1000
+                })
+                this.handles.ne = L.marker(ne, { 
+                    icon: resizeIcon, 
+                    draggable: true,
+                    zIndexOffset: 1000
+                })
+                this.handles.sw = L.marker(sw, { 
+                    icon: resizeIcon, 
+                    draggable: true,
+                    zIndexOffset: 1000
+                })
+                this.handles.se = L.marker(se, { 
+                    icon: resizeIcon, 
+                    draggable: true,
+                    zIndexOffset: 1000
+                })
+                
+                // Créer handle de rotation au centre
+                this.handles.rotate = L.marker(center, { 
+                    icon: rotateIcon, 
+                    draggable: false,
+                    zIndexOffset: 1001
+                })
+                
+                // Event listeners pour resize (drag des coins)
+                this.handles.nw.on('drag', (e) => this.onCornerDrag('nw', e.target.getLatLng()))
+                this.handles.ne.on('drag', (e) => this.onCornerDrag('ne', e.target.getLatLng()))
+                this.handles.sw.on('drag', (e) => this.onCornerDrag('sw', e.target.getLatLng()))
+                this.handles.se.on('drag', (e) => this.onCornerDrag('se', e.target.getLatLng()))
+                
+                // Event listeners pour rotation (clic + move souris)
+                this.handles.rotate.on('mousedown', (e) => this.onRotationStart(e))
+                
+                this.handles.nw.on('dragend', () => this.onTransformEnd())
+                this.handles.ne.on('dragend', () => this.onTransformEnd())
+                this.handles.sw.on('dragend', () => this.onTransformEnd())
+                this.handles.se.on('dragend', () => this.onTransformEnd())
+                
+                console.log("✅ Handles créés pour rectangle", this.id)
+            }
+            
+            updateHandles() {
+                if (!this.handles.nw) return
+                
+                const bounds = this.rectangle.getBounds()
+                const center = bounds.getCenter()
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                this.handles.nw.setLatLng(nw)
+                this.handles.ne.setLatLng(ne)
+                this.handles.sw.setLatLng(sw)
+                this.handles.se.setLatLng(se)
+                this.handles.rotate.setLatLng(center)
+            }
+            
+            showHandles() {
+                if (!this.handles.nw) {
+                    this.createHandles()
+                }
+                
+                this.handles.nw.addTo(map)
+                this.handles.ne.addTo(map)
+                this.handles.sw.addTo(map)
+                this.handles.se.addTo(map)
+                this.handles.rotate.addTo(map)
+                
+                // Mettre surbrillance sur rectangle sélectionné
+                this.rectangle.setStyle({ weight: 6, color: '#f59e0b' })
+            }
+            
+            hideHandles() {
+                if (this.handles.nw) {
+                    map.removeLayer(this.handles.nw)
+                    map.removeLayer(this.handles.ne)
+                    map.removeLayer(this.handles.sw)
+                    map.removeLayer(this.handles.se)
+                    map.removeLayer(this.handles.rotate)
+                }
+                
+                // Retirer surbrillance
+                this.rectangle.setStyle({ weight: 4, color: '#3b82f6' })
+            }
+            
+            onCornerDrag(corner, newLatLng) {
+                const bounds = this.rectangle.getBounds()
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                let newBounds
+                
+                // Mettre à jour bounds selon coin déplacé
+                switch(corner) {
+                    case 'nw':
+                        newBounds = L.latLngBounds(newLatLng, se)
+                        break
+                    case 'ne':
+                        newBounds = L.latLngBounds([newLatLng.lat, sw.lng], [sw.lat, newLatLng.lng])
+                        break
+                    case 'sw':
+                        newBounds = L.latLngBounds([ne.lat, newLatLng.lng], [newLatLng.lat, ne.lng])
+                        break
+                    case 'se':
+                        newBounds = L.latLngBounds(nw, newLatLng)
+                        break
+                }
+                
+                // Validation: empêcher inversion du rectangle
+                if (newBounds && this.isValidBounds(newBounds)) {
+                    this.rectangle.setBounds(newBounds)
+                    this.updateHandles()
+                    // Ne pas régénérer pendant le drag (performance)
+                }
+            }
+            
+            isValidBounds(bounds) {
+                const nw = bounds.getNorthWest()
+                const se = bounds.getSouthEast()
+                
+                // Vérifier que le rectangle n'est pas inversé
+                return (nw.lat > se.lat) && (se.lng > nw.lng)
+            }
+            
+            onTransformEnd() {
+                // Régénérer modules après resize
+                this.regenerateModules()
+                applyRectanglesToModules()
+                console.log("✅ Transform terminé - modules régénérés")
+            }
+            
+            onRotationStart(e) {
+                this.isRotating = true
+                const center = this.rectangle.getBounds().getCenter()
+                const mouseLatLng = e.latlng
+                
+                // Calculer angle initial
+                this.rotationStartAngle = this.calculateAngle(center, mouseLatLng)
+                this.rotationCenter = center
+                
+                // Changer curseur
+                this.handles.rotate.getElement().style.cursor = 'grabbing'
+                
+                // Ajouter listeners globaux pour mousemove et mouseup
+                map.on('mousemove', this.onRotationMove, this)
+                map.on('mouseup', this.onRotationEnd, this)
+                
+                // Empêcher propagation
+                L.DomEvent.stopPropagation(e.originalEvent)
+            }
+            
+            onRotationMove(e) {
+                if (!this.isRotating) return
+                
+                const currentAngle = this.calculateAngle(this.rotationCenter, e.latlng)
+                const angleDiff = currentAngle - this.rotationStartAngle
+                
+                // Rotation visuelle du rectangle
+                this.rotateRectangle(angleDiff)
+                this.updateHandles()
+            }
+            
+            onRotationEnd(e) {
+                if (!this.isRotating) return
+                
+                this.isRotating = false
+                this.handles.rotate.getElement().style.cursor = 'grab'
+                
+                // Retirer listeners globaux
+                map.off('mousemove', this.onRotationMove, this)
+                map.off('mouseup', this.onRotationEnd, this)
+                
+                // Régénérer modules après rotation
+                this.regenerateModules()
+                applyRectanglesToModules()
+                console.log("✅ Rotation terminée - modules régénérés")
+            }
+            
+            calculateAngle(center, point) {
+                // Calculer angle en degrés entre centre et point
+                const dx = point.lng - center.lng
+                const dy = point.lat - center.lat
+                return Math.atan2(dy, dx) * (180 / Math.PI)
+            }
+            
+            rotateRectangle(angleDegrees) {
+                const bounds = this.rectangle.getBounds()
+                const center = bounds.getCenter()
+                
+                // Récupérer coins actuels
+                const nw = bounds.getNorthWest()
+                const ne = bounds.getNorthEast()
+                const sw = bounds.getSouthWest()
+                const se = bounds.getSouthEast()
+                
+                // Convertir angle en radians
+                const angleRad = angleDegrees * (Math.PI / 180)
+                const cos = Math.cos(angleRad)
+                const sin = Math.sin(angleRad)
+                
+                // Fonction rotation 2D autour centre
+                const rotatePoint = (lat, lng) => {
+                    const dx = lng - center.lng
+                    const dy = lat - center.lat
+                    
+                    return {
+                        lat: center.lat + (dy * cos - dx * sin),
+                        lng: center.lng + (dx * cos + dy * sin)
+                    }
+                }
+                
+                // Appliquer rotation aux 4 coins
+                const newNW = rotatePoint(nw.lat, nw.lng)
+                const newNE = rotatePoint(ne.lat, ne.lng)
+                const newSW = rotatePoint(sw.lat, sw.lng)
+                const newSE = rotatePoint(se.lat, se.lng)
+                
+                // IMPORTANT: Leaflet.rectangle ne supporte que rectangles alignés axes
+                // Pour rotation visuelle, on doit utiliser un polygon
+                // Convertir rectangle en polygon rotatif
+                if (!this.rotatedPolygon) {
+                    this.rotatedPolygon = L.polygon([
+                        [newNW.lat, newNW.lng],
+                        [newNE.lat, newNE.lng],
+                        [newSE.lat, newSE.lng],
+                        [newSW.lat, newSW.lng]
+                    ], {
+                        color: "#f59e0b",
+                        weight: 6,
+                        fillColor: "transparent",
+                        fillOpacity: 0
+                    })
+                    
+                    // Remplacer rectangle par polygon
+                    drawnItems.removeLayer(this.rectangle)
+                    this.rotatedPolygon.addTo(drawnItems)
+                } else {
+                    // Mettre à jour coords polygon
+                    this.rotatedPolygon.setLatLngs([
+                        [newNW.lat, newNW.lng],
+                        [newNE.lat, newNE.lng],
+                        [newSE.lat, newSE.lng],
+                        [newSW.lat, newSW.lng]
+                    ])
+                }
+                
+                // Stocker angle rotation pour régénération modules
+                this.currentRotation = angleDegrees
             }
             
             // ================================================================
@@ -4652,6 +5003,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             .addTo(map)
             console.log(' Contrôle de recherche GPS/Adresse ajouté')
+            
+            // Event listener global: désactiver handles si clic hors rectangle
+            map.on('click', (e) => {
+                // Vérifier si clic sur un rectangle (géré par rectangle.on('click'))
+                // Si pas de propagation stoppée, désactiver tous les handles
+                setTimeout(() => {
+                    let clickedOnRectangle = false
+                    moduleRectangles.forEach(rect => {
+                        if (rect.rectangle.getBounds().contains(e.latlng)) {
+                            clickedOnRectangle = true
+                        }
+                    })
+                    
+                    if (!clickedOnRectangle) {
+                        moduleRectangles.forEach(rect => rect.hideHandles())
+                    }
+                }, 10)
+            })
             
             // Charger contour toiture existant
             if (zoneData.roof_polygon) {
