@@ -131,7 +131,7 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
       `).bind(zoneId, elModule.module_identifier).first()
       
       if (!existingModule) {
-        // Créer module PV (colonnes réelles)
+        // Créer module PV avec données EL
         await env.DB.prepare(`
           INSERT INTO pv_modules (
             zone_id,
@@ -140,10 +140,12 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
             position_in_string,
             pos_x_meters,
             pos_y_meters,
-            azimuth,
-            tilt,
+            el_defect_type,
+            el_severity_level,
+            el_notes,
+            el_analysis_date,
             notes
-          ) VALUES (?, ?, ?, ?, ?, ?, 180, 30, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
         `).bind(
           zoneId,
           elModule.module_identifier,
@@ -151,7 +153,10 @@ syncModule.post('/sync-audit-to-plant', async (c) => {
           elModule.position_in_string,
           elModule.physical_col * 2, // Espacement 2m
           elModule.physical_row * 1, // Espacement 1m
-          `EL: ${elModule.defect_type} (sév ${elModule.severity_level}) | ${elModule.comment || ''} | Token: ${auditToken}`
+          elModule.defect_type,
+          elModule.severity_level,
+          elModule.comment || '',
+          `Sync auto audit EL ${auditToken}`
         ).run()
         
         createdCount++

@@ -7,6 +7,7 @@ import pvModule from './modules/pv/routes/plants'
 import openSolarModule from './opensolar'
 import interconnectModule from './modules/interconnect'
 import syncModule from './modules/interconnect/sync'
+import syncReverseModule from './modules/interconnect/sync-reverse'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -25,6 +26,19 @@ app.use('/api/*', cors({
 
 // Serveur de fichiers statiques
 app.use('/static/*', serveStatic({ root: './public' }))
+
+// Favicon
+app.get('/favicon.svg', (c) => {
+  return c.body(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#9333ea"/>
+  <path d="M30 20 L50 40 L70 20 L70 50 L50 70 L30 50 Z" fill="#fbbf24"/>
+  <circle cx="50" cy="45" r="8" fill="#ffffff"/>
+</svg>`, 200, { 'Content-Type': 'image/svg+xml' })
+})
+
+app.get('/favicon.ico', (c) => {
+  return c.redirect('/favicon.svg', 301)
+})
 
 // ============================================================================
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
@@ -58,7 +72,16 @@ app.route('/api/interconnect', interconnectModule)
 // - GET /api/sync/audit/:token/sync-status → État synchronisation
 // ============================================================================
 app.route('/api/sync', syncModule)
-app.route('/api/sync', syncModule)
+
+// ============================================================================
+// MODULE SYNC-REVERSE - Synchronisation PV Carto → Audit EL
+// ============================================================================
+// Crée des audits EL depuis modélisation PV Cartography
+// Routes:
+// - POST /api/sync-reverse/create-audit-from-plant → Créer audit depuis centrale PV
+// - GET /api/sync-reverse/plant/:plantId/can-create-audit → Vérifier si création possible
+// ============================================================================
+app.route('/api/sync-reverse', syncReverseModule)
 
 // ============================================================================
 // MODULE OPENSOLAR DXF IMPORT - ISOLÉ (Point 5.0 - Module autonome)
@@ -1346,11 +1369,11 @@ app.get('/audit/:token', async (c) => {
                             window.location.href = \`/pv/plant/\${data.plant.plant_id}\`
                         }
                         btn.title = \`Cartographie PV: \${data.plant.plant_name || 'Centrale liée'}\`
-                        console.log('✅ Centrale PV liée:', data.plant.plant_name)
+                        console.log("✅ Centrale PV liée:", data.plant.plant_name)
                     }
                 }
             } catch (error) {
-                console.log('ℹ️ Aucune centrale PV liée à cet audit')
+                console.log("ℹ️ Aucune centrale PV liée à cet audit")
             }
         }
         
@@ -1358,7 +1381,7 @@ app.get('/audit/:token', async (c) => {
         window.addEventListener('DOMContentLoaded', () => {
             setTimeout(loadPlantLink, 500)
         })
-        </script>
+        <\/script>
     </body>
     </html>
   `)
@@ -2759,7 +2782,7 @@ app.get('/pv/plants', (c) => {
 
         // Init
         loadPlants()
-        </script>
+        <\/script>
     </body>
     </html>
   `)
@@ -2977,14 +3000,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
         let zoneData = null
         let backgroundImage = null
         let placementMode = 'manual'
-        let currentRotati font-black">
-                        ANNULER
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <script>
+        let currentRotation = 0
         // VARIABLES GLOBALES
         const plantId = '${plantId}'
         const zoneId = '${zoneId}'
@@ -3379,7 +3395,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
         
         // INIT
         init()
-        </script>
+        <\/script>
     </body>
     </html>
   `)
@@ -3393,10 +3409,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
   const plantId = c.req.param('plantId')
   const zoneId = c.req.param('zoneId')
   
+  // Force browser to reload - no cache
+  c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+  
+  const buildTimestamp = Date.now()
+  
   return c.html(`
     <!DOCTYPE html>
     <html lang="fr">
     <head>
+        <!-- BUILD: ${buildTimestamp} - V2 Editor -->
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Cartographie PV Pro - DiagPV</title>
@@ -3407,6 +3431,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
         <script src="https://unpkg.com/leaflet-path-transform@2.1.3/dist/L.Path.Transform.js"></script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+        <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -3486,7 +3512,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         <div class="container mx-auto px-4 py-6 grid grid-cols-4 gap-6">
             <!-- LEFT SIDEBAR: Configuration -->
             <div class="col-span-1 space-y-4">
-                <!-- Étape 0 : Structures (NOUVEAU - Modélisation centrale) -->
+                <!-- Étape 0 : Structures (DÉSACTIVÉ - Fait doublon avec toiture) -->
+                <!--
                 <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-4">
                     <h3 class="text-lg font-black mb-3 text-purple-400">
                         <i class="fas fa-building mr-2"></i>ÉTAPE 0 : STRUCTURES
@@ -3518,12 +3545,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <div id="totalStructuresArea" class="text-lg font-black text-purple-400">0 m²</div>
                     </div>
                 </div>
+                -->
                 
-                <!-- Étape 1 : Dessin -->
+                <!-- Étape 1 : Toiture -->
                 <div class="bg-gray-900 rounded-lg border-2 border-yellow-400 p-4">
                     <h3 class="text-lg font-black mb-3 text-yellow-400">
-                        <i class="fas fa-pencil-ruler mr-2"></i>ÉTAPE 1 : DESSIN
+                        <i class="fas fa-solar-panel mr-2"></i>ÉTAPE 1 : TOITURE
                     </h3>
+                    <p class="text-xs text-gray-400 mb-3">Dessinez le contour de la zone PV</p>
                     <button id="drawRoofBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 py-3 rounded font-bold mb-2">
                         <i class="fas fa-draw-polygon mr-2"></i>DESSINER TOITURE
                     </button>
@@ -3559,12 +3588,29 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <input type="number" id="rectString" min="1" max="50" value="1"
                                    class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold">
                         </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Alignement</label>
+                            <select id="rectAlignment" class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-center font-bold text-sm">
+                                <option value="center">🎯 Centre</option>
+                                <option value="north">⬆️ Nord (Haut)</option>
+                                <option value="south">⬇️ Sud (Bas)</option>
+                                <option value="east">➡️ Est (Droite)</option>
+                                <option value="west">⬅️ Ouest (Gauche)</option>
+                                <option value="nw">↖️ Nord-Ouest</option>
+                                <option value="ne">↗️ Nord-Est</option>
+                                <option value="sw">↙️ Sud-Ouest</option>
+                                <option value="se">↘️ Sud-Est</option>
+                            </select>
+                        </div>
                         <div class="p-2 bg-black rounded text-xs">
                             <div class="text-gray-400">Total modules:</div>
                             <div id="rectTotal" class="text-lg font-black text-orange-400">120</div>
                         </div>
                         <button id="createRectangleBtn" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded font-bold">
                             <i class="fas fa-plus-square mr-2"></i>CRÉER RECTANGLE
+                        </button>
+                        <button id="importModulesBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-download mr-2"></i>IMPORTER TOUT JALIBAT (10 STRINGS)
                         </button>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
@@ -3590,7 +3636,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 <!-- Étape 2 : Configuration Électrique -->
                 <div class="bg-gray-900 rounded-lg border-2 border-green-400 p-4">
                     <h3 class="text-lg font-black mb-3 text-green-400">
-                        <i class="fas fa-bolt mr-2"></i>ÉTAPE 2 : CONFIG ÉLEC
+                        <i class="fas fa-bolt mr-2"></i>ÉTAPE 2 : STRINGS
                     </h3>
                     <div class="space-y-3">
                         <div>
@@ -3624,7 +3670,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 <!-- Étape 3 : Placement Modules -->
                 <div class="bg-gray-900 rounded-lg border-2 border-purple-400 p-4">
                     <h3 class="text-lg font-black mb-3 text-purple-400">
-                        <i class="fas fa-solar-panel mr-2"></i>ÉTAPE 3 : MODULES
+                        <i class="fas fa-solar-panel mr-2"></i>ÉTAPE 3 : PLACEMENT MODULES
                     </h3>
                     <div class="space-y-2">
                         <button id="drawRowBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-sm">
@@ -3676,6 +3722,32 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <span>⚪ Pending:</span>
                             <span id="statsPending" class="font-bold text-gray-400">0</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Synchronisation EL -->
+                <div class="bg-gray-900 rounded-lg border-2 border-cyan-400 p-4">
+                    <h3 class="text-sm font-black mb-2 text-cyan-400">
+                        <i class="fas fa-sync-alt mr-1"></i>SYNC EL ↔️ CARTO
+                    </h3>
+                    <div class="space-y-2">
+                        <button id="syncELBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-sync-alt mr-1"></i>SYNCHRONISER MAINTENANT
+                        </button>
+                        <div id="syncStatus" class="text-xs p-2 bg-black rounded">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-gray-400">État:</span>
+                                <span id="syncStatusText" class="font-bold text-gray-400">En attente</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-400">Dernière sync:</span>
+                                <span id="syncLastTime" class="font-bold text-gray-400">Jamais</span>
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 text-xs text-gray-400">
+                            <input type="checkbox" id="autoSyncEnabled" checked class="w-4 h-4">
+                            Auto-sync (30s)
+                        </label>
                     </div>
                 </div>
 
@@ -3826,7 +3898,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let zoneData = null
         let currentRotation = 0
         let selectedModule = null
-        let placementMode = 'manual'
+        let placementMode = "manual"
         let drawControl = null
         let nextModuleNum = 1
         let stringsConfig = [] // Configuration strings non réguliers: [{stringNum: 1, modulesCount: 26}, ...] - v2.1
@@ -3849,13 +3921,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let showRectInfo = true
         
         const STATUS_COLORS = {
-            ok: '#22c55e',
-            inequality: '#eab308',
-            microcracks: '#f97316',
-            dead: '#ef4444',
-            string_open: '#3b82f6',
-            not_connected: '#6b7280',
-            pending: '#e5e7eb'
+            ok: "#22c55e",
+            inequality: "#eab308",
+            microcracks: "#f97316",
+            dead: "#ef4444",
+            string_open: "#3b82f6",
+            not_connected: "#6b7280",
+            pending: "#e5e7eb"
         }
         
         // ================================================================
@@ -3873,10 +3945,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Créer rectangle Leaflet
                 this.rectangle = L.rectangle(initialBounds, {
-                    color: '#f97316',
+                    color: "#f97316",
                     weight: 3,
-                    fillColor: 'transparent',
-                    className: 'module-rectangle',
+                    fillColor: "transparent",
+                    className: "module-rectangle",
                     draggable: false
                 })
                 
@@ -3896,12 +3968,105 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 this.rectangle.on('drag', () => this.regenerateModules())
                 
+                // NOUVEAU: Rotation avec clic long + mouvement souris
+                let isRotating = false
+                let rotationStartAngle = 0
+                let rotationStartMouseAngle = 0
+                let rotationTimeout = null
+                
+                this.rectangle.on('mousedown', (e) => {
+                    const center = this.rectangle.getBounds().getCenter()
+                    const mouseLatLng = e.latlng
+                    
+                    // Calculer angle initial de la souris par rapport au centre
+                    rotationStartMouseAngle = Math.atan2(
+                        mouseLatLng.lng - center.lng,
+                        mouseLatLng.lat - center.lat
+                    ) * 180 / Math.PI
+                    
+                    rotationStartAngle = this.rectangle.transform ? (this.rectangle.transform.getRotation() || 0) : 0
+                    
+                    // Démarrer timer pour clic long (500ms)
+                    rotationTimeout = setTimeout(() => {
+                        isRotating = true
+                        map.dragging.disable()
+                        this.rectangle.dragging.disable()
+                        console.log("🔄 Mode rotation activé (clic long)")
+                    }, 500)
+                })
+                
+                this.rectangle.on('mouseup', () => {
+                    if (rotationTimeout) {
+                        clearTimeout(rotationTimeout)
+                        rotationTimeout = null
+                    }
+                    if (isRotating) {
+                        isRotating = false
+                        map.dragging.enable()
+                        this.rectangle.dragging.enable()
+                        console.log("🔄 Mode rotation désactivé")
+                    }
+                })
+                
+                this.rectangle.on('mousemove', (e) => {
+                    if (isRotating && this.rectangle.transform) {
+                        const center = this.rectangle.getBounds().getCenter()
+                        const mouseLatLng = e.latlng
+                        
+                        // Calculer angle actuel de la souris
+                        const currentMouseAngle = Math.atan2(
+                            mouseLatLng.lng - center.lng,
+                            mouseLatLng.lat - center.lat
+                        ) * 180 / Math.PI
+                        
+                        // Calculer différence d'angle
+                        const angleDelta = currentMouseAngle - rotationStartMouseAngle
+                        const newAngle = rotationStartAngle + angleDelta
+                        
+                        this.rectangle.transform.rotate(newAngle)
+                        this.regenerateModules()
+                        applyRectanglesToModules()
+                    }
+                })
+                
+                // Ajouter popup avec contrôles
+                const popupContent = '<div class="p-3 bg-gray-900 text-white rounded">' +
+                    '<h3 class="font-bold text-lg mb-2 text-orange-400">📦 Rectangle #' + this.id + '</h3>' +
+                    '<p class="text-sm mb-2">' + this.rows + ' lignes × ' + this.cols + ' colonnes = <strong>' + (this.rows * this.cols) + ' modules</strong></p>' +
+                    '<p class="text-xs text-gray-400 mb-3">Strings ' + this.stringStart + '-' + (this.stringStart + Math.floor((this.rows * this.cols - 1) / 24)) + '</p>' +
+                    '<div class="space-y-2">' +
+                        '<button onclick="rotateRectangle(' + this.id + ', 15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
+                            '🔄 Rotation +15°' +
+                        '</button>' +
+                        '<button onclick="rotateRectangle(' + this.id + ', -15)" class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded text-sm font-bold">' +
+                            '↩️ Rotation -15°' +
+                        '</button>' +
+                        '<button onclick="duplicateRectangle(' + this.id + ')" class="w-full bg-green-600 hover:bg-green-700 py-2 px-3 rounded text-sm font-bold">' +
+                            '📋 Dupliquer' +
+                        '</button>' +
+                        '<button onclick="deleteRectangle(' + this.id + ')" class="w-full bg-red-600 hover:bg-red-700 py-2 px-3 rounded text-sm font-bold">' +
+                            '🗑️ Supprimer' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-400">' +
+                        '<p class="font-bold text-yellow-400 mb-1">💡 Raccourcis :</p>' +
+                        '<p>🔄 Clic long + glisser : Rotation</p>' +
+                        '<p>🔲 Poignées : Redimensionner</p>' +
+                        '<p>✋ Clic court : Déplacer</p>' +
+                    '</div>' +
+                    '</div>'
+                
+                this.rectangle.bindPopup(popupContent, {
+                    maxWidth: 300,
+                    className: 'rectangle-controls-popup'
+                })
+                
                 // Générer modules initiaux
                 this.regenerateModules()
             }
             
             regenerateModules() {
-                console.log('🔄 Régénération modules rectangle', this.id)
+                console.log("🔄 Régénération modules rectangle", this.id)
                 
                 // Clear old modules/grid
                 this.clearVisuals()
@@ -3925,7 +4090,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const moduleWidthPixels = 1.7 * pixelsPerMeter
                 const moduleHeightPixels = 1.0 * pixelsPerMeter
                 
-                console.log('📏 Module:', moduleWidthPixels.toFixed(1) + 'px × ' + moduleHeightPixels.toFixed(1) + 'px')
+                console.log("📏 Module:", moduleWidthPixels.toFixed(1) + "px × " + moduleHeightPixels.toFixed(1) + "px")
                 
                 // Generate grid with bilinear interpolation
                 this.modules = []
@@ -3972,7 +4137,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         this.modules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
-                            module_identifier: 'S' + currentString + '-P' + (positionInString < 10 ? '0' : '') + positionInString,
+                            module_identifier: "S" + currentString + "-P" + (positionInString < 10 ? '0' : '') + positionInString,
                             latitude: centerLat,
                             longitude: centerLng,
                             pos_x_meters: col * 1.7,
@@ -3983,7 +4148,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             string_number: currentString,
                             position_in_string: positionInString,
                             power_wp: 450,
-                            module_status: 'pending',
+                            module_status: "pending",
                             status_comment: null,
                             rectangleId: this.id,
                             // Ajouter bounds GPS du module individuel
@@ -4004,7 +4169,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     this.updateInfoOverlay()
                 }
                 
-                console.log('✅ Rectangle', this.id, ':', this.modules.length, 'modules générés avec dimensions réelles')
+                console.log("✅ Rectangle", this.id, ":", this.modules.length, "modules générés avec dimensions réelles")
             }
             
             drawGrid() {
@@ -4025,10 +4190,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const endLng = ne.lng + (se.lng - ne.lng) * ratio
                     
                     const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
-                        color: '#ffffff',
+                        color: "#ffffff",
                         weight: 1,
                         opacity: 0.3,
-                        className: 'rectangle-grid-line',
+                        className: "rectangle-grid-line",
                         interactive: false
                     })
                     
@@ -4047,10 +4212,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const endLng = sw.lng + (se.lng - sw.lng) * ratio
                     
                     const line = L.polyline([[startLat, startLng], [endLat, endLng]], {
-                        color: '#ffffff',
+                        color: "#ffffff",
                         weight: 1,
                         opacity: 0.3,
-                        className: 'rectangle-grid-line',
+                        className: "rectangle-grid-line",
                         interactive: false
                     })
                     
@@ -4070,14 +4235,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const stringEnd = this.stringStart + Math.floor((totalModules - 1) / 24)
                 
                 const html = '<div class="rectangle-info-overlay">' +
-                    '<strong>' + this.rows + ' lignes × ' + this.cols + ' modules</strong><br>' +
-                    'Strings ' + this.stringStart + '-' + stringEnd + ' | ' + totalModules + ' modules<br>' +
-                    powerKwc + ' kWc | Rectangle #' + this.id +
+                    '<strong>' + this.rows + " lignes × " + this.cols + " modules</strong><br>" +
+                    'Strings ' + this.stringStart + "-" + stringEnd + " | " + totalModules + " modules<br>" +
+                    powerKwc + " kWc | Rectangle #" + this.id +
                     '</div>'
                 
                 this.infoMarker = L.marker(center, {
                     icon: L.divIcon({
-                        className: 'rectangle-info-marker',
+                        className: "rectangle-info-marker",
                         html: html,
                         iconSize: [200, 60],
                         iconAnchor: [100, 30]
@@ -4120,17 +4285,33 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // SYNCHRONISATION EL: Rafraîchir couleurs modules
             // ================================================================
             refreshModuleColors() {
-                // Mettre à jour couleurs fillColor de chaque cellule du rectangle
-                // basé sur module_status synchronisé depuis API EL
+                // Mettre à jour couleurs des modules affichés après sync EL
+                console.log("🎨 Rectangle", this.id, ":", this.modules.length, "modules - refreshing colors...")
                 
-                // Cette méthode est appelée après syncModulesFromEL()
-                // Pour l'instant, on ne fait rien car les rectangles n'affichent pas
-                // de couleurs individuelles par module (c'est une grille uniforme)
+                // Les modules sont affichés par renderModules() qui utilise déjà
+                // module_status pour déterminer la couleur
+                // Donc on appelle simplement renderModules() depuis la fonction sync
                 
-                // TODO Future: Si on veut afficher couleurs individuelles, créer
-                // des petits rectangles colorés pour chaque module dans la grille
+                // Optionnel: Mettre à jour le contour du rectangle selon le pire statut
+                const hasDeadModules = this.modules.some(m => m.module_status === 'dead')
+                const hasStringOpenModules = this.modules.some(m => m.module_status === 'string_open')
+                const hasMicrocracksModules = this.modules.some(m => m.module_status === 'microcracks')
                 
-                console.log('🎨 Rectangle', this.id, ':', this.modules.length, 'modules colors refreshed')
+                let borderColor = "#f97316"  // Orange par défaut
+                
+                if (hasDeadModules) {
+                    borderColor = "#ef4444"  // Rouge si modules dead
+                } else if (hasStringOpenModules) {
+                    borderColor = "#3b82f6"  // Bleu si string ouvert
+                } else if (hasMicrocracksModules) {
+                    borderColor = "#f97316"  // Orange si microfissures
+                } else {
+                    borderColor = "#22c55e"  // Vert si tout OK
+                }
+                
+                this.rectangle.setStyle({ color: borderColor })
+                
+                console.log("✅ Rectangle", this.id, "border color updated:", borderColor)
             }
         }
         
@@ -4152,7 +4333,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     })
                     
                     updateStructuresUI()
-                    console.log('✅ Structures chargées:', structures.length)
+                    console.log("✅ Structures chargées:", structures.length)
                 }
             } catch (error) {
                 console.error('Erreur chargement structures:', error)
@@ -4160,7 +4341,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         function displayStructure(structure) {
-            const geometry = typeof structure.geometry === 'string' ? JSON.parse(structure.geometry) : structure.geometry
+            const geometry = typeof structure.geometry === "string" ? JSON.parse(structure.geometry) : structure.geometry
             
             // Créer polygon Leaflet
             const coords = geometry.coordinates[0].map(coord => [coord[0], coord[1]])
@@ -4170,14 +4351,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 weight: 2,
                 fillColor: structure.fill_color || '#d1d5db',
                 fillOpacity: structure.opacity || 0.3,
-                className: 'structure-layer'
+                className: "structure-layer"
             })
             
             // Tooltip avec nom structure
             layer.bindTooltip(structure.structure_name, {
                 permanent: false,
-                direction: 'center',
-                className: 'structure-tooltip'
+                direction: "center",
+                className: "structure-tooltip"
             })
             
             // Ajouter au calque structures
@@ -4194,8 +4375,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             if (!structureDrawControl) {
                 structureDrawControl = new L.Draw.Polygon(map, {
                     shapeOptions: {
-                        color: type === 'building' ? '#6b7280' : type === 'carport' ? '#f59e0b' : '#22c55e',
-                        fillColor: type === 'building' ? '#d1d5db' : type === 'carport' ? '#fbbf24' : '#86efac',
+                        color: type === "building" ? '#6b7280' : type === "carport" ? '#f59e0b' : "#22c55e",
+                        fillColor: type === "building" ? '#d1d5db' : type === "carport" ? '#fbbf24' : "#86efac",
                         fillOpacity: 0.3
                     }
                 })
@@ -4216,17 +4397,17 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Demander nom structure
             const typeLabels = {
-                'building': 'Bâtiment',
-                'carport': 'Ombrière',
-                'ground': 'Champ',
-                'technical': 'Zone Technique'
+                'building': "Bâtiment",
+                'carport': "Ombrière",
+                'ground': "Champ",
+                'technical': "Zone Technique"
             }
             
-            const defaultName = typeLabels[currentDrawingStructureType] + ' ' + (structures.length + 1)
+            const defaultName = typeLabels[currentDrawingStructureType] + " " + (structures.length + 1)
             const name = prompt('Nom de la structure:', defaultName)
             
             if (!name) {
-                console.log('❌ Création structure annulée')
+                console.log("❌ Création structure annulée")
                 return
             }
             
@@ -4235,22 +4416,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             coordinates.push(coordinates[0]) // Fermer polygon
             
             const geometry = {
-                type: 'Polygon',
+                type: "Polygon",
                 coordinates: [coordinates]
             }
             
             // Couleurs par type
             const colors = {
-                'building': { fill: '#d1d5db', stroke: '#6b7280' },
-                'carport': { fill: '#fbbf24', stroke: '#f59e0b' },
-                'ground': { fill: '#86efac', stroke: '#22c55e' },
-                'technical': { fill: '#60a5fa', stroke: '#3b82f6' }
+                'building': { fill: "#d1d5db", stroke: "#6b7280" },
+                'carport': { fill: "#fbbf24", stroke: "#f59e0b" },
+                'ground': { fill: "#86efac", stroke: "#22c55e" },
+                'technical': { fill: "#60a5fa", stroke: "#3b82f6" }
             }
             
             try {
                 const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/structures\`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "POST",
+                    headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify({
                         structure_type: currentDrawingStructureType,
                         structure_name: name,
@@ -4267,11 +4448,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (data.success) {
                     // Recharger structures
                     await loadStructures()
-                    alert('✅ Structure créée: ' + name + ' (' + Math.round(area) + ' m²)')
+                    alert("✅ Structure créée: " + name + " (" + Math.round(area) + " m²)")
                 }
             } catch (error) {
                 console.error('Erreur création structure:', error)
-                alert('❌ Erreur création structure')
+                alert("❌ Erreur création structure")
             }
             
             currentDrawingStructureType = null
@@ -4282,7 +4463,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             try {
                 await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/structures/\${structureId}\`, {
-                    method: 'DELETE'
+                    method: "DELETE"
                 })
                 
                 // Retirer de la carte
@@ -4295,10 +4476,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 structures = structures.filter(s => s.id !== structureId)
                 
                 updateStructuresUI()
-                alert('✅ Structure supprimée')
+                alert("✅ Structure supprimée")
             } catch (error) {
                 console.error('Erreur suppression structure:', error)
-                alert('❌ Erreur suppression')
+                alert("❌ Erreur suppression")
             }
         }
         
@@ -4315,10 +4496,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Icônes par type
             const icons = {
-                'building': '🏢',
-                'carport': '🅿️',
-                'ground': '🌾',
-                'technical': '📏'
+                'building': "🏢",
+                'carport': "🅿️",
+                'ground': "🌾",
+                'technical': "📏"
             }
             
             container.innerHTML = structures.map(s => \`
@@ -4335,21 +4516,62 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Mettre à jour surface totale
             const totalArea = structures.reduce((sum, s) => sum + s.area_sqm, 0)
-            document.getElementById('totalStructuresArea').textContent = Math.round(totalArea) + ' m²'
+            document.getElementById('totalStructuresArea').textContent = Math.round(totalArea) + " m²"
         }
         
         // ================================================================
         // INIT
         // ================================================================
         async function init() {
-            await loadPlantData()
-            await loadZoneData()
-            initMap()
-            await loadStructures() // NOUVEAU: Charger structures
-            await loadModules()
-            setupEventListeners()
-            updateStats()
-            updateStringsProgress()  // Initialiser progression
+            console.log("🚀 INIT STARTED")
+            try {
+                await loadPlantData()
+                console.log("✅ Plant data loaded")
+                await loadZoneData()
+                console.log("✅ Zone data loaded")
+                initMap()
+                console.log("✅ Map initialized")
+                await loadStructures() // NOUVEAU: Charger structures
+                console.log("✅ Structures loaded")
+                await loadModules()
+                console.log("✅ Modules loaded")
+                setupEventListeners()
+                console.log("✅ Event listeners setup")
+                updateStats()
+                console.log("✅ Stats updated")
+                updateStringsProgress()  // Initialiser progression
+                
+                // AUTO-LOAD JALIBAT: Si Plant 6 et zone 14-23, charger automatiquement les 10 strings
+                if (plantId === 6 && zoneId >= 14 && zoneId <= 23) {
+                    console.log("🏭 JALIBAT Plant détecté - Auto-chargement des 10 strings...")
+                    // Sync EL initial
+                    await syncModulesFromEL()
+                    // Charger rectangles si toiture existe (TOUJOURS, ignorer moduleRectangles.length)
+                    if (roofPolygon) {
+                        console.log("🔄 Toiture existante - Import automatique dans 2s...")
+                        console.log("⚠️ Les rectangles existants seront remplacés")
+                        setTimeout(() => {
+                            console.log("📥 Déclenchement auto-import JALIBAT...")
+                            // Nettoyer rectangles existants
+                            moduleRectangles.forEach(rect => {
+                                if (rect.rectangle) map.removeLayer(rect.rectangle)
+                                if (rect.gridGroup) map.removeLayer(rect.gridGroup)
+                                if (rect.labelGroup) map.removeLayer(rect.labelGroup)
+                                if (rect.infoMarker) map.removeLayer(rect.infoMarker)
+                            })
+                            moduleRectangles = []
+                            // Lancer import
+                            importExistingModules()
+                        }, 2000)
+                    } else {
+                        console.log("⏳ Aucune toiture - En attente du dessin pour auto-import...")
+                    }
+                }
+                
+                console.log("✅ INIT COMPLETED")
+            } catch (error) {
+                console.error("❌ INIT FAILED:", error)
+            }
         }
         
         async function loadPlantData() {
@@ -4359,7 +4581,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 plantData = data.plant
             } catch (error) {
                 console.error('Erreur chargement centrale:', error)
-                plantData = { latitude: 48.8566, longitude: 2.3522, plant_name: 'Centrale' }
+                plantData = { latitude: 48.8566, longitude: 2.3522, plant_name: "Centrale" }
             }
         }
         
@@ -4382,16 +4604,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (zoneData.modules_per_string && modulesPerStringEl) modulesPerStringEl.value = zoneData.modules_per_string
                 
                 // Charger config strings non réguliers
-                if (zoneData.strings_config && zoneData.strings_config !== 'null') {
+                if (zoneData.strings_config && zoneData.strings_config !== "null") {
                     try {
                         const parsed = JSON.parse(zoneData.strings_config)
                         // Vérifier que c'est bien un array valide
                         if (Array.isArray(parsed) && parsed.length > 0) {
                             stringsConfig = parsed
-                            console.log('✅ Configuration strings chargée:', stringsConfig)
+                            console.log("✅ Configuration strings chargée:", stringsConfig)
                         } else {
                             stringsConfig = []
-                            console.log('⚠️ Configuration strings vide ou invalide')
+                            console.log("⚠️ Configuration strings vide ou invalide")
                         }
                     } catch (e) {
                         console.error('❌ Erreur parsing strings_config:', e)
@@ -4399,11 +4621,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     }
                 } else {
                     stringsConfig = []
-                    console.log('ℹ️ Aucune configuration strings sauvegardée')
+                    console.log("ℹ️ Aucune configuration strings sauvegardée")
                 }
             } catch (error) {
                 console.error('Erreur chargement zone:', error)
-                zoneData = { zone_name: 'Zone', azimuth: 180, tilt: 30 }
+                zoneData = { zone_name: "Zone", azimuth: 180, tilt: 30 }
             }
         }
         
@@ -4417,26 +4639,65 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 maxZoom: 22
             })
             
-            // OpenStreetMap Standard (pas de CORS pour export PDF)
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // NOUVEAU: Deux calques de fond avec contrôle de bascule
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 22,
+                attribution: '© Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN'
+            })
+            
+            const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map)
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            })
+            
+            // Ajouter vue satellite par défaut
+            satelliteLayer.addTo(map)
+            
+            // Contrôle de basculement entre vues
+            const baseLayers = {
+                '🛰️ Satellite': satelliteLayer,
+                '🗺️ Carte avec rues': streetLayer
+            }
+            L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map)
             
             // NOUVEAU: Ajouter calques hiérarchiques (structures sous modules)
             map.addLayer(structuresLayer)  // Calque 1: Structures (fond)
             map.addLayer(drawnItems)        // Calque 2: Modules + annotations
             L.control.scale({ metric: true, imperial: false }).addTo(map)
             
+            // NOUVEAU: Contrôle de recherche GPS/Adresse
+            L.Control.geocoder({
+                defaultMarkGeocode: false,
+                placeholder: 'Rechercher adresse ou coordonnées GPS...',
+                errorMessage: 'Aucun résultat trouvé',
+                position: 'topleft',
+                collapsed: false
+            })
+            .on('markgeocode', function(e) {
+                const latlng = e.geocode.center
+                map.setView(latlng, 20)
+                L.marker(latlng, {
+                    icon: L.divIcon({
+                        className: 'search-marker',
+                        html: '<div style="background: #ef4444; color: white; padding: 8px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-map-marker-alt"></i></div>',
+                        iconSize: [40, 40]
+                    })
+                }).addTo(map)
+                    .bindPopup('<strong>' + e.geocode.name + '</strong><br><small>Lat: ' + latlng.lat.toFixed(6) + '<br>Lng: ' + latlng.lng.toFixed(6) + '</small>')
+                    .openPopup()
+            })
+            .addTo(map)
+            console.log('🔍 Contrôle de recherche GPS/Adresse ajouté')
+            
             // Charger contour toiture existant
             if (zoneData.roof_polygon) {
                 try {
                     const savedCoords = JSON.parse(zoneData.roof_polygon)
                     roofPolygon = L.polygon(savedCoords, {
-                        color: '#fbbf24',
+                        color: "#fbbf24",
                         weight: 3,
                         fillOpacity: 0.1,
-                        className: 'roof-polygon'
+                        className: "roof-polygon"
                     }).addTo(drawnItems)
                     
                     // Calculer surface avec polygone fermé
@@ -4446,7 +4707,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     }
                     const validGeoJSON = turf.polygon([coords])
                     roofArea = turf.area(validGeoJSON)
-                    document.getElementById('roofArea').textContent = roofArea.toFixed(2) + ' m²'
+                    document.getElementById('roofArea').textContent = roofArea.toFixed(2) + " m²"
                     document.getElementById('roofInfo').classList.remove('hidden')
                 } catch (e) {
                     console.error('Erreur chargement polygone:', e)
@@ -4479,22 +4740,37 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // DESSIN TOITURE
         // ================================================================
         function enableRoofDrawing() {
-            console.log('🖊️ enableRoofDrawing() appelé')
-            console.log('🗺️ map:', map)
-            console.log('✏️ drawControl existant:', drawControl)
+            console.log("🖊️ enableRoofDrawing() appelé")
+            console.log("🗺️ map:", map)
+            console.log("📍 map._container:", map ? map._container : 'undefined')
+            console.log("✏️ drawControl existant:", drawControl)
+            console.log("🎨 drawnItems:", drawnItems)
+            console.log("📦 L.Control.Draw disponible:", typeof L.Control.Draw)
+            
+            if (!map) {
+                console.error("❌ ERREUR: La carte n'est pas initialisée!")
+                alert("Erreur: La carte n'est pas initialisée. Rechargez la page.")
+                return
+            }
+            
+            if (typeof L.Control.Draw === 'undefined') {
+                console.error("❌ ERREUR: Leaflet.draw n'est pas chargé!")
+                alert("Erreur: Bibliothèque Leaflet.draw non disponible. Rechargez la page.")
+                return
+            }
             
             if (drawControl) {
-                console.log('🗑️ Suppression ancien drawControl')
+                console.log("🗑️ Suppression ancien drawControl")
                 map.removeControl(drawControl)
             }
             
-            console.log('🆕 Création nouveau L.Control.Draw')
+            console.log("🆕 Création nouveau L.Control.Draw")
             drawControl = new L.Control.Draw({
                 draw: {
                     polygon: {
                         showArea: true,
                         metric: true,
-                        shapeOptions: { color: '#fbbf24', weight: 3 }
+                        shapeOptions: { color: "#fbbf24", weight: 3 }
                     },
                     polyline: false,
                     rectangle: false,
@@ -4505,9 +4781,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 edit: { featureGroup: drawnItems, remove: true }
             })
             
-            console.log('➕ Ajout drawControl à la carte')
+            console.log("➕ Ajout drawControl à la carte")
             map.addControl(drawControl)
-            console.log('✅ enableRoofDrawing() terminé - Contrôle ajouté')
+            console.log("✅ enableRoofDrawing() terminé - Contrôle ajouté")
             
             map.on(L.Draw.Event.CREATED, async (e) => {
                 if (roofPolygon) drawnItems.removeLayer(roofPolygon)
@@ -4528,10 +4804,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Créer un GeoJSON valide manuellement
                 const validGeoJSON = {
-                    type: 'Feature',
+                    type: "Feature",
                     properties: {},
                     geometry: {
-                        type: 'Polygon',
+                        type: "Polygon",
                         coordinates: [coords]
                     }
                 }
@@ -4543,10 +4819,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     roofArea = 0
                 }
                 
-                document.getElementById('roofArea').textContent = roofArea.toFixed(2) + ' m²'
+                document.getElementById('roofArea').textContent = roofArea.toFixed(2) + " m²"
                 document.getElementById('roofInfo').classList.remove('hidden')
                 
                 await saveRoofPolygon()
+                
+                // AUTO-IMPORT JALIBAT: Si Plant 6 après dessin toiture
+                if (plantId === 6 && zoneId >= 14 && zoneId <= 23) {
+                    console.log("🏭 Toiture JALIBAT dessinée - Auto-import des 10 strings...")
+                    setTimeout(() => {
+                        importExistingModules()
+                    }, 500)
+                }
             })
         }
         
@@ -4557,25 +4841,46 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             try {
                 await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/roof\`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "PUT",
+                    headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify({
                         roof_polygon: JSON.stringify(coords),
                         roof_area_sqm: roofArea
                     })
                 })
-                alert('OK: Contour toiture sauvegarde!')
+                alert("OK: Contour toiture sauvegarde!")
             } catch (error) {
-                alert('ERREUR: Sauvegarde - ' + error.message)
+                alert("ERREUR: Sauvegarde - " + error.message)
             }
         }
         
         function clearRoof() {
-            if (confirm('Effacer le contour de toiture ?')) {
+            const hasRectangles = moduleRectangles.length > 0
+            const confirmMsg = hasRectangles 
+                ? 'Effacer le contour de toiture ET tous les rectangles de modules ?' 
+                : 'Effacer le contour de toiture ?'
+            
+            if (confirm(confirmMsg)) {
                 if (roofPolygon) drawnItems.removeLayer(roofPolygon)
                 roofPolygon = null
                 roofArea = 0
                 document.getElementById('roofInfo').classList.add('hidden')
+                
+                // Supprimer aussi tous les rectangles
+                if (hasRectangles) {
+                    moduleRectangles.forEach(rect => {
+                        if (rect.rectangle) map.removeLayer(rect.rectangle)
+                        if (rect.gridGroup) map.removeLayer(rect.gridGroup)
+                        if (rect.labelGroup) map.removeLayer(rect.labelGroup)
+                        if (rect.infoMarker) map.removeLayer(rect.infoMarker)
+                    })
+                    moduleRectangles = []
+                    modules = []
+                    renderModules()
+                    updateStats()
+                    updateStringsProgress()
+                    console.log("🗑️ Toiture et rectangles supprimés")
+                }
             }
         }
         
@@ -4613,7 +4918,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                                'max="50" ' +
                                'value="' + config.modulesCount + '">' +
                     '</div>' +
-                    '<div class="text-2xl font-black text-gray-400">' + config.modulesCount + '</div>'
+                    '<div class="text-2xl font-black text-gray-400">' + config.modulesCount + "</div>"
                 container.appendChild(div)
             })
             
@@ -4644,12 +4949,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         function applyStringsConfig() {
             // Update summary display
             const total = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
-            const summaryText = stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') + ' (Total: ' + total + ')'
+            const summaryText = stringsConfig.map(c => "S" + c.stringNum + "=" + c.modulesCount).join(", ") + " (Total: " + total + ")"
             document.getElementById('stringsSummaryText').textContent = summaryText
             document.getElementById('stringsSummary').classList.remove('hidden')
             
             closeStringsModal()
-            alert('OK: Configuration appliquee - ' + total + ' modules repartis sur ' + stringsConfig.length + ' strings')
+            alert("OK: Configuration appliquee - " + total + " modules repartis sur " + stringsConfig.length + " strings")
         }
         
         function closeStringsModal() {
@@ -4664,7 +4969,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const modulesPerStringEl = document.getElementById('modulesPerString')
             
             if (!inverterEl || !junctionBoxEl || !stringEl || !modulesPerStringEl) {
-                alert('ERREUR: Champs de configuration manquants')
+                alert("ERREUR: Champs de configuration manquants")
                 return
             }
             
@@ -4673,7 +4978,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Validation: Si strings configurés, vérifier cohérence
             if (stringCount > 0 && stringsConfig.length === 0) {
-                alert("ATTENTION: Configurez d'abord les strings avec le bouton Configurer Strings!")
+                alert("ATTENTION: Configurez d" + String.fromCharCode(39) + "abord les strings avec le bouton Configurer Strings!")
                 return
             }
             
@@ -4692,14 +4997,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             try {
                 await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/config\`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "PUT",
+                    headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify(config)
                 })
                 
-                const summary = stringsConfig.length > 0 ? stringsConfig.map(c => 'S' + c.stringNum + '=' + c.modulesCount).join(', ') : 'Conf{
+                const summary = stringsConfig.length > 0 ? stringsConfig.map(c => "S" + c.stringNum + "=" + c.modulesCount).join(", ") : "Config uniforme"
+                alert("✅ Configuration sauvegardée: " + summary)
+            } catch (error) {
+                alert("❌ Erreur sauvegarde config: " + error.message)
+            }
+        }
+        
+        // ==== BOUTON AUTO-FILL MODULES ==== (DISABLED - Button not in HTML)
+        /*
+        document.getElementById('autoFillBtn').addEventListener('click', async () => {
             if (!roofPolygon) {
-                alert("ATTENTION: Dessinez d'abord le contour de toiture!")
+                alert("ATTENTION: Dessinez d" + String.fromCharCode(39) + "abord le contour de toiture!")
                 return
             }
             
@@ -4710,7 +5024,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // MODE INTELLIGENT : Si pas de config, créer distribution uniforme
             if (!useCustomConfig) {
-                console.log('⚠️ Aucune config custom - création distribution uniforme')
+                console.log("⚠️ Aucune config custom - création distribution uniforme")
                 
                 // Calculer nombre optimal de modules par string (20-30 modules recommandés)
                 const targetModulesPerString = 25
@@ -4727,8 +5041,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     stringsConfig.push({ stringNum: i, modulesCount: modulesForThisString })
                 }
                 
-                console.log('✅ Distribution auto créée:', stringsConfig)
-                alert('📊 DISTRIBUTION AUTO CRÉÉE:' + String.fromCharCode(10,10) + calculatedStrings + ' strings détectés' + String.fromCharCode(10) + baseModulesPerString + '-' + (baseModulesPerString + 1) + ' modules/string' + String.fromCharCode(10) + 'Total: ' + totalModules + ' modules' + String.fromCharCode(10,10) + 'Vous pourrez ajuster après placement!')
+                console.log("✅ Distribution auto créée:", stringsConfig)
+                alert("📊 DISTRIBUTION AUTO CRÉÉE:" + String.fromCharCode(10,10) + calculatedStrings + " strings détectés" + String.fromCharCode(10) + baseModulesPerString + "-" + (baseModulesPerString + 1) + " modules/string" + String.fromCharCode(10) + "Total: " + totalModules + " modules" + String.fromCharCode(10,10) + "Vous pourrez ajuster après placement!")
             } else {
                 totalModules = stringsConfig.reduce((sum, config) => sum + config.modulesCount, 0)
             }
@@ -4743,13 +5057,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const startLat = bounds.getNorth() // Latitude maximale (nord)
             const startLng = bounds.getWest()  // Longitude minimale (ouest)
             
-            console.log('📐 Bounds polygone:', {
+            console.log("📐 Bounds polygone:", {
                 north: bounds.getNorth(),
                 south: bounds.getSouth(),
                 east: bounds.getEast(),
                 west: bounds.getWest()
             })
-            console.log('📍 Point de départ grille (NW):', startLat, startLng)
+            console.log("📍 Point de départ grille (NW):", startLat, startLng)
             
             // Préparer polygone Turf.js
             const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])
@@ -4765,7 +5079,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             let currentStringIndex = 0
             let currentStringConfig = stringsConfig[currentStringIndex]
             
-            console.log('🎯 Début placement intelligent - Total à placer:', totalModules)
+            console.log("🎯 Début placement intelligent - Total à placer:", totalModules)
             
             // REMPLISSAGE INTELLIGENT RANGÉE PAR RANGÉE
             const maxRows = 100 // Limite sécurité
@@ -4780,7 +5094,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     currentStringIndex++
                     currentStringConfig = stringsConfig[currentStringIndex]
                     modulesPlacedInString = 0
-                    console.log('✅ String ' + (currentStringIndex) + ' terminé, passage au string ' + (currentStringIndex + 1))
+                    console.log( "✅ String " + (currentStringIndex) + " terminé, passage au string " + (currentStringIndex + 1))
                 }
                 
                 if (!currentStringConfig) break // Plus de strings à placer
@@ -4811,7 +5125,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         modules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
-                            module_identifier: 'M' + moduleNum,
+                            module_identifier: "M" + moduleNum,
                             latitude: rowLat,
                             longitude: moduleLng,
                             pos_x_meters: col * (moduleWidth + spacing),
@@ -4822,7 +5136,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             string_number: currentStringConfig.stringNum,
                             position_in_string: modulesPlacedInString + 1,
                             power_wp: 450,
-                            module_status: 'pending',
+                            module_status: "pending",
                             status_comment: null
                         })
                         moduleNum++
@@ -4837,24 +5151,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 currentRow++
-                console.log('📏 Rangée ' + currentRow + ' : ' + modulesInRow + ' modules placés')
+                console.log( "📏 Rangée " + currentRow + " : " + modulesInRow + " modules placés")
                 
                 // Si aucun module placé dans cette rangée, on a fini
                 if (modulesInRow === 0) {
-                    console.log('⚠️ Aucun module dans rangée ' + currentRow + ' - fin placement')
+                    console.log( "⚠️ Aucun module dans rangée " + currentRow + " - fin placement")
                     break
                 }
             }
             
-            console.log('✅ Placement terminé : ' + modules.length + ' modules sur ' + totalModules + ' demandés')
+            console.log( "✅ Placement terminé : " + modules.length + " modules sur " + totalModules + " demandés")
             
             nextModuleNum = moduleNum
             renderModules()
             updateStats()
-            updateStringsProgress()  // Mettre à jour progression
+            updateStringsProgress()  // Mettre a jour progression
             const stringsDetail = stringsConfig.map(c => "String " + c.stringNum + ": " + c.modulesCount + " modules").join(String.fromCharCode(10))
-            alert('OK: ' + modules.length + ' modules places!' + String.fromCharCode(10,10) + stringsDetail)
-        }
+            alert("OK: " + modules.length + " modules places!" + String.fromCharCode(10,10) + stringsDetail)
+        })
+        */
         
         function placeModuleManual() {
             // MODE HYBRIDE : Config optionnelle + auto-configuration
@@ -4862,18 +5177,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Si config existe, valider limite
             if (stringsConfig.length > 0 && modules.length >= totalConfigured) {
-                alert(String.fromCharCode(0x1F6D1) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
+                alert(String.fromCharCode(0x1F6D1) + " LIMITE ATTEINTE" + String.fromCharCode(10,10) + "Config: " + totalConfigured + " modules" + String.fromCharCode(10) + "Placés: " + modules.length + " modules" + String.fromCharCode(10,10) + "Impossible de placer plus de modules!")
                 return
             }
             
-            placementMode = 'manual'
+            placementMode = "manual"
             const msg = stringsConfig.length > 0 
-                ? 'Cliquez sur la carte pour placer des modules' + String.fromCharCode(10,10) + 'Restant: ' + (totalConfigured - modules.length) + '/' + totalConfigured + ' modules'
-                : 'Cliquez sur la carte pour placer des modules' + String.fromCharCode(10,10) + 'Mode libre : La config se mettra à jour automatiquement'
+                ? "Cliquez sur la carte pour placer des modules" + String.fromCharCode(10,10) + "Restant: " + (totalConfigured - modules.length) + "/" + totalConfigured + " modules"
+                : "Cliquez sur la carte pour placer des modules" + String.fromCharCode(10,10) + "Mode libre : La config se mettra à jour automatiquement"
             alert(msg)
             
             map.once('click', (e) => {
-                if (placementMode !== 'manual') return
+                if (placementMode !== "manual") return
                 
                 // Déterminer string et position en fonction de stringsConfig
                 let stringNum = 1
@@ -4900,7 +5215,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 modules.push({
                     id: null,
                     zone_id: parseInt(zoneId),
-                    module_identifier: 'M' + nextModuleNum,
+                    module_identifier: "M" + nextModuleNum,
                     latitude: e.latlng.lat,
                     longitude: e.latlng.lng,
                     pos_x_meters: 0,
@@ -4911,7 +5226,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     string_number: stringNum,
                     position_in_string: posInString,
                     power_wp: 450,
-                    module_status: 'pending',
+                    module_status: "pending",
                     status_comment: null
                 })
                 
@@ -4931,14 +5246,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (stringsConfig.length === 0 || modules.length < totalConfigured) {
                     placeModuleManual()
                 } else {
-                    alert(String.fromCharCode(0x2705) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Tous les modules configurés ont été placés (' + totalConfigured + '/' + totalConfigured + ')')
+                    alert(String.fromCharCode(0x2705) + " LIMITE ATTEINTE" + String.fromCharCode(10,10) + "Tous les modules configurés ont été placés (" + totalConfigured + "/" + totalConfigured + ")")
                 }
             })
         }
         
         function drawRowMode() {
             if (!roofPolygon) {
-                alert("ATTENTION: Dessinez d'abord le contour de toiture!")
+                alert("ATTENTION: Dessinez d" + String.fromCharCode(39) + "abord le contour de toiture!")
                 return
             }
             
@@ -4947,15 +5262,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Si config existe, valider limite
             if (stringsConfig.length > 0 && modules.length >= totalConfigured) {
-                alert(String.fromCharCode(0x1F6D1) + ' LIMITE ATTEINTE' + String.fromCharCode(10,10) + 'Config: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 'Placés: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 'Impossible de placer plus de modules!')
+                alert(String.fromCharCode(0x1F6D1) + " LIMITE ATTEINTE" + String.fromCharCode(10,10) + "Config: " + totalConfigured + " modules" + String.fromCharCode(10) + "Placés: " + modules.length + " modules" + String.fromCharCode(10,10) + "Impossible de placer plus de modules!")
                 return
             }
             
-            placementMode = 'drawRow'
+            placementMode = "drawRow"
             isDrawingRow = false
             rowStartLatLng = null
             
-            alert('MODE DESSIN RANGEE' + String.fromCharCode(10,10) + '1. Cliquez sur point de depart' + String.fromCharCode(10) + '2. Glissez la souris' + String.fromCharCode(10) + '3. Relachez pour creer rangee' + String.fromCharCode(10,10) + 'Appuyez sur ESC pour annuler')
+            alert("MODE DESSIN RANGEE" + String.fromCharCode(10,10) + "1. Cliquez sur point de depart" + String.fromCharCode(10) + "2. Glissez la souris" + String.fromCharCode(10) + "3. Relachez pour creer rangee" + String.fromCharCode(10,10) + "Appuyez sur ESC pour annuler")
             
             // Désactiver événements Leaflet par défaut
             map.dragging.disable()
@@ -4971,7 +5286,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         }
         
         function onRowMouseDown(e) {
-            if (placementMode !== 'drawRow') return
+            if (placementMode !== "drawRow") return
             
             isDrawingRow = true
             rowStartLatLng = e.latlng
@@ -4981,11 +5296,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 [e.latlng.lat, e.latlng.lng],
                 [e.latlng.lat, e.latlng.lng]
             ], {
-                color: '#22c55e',
+                color: "#22c55e",
                 weight: 3,
-                fillColor: '#22c55e',
+                fillColor: "#22c55e",
                 fillOpacity: 0.2,
-                dashArray: '10, 10'
+                dashArray: "10, 10"
             }).addTo(map)
         }
         
@@ -5023,13 +5338,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const totalModules = cols * rows
             
             if (totalModules === 0) {
-                alert('ATTENTION: Rectangle trop petit! Dessinez une zone plus grande.')
+                alert("ATTENTION: Rectangle trop petit! Dessinez une zone plus grande.")
                 cancelDrawRowMode()
                 return
             }
             
             // Confirmation
-            const confirmMsg = 'CREATION RANGEE' + String.fromCharCode(10,10) + 'Dimensions: ' + widthMeters.toFixed(1) + 'm x ' + heightMeters.toFixed(1) + 'm' + String.fromCharCode(10) + 'Modules: ' + cols + ' colonnes x ' + rows + ' lignes = ' + totalModules + ' modules' + String.fromCharCode(10,10) + 'Creer cette rangee?'
+            const confirmMsg = 'CREATION RANGEE' + String.fromCharCode(10,10) + "Dimensions: " + widthMeters.toFixed(1) + "m x " + heightMeters.toFixed(1) + "m" + String.fromCharCode(10) + "Modules: " + cols + " colonnes x " + rows + " lignes = " + totalModules + " modules" + String.fromCharCode(10,10) + "Creer cette rangee?"
             const confirmed = confirm(confirmMsg)
             
             if (!confirmed) {
@@ -5083,7 +5398,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         generatedModules.push({
                             id: null,
                             zone_id: parseInt(zoneId),
-                            module_identifier: 'M' + moduleNum,
+                            module_identifier: "M" + moduleNum,
                             latitude: moduleLat,
                             longitude: moduleLng,
                             pos_x_meters: 0,
@@ -5094,7 +5409,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             string_number: stringNum,
                             position_in_string: posInString,
                             power_wp: 450,
-                            module_status: 'pending',
+                            module_status: "pending",
                             status_comment: null
                         })
                         
@@ -5104,23 +5419,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             // Debug logs
-            console.log('🔷 Modules générés:', generatedModules.length)
-            console.log('🔷 Premier module:', generatedModules[0])
-            console.log('🔷 Total modules avant:', modules.length)
+            console.log("🔷 Modules générés:", generatedModules.length)
+            console.log("🔷 Premier module:", generatedModules[0])
+            console.log("🔷 Total modules avant:", modules.length)
             
             // Ajouter modules générés
             modules.push(...generatedModules)
             nextModuleNum = moduleNum
             
-            console.log('🔷 Total modules après:', modules.length)
+            console.log("🔷 Total modules après:", modules.length)
             
             // Nettoyer mode dessin
             cancelDrawRowMode()
             
             // Render
-            console.log('🔷 Appel renderModules...')
+            console.log("🔷 Appel renderModules...")
             renderModules()
-            console.log('🔷 Appel updateStats...')
+            console.log("🔷 Appel updateStats...")
             updateStats()
             
             // SYNC BIDIRECTIONNELLE : Mettre à jour config auto si mode libre
@@ -5130,13 +5445,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             updateStringsProgress()  // Mettre à jour progression
             
-            const rectInfo = 'Rectangle: ' + widthMeters.toFixed(1) + 'm x ' + heightMeters.toFixed(1) + 'm' + String.fromCharCode(10) + 'Grille: ' + cols + ' x ' + rows; alert('OK: ' + generatedModules.length + ' modules crees!' + String.fromCharCode(10,10) + rectInfo)
+            const rectInfo = "Rectangle: " + widthMeters.toFixed(1) + "m x " + heightMeters.toFixed(1) + "m" + String.fromCharCode(10) + "Grille: " + cols + " x " + rows; alert("OK: " + generatedModules.length + " modules crees!" + String.fromCharCode(10,10) + rectInfo)
         }
         
         function onEscapeKey(e) {
-            if (e.key === 'Escape' && placementMode === 'drawRow') {
+            if (e.key === "Escape" && placementMode === "drawRow") {
                 cancelDrawRowMode()
-                alert('Mode dessin rangee annule')
+                alert("Mode dessin rangee annule")
             }
         }
         
@@ -5160,22 +5475,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Reset variables
             isDrawingRow = false
             rowStartLatLng = null
-            placementMode = 'manual'
+            placementMode = "manual"
         }
         
         async function clearModules() {
-            console.log('🗑️ clearModules() appelé - Modules actuels:', modules.length)
+            console.log("🗑️ clearModules() appelé - Modules actuels:", modules.length)
             
             if (confirm('Effacer tous les modules ?')) {
-                console.log('✅ Confirmation utilisateur - Effacement en cours...')
+                console.log("✅ Confirmation utilisateur - Effacement en cours...")
                 
                 try {
                     // Supprimer de la DB
-                    console.log('🔥 DELETE API call...')
+                    console.log("🔥 DELETE API call...")
                     await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
-                        method: 'DELETE'
+                        method: "DELETE"
                     })
-                    console.log('✅ DELETE API success')
+                    console.log("✅ DELETE API success")
                     
                     // Supprimer localement
                     modules = []
@@ -5186,20 +5501,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     updateStats()
                     updateStringsProgress()
                     
-                    console.log('✅ Modules effacés - Nouveau total:', modules.length)
-                    alert('OK: Tous les modules ont été effacés')
+                    console.log("✅ Modules effacés - Nouveau total:", modules.length)
+                    alert("OK: Tous les modules ont été effacés")
                 } catch (error) {
                     console.error('❌ Erreur effacement modules:', error)
-                    alert('ERREUR: Impossible d' + String.fromCharCode(39) + 'effacer les modules - ' + error.message)
+                    alert("ERREUR: Impossible d" + String.fromCharCode(39) + "effacer les modules - " + error.message)
                 }
             } else {
-                console.log('❌ Annulation utilisateur')
+                console.log("❌ Annulation utilisateur")
             }
         }
         
         function cleanInvalidModules() {
             if (!roofPolygon) {
-                alert('⚠️ Aucune toiture dessinée - impossible de valider les modules')
+                alert("⚠️ Aucune toiture dessinée - impossible de valider les modules")
                 return
             }
             
@@ -5219,14 +5534,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             modules.forEach(m => {
                 // Check 1: GPS valide
                 if (!m.latitude || !m.longitude) {
-                    invalidModules.push({ module: m, reason: 'GPS invalide' })
+                    invalidModules.push({ module: m, reason: "GPS invalide" })
                     return
                 }
                 
                 // Check 2: Centre dans polygone
                 const centerPoint = turf.point([m.longitude, m.latitude])
                 if (!turf.booleanPointInPolygon(centerPoint, poly)) {
-                    invalidModules.push({ module: m, reason: 'Hors toiture (centre)' })
+                    invalidModules.push({ module: m, reason: "Hors toiture (centre)" })
                     return
                 }
                 
@@ -5249,7 +5564,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     turf.booleanPointInPolygon(bottomRight, poly)
                 
                 if (!allCornersInside) {
-                    invalidModules.push({ module: m, reason: 'Hors toiture (coins)' })
+                    invalidModules.push({ module: m, reason: "Hors toiture (coins)" })
                     return
                 }
                 
@@ -5260,23 +5575,23 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             modules = validModules
             const removed = before - modules.length
             
-            console.log('🧹 Nettoyage: ' + removed + ' modules invalides supprimés (' + modules.length + ' restants)')
-            console.log('📋 Détail modules supprimés:', invalidModules)
+            console.log( "🧹 Nettoyage: " + removed + " modules invalides supprimés (" + modules.length + " restants)")
+            console.log("📋 Détail modules supprimés:", invalidModules)
             
             renderModules()
             updateStats()
             updateStringsProgress()
             
             if (removed > 0) {
-                const msg = '🧹 NETTOYAGE TERMINÉ' + String.fromCharCode(10,10) +
-                    removed + ' modules supprimés' + String.fromCharCode(10) +
-                    modules.length + ' modules valides restants' + String.fromCharCode(10,10) +
-                    'Raisons:' + String.fromCharCode(10) +
-                    '  - GPS invalide: ' + invalidModules.filter(i => i.reason === 'GPS invalide').length + String.fromCharCode(10) +
-                    '  - Hors toiture: ' + invalidModules.filter(i => i.reason.startsWith('Hors')).length
+                const msg = "🧹 NETTOYAGE TERMINÉ" + String.fromCharCode(10,10) +
+                    removed + " modules supprimés" + String.fromCharCode(10) +
+                    modules.length + " modules valides restants" + String.fromCharCode(10,10) +
+                    "Raisons:" + String.fromCharCode(10) +
+                    "  - GPS invalide: " + invalidModules.filter(i => i.reason === "GPS invalide").length + String.fromCharCode(10) +
+                    "  - Hors toiture: " + invalidModules.filter(i => i.reason.startsWith("Hors")).length
                 alert(msg)
             } else {
-                alert('✅ Aucun module invalide trouvé' + String.fromCharCode(10) + 'Tous les modules sont correctement positionnés')
+                alert("✅ Aucun module invalide trouvé" + String.fromCharCode(10) + "Tous les modules sont correctement positionnés")
             }
         }
         
@@ -5285,13 +5600,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function createModuleRectangle() {
             if (!roofPolygon) {
-                alert('⚠️ Dessinez d' + String.fromCharCode(39) + 'abord la toiture !')
+                alert("⚠️ Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
                 return
             }
             
             const rows = parseInt(document.getElementById('rectRows').value) || 5
             const cols = parseInt(document.getElementById('rectCols').value) || 24
             const stringStart = parseInt(document.getElementById('rectString').value) || 1
+            const alignment = document.getElementById('rectAlignment').value || 'center'
             
             // *** NOUVELLE MÉTHODE PIXEL-BASED (comme SolarEdge) ***
             const moduleWidth = 1.7   // m
@@ -5301,23 +5617,77 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const totalWidthMeters = cols * moduleWidth + (cols - 1) * spacing
             const totalHeightMeters = rows * moduleHeight + (rows - 1) * spacing
             
-            console.log('📐 Rectangle réel:', totalWidthMeters.toFixed(1) + 'm × ' + totalHeightMeters.toFixed(1) + 'm')
+            console.log("📐 Rectangle réel:", totalWidthMeters.toFixed(1) + "m × " + totalHeightMeters.toFixed(1) + "m")
+            console.log("📍 Alignement:", alignment)
             
             // Convertir mètres → pixels selon zoom actuel
             const zoom = map.getZoom()
-            const center = map.getCenter()
+            
+            // *** NOUVEAU : Positionner selon alignement choisi ***
+            const roofBounds = roofPolygon.getBounds()
+            let anchorLat, anchorLng
+            
+            switch(alignment) {
+                case 'north':
+                    anchorLat = roofBounds.getNorth()
+                    anchorLng = (roofBounds.getWest() + roofBounds.getEast()) / 2
+                    console.log("⬆️ Alignement NORD")
+                    break
+                case 'south':
+                    anchorLat = roofBounds.getSouth()
+                    anchorLng = (roofBounds.getWest() + roofBounds.getEast()) / 2
+                    console.log("⬇️ Alignement SUD")
+                    break
+                case 'east':
+                    anchorLat = (roofBounds.getNorth() + roofBounds.getSouth()) / 2
+                    anchorLng = roofBounds.getEast()
+                    console.log("➡️ Alignement EST")
+                    break
+                case 'west':
+                    anchorLat = (roofBounds.getNorth() + roofBounds.getSouth()) / 2
+                    anchorLng = roofBounds.getWest()
+                    console.log("⬅️ Alignement OUEST")
+                    break
+                case 'nw':
+                    anchorLat = roofBounds.getNorth()
+                    anchorLng = roofBounds.getWest()
+                    console.log("↖️ Alignement NORD-OUEST")
+                    break
+                case 'ne':
+                    anchorLat = roofBounds.getNorth()
+                    anchorLng = roofBounds.getEast()
+                    console.log("↗️ Alignement NORD-EST")
+                    break
+                case 'sw':
+                    anchorLat = roofBounds.getSouth()
+                    anchorLng = roofBounds.getWest()
+                    console.log("↙️ Alignement SUD-OUEST")
+                    break
+                case 'se':
+                    anchorLat = roofBounds.getSouth()
+                    anchorLng = roofBounds.getEast()
+                    console.log("↘️ Alignement SUD-EST")
+                    break
+                default: // center
+                    anchorLat = roofBounds.getCenter().lat
+                    anchorLng = roofBounds.getCenter().lng
+                    console.log("🎯 Alignement CENTRE")
+            }
+            
+            const center = L.latLng(anchorLat, anchorLng)
+            console.log("🏠 Point ancrage:", center.lat.toFixed(6) + ", " + center.lng.toFixed(6))
             
             // Formule Leaflet: mètres par pixel selon zoom
             const metersPerPixel = 156543.03392 * Math.cos(center.lat * Math.PI / 180) / Math.pow(2, zoom)
             const pixelsPerMeter = 1 / metersPerPixel
             
-            console.log('🔍 Zoom:', zoom, '| Pixels/mètre:', pixelsPerMeter.toFixed(2))
+            console.log("🔍 Zoom:", zoom, "| Pixels/mètre:", pixelsPerMeter.toFixed(2))
             
             // Taille rectangle en pixels
             const totalWidthPixels = totalWidthMeters * pixelsPerMeter
             const totalHeightPixels = totalHeightMeters * pixelsPerMeter
             
-            console.log('📏 Pixels:', totalWidthPixels.toFixed(0) + 'px × ' + totalHeightPixels.toFixed(0) + 'px')
+            console.log("📏 Pixels:", totalWidthPixels.toFixed(0) + "px × " + totalHeightPixels.toFixed(0) + "px")
             
             // Convertir centre map en pixels
             const centerPoint = map.latLngToContainerPoint(center)
@@ -5338,7 +5708,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             const bounds = [topLeft, bottomRight]
             
-            console.log('📍 Bounds GPS:', bounds)
+            console.log("📍 Bounds GPS:", bounds)
             
             // Create rectangle
             const id = moduleRectangles.length + 1
@@ -5351,7 +5721,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateRectanglesList()
             applyRectanglesToModules()
             
-            alert('✅ Rectangle créé: ' + (rows * cols) + ' modules' + String.fromCharCode(10) + 'Déplacez et redimensionnez avec les poignées')
+            alert("✅ Rectangle créé: " + (rows * cols) + " modules" + String.fromCharCode(10) + "Déplacez et redimensionnez avec les poignées")
         }
         
         function applyRectanglesToModules() {
@@ -5362,18 +5732,249 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 modules = modules.concat(rect.modules)
             })
             
-            console.log('📦 Modules totaux depuis rectangles:', modules.length)
+            console.log("📦 Modules totaux depuis rectangles:", modules.length)
             
             renderModules()
             updateStats()
             updateStringsProgress()
         }
         
+        async function importExistingModules() {
+            if (!roofPolygon) {
+                alert("⚠️ Dessinez d" + String.fromCharCode(39) + "abord la toiture !")
+                return
+            }
+            
+            if (moduleRectangles.length > 0 && !confirm("⚠️ Des rectangles existent déjà. Les remplacer par l" + String.fromCharCode(39) + "import ?")) {
+                return
+            }
+            
+            try {
+                console.log("📥 Import GLOBAL - Toutes les zones du plant JALIBAT...")
+                
+                // NOUVEAU: Récupérer TOUTES les zones du plant (14 à 23 = Strings 1-10)
+                const allZones = [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]  // Zone IDs pour JALIBAT
+                const allModulesByZone = {}
+                let totalModulesCount = 0
+                
+                // Récupérer modules de chaque zone en parallèle
+                const promises = allZones.map(zoneId => 
+                    fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`)
+                        .then(r => r.json())
+                        .then(data => ({ zoneId, modules: data.modules || [] }))
+                )
+                
+                const results = await Promise.all(promises)
+                
+                results.forEach(result => {
+                    allModulesByZone[result.zoneId] = result.modules
+                    totalModulesCount += result.modules.length
+                    console.log(\`📦 Zone \${result.zoneId}: \${result.modules.length} modules\`)
+                })
+                
+                console.log("📦 TOTAL modules trouvés:", totalModulesCount)
+                
+                if (totalModulesCount === 0) {
+                    alert("⚠️ Aucun module trouvé en base de données pour ce plant")
+                    return
+                }
+                
+                // Configuration JALIBAT: 10 strings
+                // String 1 (zone 14) = 26 modules
+                // Strings 2-10 (zones 15-23) = 24 modules chacun
+                const stringConfigs = [
+                    { zoneId: 14, stringNum: 1, rows: 2, cols: 13 },  // 26 modules = 2×13
+                    { zoneId: 15, stringNum: 2, rows: 2, cols: 12 },  // 24 modules = 2×12
+                    { zoneId: 16, stringNum: 3, rows: 2, cols: 12 },
+                    { zoneId: 17, stringNum: 4, rows: 2, cols: 12 },
+                    { zoneId: 18, stringNum: 5, rows: 2, cols: 12 },
+                    { zoneId: 19, stringNum: 6, rows: 2, cols: 12 },
+                    { zoneId: 20, stringNum: 7, rows: 2, cols: 12 },
+                    { zoneId: 21, stringNum: 8, rows: 2, cols: 12 },
+                    { zoneId: 22, stringNum: 9, rows: 2, cols: 12 },
+                    { zoneId: 23, stringNum: 10, rows: 2, cols: 12 }
+                ]
+                
+                console.log("📐 Configuration JALIBAT: 10 rectangles (String 1=26, Strings 2-10=24)")
+                
+                // Paramètres globaux
+                const roofBounds = roofPolygon.getBounds()
+                const roofCenter = roofBounds.getCenter()
+                const zoom = map.getZoom()
+                const moduleWidth = 1.7
+                const moduleHeight = 1.0
+                const spacing = 0.01  // Espacement réduit entre modules
+                const rectSpacing = 0.3  // Espacement réduit entre rectangles (mètres)
+                
+                const metersPerPixel = 156543.03392 * Math.cos(roofCenter.lat * Math.PI / 180) / Math.pow(2, zoom)
+                const pixelsPerMeter = 1 / metersPerPixel
+                
+                // Calculer dimensions réelles du polygone de toiture
+                const roofNorth = roofBounds.getNorth()
+                const roofSouth = roofBounds.getSouth()
+                const roofEast = roofBounds.getEast()
+                const roofWest = roofBounds.getWest()
+                
+                // Calcul taille toiture en mètres (approximation)
+                const roofWidthDegrees = roofEast - roofWest
+                const roofHeightDegrees = roofNorth - roofSouth
+                const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
+                const roofHeightMeters = roofHeightDegrees * 110574
+                
+                console.log(\`📏 Toiture: \${roofWidthMeters.toFixed(1)}m × \${roofHeightMeters.toFixed(1)}m\`)
+                
+                // Calculer dimensions totales nécessaires pour grille 5×2
+                const rectsPerRow = 5
+                const rectsPerCol = 2
+                
+                // Dimensions réelles par type de rectangle
+                const string1Width = 13 * moduleWidth + (13 - 1) * spacing  // 26 modules = 2×13
+                const standardWidth = 12 * moduleWidth + (12 - 1) * spacing  // 24 modules = 2×12
+                const rectHeight = 2 * moduleHeight + (2 - 1) * spacing
+                
+                // Largeur totale RÉELLE nécessaire = 1 String 1 + 4 Strings standard + 4 espacements
+                const totalWidthNeeded = string1Width + (4 * standardWidth) + (4 * rectSpacing)
+                const totalHeightNeeded = 2 * rectHeight + 1 * rectSpacing
+                
+                // ÉCHELLE 1:1 - Pas de réduction artificielle
+                // Les modules sont affichés à leur taille réelle (1.7m × 1.0m chacun)
+                const widthScale = (roofWidthMeters * 0.95) / totalWidthNeeded
+                const heightScale = (roofHeightMeters * 0.95) / totalHeightNeeded
+                const scaleFactor = Math.min(widthScale, heightScale, 1.0)  // Utiliser échelle réelle si possible
+                
+                console.log(\`🔬 Scale factor: \${scaleFactor.toFixed(3)} (total needed: \${totalWidthNeeded.toFixed(1)}m × \${totalHeightNeeded.toFixed(1)}m)\`)
+                
+                // Positionner les rectangles en grille 5×2 avec mise à l'échelle
+                let currentX = 0  // Offset horizontal en mètres
+                let currentY = 0  // Offset vertical en mètres
+                let rectIndex = 0
+                
+                console.log("🎯 Création des 10 rectangles...")
+                
+                stringConfigs.forEach((config, idx) => {
+                    const existingModules = allModulesByZone[config.zoneId] || []
+                    
+                    if (existingModules.length === 0) {
+                        console.warn(\`⚠️ Aucun module pour zone \${config.zoneId}\`)
+                        return
+                    }
+                    
+                    // Calculer dimensions du rectangle AVEC mise à l'échelle
+                    const rectWidthMeters = (config.cols * moduleWidth + (config.cols - 1) * spacing) * scaleFactor
+                    const rectHeightMeters = (config.rows * moduleHeight + (config.rows - 1) * spacing) * scaleFactor
+                    
+                    // Convertir dimensions en degrés GPS (méthode directe)
+                    const rectWidthDegrees = rectWidthMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                    const rectHeightDegrees = rectHeightMeters / 110574
+                    
+                    // Position depuis le coin NORD-OUEST (haut-gauche) de la toiture avec marge
+                    const marginMeters = roofWidthMeters * 0.075  // Marge 7.5% du bord
+                    const marginLatDegrees = marginMeters / 110574
+                    const marginLngDegrees = marginMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                    
+                    // Point de départ (coin NW avec marge)
+                    const startLat = roofNorth - marginLatDegrees
+                    const startLng = roofWest + marginLngDegrees
+                    
+                    // Convertir offsets en degrés (currentX/Y sont déjà en mètres avec scaleFactor appliqué)
+                    const offsetLatDegrees = currentY / 110574
+                    const offsetLngDegrees = currentX / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                    
+                    // Calculer position finale du rectangle (en degrés GPS)
+                    const topLeft = L.latLng(
+                        startLat - offsetLatDegrees,
+                        startLng + offsetLngDegrees
+                    )
+                    const bottomRight = L.latLng(
+                        startLat - offsetLatDegrees - rectHeightDegrees,
+                        startLng + offsetLngDegrees + rectWidthDegrees
+                    )
+                    const bounds = [topLeft, bottomRight]
+                    
+                    // Créer rectangle
+                    const rectId = moduleRectangles.length + 1
+                    const rect = new RectangleModuleGroup(rectId, config.rows, config.cols, config.stringNum, bounds)
+                    rect.addToMap()
+                    moduleRectangles.push(rect)
+                    
+                    console.log(\`✅ Rectangle \${rectId} créé: String \${config.stringNum} (\${config.rows}×\${config.cols}) - Position: X=\${currentX.toFixed(1)}m Y=\${currentY.toFixed(1)}m\`)
+                    
+                    // Mapper statuts EL
+                    rect.modules.forEach(newModule => {
+                        const existingModule = existingModules.find(m => 
+                            m.string_number === newModule.string_number && 
+                            m.position_in_string === newModule.position_in_string
+                        )
+                        
+                        if (existingModule) {
+                            newModule.module_status = existingModule.module_status || 'pending'
+                            newModule.el_defect_type = existingModule.el_defect_type
+                            newModule.el_severity_level = existingModule.el_severity_level
+                            newModule.el_notes = existingModule.el_notes
+                            newModule.status_comment = existingModule.status_comment
+                        }
+                    })
+                    
+                    // Calculer position suivante (grille 5×2) avec mise à l'échelle
+                    rectIndex++
+                    if (rectIndex % rectsPerRow === 0) {
+                        // Passer à la rangée suivante
+                        currentX = 0
+                        currentY += rectHeightMeters + (rectSpacing * scaleFactor)
+                    } else {
+                        // Avancer horizontalement (utiliser la largeur RÉELLE du rectangle actuel)
+                        currentX += rectWidthMeters + (rectSpacing * scaleFactor)
+                    }
+                })
+                
+                updateRectanglesList()
+                applyRectanglesToModules()
+                
+                // Compter statuts mappés
+                const totalMappedCount = moduleRectangles.reduce((sum, rect) => {
+                    return sum + rect.modules.filter(m => m.module_status !== 'pending').length
+                }, 0)
+                
+                const totalGeneratedModules = moduleRectangles.reduce((sum, rect) => sum + rect.modules.length, 0)
+                
+                alert(
+                    "✅ IMPORT GLOBAL JALIBAT TERMINÉ" + String.fromCharCode(10,10) +
+                    "📦 10 rectangles créés:" + String.fromCharCode(10) +
+                    "   • String 1: 2×13 = 26 modules" + String.fromCharCode(10) +
+                    "   • Strings 2-10: 2×12 = 24 modules chacun" + String.fromCharCode(10,10) +
+                    "📊 Total modules importés: " + totalModulesCount + String.fromCharCode(10) +
+                    "📊 Total modules générés: " + totalGeneratedModules + String.fromCharCode(10) +
+                    "✅ Statuts EL mappés: " + totalMappedCount + "/" + totalGeneratedModules + String.fromCharCode(10,10) +
+                    "💡 Ajustez positions/rotations avec clic long + glisser"
+                )
+                
+            } catch (error) {
+                console.error("❌ Erreur import:", error)
+                alert("❌ ERREUR IMPORT" + String.fromCharCode(10,10) + error.message)
+            }
+        }
+        
+        function rotateRectangle(id, angleDelta) {
+            const rect = moduleRectangles.find(r => r.id === id)
+            if (!rect) return
+            
+            if (rect.rectangle.transform) {
+                const currentAngle = rect.rectangle.transform.getRotation() || 0
+                const newAngle = currentAngle + angleDelta
+                rect.rectangle.transform.rotate(newAngle)
+                rect.regenerateModules()
+                applyRectanglesToModules()
+                console.log("🔄 Rectangle", id, "rotation:", newAngle + "°")
+            } else {
+                alert("⚠️ Rotation non disponible - Leaflet Transform non chargé")
+            }
+        }
+        
         function deleteRectangle(id) {
             const index = moduleRectangles.findIndex(r => r.id === id)
             if (index === -1) return
             
-            if (!confirm('Supprimer ce rectangle et ses ' + (moduleRectangles[index].rows * moduleRectangles[index].cols) + ' modules ?')) {
+            if (!confirm( "Supprimer ce rectangle et ses " + (moduleRectangles[index].rows * moduleRectangles[index].cols) + " modules ?")) {
                 return
             }
             
@@ -5405,7 +6006,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateRectanglesList()
             applyRectanglesToModules()
             
-            alert('✅ Rectangle dupliqué' + String.fromCharCode(10) + 'String départ: ' + newStringStart)
+            alert("✅ Rectangle dupliqué" + String.fromCharCode(10) + "String départ: " + newStringStart)
         }
         
         function updateRectanglesList() {
@@ -5425,7 +6026,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const powerKwc = (totalModules * 0.45).toFixed(1)
                 const stringEnd = rect.stringStart + Math.floor((totalModules - 1) / 24)
                 
-                html += '<div class="p-2 bg-black rounded border border-orange-600">' +
+                html += ('<div class="p-2 bg-black rounded border border-orange-600">' +
                     '<div class="flex justify-between items-center mb-1">' +
                     '<span class="font-bold text-orange-400">Rectangle ' + rect.id + '</span>' +
                     '<div class="flex gap-1">' +
@@ -5441,7 +6042,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     rect.rows + ' × ' + rect.cols + ' = ' + totalModules + ' modules<br>' +
                     'Strings ' + rect.stringStart + '-' + stringEnd + ' | ' + powerKwc + ' kWc' +
                     '</div>' +
-                    '</div>'
+                    '</div>')
             })
             
             container.innerHTML = html
@@ -5482,7 +6083,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // RENDU MODULES
         // ================================================================
         function renderModules() {
-            console.log('🎨 renderModules: Nombre de modules à afficher:', modules.length)
+            console.log("🎨 renderModules: Nombre de modules à afficher:", modules.length)
             
             drawnItems.eachLayer(layer => {
                 if (layer.options.className && layer.options.className.startsWith('module-')) {
@@ -5497,7 +6098,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     return
                 }
                 
-                console.log('🎨 Render module ' + (index + 1) + ':', module.module_identifier, 'at', module.latitude, module.longitude)
+                console.log( "🎨 Render module " + (index + 1) + ":", module.module_identifier, "at", module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
                 // *** NOUVEAU : Utiliser moduleBounds si disponible (depuis rectangles), sinon calculer ***
@@ -5521,12 +6122,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     weight: 2,
                     fillColor: color,
                     fillOpacity: 0.7,
-                    className: 'module-' + module.module_status,
+                    className: "module-" + module.module_status,
                     interactive: true  // Capturer explicitement les clics
                 })
                 
                 // Ajouter label texte au centre du module (format: S1-P15)
-                const labelText = 'S' + module.string_number + '-P' + (module.position_in_string < 10 ? '0' : '') + module.position_in_string
+                const labelText = 'S' + module.string_number + "-P" + (module.position_in_string < 10 ? '0' : '') + module.position_in_string
                 
                 // Seulement afficher labels si showRectLabels est true (pour rectangles) ou si pas dans rectangle
                 const shouldShowLabel = !module.rectangleId || showRectLabels
@@ -5545,8 +6146,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 rect.bindPopup(
-                    '<strong>' + module.module_identifier + '</strong><br>' +
-                    'String ' + module.string_number + ' | Pos ' + module.position_in_string + '<br>' +
+                    '<strong>' + module.module_identifier + "</strong><br>" +
+                    'String ' + module.string_number + " | Pos " + module.position_in_string + "<br>" +
                     'Statut: ' + module.module_status
                 )
                 
@@ -5591,14 +6192,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const totalConfigured = stringsConfig.reduce((sum, s) => sum + s.modulesCount, 0)
                     
                     if (modules.length !== totalConfigured) {
-                        const warningMsg = String.fromCharCode(0x26A0) + ' INCOHERENCE DETECTEE' + String.fromCharCode(10,10) + 
-                            'Configures: ' + totalConfigured + ' modules' + String.fromCharCode(10) + 
-                            'Places: ' + modules.length + ' modules' + String.fromCharCode(10,10) + 
-                            'Sauvegarder quand meme? (NON recommande)'
+                        const warningMsg = String.fromCharCode(0x26A0) + " INCOHERENCE DETECTEE" + String.fromCharCode(10,10) + 
+                            "Configures: " + totalConfigured + " modules" + String.fromCharCode(10) + 
+                            "Places: " + modules.length + " modules" + String.fromCharCode(10,10) + 
+                            "Sauvegarder quand meme? (NON recommande)"
                         
                         const proceed = confirm(warningMsg)
                         if (!proceed) {
-                            alert('Sauvegarde annulee. Ajustez vos modules ou config strings.')
+                            alert("Sauvegarde annulee. Ajustez vos modules ou config strings.")
                             return
                         }
                     }
@@ -5606,13 +6207,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Sauvegarder modules
                 await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
-                    method: 'DELETE'
+                    method: "DELETE"
                 })
                 
                 if (modules.length > 0) {
                     const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: "POST",
+                        headers: { 'Content-Type': "application/json" },
                         body: JSON.stringify({ modules })
                     })
                     
@@ -5629,12 +6230,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Sauvegarder toiture
                 if (roofPolygon) await saveRoofPolygon()
                 
-                const saveMsg = 'OK: Sauvegarde complete reussie!' + String.fromCharCode(10) + modules.length + ' modules | Surface: ' + roofArea.toFixed(2) + ' m2'
+                const saveMsg = 'OK: Sauvegarde complete reussie!' + String.fromCharCode(10) + modules.length + " modules | Surface: " + roofArea.toFixed(2) + " m2"
                 alert(saveMsg)
                 
                 await loadModules()
             } catch (error) {
-                alert('ERREUR: Sauvegarde - ' + error.message)
+                alert("ERREUR: Sauvegarde - " + error.message)
             }
         }
         
@@ -5647,13 +6248,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Calculs statistiques
             const total = modules.length
-            const ok = modules.filter(m => m.module_status === 'ok').length
-            const inequality = modules.filter(m => m.module_status === 'inequality').length
-            const microcracks = modules.filter(m => m.module_status === 'microcracks').length
-            const dead = modules.filter(m => m.module_status === 'dead').length
-            const stringOpen = modules.filter(m => m.module_status === 'string_open').length
-            const notConnected = modules.filter(m => m.module_status === 'not_connected').length
-            const pending = modules.filter(m => m.module_status === 'pending').length
+            const ok = modules.filter(m => m.module_status === "ok").length
+            const inequality = modules.filter(m => m.module_status === "inequality").length
+            const microcracks = modules.filter(m => m.module_status === "microcracks").length
+            const dead = modules.filter(m => m.module_status === "dead").length
+            const stringOpen = modules.filter(m => m.module_status === "string_open").length
+            const notConnected = modules.filter(m => m.module_status === "not_connected").length
+            const pending = modules.filter(m => m.module_status === "pending").length
             const defects = total - ok - pending
             
             const stringCount = parseInt(document.getElementById('stringCount').value) || 0
@@ -5673,10 +6274,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.setTextColor(255, 255, 255)
             doc.setFontSize(24)
             doc.setFont('helvetica', 'bold')
-            doc.text('DIAGPV', 105, 25, { align: 'center' })
+            doc.text('DIAGPV', 105, 25, { align: "center" })
             
             doc.setFontSize(18)
-            doc.text('RAPPORT D' + String.fromCharCode(39) + 'AUDIT PHOTOVOLTAÏQUE', 105, 40, { align: 'center' })
+            doc.text( "RAPPORT D" + String.fromCharCode(39) + "AUDIT PHOTOVOLTAÏQUE", 105, 40, { align: "center" })
             
             doc.setTextColor(0, 0, 0)
             doc.setFontSize(14)
@@ -5695,7 +6296,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.text(zoneData.zone_name || 'Zone 1', 60, 106)
             
             doc.text('Puissance:', 20, 114)
-            doc.text(powerKwc + ' kWc', 60, 114)
+            doc.text(powerKwc + " kWc", 60, 114)
             
             doc.setFontSize(14)
             doc.setFont('helvetica', 'bold')
@@ -5710,20 +6311,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.text('DiagPV - Audit Professionnel', 60, 148)
             
             doc.text('Référence:', 20, 156)
-            doc.text('DIAGPV-2025-' + Date.now().toString().slice(-6), 60, 156)
+            doc.text( "DIAGPV-2025-" + Date.now().toString().slice(-6), 60, 156)
             
             doc.setFillColor(220, 38, 38)
             doc.roundedRect(20, 170, 170, 15, 3, 3, 'F')
             doc.setTextColor(255, 255, 255)
             doc.setFontSize(12)
             doc.setFont('helvetica', 'bold')
-            doc.text('CONFIDENTIEL - USAGE INTERNE UNIQUEMENT', 105, 179, { align: 'center' })
+            doc.text('CONFIDENTIEL - USAGE INTERNE UNIQUEMENT', 105, 179, { align: "center" })
             
             doc.setTextColor(150, 150, 150)
             doc.setFontSize(9)
             doc.setFont('helvetica', 'normal')
-            doc.text('DiagPV - Expert Audit Photovoltaïque', 105, 280, { align: 'center' })
-            doc.text('www.diagnostic-photovoltaique.fr', 105, 285, { align: 'center' })
+            doc.text('DiagPV - Expert Audit Photovoltaïque', 105, 280, { align: "center" })
+            doc.text('www.diagnostic-photovoltaique.fr', 105, 285, { align: "center" })
             
             // ========================================
             // PAGE 2: SYNTHÈSE EXÉCUTIVE
@@ -5749,12 +6350,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             doc.text('Modules OK:', 25, 45)
             doc.setFont('helvetica', 'bold')
-            doc.text(ok + '/' + total + '  (' + okPercent + String.fromCharCode(37) + ')', 80, 45)
+            doc.text(ok + "/" + total + "  (" + okPercent + String.fromCharCode(37) + ")", 80, 45)
             
             doc.setFont('helvetica', 'normal')
             doc.text('Modules défectueux:', 25, 53)
             doc.setFont('helvetica', 'bold')
-            doc.text(defects + '/' + total + '  (' + defectsPercent + String.fromCharCode(37) + ')', 80, 53)
+            doc.text(defects + "/" + total + "  (" + defectsPercent + String.fromCharCode(37) + ")", 80, 53)
             
             // Répartition défauts
             doc.setFontSize(12)
@@ -5769,7 +6370,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.circle(25, 79, 2, 'F')
                 doc.text('Modules HS:', 30, 80)
                 doc.setFont('helvetica', 'bold')
-                doc.text(dead + '  (' + ((dead/total)*100).toFixed(1) + String.fromCharCode(37) + ')  CRITIQUE', 70, 80)
+                doc.text(dead + "  (" + ((dead/total)*100).toFixed(1) + String.fromCharCode(37) + ")  CRITIQUE", 70, 80)
             }
             
             if (stringOpen > 0) {
@@ -5778,7 +6379,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.setFont('helvetica', 'normal')
                 doc.text('String ouvert:', 30, 88)
                 doc.setFont('helvetica', 'bold')
-                doc.text(stringOpen + '  (' + ((stringOpen/total)*100).toFixed(1) + String.fromCharCode(37) + ')  MAJEUR', 70, 88)
+                doc.text(stringOpen + "  (" + ((stringOpen/total)*100).toFixed(1) + String.fromCharCode(37) + ")  MAJEUR", 70, 88)
             }
             
             if (microcracks > 0) {
@@ -5787,7 +6388,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.setFont('helvetica', 'normal')
                 doc.text('Microfissures:', 30, 96)
                 doc.setFont('helvetica', 'bold')
-                doc.text(microcracks + '  (' + ((microcracks/total)*100).toFixed(1) + String.fromCharCode(37) + ')  MINEUR', 70, 96)
+                doc.text(microcracks + "  (" + ((microcracks/total)*100).toFixed(1) + String.fromCharCode(37) + ")  MINEUR", 70, 96)
             }
             
             if (inequality > 0) {
@@ -5796,7 +6397,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.setFont('helvetica', 'normal')
                 doc.text('Inégalités:', 30, 104)
                 doc.setFont('helvetica', 'bold')
-                doc.text(inequality + '  (' + ((inequality/total)*100).toFixed(1) + String.fromCharCode(37) + ')  SURVEILLANCE', 70, 104)
+                doc.text(inequality + "  (" + ((inequality/total)*100).toFixed(1) + String.fromCharCode(37) + ")  SURVEILLANCE", 70, 104)
             }
             
             // Impact financier
@@ -5808,12 +6409,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.setFont('helvetica', 'normal')
             doc.text('Perte production:', 25, 130)
             doc.setFont('helvetica', 'bold')
-            doc.text(lossKwh + ' kWh/an', 80, 130)
+            doc.text(lossKwh + " kWh/an", 80, 130)
             
             doc.setFont('helvetica', 'normal')
             doc.text('Perte financière:', 25, 138)
             doc.setFont('helvetica', 'bold')
-            doc.text(lossEur + ' EUR/an (0.18 EUR/kWh)', 80, 138)
+            doc.text(lossEur + " EUR/an (0.18 EUR/kWh)", 80, 138)
             
             // État strings
             doc.setFontSize(12)
@@ -5828,19 +6429,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             stringNumbers.forEach(stringNum => {
                 const stringModules = modules.filter(m => m.string_number === stringNum)
-                const stringOk = stringModules.filter(m => m.module_status === 'ok').length
+                const stringOk = stringModules.filter(m => m.module_status === "ok").length
                 const stringTotal = stringModules.length
-                const stringDefects = stringModules.filter(m => m.module_status !== 'ok' && m.module_status !== 'pending')
+                const stringDefects = stringModules.filter(m => m.module_status !== "ok" && m.module_status !== "pending")
                 
-                doc.text('String ' + stringNum + ':', 25, yString)
-                doc.text(stringOk + '/' + stringTotal + ' OK', 50, yString)
+                doc.text( "String " + stringNum + ":", 25, yString)
+                doc.text(stringOk + "/" + stringTotal + " OK", 50, yString)
                 
                 if (stringDefects.length > 0) {
                     const defectList = stringDefects.map(m => m.module_identifier).slice(0, 3).join(', ')
                     doc.setFont('helvetica', 'bold')
-                    doc.text(stringDefects.length + ' défaut' + (stringDefects.length > 1 ? 's' : ''), 80, yString)
+                    doc.text(stringDefects.length + " défaut" + (stringDefects.length > 1 ? 's' : ''), 80, yString)
                     doc.setFont('helvetica', 'normal')
-                    doc.text('(' + defectList + (stringDefects.length > 3 ? '...' : '') + ')', 105, yString)
+                    doc.text( "(" + defectList + (stringDefects.length > 3 ? '...' : '') + ")", 105, yString)
                 }
                 
                 yString += 6
@@ -5852,16 +6453,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             doc.setTextColor(255, 255, 255)
             doc.setFontSize(11)
             doc.setFont('helvetica', 'bold')
-            doc.text('PRIORITÉ INTERVENTION: ' + (dead > 0 ? 'P1 - URGENT' : defects > 0 ? 'P2 - COURT TERME' : 'P3 - SURVEILLANCE'), 105, yString + 13, { align: 'center' })
+            doc.text( "PRIORITÉ INTERVENTION: " + (dead > 0 ? 'P1 - URGENT' : defects > 0 ? 'P2 - COURT TERME' : "P3 - SURVEILLANCE"), 105, yString + 13, { align: "center" })
             
             doc.setFontSize(9)
             doc.setFont('helvetica', 'normal')
             if (dead > 0) {
-                doc.text('→ Remplacer ' + dead + ' module' + (dead > 1 ? 's' : '') + ' HS immédiatement', 105, yString + 20, { align: 'center' })
+                doc.text( "→ Remplacer " + dead + " module" + (dead > 1 ? 's' : '') + " HS immédiatement", 105, yString + 20, { align: "center" })
             } else if (stringOpen > 0) {
-                doc.text('→ Vérifier connexions électriques (' + stringOpen + ' string' + (stringOpen > 1 ? 's' : '') + ' ouvert' + (stringOpen > 1 ? 's' : '') + ')', 105, yString + 20, { align: 'center' })
+                doc.text( "→ Vérifier connexions électriques (" + stringOpen + " string" + (stringOpen > 1 ? 's' : '') + " ouvert" + (stringOpen > 1 ? 's' : '') + ")", 105, yString + 20, { align: "center" })
             } else if (defects > 0) {
-                doc.text('→ Surveillance et maintenance préventive', 105, yString + 20, { align: 'center' })
+                doc.text('→ Surveillance et maintenance préventive', 105, yString + 20, { align: "center" })
             }
             
             // ========================================
@@ -5869,21 +6470,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // ========================================
             stringNumbers.forEach(stringNum => {
                 const stringModules = modules.filter(m => m.string_number === stringNum)
-                const stringDefects = stringModules.filter(m => m.module_status !== 'ok' && m.module_status !== 'pending')
+                const stringDefects = stringModules.filter(m => m.module_status !== "ok" && m.module_status !== "pending")
                 
                 if (stringDefects.length > 0) {
                     doc.addPage()
                     doc.setTextColor(0, 0, 0)
                     doc.setFontSize(14)
                     doc.setFont('helvetica', 'bold')
-                    doc.text('STRING ' + stringNum + ' - ' + stringModules.length + ' MODULES', 20, 20)
+                    doc.text( "STRING " + stringNum + " - " + stringModules.length + " MODULES", 20, 20)
                     
                     doc.setLineWidth(0.5)
                     doc.line(20, 23, 190, 23)
                     
                     doc.setFontSize(11)
-                    doc.text('État: ' + (stringModules.length - stringDefects.length) + '/' + stringModules.length + ' OK (' + (((stringModules.length - stringDefects.length) / stringModules.length) * 100).toFixed(1) + String.fromCharCode(37) + ')', 20, 32)
-                    doc.text('Défauts: ' + stringDefects.length, 20, 40)
+                    doc.text( "État: " + (stringModules.length - stringDefects.length) + "/" + stringModules.length + " OK (" + (((stringModules.length - stringDefects.length) / stringModules.length) * 100).toFixed(1) + String.fromCharCode(37) + ")", 20, 32)
+                    doc.text( "Défauts: " + stringDefects.length, 20, 40)
                     
                     let yDefect = 50
                     stringDefects.forEach(defect => {
@@ -5893,11 +6494,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         }
                         
                         const statusLabels = {
-                            dead: 'MODULE HS (CRITIQUE)',
-                            string_open: 'STRING OUVERT (MAJEUR)',
-                            microcracks: 'MICROFISSURES (MINEUR)',
-                            inequality: 'INÉGALITÉ (SURVEILLANCE)',
-                            not_connected: 'NON CONNECTÉ'
+                            dead: "MODULE HS (CRITIQUE)",
+                            string_open: "STRING OUVERT (MAJEUR)",
+                            microcracks: "MICROFISSURES (MINEUR)",
+                            inequality: "INÉGALITÉ (SURVEILLANCE)",
+                            not_connected: "NON CONNECTÉ"
                         }
                         
                         const statusColors = {
@@ -5913,18 +6514,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         
                         doc.setFontSize(10)
                         doc.setFont('helvetica', 'bold')
-                        doc.text(defect.module_identifier + ' - ' + statusLabels[defect.module_status], 27, yDefect + 1)
+                        doc.text(defect.module_identifier + " - " + statusLabels[defect.module_status], 27, yDefect + 1)
                         
                         doc.setFontSize(9)
                         doc.setFont('helvetica', 'normal')
                         yDefect += 7
-                        doc.text('Position: String ' + defect.string_number + ', Position ' + defect.position_in_string, 27, yDefect)
+                        doc.text( "Position: String " + defect.string_number + ", Position " + defect.position_in_string, 27, yDefect)
                         yDefect += 5
-                        doc.text('GPS: ' + defect.latitude.toFixed(7) + '°N, ' + defect.longitude.toFixed(7) + '°E', 27, yDefect)
+                        doc.text( "GPS: " + defect.latitude.toFixed(7) + "°N, " + defect.longitude.toFixed(7) + "°E", 27, yDefect)
                         
                         if (defect.status_comment) {
                             yDefect += 5
-                            doc.text('Commentaire: ' + defect.status_comment, 27, yDefect)
+                            doc.text( "Commentaire: " + defect.status_comment, 27, yDefect)
                         }
                         
                         yDefect += 10
@@ -5955,7 +6556,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 const statusEmoji = {ok:'OK',inequality:'INEG',microcracks:'MICRO',dead:'HS',string_open:'OPEN',not_connected:'NC',pending:'PEND'}[m.module_status]
-                doc.text(m.module_identifier + ' | S' + m.string_number + 'P' + m.position_in_string + ' | ' + statusEmoji, 20, yList)
+                doc.text(m.module_identifier + " | S" + m.string_number + "P" + m.position_in_string + " | " + statusEmoji, 20, yList)
                 yList += 5
             })
             
@@ -5978,7 +6579,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const canvas = await html2canvas(mapElement, {
                     useCORS: true,
                     allowTaint: false,
-                    backgroundColor: '#ffffff',
+                    backgroundColor: "#ffffff",
                     scale: 2 // Haute qualité
                 })
                 
@@ -6028,7 +6629,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.rect(80, yLegend - 3, 5, 5, 'F')
                 doc.text('Non connecté', 90, yLegend)
                 
-                console.log('✅ Plan cartographique ajouté au PDF')
+                console.log("✅ Plan cartographique ajouté au PDF")
             } catch (error) {
                 console.error('❌ Erreur capture carte:', error)
                 doc.setFontSize(12)
@@ -6043,12 +6644,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 doc.setPage(i)
                 doc.setFontSize(8)
                 doc.setTextColor(128, 128, 128)
-                doc.text('DiagPV - Rapport Audit PV - ' + (plantData.plant_name || 'Centrale'), 20, 287)
-                doc.text('Page ' + i + '/' + pageCount, 180, 287)
-                doc.text('Confidentiel - ' + new Date().toLocaleDateString('fr-FR'), 105, 287, { align: 'center' })
+                doc.text( "DiagPV - Rapport Audit PV - " + (plantData.plant_name || 'Centrale'), 20, 287)
+                doc.text( "Page " + i + "/" + pageCount, 180, 287)
+                doc.text( "Confidentiel - " + new Date().toLocaleDateString('fr-FR'), 105, 287, { align: "center" })
             }
             
-            doc.save('DiagPV_' + (zoneData.zone_name || 'Zone') + '_' + Date.now() + '.pdf')
+            doc.save( "DiagPV_" + (zoneData.zone_name || 'Zone') + "_" + Date.now() + ".pdf")
         }
         
         // ================================================================
@@ -6056,13 +6657,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function updateStats() {
             const total = modules.length
-            const ok = modules.filter(m => m.module_status === 'ok').length
-            const inequality = modules.filter(m => m.module_status === 'inequality').length
-            const microcracks = modules.filter(m => m.module_status === 'microcracks').length
-            const dead = modules.filter(m => m.module_status === 'dead').length
-            const stringOpen = modules.filter(m => m.module_status === 'string_open').length
-            const notConnected = modules.filter(m => m.module_status === 'not_connected').length
-            const pending = modules.filter(m => m.module_status === 'pending').length
+            const ok = modules.filter(m => m.module_status === "ok").length
+            const inequality = modules.filter(m => m.module_status === "inequality").length
+            const microcracks = modules.filter(m => m.module_status === "microcracks").length
+            const dead = modules.filter(m => m.module_status === "dead").length
+            const stringOpen = modules.filter(m => m.module_status === "string_open").length
+            const notConnected = modules.filter(m => m.module_status === "not_connected").length
+            const pending = modules.filter(m => m.module_status === "pending").length
             
             document.getElementById('statsTotal').textContent = total
             document.getElementById('statsTotal2').textContent = total
@@ -6117,7 +6718,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             inverterCountEl.value = estimatedInverters
             junctionBoxCountEl.value = estimatedJunctionBoxes
             
-            console.log('🔄 AUTO-CONFIG depuis modules:', {
+            console.log("🔄 AUTO-CONFIG depuis modules:", {
                 strings: stringNumbers.length,
                 modulesPerString: avgModulesPerString,
                 totalModules: modules.length,
@@ -6132,7 +6733,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         function redistributeStrings() {
             if (modules.length === 0) {
-                alert('⚠️ Aucun module à redistribuer!')
+                alert("⚠️ Aucun module à redistribuer!")
                 return
             }
             
@@ -6142,11 +6743,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const targetModulesPerString = 25
             const calculatedStrings = Math.ceil(totalModules / targetModulesPerString)
             
-            const msg = '🔄 REDISTRIBUTION AUTOMATIQUE' + String.fromCharCode(10,10) +
-                'Total modules: ' + totalModules + String.fromCharCode(10) +
-                'Strings détectés: ' + calculatedStrings + String.fromCharCode(10) +
-                'Modules/string: ~' + Math.round(totalModules / calculatedStrings) + String.fromCharCode(10,10) +
-                'Confirmer redistribution?'
+            const msg = "🔄 REDISTRIBUTION AUTOMATIQUE" + String.fromCharCode(10,10) +
+                "Total modules: " + totalModules + String.fromCharCode(10) +
+                "Strings détectés: " + calculatedStrings + String.fromCharCode(10) +
+                "Modules/string: ~" + Math.round(totalModules / calculatedStrings) + String.fromCharCode(10,10) +
+                "Confirmer redistribution?"
             
             if (!confirm(msg)) return
             
@@ -6196,8 +6797,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             renderModules()
             updateStringsProgress()
             
-            console.log('✅ Redistribution terminée:', stringsConfig)
-            alert('✅ Redistribution réussie!' + String.fromCharCode(10,10) + calculatedStrings + ' strings créés' + String.fromCharCode(10) + 'N' + String.fromCharCode(39) + 'oubliez pas de SAUVEGARDER!')
+            console.log("✅ Redistribution terminée:", stringsConfig)
+            alert("✅ Redistribution réussie!" + String.fromCharCode(10,10) + calculatedStrings + " strings créés" + String.fromCharCode(10) + "N" + String.fromCharCode(39) + "oubliez pas de SAUVEGARDER!")
         }
         
         // ================================================================
@@ -6282,11 +6883,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // EVENT LISTENERS
         // ================================================================
         function setupEventListeners() {
-            // STRUCTURES (Bâtiments/Ombrières/Champs) - NOUVEAU
-            document.getElementById('drawBuildingBtn').addEventListener('click', () => startDrawingStructure('building'))
-            document.getElementById('drawCarportBtn').addEventListener('click', () => startDrawingStructure('carport'))
-            document.getElementById('drawGroundBtn').addEventListener('click', () => startDrawingStructure('ground'))
-            document.getElementById('drawTechnicalBtn').addEventListener('click', () => startDrawingStructure('technical'))
+            // STRUCTURES (Désactivé - fait doublon avec toiture)
+            // document.getElementById('drawBuildingBtn').addEventListener('click', () => startDrawingStructure('building'))
+            // document.getElementById('drawCarportBtn').addEventListener('click', () => startDrawingStructure('carport'))
+            // document.getElementById('drawGroundBtn').addEventListener('click', () => startDrawingStructure('ground'))
+            // document.getElementById('drawTechnicalBtn').addEventListener('click', () => startDrawingStructure('technical'))
             
             document.getElementById('drawRoofBtn').addEventListener('click', enableRoofDrawing)
             document.getElementById('clearRoofBtn').addEventListener('click', clearRoof)
@@ -6300,10 +6901,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Module Placement
             document.getElementById('drawRowBtn').addEventListener('click', drawRowMode)
             document.getElementById('placeManualBtn').addEventListener('click', placeModuleManual)
-            document.getElementById('placeAutoBtn').addEventListener('click', placeModulesAuto)
+            // document.getElementById('placeAutoBtn').addEventListener('click', placeModulesAuto) // Function not defined
             document.getElementById('rotateBtn').addEventListener('click', () => {
                 currentRotation = (currentRotation + 90) % 360
-                document.getElementById('rotationLabel').textContent = currentRotation + '°'
+                document.getElementById('rotationLabel').textContent = currentRotation + "°"
             })
             document.getElementById('validateCalepinageBtn').addEventListener('click', cleanInvalidModules)
             document.getElementById('clearModulesBtn').addEventListener('click', clearModules)
@@ -6313,6 +6914,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Rectangle Modules (SolarEdge style)
             document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
+            document.getElementById('importModulesBtn').addEventListener('click', importExistingModules)
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
@@ -6335,13 +6937,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // ================================================================
         // Synchronise les statuts modules depuis l'API EL vers Canvas V2
         async function syncModulesFromEL() {
+            const statusEl = document.getElementById('syncStatusText')
+            const lastTimeEl = document.getElementById('syncLastTime')
+            
             try {
+                // Mettre à jour UI
+                if (statusEl) statusEl.textContent = '🔄 Synchronisation...'
+                if (statusEl) statusEl.className = 'font-bold text-cyan-400'
+                
                 const response = await fetch(\`/api/el/zone/\${zoneId}/modules\`)
                 const data = await response.json()
                 
                 if (!data.success || !data.modules) {
                     console.warn('⚠️ Aucune donnée EL disponible')
-                    return
+                    if (statusEl) statusEl.textContent = '⚠️ Aucune donnée EL'
+                    if (statusEl) statusEl.className = 'font-bold text-yellow-400'
+                    return 0
                 }
                 
                 let syncCount = 0
@@ -6364,24 +6975,83 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log(\`✅ Synchronisation EL: \${syncCount}/\${modules.length} modules mis à jour\`)
                 
                 // Rafraîchir affichage visuel
+                renderModules()  // Re-render avec nouvelles couleurs
                 moduleRectangles.forEach(rect => rect.refreshModuleColors())
                 updateStats()
+                
+                // Mettre à jour UI
+                if (statusEl) statusEl.textContent = \`✅ Sync OK (\${syncCount})\`
+                if (statusEl) statusEl.className = 'font-bold text-green-400'
+                if (lastTimeEl) lastTimeEl.textContent = new Date().toLocaleTimeString('fr-FR')
                 
                 return syncCount
             } catch (error) {
                 console.error('❌ Erreur sync EL:', error)
+                if (statusEl) statusEl.textContent = '❌ Erreur sync'
+                if (statusEl) statusEl.className = 'font-bold text-red-400'
                 return 0
             }
         }
         
         // Auto-sync au chargement de la page (après retour depuis Module EL)
         window.addEventListener('focus', () => {
-            console.log('🔄 Page focus - Synchronisation automatique EL...')
+            console.log("🔄 Page focus - Synchronisation automatique EL...")
             syncModulesFromEL()
         })
         
+        // Polling automatique toutes les 30 secondes (si activé)
+        let autoSyncInterval = null
+        
+        function startAutoSync() {
+            if (autoSyncInterval) clearInterval(autoSyncInterval)
+            
+            autoSyncInterval = setInterval(() => {
+                const autoSyncCheckbox = document.getElementById('autoSyncEnabled')
+                if (autoSyncCheckbox && autoSyncCheckbox.checked) {
+                    console.log("🔄 Auto-sync (30s)...")
+                    syncModulesFromEL()
+                }
+            }, 30000)  // 30 secondes
+            
+            console.log("✅ Auto-sync activé (30s)")
+        }
+        
+        function stopAutoSync() {
+            if (autoSyncInterval) {
+                clearInterval(autoSyncInterval)
+                autoSyncInterval = null
+                console.log("🛑 Auto-sync désactivé")
+            }
+        }
+        
+        // Démarrer auto-sync au chargement
+        startAutoSync()
+        
+        // Event listener checkbox auto-sync
+        const autoSyncCheckbox = document.getElementById('autoSyncEnabled')
+        if (autoSyncCheckbox) {
+            autoSyncCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    startAutoSync()
+                } else {
+                    stopAutoSync()
+                }
+            })
+        }
+        
+        // Event listener bouton sync manuel
+        const syncELBtn = document.getElementById('syncELBtn')
+        if (syncELBtn) {
+            syncELBtn.addEventListener('click', () => {
+                console.log("🔄 Sync manuelle déclenchée")
+                syncModulesFromEL()
+            })
+        }
+        
         // Exposer fonction sync dans console
         window.syncModulesFromEL = syncModulesFromEL
+        window.startAutoSync = startAutoSync
+        window.stopAutoSync = stopAutoSync
         
         // Exposer fonctions debug et rectangles dans console
         window.cleanInvalidModules = cleanInvalidModules
@@ -6389,20 +7059,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         window.duplicateRectangle = duplicateRectangle
         window.deleteStructure = deleteStructure // NOUVEAU: Structures
         window.debugModules = () => {
-            console.log('📊 Modules totaux:', modules.length)
-            console.log('❌ Modules invalides:', modules.filter(m => !m.latitude || !m.longitude).length)
-            console.log('✅ Modules valides:', modules.filter(m => m.latitude && m.longitude).length)
+            console.log("📊 Modules totaux:", modules.length)
+            console.log("❌ Modules invalides:", modules.filter(m => !m.latitude || !m.longitude).length)
+            console.log("✅ Modules valides:", modules.filter(m => m.latitude && m.longitude).length)
         }
         window.debugRectangles = () => {
-            console.log('📦 Rectangles:', moduleRectangles.length)
+            console.log("📦 Rectangles:", moduleRectangles.length)
             moduleRectangles.forEach(r => {
-                console.log('  Rectangle', r.id, ':', r.rows, 'x', r.cols, '=', r.modules.length, 'modules')
+                console.log("  Rectangle", r.id, ":", r.rows, "x", r.cols, "=", r.modules.length, "modules")
             })
         }
         
         // INIT
         init()
-        </script>
+        <\/script>
     </body>
     </html>
   `)
@@ -6471,9 +7141,14 @@ app.get('/pv/plant/:id', async (c) => {
                                 <i class="fas fa-map-marker-alt mr-2"></i>...
                             </p>
                         </div>
-                        <button id="editPlantBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
-                            <i class="fas fa-edit mr-2"></i>MODIFIER
-                        </button>
+                        <div class="flex gap-3">
+                            <button id="createAuditBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold" title="Créer un audit EL depuis cette centrale PV">
+                                <i class="fas fa-plus-circle mr-2"></i>CRÉER AUDIT EL
+                            </button>
+                            <button id="editPlantBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                                <i class="fas fa-edit mr-2"></i>MODIFIER
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Stats Globales -->
@@ -6596,6 +7271,8 @@ app.get('/pv/plant/:id', async (c) => {
         let plantData = null
         let zones = []
 
+        document.addEventListener('DOMContentLoaded', () => {
+        
         async function loadPlantDetail() {
             try {
                 document.getElementById('loading').classList.remove('hidden')
@@ -6628,15 +7305,15 @@ app.get('/pv/plant/:id', async (c) => {
 
         function renderPlantHeader() {
             const typeIcons = {
-                rooftop: 'fa-building',
-                ground: 'fa-mountain',
-                carport: 'fa-car'
+                rooftop: "fa-building",
+                ground: "fa-mountain",
+                carport: "fa-car"
             }
             
             const typeLabels = {
-                rooftop: 'Toiture',
-                ground: 'Sol',
-                carport: 'Ombrière'
+                rooftop: "Toiture",
+                ground: "Sol",
+                carport: "Ombrière"
             }
             
             document.getElementById('plantName').textContent = plantData.plant_name
@@ -6659,6 +7336,22 @@ app.get('/pv/plant/:id', async (c) => {
                 document.getElementById('plantAddress').innerHTML = \`
                     <i class="fas fa-map-marker-alt mr-2"></i>Adresse non renseignée
                 \`
+            }
+            
+            // Gestion bouton Créer Audit EL
+            const createBtn = document.getElementById('createAuditBtn')
+            if (createBtn) {
+                const totalModules = zones.reduce((sum, z) => sum + (parseInt(z.module_count) || 0), 0)
+                
+                if (totalModules === 0) {
+                    createBtn.disabled = true
+                    createBtn.classList.add('opacity-50', 'cursor-not-allowed')
+                    createBtn.title = "Aucun module dans cette centrale. Créez des zones et positionnez des modules d" + String.fromCharCode(39) + "abord."
+                } else {
+                    createBtn.disabled = false
+                    createBtn.classList.remove('opacity-50', 'cursor-not-allowed')
+                    createBtn.title = \`Créer un audit EL depuis cette centrale (\${totalModules} modules)\`
+                }
             }
         }
 
@@ -6687,15 +7380,15 @@ app.get('/pv/plant/:id', async (c) => {
             emptyState.classList.add('hidden')
             
             const typeIcons = {
-                roof: 'fa-building',
-                ground: 'fa-mountain',
-                carport: 'fa-car'
+                roof: "fa-building",
+                ground: "fa-mountain",
+                carport: "fa-car"
             }
             
             const typeLabels = {
-                roof: 'Toiture',
-                ground: 'Sol',
-                carport: 'Ombrière'
+                roof: "Toiture",
+                ground: "Sol",
+                carport: "Ombrière"
             }
             
             container.innerHTML = zones.map(zone => \`
@@ -6733,7 +7426,7 @@ app.get('/pv/plant/:id', async (c) => {
                         </div>
                         <div>
                             <div class="text-sm text-gray-500">Surface</div>
-                            <div class="text-lg font-bold text-blue-400">\${zone.area_sqm ? zone.area_sqm.toFixed(0) + ' m²' : '-'}</div>
+                            <div class="text-lg font-bold text-blue-400">\${zone.area_sqm ? zone.area_sqm.toFixed(0) + ' m²' : "-"}</div>
                         </div>
                     </div>
                     
@@ -6780,7 +7473,7 @@ app.get('/pv/plant/:id', async (c) => {
             
             try {
                 const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}\`, {
-                    method: 'DELETE'
+                    method: "DELETE"
                 })
                 
                 const data = await response.json()
@@ -6793,7 +7486,7 @@ app.get('/pv/plant/:id', async (c) => {
                 loadPlantDetail()
             } catch (error) {
                 console.error('Erreur:', error)
-                alert('Erreur: ' + error.message)
+                alert( "Erreur: " + error.message)
             }
         }
 
@@ -6811,11 +7504,11 @@ app.get('/pv/plant/:id', async (c) => {
                     ? \`/api/pv/plants/\${plantId}/zones/\${zoneId}\`
                     : \`/api/pv/plants/\${plantId}/zones\`
                 
-                const method = isEdit ? 'PUT' : 'POST'
+                const method = isEdit ? 'PUT' : "POST"
                 
                 const response = await fetch(url, {
                     method,
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify(formData)
                 })
                 
@@ -6825,12 +7518,12 @@ app.get('/pv/plant/:id', async (c) => {
                     throw new Error(data.error || 'Erreur enregistrement zone')
                 }
                 
-                alert(isEdit ? 'Zone modifiée avec succès' : 'Zone créée avec succès')
+                alert(isEdit ? 'Zone modifiée avec succès' : "Zone créée avec succès")
                 hideZoneModal()
                 loadPlantDetail()
             } catch (error) {
                 console.error('Erreur:', error)
-                alert('Erreur: ' + error.message)
+                alert( "Erreur: " + error.message)
             }
         }
 
@@ -6841,6 +7534,48 @@ app.get('/pv/plant/:id', async (c) => {
         // Event Listeners
         document.getElementById('addZoneBtn').addEventListener('click', showAddZoneModal)
         document.getElementById('cancelZoneBtn').addEventListener('click', hideZoneModal)
+        
+        // Créer Audit EL depuis centrale PV (Sync Reverse)
+        const createAuditBtnEl = document.getElementById('createAuditBtn')
+        if (createAuditBtnEl) {
+            createAuditBtnEl.addEventListener('click', async () => {
+                if (!confirm(\`Créer un nouvel audit EL à partir de cette centrale PV ?\n\nToutes les zones et modules seront importés automatiquement.\`)) {
+                    return
+                }
+                
+                const btn = document.getElementById('createAuditBtn')
+                const originalText = btn.innerHTML
+                btn.disabled = true
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>CRÉATION...'
+                
+                try {
+                    const response = await fetch('/api/sync-reverse/create-audit-from-plant', {
+                        method: "POST",
+                        headers: { 'Content-Type': "application/json" },
+                        body: JSON.stringify({
+                            plantId: parseInt(plantId),
+                            projectName: plantData.plant_name || 'Audit EL',
+                            clientName: "Client",
+                            location: [plantData.address, plantData.city].filter(Boolean).join(', ') || 'À définir'
+                        })
+                    })
+                    
+                    const data = await response.json()
+                    
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.error || 'Erreur création audit')
+                    }
+                    
+                    alert("✅ Audit EL créé avec succès !" + String.fromCharCode(10,10) + "Token: " + data.auditToken + String.fromCharCode(10) + "Modules importés: " + data.modulesCreated + String.fromCharCode(10) + "Strings: " + data.stringCount + String.fromCharCode(10,10) + "Redirection vers l" + String.fromCharCode(39) + "audit...")
+                    window.location.href = data.auditUrl
+                } catch (error) {
+                    console.error('Erreur:', error)
+                    alert( "❌ Erreur: " + error.message)
+                    btn.disabled = false
+                    btn.innerHTML = originalText
+                }
+            })
+        }
         
         document.getElementById('zoneForm').addEventListener('submit', (e) => {
             e.preventDefault()
@@ -6859,7 +7594,9 @@ app.get('/pv/plant/:id', async (c) => {
 
         // Init
         loadPlantDetail()
-        </script>
+        
+        }) // End DOMContentLoaded
+        <\/script>
     </body>
     </html>
   `)
@@ -6966,7 +7703,7 @@ app.get('/opensolar', (c) => {
             L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
                 maxZoom: 22,
                 subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                attribution: 'Google Satellite'
+                attribution: "Google Satellite"
             }).addTo(map)
 
             let parsedModules = []
@@ -6989,8 +7726,8 @@ app.get('/opensolar', (c) => {
                     const content = await file.text()
                     
                     const response = await fetch('/api/opensolar/parse-dxf', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: "POST",
+                        headers: { 'Content-Type': "application/json" },
                         body: JSON.stringify({ dxfContent: content, zoneId })
                     })
 
@@ -7034,8 +7771,8 @@ app.get('/opensolar', (c) => {
                     data.modules.forEach(m => {
                         const marker = L.circleMarker([m.latitude, m.longitude], {
                             radius: 8,
-                            fillColor: '#f97316',
-                            color: '#fff',
+                            fillColor: "#f97316",
+                            color: "#fff",
                             weight: 2,
                             fillOpacity: 0.8
                         }).bindPopup(\`
@@ -7068,8 +7805,8 @@ app.get('/opensolar', (c) => {
 
                 try {
                     const response = await fetch('/api/opensolar/import-modules', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: "POST",
+                        headers: { 'Content-Type': "application/json" },
                         body: JSON.stringify({ zoneId, modules: parsedModules })
                     })
 
@@ -7085,7 +7822,7 @@ app.get('/opensolar', (c) => {
                     status.innerHTML = \`<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur: \${error.message}</p>\`
                 }
             })
-        </script>
+        <\/script>
     </body>
     </html>
   `)
