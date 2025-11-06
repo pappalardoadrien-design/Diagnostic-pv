@@ -3983,21 +3983,35 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     fillColor: "#3b82f6",
                     fillOpacity: 0.3,
                     className: "module-rectangle",
-                    draggable: false
+                    draggable: true,
+                    transform: true
                 })
                 
-                // Enable transform (resize/rotate)
-                if (this.rectangle.transform) {
+                // Enable transform (resize/rotate) - FORCER l'activation
+                if (typeof L.Path.Transform !== 'undefined') {
                     this.rectangle.transform.enable({
                         rotation: true,
                         scaling: true,
-                        uniformScaling: false
+                        uniformScaling: false,
+                        handlerOptions: {
+                            radius: 8,
+                            fillColor: '#fff',
+                            color: '#3b82f6',
+                            fillOpacity: 1,
+                            maintainAspectRatio: false,
+                            centerScaling: false
+                        }
                     })
                     
                     // Event listeners
-                    this.rectangle.on('transformed', () => this.regenerateModules())
+                    this.rectangle.on('transformed', () => {
+                        this.regenerateModules()
+                        applyRectanglesToModules()
+                    })
+                    
+                    console.log("Transform enabled for rectangle", this.id)
                 } else {
-                    console.warn('ATTENTION Leaflet Transform not loaded - drag to move only')
+                    console.error('ERREUR: Leaflet Path Transform non charge!')
                 }
                 
                 this.rectangle.on('drag', () => this.regenerateModules())
