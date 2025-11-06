@@ -3612,6 +3612,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="importModulesBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold text-sm">
                             <i class="fas fa-download mr-2"></i>IMPORTER TOUT JALIBAT (10 STRINGS)
                         </button>
+                        <button id="import242SingleBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-th mr-2"></i>IMPORTER 242 MODULES (1 ARRAY)
+                        </button>
                         <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
                             <i class="fas fa-info-circle mr-1"></i><strong>Astuce:</strong> Après import, ajustez position/rotation des rectangles pour alignement visuel sur satellite
                         </div>
@@ -6002,6 +6005,131 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
         }
         
+        // NOUVELLE FONCTION: Import 242 modules en 1 seul array rectangulaire
+        async function import242SingleArray() {
+            if (!roofPolygon) {
+                alert("⚠️ Créez d'abord un polygone de toiture (Étape 0)")
+                return
+            }
+            
+            if (!confirm("Importer 242 modules (22 cols × 11 rows) en 1 rectangle ?\n\nCela va créer un array LANDSCAPE unique.")) {
+                return
+            }
+            
+            try {
+                console.log("🚀 Import 242 modules (1 array) démarré...")
+                
+                // Configuration: 1 seul rectangle de 22×11 = 242 modules
+                const rows = 11
+                const cols = 22
+                const totalModules = rows * cols
+                
+                console.log("📐 Configuration: " + cols + " colonnes × " + rows + " rangées = " + totalModules + " modules")
+                
+                // Paramètres globaux
+                const roofBounds = roofPolygon.getBounds()
+                const roofCenter = roofBounds.getCenter()
+                const zoom = map.getZoom()
+                const moduleWidth = 1.7   // LANDSCAPE: largeur
+                const moduleHeight = 1.13  // LANDSCAPE: hauteur
+                const spacing = 0.01       // Espacement entre modules
+                
+                const metersPerPixel = 156543.03392 * Math.cos(roofCenter.lat * Math.PI / 180) / Math.pow(2, zoom)
+                const pixelsPerMeter = 1 / metersPerPixel
+                
+                // Calculer dimensions réelles du polygone de toiture
+                const roofNorth = roofBounds.getNorth()
+                const roofSouth = roofBounds.getSouth()
+                const roofEast = roofBounds.getEast()
+                const roofWest = roofBounds.getWest()
+                
+                const roofWidthDegrees = roofEast - roofWest
+                const roofHeightDegrees = roofNorth - roofSouth
+                const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
+                const roofHeightMeters = roofHeightDegrees * 110574
+                
+                console.log("📏 Toiture: " + roofWidthMeters.toFixed(1) + "m × " + roofHeightMeters.toFixed(1) + "m")
+                
+                // Calculer dimensions nécessaires pour l'array
+                const arrayWidthNeeded = cols * moduleWidth + (cols - 1) * spacing
+                const arrayHeightNeeded = rows * moduleHeight + (rows - 1) * spacing
+                
+                console.log("📏 Array nécessaire: " + arrayWidthNeeded.toFixed(1) + "m × " + arrayHeightNeeded.toFixed(1) + "m")
+                
+                // ÉCHELLE ADAPTATIVE (92% de la toiture)
+                const widthScale = (roofWidthMeters * 0.92) / arrayWidthNeeded
+                const heightScale = (roofHeightMeters * 0.92) / arrayHeightNeeded
+                const scaleFactor = Math.min(widthScale, heightScale, 1.0)
+                
+                console.log("📊 Scale factor: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
+                
+                // Calculer dimensions finales avec scale
+                const rectWidthMeters = arrayWidthNeeded * scaleFactor
+                const rectHeightMeters = arrayHeightNeeded * scaleFactor
+                
+                // Convertir en degrés GPS
+                const rectWidthDegrees = rectWidthMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                const rectHeightDegrees = rectHeightMeters / 110574
+                
+                // Centrer sur la toiture avec marge 4%
+                const marginMeters = roofWidthMeters * 0.04
+                const marginLatDegrees = marginMeters / 110574
+                const marginLngDegrees = marginMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                
+                // Calculer position centree
+                const centerLat = (roofNorth + roofSouth) / 2
+                const centerLng = (roofWest + roofEast) / 2
+                
+                const topLeft = L.latLng(
+                    centerLat + (rectHeightDegrees / 2),
+                    centerLng - (rectWidthDegrees / 2)
+                )
+                const bottomRight = L.latLng(
+                    centerLat - (rectHeightDegrees / 2),
+                    centerLng + (rectWidthDegrees / 2)
+                )
+                const bounds = [topLeft, bottomRight]
+                
+                // Créer le rectangle unique
+                const rectId = moduleRectangles.length + 1
+                const rect = new RectangleModuleGroup(rectId, rows, cols, 1, bounds)
+                rect.addToMap()
+                moduleRectangles.push(rect)
+                
+                console.log("✅ Rectangle créé: " + cols + "×" + rows + " = " + totalModules + " modules")
+                
+                updateRectanglesList()
+                applyRectanglesToModules()
+                
+                // Afficher panneau aide alignement
+                const helpPanel = document.getElementById('alignmentHelp')
+                if (helpPanel) {
+                    helpPanel.classList.remove('hidden')
+                    setTimeout(() => {
+                        helpPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                    }, 500)
+                }
+                
+                alert(
+                    "✅ IMPORT 242 MODULES TERMINÉ" + String.fromCharCode(10,10) +
+                    "📦 1 rectangle créé:" + String.fromCharCode(10) +
+                    "   • " + cols + " colonnes × " + rows + " rangées" + String.fromCharCode(10) +
+                    "   • Orientation LANDSCAPE (1.7m × 1.13m)" + String.fromCharCode(10,10) +
+                    "📊 Total: " + totalModules + " modules" + String.fromCharCode(10) +
+                    "📏 Dimensions: " + rectWidthMeters.toFixed(1) + "m × " + rectHeightMeters.toFixed(1) + "m" + String.fromCharCode(10) +
+                    "📏 Échelle: " + (scaleFactor * 100).toFixed(1) + "%"  + String.fromCharCode(10,10) +
+                    "🎯 PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
+                    "Ajustez visuellement le rectangle pour" + String.fromCharCode(10) +
+                    "correspondre à la photo satellite !" + String.fromCharCode(10,10) +
+                    "→ Voir panneau 'ALIGNEMENT VISUEL' à gauche"
+                )
+                
+            } catch (error) {
+                console.error("❌ Erreur import 242:", error)
+                alert("❌ ERREUR IMPORT 242" + String.fromCharCode(10,10) + error.message)
+            }
+        }
+        
         function rotateRectangle(id, angleDelta) {
             const rect = moduleRectangles.find(r => r.id === id)
             if (!rect) return
@@ -6963,6 +7091,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // Rectangle Modules (SolarEdge style)
             document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
             document.getElementById('importModulesBtn').addEventListener('click', importExistingModules)
+            document.getElementById('import242SingleBtn').addEventListener('click', import242SingleArray)
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
