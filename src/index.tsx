@@ -4090,16 +4090,40 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Clear old modules/grid
                 this.clearVisuals()
                 
-                // Get rectangle bounds
-                const bounds = this.rectangle.getBounds()
-                const nw = bounds.getNorthWest()
-                const ne = bounds.getNorthEast()
-                const sw = bounds.getSouthWest()
-                const se = bounds.getSouthEast()
+                // ================================================================
+                // CORRECTION ROTATION: Utiliser polygon pivoté si existe
+                // ================================================================
+                let nw, ne, sw, se, centerLat, centerLng
+                
+                if (this.rotatedPolygon) {
+                    // Rectangle pivoté → utiliser coordonnées polygon
+                    const coords = this.rotatedPolygon.getLatLngs()[0]
+                    nw = coords[0]  // Nord-Ouest
+                    ne = coords[1]  // Nord-Est
+                    se = coords[2]  // Sud-Est
+                    sw = coords[3]  // Sud-Ouest
+                    
+                    // Calculer centre du polygon
+                    centerLat = (nw.lat + se.lat) / 2
+                    centerLng = (nw.lng + se.lng) / 2
+                    
+                    console.log("✅ Utilisation polygon pivoté pour génération modules")
+                } else {
+                    // Rectangle normal → utiliser bounds classiques
+                    const bounds = this.rectangle.getBounds()
+                    nw = bounds.getNorthWest()
+                    ne = bounds.getNorthEast()
+                    sw = bounds.getSouthWest()
+                    se = bounds.getSouthEast()
+                    
+                    centerLat = bounds.getCenter().lat
+                    centerLng = bounds.getCenter().lng
+                    
+                    console.log("✅ Utilisation rectangle normal pour génération modules")
+                }
                 
                 // Calculer dimensions réelles du module en coordonnées GPS
                 const zoom = map.getZoom()
-                const centerLat = bounds.getCenter().lat
                 
                 // Formule Leaflet: mètres par pixel
                 const metersPerPixel = 156543.03392 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, zoom)
@@ -5022,15 +5046,29 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             })
             
-            // Ajouter vue satellite par défaut
+            // NOUVEAU: Overlay labels (noms de rues) transparent - fonctionne sur satellite
+            const labelsLayer = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner-labels/{z}/{x}/{y}.png', {
+                maxZoom: 20,
+                attribution: 'Map labels by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.',
+                opacity: 0.8
+            })
+            
+            // Ajouter vue satellite par défaut + labels
             satelliteLayer.addTo(map)
+            labelsLayer.addTo(map)  // ✅ Labels activés par défaut
             
             // Contrôle de basculement entre vues
             const baseLayers = {
-                '️ Satellite': satelliteLayer,
-                'CARTE Carte avec rues': streetLayer
+                '🛰️ Satellite': satelliteLayer,
+                '🗺️ Carte avec rues': streetLayer
             }
-            L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map)
+            
+            // Contrôle overlays (labels activables/désactivables)
+            const overlayLayers = {
+                '🏷️ Noms de rues': labelsLayer
+            }
+            
+            L.control.layers(baseLayers, overlayLayers, { position: 'topright' }).addTo(map)
             
             // NOUVEAU: Ajouter calques hiérarchiques (structures sous modules)
             map.addLayer(structuresLayer)  // Calque 1: Structures (fond)
