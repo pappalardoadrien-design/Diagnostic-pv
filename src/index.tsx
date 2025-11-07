@@ -5049,6 +5049,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log("✅ Structures loaded")
                 await loadModules()
                 console.log("✅ Modules loaded")
+                await loadInverters()
+                console.log("✅ Inverters loaded")
                 setupEventListeners()
                 console.log("✅ Event listeners setup")
                 updateStats()
@@ -5087,6 +5089,301 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.error("❌ INIT FAILED:", error)
             }
         }
+        
+        // ================================================================
+        // CONFIGURATION ÉLECTRIQUE - Onduleurs & Strings
+        // ================================================================
+        
+        async function loadInverters() {
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters\`)
+                const data = await response.json()
+                
+                if (data.success) {
+                    inverters = data.inverters || []
+                    renderInvertersList()
+                }
+            } catch (error) {
+                console.error('Erreur chargement onduleurs:', error)
+            }
+        }
+        
+        function renderInvertersList() {
+            const container = document.getElementById('invertersList')
+            
+            if (!container) return
+            
+            if (inverters.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-500 text-center py-2">Aucun onduleur configuré</p>'
+                return
+            }
+            
+            container.innerHTML = inverters.map(inv => 
+                '<div class="bg-black rounded p-2 text-xs border border-yellow-600">' +
+                    '<div class="flex justify-between items-center mb-1">' +
+                        '<span class="font-bold text-yellow-400">' + inv.inverter_name + '</span>' +
+                        '<div class="flex gap-1">' +
+                            '<button onclick="editInverter(' + inv.id + ')" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs">' +
+                                '<i class="fas fa-edit"></i>' +
+                            '</button>' +
+                            '<button onclick="deleteInverter(' + inv.id + ')" class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs">' +
+                                '<i class="fas fa-trash"></i>' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="text-gray-400 space-y-1">' +
+                        '<div>⚡ ' + inv.rated_power_kw + ' kW</div>' +
+                        '<div>📊 ' + (inv.assigned_strings || 0) + ' strings / ' + (inv.module_count || 0) + ' modules</div>' +
+                        '<div class="flex items-center gap-2">' +
+                            '<span>Charge:</span>' +
+                            '<div class="flex-1 bg-gray-700 rounded-full h-2">' +
+                                '<div class="bg-yellow-400 h-2 rounded-full" style="width: ' + (inv.load_percent || 0) + '%"></div>' +
+                            '</div>' +
+                            '<span class="font-bold">' + (inv.load_percent || 0) + '%</span>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
+            ).join('')
+        }
+        
+        function showInverterModal(inverterId = null) {
+            const modal = document.getElementById('inverterModal')
+            const form = document.getElementById('inverterForm')
+            const title = document.getElementById('inverterModalTitle')
+            
+            if (!modal || !form || !title) return
+            
+            // Mode création vs édition
+            if (inverterId) {
+                const inverter = inverters.find(i => i.id === inverterId)
+                if (!inverter) return
+                
+                currentEditingInverter = inverter
+                title.textContent = 'MODIFIER ONDULEUR'
+                
+                // Remplir formulaire
+                document.getElementById('inverterId').value = inverter.id
+                document.getElementById('inverterName').value = inverter.inverter_name
+                document.getElementById('inverterPower').value = inverter.rated_power_kw
+                document.getElementById('inverterBrand').value = inverter.inverter_brand || ''
+                document.getElementById('inverterModel').value = inverter.inverter_model || ''
+                document.getElementById('inverterMppt').value = inverter.mppt_count || 4
+                document.getElementById('inverterEfficiency').value = inverter.efficiency_percent || 98
+                document.getElementById('inverterNotes').value = inverter.notes || ''
+            } else {
+                currentEditingInverter = null
+                title.textContent = 'NOUVEL ONDULEUR'
+                form.reset()
+                document.getElementById('inverterId').value = ''
+            }
+            
+            // Générer checkboxes strings disponibles
+            populateStringCheckboxes(inverterId)
+            
+            modal.classList.remove('hidden')
+        }
+        
+        function hideInverterModal() {
+            const modal = document.getElementById('inverterModal')
+            if (modal) {
+                modal.classList.add('hidden')
+            }
+            currentEditingInverter = null
+        }
+        
+        function populateStringCheckboxes(inverterId) {
+            const container = document.getElementById('stringCheckboxes')
+            
+            if (!container) return
+            
+            // Récupérer strings uniques des modules
+            const uniqueStrings = [...new Set(modules.map(m => m.string_number))]
+                .filter(s => s != null)
+                .sort((a, b) => a - b)
+            
+            if (uniqueStrings.length === 0) {
+                container.innerHTML = '<p class="col-span-4 text-xs text-gray-500 text-center">Aucun string détecté</p>'
+                return
+            }
+            
+            // Si édition, récupérer strings déjà attribués
+            let assignedStrings = []
+            if (inverterId) {
+                const inv = inverters.find(i => i.id === inverterId)
+                // Les strings attribués sont dans les résultats de l'API
+                assignedStrings = inv?.strings?.map(s => s.string_number) || []
+            }
+            
+            container.innerHTML = uniqueStrings.map(strNum => {
+                const checked = assignedStrings.includes(strNum) ? 'checked' : ''
+                return '<label class="flex items-center gap-1 text-xs bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600">' +
+                    '<input type="checkbox" name="strings" value="' + strNum + '" ' + checked + ' class="form-checkbox text-yellow-400">' +
+                    '<span>S' + strNum + '</span>' +
+                    '</label>'
+            }).join('')
+        }
+        
+        async function saveInverter(event) {
+            event.preventDefault()
+            
+            const inverterId = document.getElementById('inverterId').value
+            const formData = {
+                inverter_name: document.getElementById('inverterName').value,
+                rated_power_kw: parseFloat(document.getElementById('inverterPower').value),
+                inverter_brand: document.getElementById('inverterBrand').value || null,
+                inverter_model: document.getElementById('inverterModel').value || null,
+                mppt_count: parseInt(document.getElementById('inverterMppt').value) || 4,
+                efficiency_percent: parseFloat(document.getElementById('inverterEfficiency').value) || 98,
+                notes: document.getElementById('inverterNotes').value || null
+            }
+            
+            try {
+                let response
+                if (inverterId) {
+                    // Mise à jour
+                    response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters/\${inverterId}\`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    })
+                } else {
+                    // Création
+                    response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters\`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    })
+                }
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                    // Gérer attributions strings
+                    const newInverterId = inverterId || data.inverter.id
+                    await updateStringAssignments(newInverterId)
+                    
+                    // Recharger liste
+                    await loadInverters()
+                    hideInverterModal()
+                    alert('Onduleur enregistré avec succès!')
+                } else {
+                    alert('Erreur: ' + data.error)
+                }
+            } catch (error) {
+                console.error('Erreur sauvegarde onduleur:', error)
+                alert('Erreur sauvegarde onduleur')
+            }
+        }
+        
+        async function updateStringAssignments(inverterId) {
+            const selectedStrings = Array.from(document.querySelectorAll('input[name="strings"]:checked'))
+                .map(cb => parseInt(cb.value))
+            
+            // Récupérer strings actuellement attribués
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters/\${inverterId}\`)
+                const data = await response.json()
+                
+                if (!data.success) return
+                
+                const currentStrings = data.strings?.map(s => s.string_number) || []
+                
+                // Retirer strings décochés
+                for (const strNum of currentStrings) {
+                    if (!selectedStrings.includes(strNum)) {
+                        await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters/\${inverterId}/assign-string/\${strNum}\`, {
+                            method: 'DELETE'
+                        })
+                    }
+                }
+                
+                // Ajouter nouveaux strings
+                for (const strNum of selectedStrings) {
+                    if (!currentStrings.includes(strNum)) {
+                        await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters/\${inverterId}/assign-string\`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ string_number: strNum })
+                        })
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur sync strings:', error)
+            }
+        }
+        
+        async function deleteInverter(id) {
+            const inverter = inverters.find(i => i.id === id)
+            if (!inverter) return
+            
+            if (!confirm(\`Supprimer l'onduleur "\${inverter.inverter_name}" ?\`)) {
+                return
+            }
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/inverters/\${id}\`, {
+                    method: 'DELETE'
+                })
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                    await loadInverters()
+                    alert('Onduleur supprimé')
+                } else {
+                    alert('Erreur: ' + data.error)
+                }
+            } catch (error) {
+                console.error('Erreur suppression onduleur:', error)
+                alert('Erreur suppression onduleur')
+            }
+        }
+        
+        async function validateElectricalConfig() {
+            const validationDiv = document.getElementById('electricalValidation')
+            const warningsDiv = document.getElementById('validationWarnings')
+            const errorsDiv = document.getElementById('validationErrors')
+            
+            if (!validationDiv || !warningsDiv || !errorsDiv) return
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/electrical-validation\`)
+                const data = await response.json()
+                
+                if (data.success) {
+                    const val = data.validation
+                    
+                    let warningsHtml = ''
+                    if (val.warnings && val.warnings.length > 0) {
+                        warningsHtml = val.warnings.map(w => '<div>⚠️ ' + w + '</div>').join('')
+                    }
+                    
+                    let errorsHtml = ''
+                    if (val.errors && val.errors.length > 0) {
+                        errorsHtml = val.errors.map(e => '<div>❌ ' + e + '</div>').join('')
+                    }
+                    
+                    if (warningsHtml || errorsHtml) {
+                        validationDiv.classList.remove('hidden')
+                        warningsDiv.innerHTML = warningsHtml
+                        errorsDiv.innerHTML = errorsHtml
+                    } else {
+                        validationDiv.classList.remove('hidden')
+                        warningsDiv.innerHTML = '<div class="text-green-400">✅ Configuration valide</div>'
+                        errorsDiv.innerHTML = ''
+                    }
+                    
+                    console.log('📊 Validation Électrique:', val)
+                }
+            } catch (error) {
+                console.error('Erreur validation:', error)
+                alert('Erreur validation configuration')
+            }
+        }
+        
+        // Fonctions globales pour onclick
+        window.editInverter = (id) => showInverterModal(id)
+        window.deleteInverter = deleteInverter
         
         async function loadPlantData() {
             try {
@@ -7398,6 +7695,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 document.getElementById('alignmentHelp').classList.add('hidden')
             })
             document.getElementById('showRectInfo').addEventListener('change', toggleRectInfoVisibility)
+            
+            // Configuration électrique - Onduleurs
+            const addInverterBtn = document.getElementById('addInverterBtn')
+            const inverterForm = document.getElementById('inverterForm')
+            const cancelInverterBtn = document.getElementById('cancelInverterBtn')
+            const validateElectricalBtn = document.getElementById('validateElectricalBtn')
+            
+            if (addInverterBtn) {
+                addInverterBtn.addEventListener('click', () => showInverterModal(null))
+            }
+            if (inverterForm) {
+                inverterForm.addEventListener('submit', saveInverter)
+            }
+            if (cancelInverterBtn) {
+                cancelInverterBtn.addEventListener('click', hideInverterModal)
+            }
+            if (validateElectricalBtn) {
+                validateElectricalBtn.addEventListener('click', validateElectricalConfig)
+            }
             
             document.querySelectorAll('.status-btn').forEach(btn => {
                 btn.addEventListener('click', () => selectStatus(btn.dataset.status))
