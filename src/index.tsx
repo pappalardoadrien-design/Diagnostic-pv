@@ -3736,6 +3736,38 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     </div>
                 </div>
 
+                <!-- ÉTAPE 4 : Configuration Électrique -->
+                <div class="bg-gray-900 rounded-lg border-2 border-yellow-400 p-4">
+                    <h3 class="text-lg font-black mb-3 text-yellow-400">
+                        <i class="fas fa-plug mr-2"></i>ÉTAPE 4 : CONFIG ÉLECTRIQUE
+                    </h3>
+                    <div class="space-y-3">
+                        <!-- Onduleurs -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-gray-300">🔌 Onduleurs</span>
+                                <button id="addInverterBtn" class="bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded text-xs font-bold">
+                                    <i class="fas fa-plus mr-1"></i>Ajouter
+                                </button>
+                            </div>
+                            <div id="invertersList" class="space-y-2 max-h-60 overflow-y-auto">
+                                <p class="text-xs text-gray-500 text-center py-2">Aucun onduleur configuré</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Validation -->
+                        <div id="electricalValidation" class="bg-black rounded p-2 text-xs hidden">
+                            <div class="font-bold text-yellow-400 mb-1">⚡ Validation</div>
+                            <div id="validationWarnings" class="text-orange-400"></div>
+                            <div id="validationErrors" class="text-red-400"></div>
+                        </div>
+                        
+                        <button id="validateElectricalBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-check-circle mr-1"></i>Valider Configuration
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Stats Rapides -->
                 <div class="bg-gray-900 rounded-lg border-2 border-blue-400 p-4">
                     <h3 class="text-sm font-black mb-2 text-blue-400">
@@ -3945,6 +3977,88 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             </div>
         </div>
 
+        <!-- Modal Onduleur (Création/Édition) -->
+        <div id="inverterModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                <h3 class="text-xl font-black mb-4 text-center text-yellow-400">
+                    <i class="fas fa-plug mr-2"></i><span id="inverterModalTitle">NOUVEL ONDULEUR</span>
+                </h3>
+                
+                <form id="inverterForm" class="space-y-4">
+                    <input type="hidden" id="inverterId" value="">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Nom Onduleur *</label>
+                            <input type="text" id="inverterName" required
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                                   placeholder="Onduleur 1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Puissance Nominale (kW) *</label>
+                            <input type="number" id="inverterPower" required step="0.1" min="0"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                                   placeholder="100">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Marque</label>
+                            <input type="text" id="inverterBrand"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                                   placeholder="Huawei, Fronius, SMA...">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Modèle</label>
+                            <input type="text" id="inverterModel"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                                   placeholder="SUN2000-100KTL">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Nombre MPPT</label>
+                            <input type="number" id="inverterMppt" min="1" max="12" value="4"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Rendement (%)</label>
+                            <input type="number" id="inverterEfficiency" step="0.1" min="90" max="100" value="98"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Attribution Strings</label>
+                        <div id="stringAssignmentContainer" class="bg-black rounded p-3 max-h-60 overflow-y-auto">
+                            <p class="text-xs text-gray-500 text-center">Sélectionnez les strings à attribuer</p>
+                            <div id="stringCheckboxes" class="grid grid-cols-4 gap-2 mt-2">
+                                <!-- Généré dynamiquement -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Notes</label>
+                        <textarea id="inverterNotes" rows="2"
+                                  class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-yellow-400 focus:outline-none"
+                                  placeholder="Notes techniques..."></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-yellow-600 hover:bg-yellow-700 py-3 rounded font-black">
+                            <i class="fas fa-save mr-2"></i>ENREGISTRER
+                        </button>
+                        <button type="button" id="cancelInverterBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                            ANNULER
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
         // ================================================================
         // VARIABLES GLOBALES
@@ -3982,6 +4096,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let showRectGrid = false      // Grille désactivée par défaut (vue épurée)
         let showRectLabels = false    // Labels désactivés par défaut
         let showRectInfo = false      // Info overlay désactivé par défaut
+        
+        // Variables pour configuration électrique (onduleurs + strings) - NOUVEAU
+        let inverters = [] // Array d'onduleurs: {id, inverter_name, rated_power_kw, ...}
+        let currentEditingInverter = null // Onduleur en cours d'édition (null = création)
         
         const STATUS_COLORS = {
             ok: "#22c55e",

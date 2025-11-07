@@ -6,6 +6,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import structuresRouter from './structures'
+import invertersRouter from './inverters'
 
 type Bindings = {
   DB: D1Database
@@ -19,6 +20,11 @@ const plantsRouter = new Hono<{ Bindings: Bindings }>()
 // ROUTES STRUCTURES (Modélisation bâtiments/ombrières/champs)
 // ============================================================================
 plantsRouter.route('/:plantId/zones/:zoneId/structures', structuresRouter)
+
+// ============================================================================
+// ROUTES INVERTERS (Configuration électrique - Onduleurs + Strings)
+// ============================================================================
+plantsRouter.route('/', invertersRouter)
 
 // ============================================================================
 // CENTRALES PV
