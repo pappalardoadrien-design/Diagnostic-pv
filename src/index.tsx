@@ -4248,7 +4248,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     fillOpacity: 0.15,
                     className: "module-rectangle",
                     draggable: true,
-                    pmIgnore: false  // Activer Leaflet.PM pour drag & drop
+                    pmIgnore: false,  // Activer Leaflet.PM pour drag & drop
+                    interactive: true,  // IMPORTANT: Permettre les clics
+                    bubblingMouseEvents: false  // Ne pas propager les clics à la carte
+                })
+                
+                // Effet visuel au survol pour indiquer que c'est cliquable
+                this.rectangle.on('mouseover', () => {
+                    if (!this.isRotating) {
+                        this.rectangle.setStyle({ weight: 5, opacity: 1 })
+                    }
+                })
+                this.rectangle.on('mouseout', () => {
+                    if (!this.handles.nw || !map.hasLayer(this.handles.nw)) {
+                        this.rectangle.setStyle({ weight: 3, opacity: 0.8 })
+                    }
                 })
                 
                 // Event listeners pour édition
@@ -4594,7 +4608,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 // Event listener pour activer handles au clic
-                this.rectangle.on('click', () => {
+                // Utiliser mousedown au lieu de click car PM peut bloquer click
+                const selectRectangle = () => {
+                    console.log("🖱️ Rectangle cliqué, ID:", this.id)
                     // Désactiver handles des autres rectangles
                     moduleRectangles.forEach(rect => {
                         if (rect.id !== this.id) {
@@ -4604,7 +4620,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     // Activer handles de ce rectangle
                     this.showHandles()
-                })
+                }
+                
+                this.rectangle.on('click', selectRectangle)
+                this.rectangle.on('mousedown', selectRectangle)
             }
             
             removeFromMap() {
