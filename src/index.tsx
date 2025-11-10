@@ -5712,8 +5712,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             
             // NOUVEAU: Deux calques de fond avec contrôle de bascule
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            // Google Satellite - Meilleur zoom et disponibilité
+            const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                maxZoom: 22,           // Zoom maximum de la carte
+                maxNativeZoom: 21,     // Zoom maximum des tuiles natives
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: 'Map data © Google'
+            })
+            
+            // Esri Satellite - Alternative (zoom moins élevé)
+            const esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 22,
+                maxNativeZoom: 19,     // Esri s'arrête à zoom 19
                 attribution: '© Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN'
             })
             
@@ -5735,7 +5745,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Contrôle de basculement entre vues
             const baseLayers = {
-                '🛰️ Satellite': satelliteLayer,
+                '🛰️ Satellite (Google)': satelliteLayer,
+                '🛰️ Satellite (Esri)': esriLayer,
                 '🗺️ Carte avec rues': streetLayer
             }
             
