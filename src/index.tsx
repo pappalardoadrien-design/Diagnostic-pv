@@ -4246,22 +4246,75 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     opacity: 0.8,
                     fillColor: "#f59e0b",
                     fillOpacity: 0.15,
-                    className: "module-rectangle",
-                    draggable: true,
-                    pmIgnore: false,  // Activer Leaflet.PM pour drag & drop
-                    interactive: true,  // IMPORTANT: Permettre les clics
-                    bubblingMouseEvents: false  // Ne pas propager les clics à la carte
+                    className: "module-rectangle-" + this.id,
+                    interactive: true,  // CRITIQUE: Permettre les clics
+                    bubblingMouseEvents: true  // Permettre la propagation pour le drag
                 })
                 
                 // Effet visuel au survol pour indiquer que c'est cliquable
-                this.rectangle.on('mouseover', () => {
+                this.rectangle.on('mouseover', (e) => {
                     if (!this.isRotating) {
-                        this.rectangle.setStyle({ weight: 5, opacity: 1 })
+                        this.rectangle.setStyle({ weight: 5, opacity: 1, cursor: 'pointer' })
+                        console.log("👆 Survol rectangle ID:", this.id)
                     }
                 })
+                
                 this.rectangle.on('mouseout', () => {
                     if (!this.handles.nw || !map.hasLayer(this.handles.nw)) {
                         this.rectangle.setStyle({ weight: 3, opacity: 0.8 })
+                    }
+                })
+                
+                // DRAG & DROP avec événements Leaflet natifs
+                let isDragging = false
+                let dragStartLatLng = null
+                
+                this.rectangle.on('mousedown', (e) => {
+                    // Si on clique sur le rectangle (pas sur les handles)
+                    if (!this.isRotating && e.originalEvent.button === 0) {
+                        isDragging = true
+                        dragStartLatLng = e.latlng
+                        map.dragging.disable()
+                        console.log("🖱️ Début drag rectangle ID:", this.id)
+                        L.DomEvent.stopPropagation(e.originalEvent)
+                    }
+                })
+                
+                map.on('mousemove', (e) => {
+                    if (isDragging && dragStartLatLng && this.rectangle) {
+                        const latDiff = e.latlng.lat - dragStartLatLng.lat
+                        const lngDiff = e.latlng.lng - dragStartLatLng.lng
+                        
+                        const bounds = this.rectangle.getBounds()
+                        const nw = bounds.getNorthWest()
+                        const se = bounds.getSouthEast()
+                        
+                        const newBounds = L.latLngBounds(
+                            [nw.lat + latDiff, nw.lng + lngDiff],
+                            [se.lat + latDiff, se.lng + lngDiff]
+                        )
+                        
+                        this.rectangle.setBounds(newBounds)
+                        this.updateHandles()
+                        dragStartLatLng = e.latlng
+                    }
+                })
+                
+                map.on('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false
+                        map.dragging.enable()
+                        
+                        // Mettre à jour position finale
+                        const newBounds = this.rectangle.getBounds()
+                        this.originalCenter = newBounds.getCenter()
+                        this.originalBounds = newBounds
+                        
+                        // Régénérer modules
+                        this.regenerateModules()
+                        saveRectanglesConfig()
+                        
+                        console.log("✅ Rectangle déplacé - nouvelle position:", this.originalCenter.lat.toFixed(6), this.originalCenter.lng.toFixed(6))
                     }
                 })
                 
@@ -4587,30 +4640,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
                 
-                // Activer mode drag avec Leaflet.PM
-                if (this.rectangle.pm) {
-                    this.rectangle.pm.enable({ draggable: true })
-                    
-                    // Event dragend pour mettre à jour position
-                    this.rectangle.on('pm:dragend', () => {
-                        const newBounds = this.rectangle.getBounds()
-                        this.originalCenter = newBounds.getCenter()
-                        this.originalBounds = newBounds
-                        
-                        // Régénérer modules avec nouvelle position
-                        this.regenerateModules()
-                        
-                        // Sauvegarder config rectangles
-                        saveRectanglesConfig()
-                        
-                        console.log("✅ Rectangle déplacé - nouvelle position:", this.originalCenter.lat.toFixed(6), this.originalCenter.lng.toFixed(6))
-                    })
-                }
-                
                 // Event listener pour activer handles au clic
-                // Utiliser mousedown au lieu de click car PM peut bloquer click
-                const selectRectangle = () => {
+                const selectRectangle = (e) => {
                     console.log("🖱️ Rectangle cliqué, ID:", this.id)
+                    
+                    // Empêcher propagation pour éviter que la carte capte le clic
+                    if (e && e.originalEvent) {
+                        L.DomEvent.stopPropagation(e.originalEvent)
+                    }
+                    
                     // Désactiver handles des autres rectangles
                     moduleRectangles.forEach(rect => {
                         if (rect.id !== this.id) {
@@ -4622,8 +4660,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     this.showHandles()
                 }
                 
+                // Utiliser plusieurs événements pour garantir la détection
                 this.rectangle.on('click', selectRectangle)
-                this.rectangle.on('mousedown', selectRectangle)
+                this.rectangle.on('dblclick', selectRectangle)
             }
             
             removeFromMap() {
