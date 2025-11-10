@@ -4637,6 +4637,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             addToMap() {
                 this.rectangle.addTo(drawnItems)
+                console.log("➕ Rectangle ajouté à la carte, ID:", this.id, "- Visible:", map.hasLayer(this.rectangle))
+                
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
                 
