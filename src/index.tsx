@@ -4634,6 +4634,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             
                             draggingRect.rectangle.setBounds(newBounds)
                             
+                            // CRITIQUE: Si rotation active, mettre à jour aussi le rotatedPolygon
+                            if (draggingRect.rotatedPolygon && map.hasLayer(draggingRect.rotatedPolygon)) {
+                                const corners = draggingRect.rotatedPolygon.getLatLngs()[0]
+                                const newCorners = corners.map(corner => {
+                                    return L.latLng(corner.lat + latDiff, corner.lng + lngDiff)
+                                })
+                                draggingRect.rotatedPolygon.setLatLngs(newCorners)
+                            }
+                            
                             // Mettre à jour les handles si ils existent
                             if (draggingRect.handles.nw && map.hasLayer(draggingRect.handles.nw)) {
                                 draggingRect.updateHandles()
@@ -4739,8 +4748,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // HANDLES INTERACTIFS (DRAG/RESIZE/ROTATE)
             // ================================================================
             
+            // Helper: Retourner les bounds corrects (rotatedPolygon si rotation active, sinon rectangle)
+            getVisibleShape() {
+                return (this.rotatedPolygon && map.hasLayer(this.rotatedPolygon)) ? this.rotatedPolygon : this.rectangle
+            }
+            
             createHandles() {
-                const bounds = this.rectangle.getBounds()
+                // CRITIQUE: Utiliser rotatedPolygon si rotation active
+                const shape = this.getVisibleShape()
+                const bounds = shape.getBounds()
                 const center = bounds.getCenter()
                 const nw = bounds.getNorthWest()
                 const ne = bounds.getNorthEast()
@@ -4819,7 +4835,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateHandles() {
                 if (!this.handles.nw) return
                 
-                const bounds = this.rectangle.getBounds()
+                // CRITIQUE: Utiliser rotatedPolygon si rotation active
+                const shape = this.getVisibleShape()
+                const bounds = shape.getBounds()
                 const center = bounds.getCenter()
                 const nw = bounds.getNorthWest()
                 const ne = bounds.getNorthEast()
