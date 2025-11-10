@@ -4265,58 +4265,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     }
                 })
                 
-                // DRAG & DROP avec événements Leaflet natifs
-                let isDragging = false
-                let dragStartLatLng = null
+                // Stocker les variables de drag dans l'instance pour y accéder depuis setupDragEvents()
+                this.isDragging = false
+                this.dragStartLatLng = null
+                this.dragStartBounds = null
                 
-                this.rectangle.on('mousedown', (e) => {
-                    // Si on clique sur le rectangle (pas sur les handles)
-                    if (!this.isRotating && e.originalEvent.button === 0) {
-                        isDragging = true
-                        dragStartLatLng = e.latlng
-                        map.dragging.disable()
-                        console.log("🖱️ Début drag rectangle ID:", this.id)
-                        L.DomEvent.stopPropagation(e.originalEvent)
-                    }
-                })
-                
-                map.on('mousemove', (e) => {
-                    if (isDragging && dragStartLatLng && this.rectangle) {
-                        const latDiff = e.latlng.lat - dragStartLatLng.lat
-                        const lngDiff = e.latlng.lng - dragStartLatLng.lng
-                        
-                        const bounds = this.rectangle.getBounds()
-                        const nw = bounds.getNorthWest()
-                        const se = bounds.getSouthEast()
-                        
-                        const newBounds = L.latLngBounds(
-                            [nw.lat + latDiff, nw.lng + lngDiff],
-                            [se.lat + latDiff, se.lng + lngDiff]
-                        )
-                        
-                        this.rectangle.setBounds(newBounds)
-                        this.updateHandles()
-                        dragStartLatLng = e.latlng
-                    }
-                })
-                
-                map.on('mouseup', () => {
-                    if (isDragging) {
-                        isDragging = false
-                        map.dragging.enable()
-                        
-                        // Mettre à jour position finale
-                        const newBounds = this.rectangle.getBounds()
-                        this.originalCenter = newBounds.getCenter()
-                        this.originalBounds = newBounds
-                        
-                        // Régénérer modules
-                        this.regenerateModules()
-                        saveRectanglesConfig()
-                        
-                        console.log("✅ Rectangle déplacé - nouvelle position:", this.originalCenter.lat.toFixed(6), this.originalCenter.lng.toFixed(6))
-                    }
-                })
+                // Configurer les events de drag (sera aussi appelé après restauration)
+                this.setupDragEvents()
                 
                 // Event listeners pour édition
                 this.rectangle.on('dragstart', () => {
@@ -4635,6 +4590,88 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
             }
             
+            setupDragEvents() {
+                // Configuration des events de drag & drop
+                // Peut être appelé plusieurs fois (création + restauration)
+                
+                // Supprimer les anciens events pour éviter les doublons
+                this.rectangle.off('mousedown')
+                
+                this.rectangle.on('mousedown', (e) => {
+                    // Clic gauche UNIQUEMENT si pas en rotation
+                    if (!this.isRotating && e.originalEvent.button === 0) {
+                        this.isDragging = true
+                        this.dragStartLatLng = e.latlng
+                        this.dragStartBounds = this.rectangle.getBounds()
+                        map.dragging.disable()
+                        L.DomEvent.stopPropagation(e.originalEvent)
+                        L.DomEvent.preventDefault(e.originalEvent)
+                        console.log("🖱️ Début drag rectangle ID:", this.id)
+                    }
+                })
+            }
+            
+            setupMapDragEvents() {
+                // Events globaux sur la carte pour le drag
+                // Ces events sont partagés entre tous les rectangles
+                if (!window.rectangleDragEventsSetup) {
+                    window.rectangleDragEventsSetup = true
+                    
+                    map.on('mousemove', (e) => {
+                        // Trouver le rectangle en cours de drag
+                        const draggingRect = moduleRectangles.find(r => r.isDragging)
+                        if (draggingRect && draggingRect.dragStartLatLng && draggingRect.dragStartBounds) {
+                            const latDiff = e.latlng.lat - draggingRect.dragStartLatLng.lat
+                            const lngDiff = e.latlng.lng - draggingRect.dragStartLatLng.lng
+                            
+                            const nw = draggingRect.dragStartBounds.getNorthWest()
+                            const se = draggingRect.dragStartBounds.getSouthEast()
+                            
+                            const newBounds = L.latLngBounds(
+                                [nw.lat + latDiff, nw.lng + lngDiff],
+                                [se.lat + latDiff, se.lng + lngDiff]
+                            )
+                            
+                            draggingRect.rectangle.setBounds(newBounds)
+                            
+                            // Mettre à jour les handles si visibles
+                            if (draggingRect.handlesVisible) {
+                                draggingRect.updateHandles()
+                            }
+                        }
+                    })
+                    
+                    map.on('mouseup', () => {
+                        // Trouver le rectangle en cours de drag
+                        const draggingRect = moduleRectangles.find(r => r.isDragging)
+                        if (draggingRect) {
+                            draggingRect.isDragging = false
+                            map.dragging.enable()
+                            
+                            // Mettre à jour position finale
+                            const newBounds = draggingRect.rectangle.getBounds()
+                            draggingRect.originalCenter = newBounds.getCenter()
+                            draggingRect.originalBounds = newBounds
+                            
+                            // Régénérer modules
+                            draggingRect.regenerateModules()
+                            saveRectanglesConfig()
+                            
+                            console.log("✅ Rectangle déplacé:", draggingRect.originalCenter.lat.toFixed(6), draggingRect.originalCenter.lng.toFixed(6))
+                        }
+                    })
+                    
+                    // Désélection au clic sur la carte
+                    map.on('click', (e) => {
+                        // Si on clique sur la carte (pas sur un rectangle)
+                        console.log("🗺️ Clic sur la carte - désélection tous rectangles")
+                        moduleRectangles.forEach(rect => rect.hideHandles())
+                    })
+                    
+                    console.log("✅ Events globaux drag configurés (une seule fois)")
+                }
+            }
+            
             addToMap() {
                 // Ajouter directement à la carte ET à drawnItems
                 this.rectangle.addTo(map)
@@ -4643,16 +4680,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Forcer z-index élevé pour être au-dessus de tout
                 this.rectangle.bringToFront()
                 
-                console.log("➕ Rectangle ajouté, ID:", this.id, "- onMap:", map.hasLayer(this.rectangle), "- onDrawnItems:", drawnItems.hasLayer(this.rectangle))
+                console.log("➕ Rectangle ajouté à la carte, ID:", this.id, "- Visible:", map.hasLayer(this.rectangle))
                 
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
                 
-                // Event listener pour activer handles au clic
+                // Configurer les events globaux de drag (une seule fois)
+                this.setupMapDragEvents()
+                
+                // Event listener pour SÉLECTION au clic
                 const selectRectangle = (e) => {
-                    console.log("🖱️ Rectangle cliqué, ID:", this.id)
+                    console.log("🎯 Rectangle sélectionné, ID:", this.id)
                     
-                    // Empêcher propagation pour éviter que la carte capte le clic
+                    // Empêcher propagation vers la carte
                     if (e && e.originalEvent) {
                         L.DomEvent.stopPropagation(e.originalEvent)
                     }
@@ -4668,9 +4708,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     this.showHandles()
                 }
                 
-                // Utiliser plusieurs événements pour garantir la détection
+                // Click pour sélection
                 this.rectangle.on('click', selectRectangle)
-                this.rectangle.on('dblclick', selectRectangle)
             }
             
             removeFromMap() {
