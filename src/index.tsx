@@ -3768,6 +3768,27 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     </div>
                 </div>
 
+                <!-- ÉTAPE 5 : Export GeoJSON/KML -->
+                <div class="bg-gray-900 rounded-lg border-2 border-cyan-400 p-4">
+                    <h3 class="text-lg font-black mb-3 text-cyan-400">
+                        <i class="fas fa-download mr-2"></i>ÉTAPE 5 : EXPORT
+                    </h3>
+                    <div class="space-y-2">
+                        <button id="exportGeoJsonBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-map-marked-alt mr-1"></i>Export GeoJSON
+                        </button>
+                        <button id="exportKmlBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-globe mr-1"></i>Export KML
+                        </button>
+                        <button id="exportCsvBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-bold text-sm">
+                            <i class="fas fa-file-excel mr-1"></i>Export CSV
+                        </button>
+                        <div class="mt-2 p-2 bg-cyan-900 rounded text-xs text-cyan-200">
+                            <i class="fas fa-info-circle mr-1"></i><strong>IEC 62446-1:</strong> Traçabilité GPS des modules
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Stats Rapides -->
                 <div class="bg-gray-900 rounded-lg border-2 border-blue-400 p-4">
                     <h3 class="text-sm font-black mb-2 text-blue-400">
@@ -5384,6 +5405,94 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // Fonctions globales pour onclick
         window.editInverter = (id) => showInverterModal(id)
         window.deleteInverter = deleteInverter
+        
+        // ================================================================
+        // FONCTIONS EXPORT (GeoJSON, KML, CSV)
+        // ================================================================
+        
+        async function exportGeoJSON() {
+            try {
+                console.log('📥 Export GeoJSON démarré...')
+                const url = '/api/pv/plants/' + plantId + '/zones/' + zoneId + '/export/geojson'
+                const response = await fetch(url)
+                
+                if (!response.ok) {
+                    throw new Error('Erreur export GeoJSON: ' + response.statusText)
+                }
+                
+                const blob = await response.blob()
+                const downloadUrl = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = downloadUrl
+                a.download = plantData.plant_name + '_' + zoneData.zone_name + '_modules.geojson'
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(downloadUrl)
+                
+                console.log('✅ Export GeoJSON réussi')
+                alert('✅ Export GeoJSON téléchargé avec succès')
+            } catch (error) {
+                console.error('❌ Erreur export GeoJSON:', error)
+                alert('❌ Erreur export GeoJSON: ' + error.message)
+            }
+        }
+        
+        async function exportKML() {
+            try {
+                console.log('📥 Export KML démarré...')
+                const url = '/api/pv/plants/' + plantId + '/zones/' + zoneId + '/export/kml'
+                const response = await fetch(url)
+                
+                if (!response.ok) {
+                    throw new Error('Erreur export KML: ' + response.statusText)
+                }
+                
+                const blob = await response.blob()
+                const downloadUrl = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = downloadUrl
+                a.download = plantData.plant_name + '_' + zoneData.zone_name + '_modules.kml'
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(downloadUrl)
+                
+                console.log('✅ Export KML réussi')
+                alert('✅ Export KML téléchargé avec succès')
+            } catch (error) {
+                console.error('❌ Erreur export KML:', error)
+                alert('❌ Erreur export KML: ' + error.message)
+            }
+        }
+        
+        async function exportCSV() {
+            try {
+                console.log('📥 Export CSV démarré...')
+                const url = '/api/pv/plants/' + plantId + '/zones/' + zoneId + '/export/csv'
+                const response = await fetch(url)
+                
+                if (!response.ok) {
+                    throw new Error('Erreur export CSV: ' + response.statusText)
+                }
+                
+                const blob = await response.blob()
+                const downloadUrl = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = downloadUrl
+                a.download = plantData.plant_name + '_' + zoneData.zone_name + '_modules.csv'
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(downloadUrl)
+                
+                console.log('✅ Export CSV réussi')
+                alert('✅ Export CSV téléchargé avec succès')
+            } catch (error) {
+                console.error('❌ Erreur export CSV:', error)
+                alert('❌ Erreur export CSV: ' + error.message)
+            }
+        }
         
         async function loadPlantData() {
             try {
@@ -7713,6 +7822,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             if (validateElectricalBtn) {
                 validateElectricalBtn.addEventListener('click', validateElectricalConfig)
+            }
+            
+            // Export GeoJSON/KML/CSV
+            const exportGeoJsonBtn = document.getElementById('exportGeoJsonBtn')
+            const exportKmlBtn = document.getElementById('exportKmlBtn')
+            const exportCsvBtn = document.getElementById('exportCsvBtn')
+            
+            if (exportGeoJsonBtn) {
+                exportGeoJsonBtn.addEventListener('click', exportGeoJSON)
+            }
+            if (exportKmlBtn) {
+                exportKmlBtn.addEventListener('click', exportKML)
+            }
+            if (exportCsvBtn) {
+                exportCsvBtn.addEventListener('click', exportCSV)
             }
             
             document.querySelectorAll('.status-btn').forEach(btn => {

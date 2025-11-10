@@ -7,6 +7,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import structuresRouter from './structures'
 import invertersRouter from './inverters'
+import exportRouter from './export'
 
 type Bindings = {
   DB: D1Database
@@ -25,6 +26,11 @@ plantsRouter.route('/:plantId/zones/:zoneId/structures', structuresRouter)
 // ROUTES INVERTERS (Configuration électrique - Onduleurs + Strings)
 // ============================================================================
 plantsRouter.route('/', invertersRouter)
+
+// ============================================================================
+// ROUTES EXPORT (GeoJSON, KML, CSV pour traçabilité IEC 62446-1)
+// ============================================================================
+plantsRouter.route('/', exportRouter)
 
 // ============================================================================
 // CENTRALES PV
