@@ -4577,7 +4577,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             removeFromMap() {
-                drawnItems.removeLayer(this.rectangle)
+                // Supprimer le rectangle principal
+                if (this.rectangle) {
+                    drawnItems.removeLayer(this.rectangle)
+                    this.rectangle = null
+                }
+                
+                // Nettoyer tous les éléments visuels
                 this.clearVisuals()
                 this.hideHandles()
                 
@@ -6037,10 +6043,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Supprimer aussi tous les rectangles
                 if (hasRectangles) {
                     moduleRectangles.forEach(rect => {
-                        if (rect.rectangle) map.removeLayer(rect.rectangle)
-                        if (rect.gridGroup) map.removeLayer(rect.gridGroup)
-                        if (rect.labelGroup) map.removeLayer(rect.labelGroup)
-                        if (rect.infoMarker) map.removeLayer(rect.infoMarker)
+                        rect.removeFromMap()
                     })
                     moduleRectangles = []
                     modules = []
