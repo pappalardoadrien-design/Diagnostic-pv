@@ -5109,12 +5109,46 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         weight: 3,
                         opacity: 0.8,
                         fillColor: "#f59e0b",
-                        fillOpacity: 0.15
+                        fillOpacity: 0.15,
+                        interactive: true,
+                        bubblingMouseEvents: false
                     })
                     
                     // Remplacer rectangle par polygon
                     drawnItems.removeLayer(this.rectangle)
                     this.rotatedPolygon.addTo(drawnItems)
+                    
+                    // CRITIQUE: Attacher les events de sélection au polygon rotatif
+                    this.rotatedPolygon.on('click', (e) => {
+                        console.log("🎯 RotatedPolygon sélectionné, ID:", this.id)
+                        
+                        if (e && e.originalEvent) {
+                            L.DomEvent.stopPropagation(e.originalEvent)
+                        }
+                        
+                        // Désactiver handles des autres rectangles
+                        moduleRectangles.forEach(rect => {
+                            if (rect.id !== this.id) {
+                                rect.hideHandles()
+                            }
+                        })
+                        
+                        // Activer handles de ce rectangle
+                        this.showHandles()
+                    })
+                    
+                    // Attacher drag events au polygon
+                    this.rotatedPolygon.on('mousedown', (e) => {
+                        if (!this.isRotating && e.originalEvent.button === 0) {
+                            this.isDragging = true
+                            this.dragStartLatLng = e.latlng
+                            this.dragStartBounds = this.rectangle.getBounds()
+                            map.dragging.disable()
+                            L.DomEvent.stopPropagation(e.originalEvent)
+                            L.DomEvent.preventDefault(e.originalEvent)
+                            console.log("🖱️ Début drag rotatedPolygon ID:", this.id)
+                        }
+                    })
                 } else {
                     // Mettre à jour coords polygon
                     this.rotatedPolygon.setLatLngs([
@@ -5140,6 +5174,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     drawnItems.removeLayer(this.rotatedPolygon)
                     this.rotatedPolygon = null
                     this.rectangle.addTo(drawnItems)
+                    
+                    // CRITIQUE: Reconfigurer les events sur le rectangle après reset rotation
+                    this.setupDragEvents()
                 }
                 
                 // Réinitialiser angle
