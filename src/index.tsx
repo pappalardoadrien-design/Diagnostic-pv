@@ -3645,6 +3645,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="import242SingleBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
                             <i class="fas fa-download mr-2"></i>IMPORTER CONFIGURATION
                         </button>
+                        <button id="togglePersistentEditBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-lock-open mr-2"></i>MODE ÉDITION CONTINUE
+                        </button>
+                        <div id="persistentEditIndicator" class="mt-2 p-2 bg-green-900 rounded text-xs text-green-200 hidden">
+                            <i class="fas fa-check-circle mr-1"></i><strong>Mode édition continue activé</strong><br/>
+                            <span class="text-xs">Les handles restent visibles. Re-cliquez le bouton pour désactiver.</span>
+                        </div>
                         <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
                             <i class="fas fa-info-circle mr-1"></i><strong>Mode edition:</strong> Glissez les coins pour redimensionner, le centre pour pivoter
                         </div>
@@ -4117,6 +4124,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         let showRectGrid = false      // Grille désactivée par défaut (vue épurée)
         let showRectLabels = false    // Labels désactivés par défaut
         let showRectInfo = false      // Info overlay désactivé par défaut
+        let persistentEditMode = false  // Mode édition persistante (handles toujours actifs)
         
         // Variables pour configuration électrique (onduleurs + strings) - NOUVEAU
         let inverters = [] // Array d'onduleurs: {id, inverter_name, rated_power_kw, ...}
@@ -5635,7 +5643,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         }
                     })
                     
-                    if (!clickedOnRectangle) {
+                    // NOUVEAU: Respecter mode édition persistante
+                    if (!clickedOnRectangle && !persistentEditMode) {
                         moduleRectangles.forEach(rect => rect.hideHandles())
                     }
                 }, 10)
@@ -6954,6 +6963,36 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
         }
         
+        function togglePersistentEditMode() {
+            persistentEditMode = !persistentEditMode
+            const btn = document.getElementById('togglePersistentEditBtn')
+            const indicator = document.getElementById('persistentEditIndicator')
+            
+            if (persistentEditMode) {
+                // Activer mode édition persistante
+                btn.className = 'w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold text-sm mt-2'
+                btn.innerHTML = '<i class="fas fa-lock mr-2"></i>MODE ÉDITION CONTINUE'
+                indicator.classList.remove('hidden')
+                
+                // Afficher handles du premier rectangle si existe
+                if (moduleRectangles.length > 0) {
+                    moduleRectangles[0].showHandles()
+                }
+                
+                console.log("✅ Mode édition persistante ACTIVÉ")
+            } else {
+                // Désactiver mode édition persistante
+                btn.className = 'w-full bg-gray-700 hover:bg-gray-600 py-2 rounded font-bold text-sm mt-2'
+                btn.innerHTML = '<i class="fas fa-lock-open mr-2"></i>MODE ÉDITION CONTINUE'
+                indicator.classList.add('hidden')
+                
+                // Cacher tous les handles
+                moduleRectangles.forEach(rect => rect.hideHandles())
+                
+                console.log("❌ Mode édition persistante DÉSACTIVÉ")
+            }
+        }
+        
         function updateRectTotal() {
             const rows = parseInt(document.getElementById('rectRows').value) || 0
             const cols = parseInt(document.getElementById('rectCols').value) || 0
@@ -7804,6 +7843,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 document.getElementById('alignmentHelp').classList.add('hidden')
             })
             document.getElementById('showRectInfo').addEventListener('change', toggleRectInfoVisibility)
+            document.getElementById('togglePersistentEditBtn').addEventListener('click', togglePersistentEditMode)
             
             // Configuration électrique - Onduleurs
             const addInverterBtn = document.getElementById('addInverterBtn')
