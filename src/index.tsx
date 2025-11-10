@@ -4399,11 +4399,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             drawGrid() {
-                const bounds = this.rectangle.getBounds()
-                const nw = bounds.getNorthWest()
-                const ne = bounds.getNorthEast()
-                const sw = bounds.getSouthWest()
-                const se = bounds.getSouthEast()
+                // CRITIQUE: Utiliser rotatedPolygon si existe (rectangle pivoté)
+                // Sinon utiliser bounds rectangle normal
+                let nw, ne, sw, se
+                
+                if (this.rotatedPolygon) {
+                    // Rectangle pivoté → utiliser coins polygon (déjà en pixel pur)
+                    const coords = this.rotatedPolygon.getLatLngs()[0]
+                    nw = coords[0]  // Nord-Ouest
+                    ne = coords[1]  // Nord-Est
+                    se = coords[2]  // Sud-Est
+                    sw = coords[3]  // Sud-Ouest
+                } else {
+                    // Rectangle normal → utiliser bounds classiques
+                    const bounds = this.rectangle.getBounds()
+                    nw = bounds.getNorthWest()
+                    ne = bounds.getNorthEast()
+                    sw = bounds.getSouthWest()
+                    se = bounds.getSouthEast()
+                }
                 
                 // Horizontal lines
                 for (let i = 0; i <= this.rows; i++) {
