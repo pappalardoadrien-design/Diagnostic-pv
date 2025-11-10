@@ -4180,6 +4180,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.originalCenter = bounds.getCenter()  // Centre GPS original
                 this.originalBounds = bounds  // Bounds complets originaux
                 
+                // CRITIQUE: Stocker dimensions rectangle EN PIXELS (système cartésien pur)
+                // Calculé une seule fois à la création, jamais recalculé depuis GPS
+                const nwPixel = map.latLngToContainerPoint(bounds.getNorthWest())
+                const sePixel = map.latLngToContainerPoint(bounds.getSouthEast())
+                this.originalWidthPixels = Math.abs(sePixel.x - nwPixel.x)
+                this.originalHeightPixels = Math.abs(sePixel.y - nwPixel.y)
+                
+                console.log("📐 Dimensions originales:", this.originalWidthPixels.toFixed(1) + "px x " + this.originalHeightPixels.toFixed(1) + "px")
+                
                 // Créer rectangle Leaflet EDITABLE avec semi-transparence
                 this.rectangle = L.rectangle(initialBounds, {
                     color: "#f59e0b",
@@ -4205,9 +4214,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     map.doubleClickZoom.enable()
                     map.scrollWheelZoom.enable()
                     
-                    // IMPORTANT: Mettre à jour centre original après drag
-                    this.originalCenter = this.rectangle.getBounds().getCenter()
-                    this.originalBounds = this.rectangle.getBounds()
+                    // IMPORTANT: Mettre à jour centre ET dimensions après drag
+                    const newBounds = this.rectangle.getBounds()
+                    this.originalCenter = newBounds.getCenter()
+                    this.originalBounds = newBounds
+                    
+                    // Recalculer dimensions pixel
+                    const nwPixel = map.latLngToContainerPoint(newBounds.getNorthWest())
+                    const sePixel = map.latLngToContainerPoint(newBounds.getSouthEast())
+                    this.originalWidthPixels = Math.abs(sePixel.x - nwPixel.x)
+                    this.originalHeightPixels = Math.abs(sePixel.y - nwPixel.y)
                     
                     this.regenerateModules()
                     applyRectanglesToModules()
@@ -4292,6 +4308,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Centre du rectangle en pixels (calculé UNE FOIS hors boucle)
                 const rectCenterPoint = map.latLngToContainerPoint([centerLat, centerLng])
                 
+                // CRITIQUE: Utiliser dimensions RECTANGLE stockées (pas dimensions modules)
+                // Calculer espacement entre modules depuis dimensions totales
+                const gridCellWidth = this.originalWidthPixels / this.cols
+                const gridCellHeight = this.originalHeightPixels / this.rows
+                
+                console.log("📊 Grille:", gridCellWidth.toFixed(1) + "px x " + gridCellHeight.toFixed(1) + "px par cellule")
+                
                 // Précalcul cos/sin pour rotation (optimisation)
                 const cos = Math.cos(rotationAngle)
                 const sin = Math.sin(rotationAngle)
@@ -4301,10 +4324,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const positionInString = (globalPosition % 24) + 1
                     
                     for (let col = 0; col < this.cols; col++) {
-                        // ROTATION RIGIDE EN PIXEL PUR
+                        // ROTATION RIGIDE EN PIXEL PUR - Utilise dimensions RECTANGLE
                         // Position relative du module dans grille NON pivotée (0,0 = centre)
-                        const relX = (col - (this.cols - 1) / 2) * moduleWidthPixels
-                        const relY = (row - (this.rows - 1) / 2) * moduleHeightPixels
+                        const relX = (col - (this.cols - 1) / 2) * gridCellWidth
+                        const relY = (row - (this.rows - 1) / 2) * gridCellHeight
                         
                         // Rotation 2D pure autour centre rectangle
                         const rotatedX = rectCenterPoint.x + (relX * cos - relY * sin)
@@ -4672,14 +4695,21 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             onTransformEnd() {
-                // IMPORTANT: Mettre à jour centre original après resize
-                this.originalCenter = this.rectangle.getBounds().getCenter()
-                this.originalBounds = this.rectangle.getBounds()
+                // IMPORTANT: Mettre à jour centre ET dimensions après resize
+                const newBounds = this.rectangle.getBounds()
+                this.originalCenter = newBounds.getCenter()
+                this.originalBounds = newBounds
+                
+                // Recalculer dimensions pixel après resize
+                const nwPixel = map.latLngToContainerPoint(newBounds.getNorthWest())
+                const sePixel = map.latLngToContainerPoint(newBounds.getSouthEast())
+                this.originalWidthPixels = Math.abs(sePixel.x - nwPixel.x)
+                this.originalHeightPixels = Math.abs(sePixel.y - nwPixel.y)
                 
                 // Régénérer modules après resize
                 this.regenerateModules()
                 applyRectanglesToModules()
-                console.log("✅ Transform terminé - centre original MAJ - modules régénérés")
+                console.log("✅ Transform terminé - centre + dimensions MAJ - modules régénérés")
             }
             
             onRotationStart(e) {
