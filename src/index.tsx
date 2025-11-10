@@ -3657,8 +3657,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" id="showRectGrid" class="w-4 h-4">
-                                <label for="showRectGrid" class="text-gray-400">Afficher grille</label>
+                                <input type="checkbox" id="showRectGrid" class="w-4 h-4" checked>
+                                <label for="showRectGrid" class="text-gray-400">✨ Afficher grille modules</label>
                             </div>
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectLabels" class="w-4 h-4">
@@ -3667,6 +3667,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectInfo" class="w-4 h-4">
                                 <label for="showRectInfo" class="text-gray-400">Info rectangle</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="liveRotationPreview" class="w-4 h-4" checked>
+                                <label for="liveRotationPreview" class="text-gray-400">🔄 Aperçu temps réel rotation</label>
                             </div>
                         </div>
                     </div>
@@ -4121,10 +4125,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         // Variables pour rectangles modules (SolarEdge style)
         let moduleRectangles = [] // Array de RectangleModuleGroup
-        let showRectGrid = false      // Grille désactivée par défaut (vue épurée)
+        let showRectGrid = true       // Grille activée par défaut (aide alignement)
         let showRectLabels = false    // Labels désactivés par défaut
         let showRectInfo = false      // Info overlay désactivé par défaut
         let persistentEditMode = false  // Mode édition persistante (handles toujours actifs)
+        let liveRotationPreview = true  // Aperçu modules pendant rotation
         
         // Variables pour configuration électrique (onduleurs + strings) - NOUVEAU
         let inverters = [] // Array d'onduleurs: {id, inverter_name, rated_power_kw, ...}
@@ -4165,12 +4170,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.currentRotation = 0
                 this.rotatedPolygon = null
                 
-                // Créer rectangle Leaflet EDITABLE
+                // Créer rectangle Leaflet EDITABLE avec semi-transparence
                 this.rectangle = L.rectangle(initialBounds, {
-                    color: "#3b82f6",
-                    weight: 4,
-                    fillColor: "transparent",
-                    fillOpacity: 0,
+                    color: "#f59e0b",
+                    weight: 3,
+                    opacity: 0.8,
+                    fillColor: "#f59e0b",
+                    fillOpacity: 0.15,
                     className: "module-rectangle",
                     draggable: true
                 })
@@ -4700,6 +4706,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Rotation visuelle du rectangle
                 this.rotateRectangle(angleDiff)
                 this.updateHandles()
+                
+                // NOUVEAU: Aperçu modules en temps réel pendant rotation
+                if (liveRotationPreview) {
+                    this.regenerateModules()
+                }
             }
             
             onRotationEnd(e) {
@@ -4773,9 +4784,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         [newSW.lat, newSW.lng]
                     ], {
                         color: "#f59e0b",
-                        weight: 6,
-                        fillColor: "transparent",
-                        fillOpacity: 0
+                        weight: 3,
+                        opacity: 0.8,
+                        fillColor: "#f59e0b",
+                        fillOpacity: 0.15
                     })
                     
                     // Remplacer rectangle par polygon
@@ -7844,6 +7856,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
             document.getElementById('showRectInfo').addEventListener('change', toggleRectInfoVisibility)
             document.getElementById('togglePersistentEditBtn').addEventListener('click', togglePersistentEditMode)
+            document.getElementById('liveRotationPreview').addEventListener('change', (e) => {
+                liveRotationPreview = e.target.checked
+                console.log(liveRotationPreview ? "✅ Aperçu rotation temps réel activé" : "❌ Aperçu rotation temps réel désactivé")
+            })
             
             // Configuration électrique - Onduleurs
             const addInverterBtn = document.getElementById('addInverterBtn')
