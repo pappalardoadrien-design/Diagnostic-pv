@@ -4844,36 +4844,39 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             rotateRectangle(angleDegrees) {
-                const bounds = this.rectangle.getBounds()
-                const center = bounds.getCenter()
+                // ROTATION PIXEL PUR - Aucune déformation Mercator
                 
-                // Récupérer coins actuels
-                const nw = bounds.getNorthWest()
-                const ne = bounds.getNorthEast()
-                const sw = bounds.getSouthWest()
-                const se = bounds.getSouthEast()
+                // Utiliser centre original stocké (pas bounds qui peut être déformé)
+                const center = this.originalCenter
+                const centerPixel = map.latLngToContainerPoint(center)
                 
                 // Convertir angle en radians
                 const angleRad = angleDegrees * (Math.PI / 180)
                 const cos = Math.cos(angleRad)
                 const sin = Math.sin(angleRad)
                 
-                // Fonction rotation 2D autour centre
-                const rotatePoint = (lat, lng) => {
-                    const dx = lng - center.lng
-                    const dy = lat - center.lat
-                    
-                    return {
-                        lat: center.lat + (dy * cos - dx * sin),
-                        lng: center.lng + (dx * cos + dy * sin)
-                    }
-                }
+                // Calculer les 4 coins du rectangle NON pivoté en pixel
+                const halfWidth = this.originalWidthPixels / 2
+                const halfHeight = this.originalHeightPixels / 2
                 
-                // Appliquer rotation aux 4 coins
-                const newNW = rotatePoint(nw.lat, nw.lng)
-                const newNE = rotatePoint(ne.lat, ne.lng)
-                const newSW = rotatePoint(sw.lat, sw.lng)
-                const newSE = rotatePoint(se.lat, se.lng)
+                const cornersLocal = [
+                    { x: -halfWidth, y: -halfHeight },  // NW (top-left)
+                    { x: +halfWidth, y: -halfHeight },  // NE (top-right)
+                    { x: +halfWidth, y: +halfHeight },  // SE (bottom-right)
+                    { x: -halfWidth, y: +halfHeight }   // SW (bottom-left)
+                ]
+                
+                // Appliquer rotation 2D pure en pixel
+                const cornersRotated = cornersLocal.map(corner => ({
+                    x: centerPixel.x + (corner.x * cos - corner.y * sin),
+                    y: centerPixel.y + (corner.x * sin + corner.y * cos)
+                }))
+                
+                // Convertir coins pixel → GPS
+                const newNW = map.containerPointToLatLng([cornersRotated[0].x, cornersRotated[0].y])
+                const newNE = map.containerPointToLatLng([cornersRotated[1].x, cornersRotated[1].y])
+                const newSE = map.containerPointToLatLng([cornersRotated[2].x, cornersRotated[2].y])
+                const newSW = map.containerPointToLatLng([cornersRotated[3].x, cornersRotated[3].y])
                 
                 // IMPORTANT: Leaflet.rectangle ne supporte que rectangles alignés axes
                 // Pour rotation visuelle, on doit utiliser un polygon
