@@ -6961,13 +6961,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 updateRectanglesList()
                 applyRectanglesToModules()
                 
-                // Afficher panneau aide alignement
+                // Afficher panneau aide alignement (sans scroll automatique)
                 const helpPanel = document.getElementById('alignmentHelp')
                 if (helpPanel) {
                     helpPanel.classList.remove('hidden')
-                    setTimeout(() => {
-                        helpPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-                    }, 500)
+                    // SUPPRIMÉ: scrollIntoView() - agaçant pour l'utilisateur
+                    // L'utilisateur peut voir le panneau dans la sidebar sans scroll forcé
                 }
                 
                 alert(
