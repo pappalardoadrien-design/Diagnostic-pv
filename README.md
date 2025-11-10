@@ -244,11 +244,12 @@ diagnostic-hub/
 - ✅ Export stringsConfig dans PDF (tableau récap) ✅ **TERMINÉ**
 - ✅ Interface modification config sans tout replacer ✅ **TERMINÉ**
 
-**Phase 3 - Liaison EL**: 🔜 **PLANIFIÉ**
-- Liaison bidirectionnelle PV Cartography ↔ Audits EL
-- Table `pv_cartography_audit_links`
-- Synchronisation statuts modules GPS ↔ Audits
-- Vue unifiée cartographie + audits EL
+**Phase 3 - Liaison EL**: ✅ **100% COMPLÉTÉ** 🎉
+- ✅ Table `pv_cartography_audit_links` - Migration 0013
+- ✅ API endpoints liaison/sync (4 routes)
+- ✅ Synchronisation statuts modules EL → Canvas V2
+- ✅ UI: Bouton "Importer EL" dans Canvas V2
+- ✅ Workflow complet: Token → Link → Sync → Visualisation
 
 **Phase 4 - Avancé**: 🔜 **PLANIFIÉ**
 - Duplication layouts entre zones (templates)

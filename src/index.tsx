@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import pvModule from './modules/pv/routes/plants'
+import pvElLinksModule from './modules/pv/routes/el-links'
 import openSolarModule from './opensolar'
 import interconnectModule from './modules/interconnect'
 import syncModule from './modules/interconnect/sync'
@@ -49,6 +50,7 @@ app.route('/api/el', elModule)
 // MODULE PV CARTOGRAPHY - ARCHITECTURE MODULAIRE (NOUVEAU - NON-DESTRUCTIF)
 // ============================================================================
 app.route('/api/pv/plants', pvModule)
+app.route('/api/pv', pvElLinksModule)
 
 // ============================================================================
 // MODULE INTERCONNECT - Liaison entre modules (EL  PV Carto)
@@ -3540,6 +3542,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 <div class="flex gap-3">
                     <button id="elAuditBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded font-bold" title="Audit Électroluminescence">
                         <i class="fas fa-bolt mr-2"></i>AUDIT EL
+                    </button>
+                    <button id="importElAuditBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold" title="Importer audit EL existant">
+                        <i class="fas fa-download mr-2"></i>IMPORTER EL
                     </button>
                     <button id="saveAllBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-black">
                         <i class="fas fa-save mr-2"></i>ENREGISTRER TOUT
@@ -8281,6 +8286,66 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('elAuditBtn').addEventListener('click', () => {
                 window.location.href = '/api/el/audit/zone/' + zoneId
             })
+            
+            // Import Audit EL
+            document.getElementById('importElAuditBtn').addEventListener('click', importElAudit)
+        }
+        
+        // ================================================================
+        // IMPORT AUDIT EL DANS ZONE PV
+        // ================================================================
+        async function importElAudit() {
+            const token = prompt("Token Audit EL:" + String.fromCharCode(10) + "Entrez le token de l" + String.fromCharCode(39) + "audit EL à importer")
+            
+            if (!token || token.trim() === '') {
+                return
+            }
+            
+            if (!confirm("Importer audit EL ?" + String.fromCharCode(10) + String.fromCharCode(10) + "Token: " + token + String.fromCharCode(10) + String.fromCharCode(10) + "Cette action va:" + String.fromCharCode(10) + "1. Lier cet audit EL à la zone PV" + String.fromCharCode(10) + "2. Synchroniser les statuts modules" + String.fromCharCode(10) + String.fromCharCode(10) + "Continuer ?")) {
+                return
+            }
+            
+            try {
+                // Étape 1: Créer liaison
+                const linkResponse = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/link-el-audit\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ el_audit_token: token.trim() })
+                })
+                
+                const linkData = await linkResponse.json()
+                
+                if (!linkResponse.ok) {
+                    alert("ERREUR Liaison:" + String.fromCharCode(10) + linkData.error)
+                    return
+                }
+                
+                alert("✅ Liaison créée !" + String.fromCharCode(10) + String.fromCharCode(10) + "Audit: " + linkData.audit_project + String.fromCharCode(10) + "Client: " + linkData.audit_client + String.fromCharCode(10) + "Modules: " + linkData.total_modules + String.fromCharCode(10) + String.fromCharCode(10) + "Synchronisation en cours...")
+                
+                // Étape 2: Synchroniser statuts
+                const syncResponse = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/sync-from-el\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                
+                const syncData = await syncResponse.json()
+                
+                if (!syncResponse.ok) {
+                    alert("ATTENTION Synchronisation:" + String.fromCharCode(10) + syncData.error)
+                    return
+                }
+                
+                // Recharger modules
+                await loadModules()
+                renderModules()
+                updateStats()
+                
+                alert("🎉 IMPORT RÉUSSI !" + String.fromCharCode(10) + String.fromCharCode(10) + "Modules synchronisés: " + syncData.stats.synced + "/" + syncData.stats.total_pv_modules + String.fromCharCode(10) + "Modules avec défauts: " + syncData.stats.with_defects + String.fromCharCode(10) + String.fromCharCode(10) + "La carte a été mise à jour avec les statuts EL.")
+                
+            } catch (error) {
+                console.error('Erreur import audit EL:', error)
+                alert("ERREUR:" + String.fromCharCode(10) + error.message)
+            }
         }
         
         // ================================================================
