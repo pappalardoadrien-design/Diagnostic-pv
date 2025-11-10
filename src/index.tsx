@@ -7110,6 +7110,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateRectanglesList()
             applyRectanglesToModules()
             
+            // IMPORTANT: Forcer fix du rectangle pour s'assurer qu'il est bien sur la carte
+            setTimeout(() => {
+                fixRectanglesOnMap()
+            }, 100)
+            
             alert("✅ Rectangle créé: " + (rows * cols) + " modules" + String.fromCharCode(10) + "Déplacez et redimensionnez avec les poignées")
         }
         
@@ -7227,6 +7232,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 updateRectanglesList()
                 applyRectanglesToModules()
+                
+                // IMPORTANT: Forcer fix du rectangle pour s'assurer qu'il est bien sur la carte
+                setTimeout(() => {
+                    fixRectanglesOnMap()
+                }, 100)
                 
                 // Afficher panneau aide alignement (sans scroll automatique)
                 const helpPanel = document.getElementById('alignmentHelp')
