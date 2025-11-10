@@ -4242,7 +4242,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     fillColor: "#f59e0b",
                     fillOpacity: 0.15,
                     className: "module-rectangle",
-                    draggable: true
+                    draggable: true,
+                    pmIgnore: false  // Activer Leaflet.PM pour drag & drop
                 })
                 
                 // Event listeners pour édition
@@ -4566,6 +4567,26 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rectangle.addTo(drawnItems)
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
+                
+                // Activer mode drag avec Leaflet.PM
+                if (this.rectangle.pm) {
+                    this.rectangle.pm.enable({ draggable: true })
+                    
+                    // Event dragend pour mettre à jour position
+                    this.rectangle.on('pm:dragend', () => {
+                        const newBounds = this.rectangle.getBounds()
+                        this.originalCenter = newBounds.getCenter()
+                        this.originalBounds = newBounds
+                        
+                        // Régénérer modules avec nouvelle position
+                        this.regenerateModules()
+                        
+                        // Sauvegarder config rectangles
+                        saveRectanglesConfig()
+                        
+                        console.log("✅ Rectangle déplacé - nouvelle position:", this.originalCenter.lat.toFixed(6), this.originalCenter.lng.toFixed(6))
+                    })
+                }
                 
                 // Event listener pour activer handles au clic
                 this.rectangle.on('click', () => {
