@@ -6008,7 +6008,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             const coords = roofPolygon.getLatLngs()[0].map(ll => [ll.lat, ll.lng])
             
             try {
-                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/roof\`, {
+                const apiUrl = "/api/pv/plants/" + plantId + "/zones/" + zoneId + "/roof"
+                await fetch(apiUrl, {
                     method: "PUT",
                     headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify({
@@ -6180,7 +6181,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             try {
-                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/config\`, {
+                const apiUrl = "/api/pv/plants/" + plantId + "/zones/" + zoneId + "/config"
+                await fetch(apiUrl, {
                     method: "PUT",
                     headers: { 'Content-Type': "application/json" },
                     body: JSON.stringify(config)
