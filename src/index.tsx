@@ -3695,12 +3695,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
+                                <input type="checkbox" id="showModules" class="w-4 h-4">
+                                <label for="showModules" class="text-gray-400">🔢 Afficher numéros modules</label>
+                            </div>
+                            <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectGrid" class="w-4 h-4" checked>
                                 <label for="showRectGrid" class="text-gray-400">✨ Afficher grille modules</label>
                             </div>
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectLabels" class="w-4 h-4">
-                                <label for="showRectLabels" class="text-gray-400">Afficher labels</label>
+                                <label for="showRectLabels" class="text-gray-400">Afficher labels (obsolète)</label>
                             </div>
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" id="showRectInfo" class="w-4 h-4">
@@ -4168,6 +4172,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         // Variables pour rectangles modules (SolarEdge style)
         let moduleRectangles = [] // Array de RectangleModuleGroup
+        let showModules = false       // Affichage modules désactivé par défaut (nouveau)
         let showRectGrid = true       // Grille activée par défaut (aide alignement)
         let showRectLabels = false    // Labels désactivés par défaut
         let showRectInfo = false      // Info overlay désactivé par défaut
@@ -7292,6 +7297,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             })
         }
         
+        function toggleModulesVisibility() {
+            showModules = document.getElementById('showModules').checked
+            console.log(showModules ? "✅ Affichage modules activé" : "❌ Affichage modules désactivé")
+            renderModules()
+        }
+        
         function toggleRectLabelsVisibility() {
             showRectLabels = document.getElementById('showRectLabels').checked
             renderModules()
@@ -7350,11 +7361,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         function renderModules() {
             console.log(" renderModules: Nombre de modules à afficher:", modules.length)
             
+            // Toujours nettoyer les modules existants
             drawnItems.eachLayer(layer => {
                 if (layer.options.className && layer.options.className.startsWith('module-')) {
                     drawnItems.removeLayer(layer)
                 }
             })
+            
+            // Si showModules est false, ne rien afficher
+            if (!showModules) {
+                console.log("⚠️ Affichage modules désactivé (showModules = false)")
+                return
+            }
             
             modules.forEach((module, index) => {
                 // Ignorer modules sans coordonnées GPS valides
@@ -8257,6 +8275,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('import242SingleBtn').addEventListener('click', import242SingleArray)
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
+            document.getElementById('showModules').addEventListener('change', toggleModulesVisibility)
             document.getElementById('showRectGrid').addEventListener('change', toggleRectGridVisibility)
             document.getElementById('showRectLabels').addEventListener('change', toggleRectLabelsVisibility)
             document.getElementById('hideAlignmentHelp').addEventListener('click', () => {
