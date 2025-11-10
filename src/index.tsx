@@ -7110,9 +7110,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateRectanglesList()
             applyRectanglesToModules()
             
-            // IMPORTANT: Forcer fix du rectangle pour s'assurer qu'il est bien sur la carte
+            // CRITIQUE: Forcer fix IMMÉDIATEMENT après création
             setTimeout(() => {
                 fixRectanglesOnMap()
+                // Afficher les handles du rectangle nouvellement créé
+                rect.showHandles()
             }, 100)
             
             alert("✅ Rectangle créé: " + (rows * cols) + " modules" + String.fromCharCode(10) + "Déplacez et redimensionnez avec les poignées")
@@ -7321,6 +7323,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             updateRectanglesList()
             applyRectanglesToModules()
+            
+            // CRITIQUE: Forcer fix IMMÉDIATEMENT après duplication
+            setTimeout(() => {
+                fixRectanglesOnMap()
+                // Afficher les handles du rectangle dupliqué
+                rect.showHandles()
+            }, 100)
             
             alert("Rectangle duplique" + String.fromCharCode(10) + "String depart: " + newStringStart)
         }
