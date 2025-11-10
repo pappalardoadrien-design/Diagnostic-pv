@@ -4308,12 +4308,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 // Centre du rectangle en pixels (calculé UNE FOIS hors boucle)
                 const rectCenterPoint = map.latLngToContainerPoint([centerLat, centerLng])
                 
-                // CRITIQUE: Utiliser dimensions RECTANGLE stockées (pas dimensions modules)
-                // Calculer espacement entre modules depuis dimensions totales
-                const gridCellWidth = this.originalWidthPixels / this.cols
-                const gridCellHeight = this.originalHeightPixels / this.rows
+                // CRITIQUE: Recalculer dimensions pixel depuis bounds originaux AU ZOOM ACTUEL
+                // (originalWidthPixels/Height peuvent être obsolètes si zoom a changé)
+                const currentNWPixel = map.latLngToContainerPoint(this.originalBounds.getNorthWest())
+                const currentSEPixel = map.latLngToContainerPoint(this.originalBounds.getSouthEast())
+                const currentWidthPixels = Math.abs(currentSEPixel.x - currentNWPixel.x)
+                const currentHeightPixels = Math.abs(currentSEPixel.y - currentNWPixel.y)
                 
-                console.log("📊 Grille:", gridCellWidth.toFixed(1) + "px x " + gridCellHeight.toFixed(1) + "px par cellule")
+                // Calculer espacement entre modules depuis dimensions totales
+                const gridCellWidth = currentWidthPixels / this.cols
+                const gridCellHeight = currentHeightPixels / this.rows
+                
+                console.log("📊 Grille:", gridCellWidth.toFixed(1) + "px x " + gridCellHeight.toFixed(1) + "px par cellule (zoom=" + map.getZoom() + ")")
                 
                 // Précalcul cos/sin pour rotation (optimisation)
                 const cos = Math.cos(rotationAngle)
