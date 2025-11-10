@@ -1359,23 +1359,35 @@ app.get('/audit/:token', async (c) => {
         const AUDIT_TOKEN = '${token}'
         
         async function loadPlantLink() {
+            const btn = document.getElementById('pvCartoBtn')
+            if (!btn) return
+            
             try {
                 const response = await fetch(\`/api/interconnect/audit/\${AUDIT_TOKEN}/plant\`)
                 const data = await response.json()
                 
                 if (data.linked && data.plant) {
-                    const btn = document.getElementById('pvCartoBtn')
-                    if (btn) {
-                        btn.style.display = 'flex'
-                        btn.onclick = () => {
-                            window.location.href = \`/pv/plant/\${data.plant.plant_id}\`
-                        }
-                        btn.title = \`Cartographie PV: \${data.plant.plant_name || 'Centrale liée'}\`
-                        console.log("✅ Centrale PV liée:", data.plant.plant_name)
+                    btn.style.display = 'flex'
+                    btn.onclick = () => {
+                        window.location.href = \`/pv/plant/\${data.plant.plant_id}\`
                     }
+                    btn.title = \`Cartographie PV: \${data.plant.plant_name || 'Centrale liée'}\`
+                    console.log("✅ Centrale PV liée:", data.plant.plant_name)
+                } else {
+                    btn.style.display = 'flex'
+                    btn.onclick = () => {
+                        window.location.href = \`/api/pv/el-audit/\${AUDIT_TOKEN}/quick-map\`
+                    }
+                    btn.title = "Créer cartographie PV depuis cet audit EL"
+                    console.log("ℹ️ Bouton Quick-Map activé")
                 }
             } catch (error) {
-                console.log("ℹ️ Aucune centrale PV liée à cet audit")
+                btn.style.display = 'flex'
+                btn.onclick = () => {
+                    window.location.href = \`/api/pv/el-audit/\${AUDIT_TOKEN}/quick-map\`
+                }
+                btn.title = "Créer cartographie PV depuis cet audit EL"
+                console.log("ℹ️ Bouton Quick-Map activé (fallback)")
             }
         }
         
@@ -7285,7 +7297,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // Ouvrir modal sélection audit EL
         async function openImportELModal() {
             if (!roofPolygon) {
-                alert("Créez d'abord un polygone de toiture (Étape 0)")
+                // // alert("Creez d'abord un polygone de toiture (Étape 0)")
                 return
             }
             
@@ -7303,7 +7315,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const data = await response.json()
                 
                 if (!data.success || !data.audits || data.audits.length === 0) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p>Aucun audit EL disponible</p><p class="text-xs mt-2">Créez d\'abord des audits dans Module EL</p></div>'
+                    container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p>Aucun audit EL disponible</p><p class="text-xs mt-2">Créez dabord des audits dans Module EL</p></div>'
                     return
                 }
                 
@@ -7316,7 +7328,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     return '<div class="audit-item bg-gray-800 border border-gray-700 hover:border-purple-400 rounded-lg p-4 cursor-pointer transition-all" ' +
                              'data-audit-id="' + audit.id + '" ' +
                              'data-audit-token="' + audit.audit_token + '" ' +
-                             'onclick="selectAuditForImport(\'' + audit.audit_token + '\', ' + audit.string_count + ', ' + audit.modules_per_string + ')">'
+                             'data-string-count="' + audit.string_count + '" ' +
+                             'data-modules-per-string="' + audit.modules_per_string + '" ' +
+                             'onclick="selectAuditForImport(this.dataset.auditToken, parseInt(this.dataset.stringCount), parseInt(this.dataset.modulesPerString))\">' +
                             '<div class="flex items-start justify-between">' +
                                 '<div class="flex-1">' +
                                     '<h4 class="font-bold text-lg text-purple-400 mb-1">' +
@@ -7369,7 +7383,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         
         // Sélectionner et importer un audit EL
         async function selectAuditForImport(auditToken, stringCount, modulesPerString) {
-            if (!confirm("Importer la configuration depuis cet audit EL ?\n\nStrings: " + stringCount + "\nModules/string: " + modulesPerString + "\nTotal: " + (stringCount * modulesPerString) + " modules")) {
+            const totalModules = stringCount * modulesPerString
+            if (!confirm("Importer cet audit EL ? (" + stringCount + " strings x " + modulesPerString + " modules = " + totalModules + " modules total)")) {
                 return
             }
             
@@ -7492,7 +7507,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         // Fonction legacy import 242 (conservée pour compatibilité)
         async function import242SingleArray() {
             if (!roofPolygon) {
-                alert("Creez d'abord un polygone de toiture (Etape 0)")
+                // alert("Creez d'abord un polygone de toiture (Etape 0)")
                 return
             }
             
@@ -9727,7 +9742,7 @@ app.get('/pv/plant/:id', async (c) => {
         const createAuditBtnEl = document.getElementById('createAuditBtn')
         if (createAuditBtnEl) {
             createAuditBtnEl.addEventListener('click', async () => {
-                if (!confirm(\`Créer un nouvel audit EL à partir de cette centrale PV ?\n\nToutes les zones et modules seront importés automatiquement.\`)) {
+                if (!confirm("Créer un nouvel audit EL depuis cette centrale PV ? Toutes les zones et modules seront importes automatiquement.")) {
                     return
                 }
                 

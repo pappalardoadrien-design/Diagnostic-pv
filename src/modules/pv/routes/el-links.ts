@@ -308,4 +308,141 @@ app.post('/plants/:plantId/zones/:zoneId/sync-from-el', async (c) => {
   }
 })
 
+// ============================================================================
+// GET /api/pv/el-audit/:auditToken/quick-map
+// Workflow rapide: Créer centrale + zone et rediriger vers Canvas V2
+// ============================================================================
+app.get('/el-audit/:auditToken/quick-map', async (c) => {
+  const auditToken = c.req.param('auditToken')
+  
+  try {
+    const { DB } = c.env
+    
+    // 1. Récupérer l'audit EL
+    const audit = await DB.prepare('SELECT * FROM el_audits WHERE audit_token = ?')
+      .bind(auditToken)
+      .first()
+    
+    if (!audit) {
+      return c.json({ error: 'Audit EL introuvable' }, 404)
+    }
+    
+    // 2. Vérifier si une centrale existe déjà pour cet audit
+    const existingLink = await DB.prepare(`
+      SELECT l.*, z.id as zone_id, p.id as plant_id
+      FROM pv_cartography_audit_links l
+      LEFT JOIN pv_zones z ON l.pv_zone_id = z.id
+      LEFT JOIN pv_plants p ON l.pv_plant_id = p.id
+      WHERE l.el_audit_token = ?
+      LIMIT 1
+    `).bind(auditToken).first()
+    
+    if (existingLink && existingLink.plant_id && existingLink.zone_id) {
+      // Rediriger vers l'éditeur existant
+      return c.redirect(`/pv/plant/${existingLink.plant_id}/zone/${existingLink.zone_id}/editor/v2`)
+    }
+    
+    // 3. Créer nouvelle centrale PV
+    const plantName = `${audit.project_name} - Cartographie`
+    const plantResult = await DB.prepare(`
+      INSERT INTO pv_plants (plant_name, address, notes, total_power_kwp)
+      VALUES (?, ?, ?, ?)
+    `).bind(
+      plantName,
+      audit.location || 'Localisation non définie',
+      `Centrale créée automatiquement depuis audit EL ${auditToken}`,
+      0 // Will be calculated later
+    ).run()
+    
+    const plantId = plantResult.meta.last_row_id
+    
+    // 4. Créer zone principale
+    const zoneName = `Zone 1 - ${audit.string_count}×${audit.modules_per_string}`
+    const zoneResult = await DB.prepare(`
+      INSERT INTO pv_zones (
+        plant_id, zone_name, zone_type, azimuth, tilt, notes
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      plantId,
+      zoneName,
+      'ground',
+      180, // South by default
+      30,  // Default tilt
+      `Zone créée pour audit ${auditToken} - ${audit.total_modules} modules`
+    ).run()
+    
+    const zoneId = zoneResult.meta.last_row_id
+    
+    // 5. Créer les modules PV depuis l'audit EL
+    const elModules = await DB.prepare(`
+      SELECT id, string_number, position_in_string, defect_type, severity_level, comment
+      FROM el_modules
+      WHERE el_audit_id = ?
+      ORDER BY string_number, position_in_string
+    `).bind(audit.id).all()
+    
+    if (elModules.results && elModules.results.length > 0) {
+      for (const elMod of elModules.results) {
+        const moduleId = `S${elMod.string_number}M${elMod.position_in_string}`
+        
+        await DB.prepare(`
+          INSERT INTO pv_modules (
+            zone_id, module_identifier, string_number, position_in_string,
+            pos_x_meters, pos_y_meters, rotation,
+            el_audit_id, el_audit_token, el_module_id,
+            el_defect_type, el_severity_level, el_notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          zoneId,
+          moduleId,
+          elMod.string_number,
+          elMod.position_in_string,
+          0, // pos_x - will be positioned manually in Canvas V2
+          0, // pos_y
+          0, // rotation
+          audit.id,
+          auditToken,
+          elMod.id,
+          elMod.defect_type || 'pending',
+          elMod.severity_level || 0,
+          elMod.comment
+        ).run()
+      }
+      
+      console.log(`✅ ${elModules.results.length} modules créés automatiquement`)
+    }
+    
+    // 6. Créer la liaison
+    await DB.prepare(`
+      INSERT INTO pv_cartography_audit_links (
+        pv_zone_id,
+        pv_plant_id,
+        el_audit_id,
+        el_audit_token,
+        link_type,
+        sync_direction,
+        sync_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      zoneId,
+      plantId,
+      audit.id,
+      auditToken,
+      'auto',
+      'el_to_pv',
+      'linked'
+    ).run()
+    
+    // 7. Rediriger vers l'éditeur Canvas V2
+    return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v2`)
+    
+  } catch (error: any) {
+    console.error('Erreur quick-map:', error)
+    return c.json({ 
+      error: 'Erreur création cartographie rapide', 
+      details: error.message 
+    }, 500)
+  }
+})
+
 export default app
