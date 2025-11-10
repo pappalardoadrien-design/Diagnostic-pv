@@ -3048,6 +3048,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
                 restoreStringsConfigFromLocalStorage()
             }
             
+            // Vérifier liaison audit EL
+            await checkElLink()
+            
             render()
             setupEventListeners()
         }
@@ -3546,6 +3549,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     <button id="importElAuditBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold" title="Importer audit EL existant">
                         <i class="fas fa-download mr-2"></i>IMPORTER EL
                     </button>
+                    <div id="elLinkStatus" class="hidden bg-purple-900 border-2 border-purple-500 px-4 py-2 rounded">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-link text-purple-400"></i>
+                            <div class="flex-1">
+                                <div class="text-xs text-purple-400 font-bold">LIÉ À AUDIT EL</div>
+                                <div id="elLinkInfo" class="text-xs text-white"></div>
+                            </div>
+                            <button id="viewElAuditBtn" class="bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded text-xs font-bold" title="Voir l'audit EL">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button id="resyncElBtn" class="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-bold" title="Re-synchroniser">
+                                <i class="fas fa-sync"></i>
+                            </button>
+                            <button id="unlinkElBtn" class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs font-bold" title="Délier">
+                                <i class="fas fa-unlink"></i>
+                            </button>
+                        </div>
+                    </div>
                     <button id="saveAllBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-black">
                         <i class="fas fa-save mr-2"></i>ENREGISTRER TOUT
                     </button>
@@ -8289,6 +8310,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Import Audit EL
             document.getElementById('importElAuditBtn').addEventListener('click', importElAudit)
+            
+            // Gestion liaison EL
+            const viewElBtn = document.getElementById('viewElAuditBtn')
+            const resyncBtn = document.getElementById('resyncElBtn')
+            const unlinkBtn = document.getElementById('unlinkElBtn')
+            
+            if (viewElBtn) viewElBtn.addEventListener('click', viewElAudit)
+            if (resyncBtn) resyncBtn.addEventListener('click', resyncEl)
+            if (unlinkBtn) unlinkBtn.addEventListener('click', unlinkEl)
         }
         
         // ================================================================
@@ -8344,6 +8374,138 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
             } catch (error) {
                 console.error('Erreur import audit EL:', error)
+                alert("ERREUR:" + String.fromCharCode(10) + error.message)
+            }
+            
+            // Refresh liaison après import
+            await checkElLink()
+        }
+        
+        // ================================================================
+        // GESTION LIAISON AUDIT EL
+        // ================================================================
+        let currentElLink = null
+        
+        async function checkElLink() {
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/el-link\`)
+                const data = await response.json()
+                
+                if (data.linked && data.link) {
+                    currentElLink = data.link
+                    showElLinkStatus(data.link)
+                } else {
+                    currentElLink = null
+                    hideElLinkStatus()
+                }
+            } catch (error) {
+                console.error('Erreur vérification liaison EL:', error)
+            }
+        }
+        
+        function showElLinkStatus(link) {
+            const statusDiv = document.getElementById('elLinkStatus')
+            const infoDiv = document.getElementById('elLinkInfo')
+            const importBtn = document.getElementById('importElAuditBtn')
+            
+            if (statusDiv && infoDiv) {
+                statusDiv.classList.remove('hidden')
+                infoDiv.textContent = link.project_name + " (" + link.total_modules + " modules, " + (link.total_modules_synced || 0) + " syncés)"
+            }
+            
+            if (importBtn) {
+                importBtn.classList.add('hidden')
+            }
+        }
+        
+        function hideElLinkStatus() {
+            const statusDiv = document.getElementById('elLinkStatus')
+            const importBtn = document.getElementById('importElAuditBtn')
+            
+            if (statusDiv) {
+                statusDiv.classList.add('hidden')
+            }
+            
+            if (importBtn) {
+                importBtn.classList.remove('hidden')
+            }
+        }
+        
+        async function viewElAudit() {
+            if (!currentElLink) {
+                alert("Aucune liaison trouvée")
+                return
+            }
+            
+            window.location.href = '/audit/' + currentElLink.el_audit_token
+        }
+        
+        async function resyncEl() {
+            if (!currentElLink) {
+                alert("Aucune liaison trouvée")
+                return
+            }
+            
+            if (!confirm("Re-synchroniser les statuts depuis l" + String.fromCharCode(39) + "audit EL ?" + String.fromCharCode(10) + String.fromCharCode(10) + "Audit: " + currentElLink.project_name + String.fromCharCode(10) + String.fromCharCode(10) + "Les statuts modules seront mis à jour.")) {
+                return
+            }
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/sync-from-el\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                
+                const data = await response.json()
+                
+                if (!response.ok) {
+                    alert("ERREUR:" + String.fromCharCode(10) + data.error)
+                    return
+                }
+                
+                // Recharger modules
+                await loadModules()
+                renderModules()
+                updateStats()
+                await checkElLink()
+                
+                alert("✅ Re-synchronisation réussie !" + String.fromCharCode(10) + String.fromCharCode(10) + "Modules synchronisés: " + data.stats.synced + "/" + data.stats.total_pv_modules + String.fromCharCode(10) + "Modules avec défauts: " + data.stats.with_defects)
+                
+            } catch (error) {
+                console.error('Erreur re-sync:', error)
+                alert("ERREUR:" + String.fromCharCode(10) + error.message)
+            }
+        }
+        
+        async function unlinkEl() {
+            if (!currentElLink) {
+                alert("Aucune liaison trouvée")
+                return
+            }
+            
+            if (!confirm("ATTENTION: Délier l" + String.fromCharCode(39) + "audit EL ?" + String.fromCharCode(10) + String.fromCharCode(10) + "Audit: " + currentElLink.project_name + String.fromCharCode(10) + String.fromCharCode(10) + "Les statuts modules resteront sur la carte." + String.fromCharCode(10) + "Vous pourrez relancer un import plus tard." + String.fromCharCode(10) + String.fromCharCode(10) + "Continuer ?")) {
+                return
+            }
+            
+            try {
+                const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/el-link\`, {
+                    method: 'DELETE'
+                })
+                
+                const data = await response.json()
+                
+                if (!response.ok) {
+                    alert("ERREUR:" + String.fromCharCode(10) + data.error)
+                    return
+                }
+                
+                currentElLink = null
+                hideElLinkStatus()
+                
+                alert("✅ Liaison supprimée !" + String.fromCharCode(10) + String.fromCharCode(10) + "Les statuts modules sont conservés sur la carte." + String.fromCharCode(10) + "Vous pouvez importer un nouvel audit EL.")
+                
+            } catch (error) {
+                console.error('Erreur déliaison:', error)
                 alert("ERREUR:" + String.fromCharCode(10) + error.message)
             }
         }
