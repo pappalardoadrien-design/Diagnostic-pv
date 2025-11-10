@@ -4292,7 +4292,16 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 console.log("Tech Module:", moduleWidthPixels.toFixed(1) + "px x " + moduleHeightPixels.toFixed(1) + "px")
                 
-                // Generate grid with bilinear interpolation
+                // NOUVEAU: Generate grid avec rotation RIGIDE (pas de déformation)
+                // Calcul angle de rotation du rectangle si pivoté
+                let rotationAngle = 0
+                if (this.rotatedPolygon) {
+                    // Rectangle pivoté → calculer angle entre NW et NE
+                    const dx = ne.lng - nw.lng
+                    const dy = ne.lat - nw.lat
+                    rotationAngle = Math.atan2(dy, dx)
+                }
+                
                 this.modules = []
                 let globalPosition = 0
                 
@@ -4301,21 +4310,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const positionInString = (globalPosition % 24) + 1
                     
                     for (let col = 0; col < this.cols; col++) {
-                        // Ratios for bilinear interpolation (CENTER of each module)
-                        const rowRatio = this.rows > 1 ? (row + 0.5) / this.rows : 0.5
-                        const colRatio = this.cols > 1 ? (col + 0.5) / this.cols : 0.5
+                        // NOUVEAU: Position dans grille rectangulaire rigide (en pixels)
+                        // Centre du rectangle en pixels
+                        const rectCenterPoint = map.latLngToContainerPoint([centerLat, centerLng])
                         
-                        // Interpolate top edge
-                        const topLat = nw.lat + (ne.lat - nw.lat) * colRatio
-                        const topLng = nw.lng + (ne.lng - nw.lng) * colRatio
+                        // Position relative du module dans la grille (0,0 = centre du rectangle)
+                        const relX = (col - (this.cols - 1) / 2) * moduleWidthPixels
+                        const relY = (row - (this.rows - 1) / 2) * moduleHeightPixels
                         
-                        // Interpolate bottom edge
-                        const bottomLat = sw.lat + (se.lat - sw.lat) * colRatio
-                        const bottomLng = sw.lng + (se.lng - sw.lng) * colRatio
+                        // Appliquer rotation rigide autour centre rectangle
+                        const cos = Math.cos(rotationAngle)
+                        const sin = Math.sin(rotationAngle)
                         
-                        // Final CENTER position (interpolate vertically)
-                        const centerLat = topLat + (bottomLat - topLat) * rowRatio
-                        const centerLng = topLng + (bottomLng - topLng) * rowRatio
+                        const rotatedX = rectCenterPoint.x + (relX * cos - relY * sin)
+                        const rotatedY = rectCenterPoint.y + (relX * sin + relY * cos)
+                        
+                        // Convertir position pixel en GPS
+                        const moduleCenter = map.containerPointToLatLng([rotatedX, rotatedY])
+                        const centerLat = moduleCenter.lat
+                        const centerLng = moduleCenter.lng
                         
                         // Convertir centre en pixels
                         const centerPoint = map.latLngToContainerPoint([centerLat, centerLng])
