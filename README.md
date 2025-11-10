@@ -248,8 +248,9 @@ diagnostic-hub/
 - ✅ Table `pv_cartography_audit_links` - Migration 0013
 - ✅ API endpoints liaison/sync (4 routes)
 - ✅ Synchronisation statuts modules EL → Canvas V2
-- ✅ UI: Bouton "Importer EL" dans Canvas V2
-- ✅ Workflow complet: Token → Link → Sync → Visualisation
+- ✅ UI: Bouton "Importer EL" + Badge liaison active
+- ✅ Gestion complète: Voir/Re-sync/Délier
+- ✅ Workflow complet: Token → Link → Sync → Gestion → Visualisation
 
 **Phase 4 - Avancé**: 🔜 **PLANIFIÉ**
 - Duplication layouts entre zones (templates)
