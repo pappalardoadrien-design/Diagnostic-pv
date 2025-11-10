@@ -4293,59 +4293,61 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log("Tech Module:", moduleWidthPixels.toFixed(1) + "px x " + moduleHeightPixels.toFixed(1) + "px")
                 
                 // NOUVEAU: Generate grid avec rotation RIGIDE (pas de déformation)
-                // Calcul angle de rotation du rectangle si pivoté
-                let rotationAngle = 0
-                if (this.rotatedPolygon) {
-                    // Rectangle pivoté → calculer angle entre NW et NE
-                    const dx = ne.lng - nw.lng
-                    const dy = ne.lat - nw.lat
-                    rotationAngle = Math.atan2(dy, dx)
-                }
+                // Utiliser angle de rotation RÉEL stocké (pas les coords GPS déformées)
+                const rotationAngle = (this.currentRotation || 0) * (Math.PI / 180)  // Convertir degrés → radians
+                
+                console.log("🔄 Rotation rigide:", this.currentRotation + "° = " + rotationAngle.toFixed(3) + " rad")
                 
                 this.modules = []
                 let globalPosition = 0
+                
+                // Centre du rectangle en pixels (calculé UNE FOIS hors boucle)
+                const rectCenterPoint = map.latLngToContainerPoint([centerLat, centerLng])
+                
+                // Précalcul cos/sin pour rotation (optimisation)
+                const cos = Math.cos(rotationAngle)
+                const sin = Math.sin(rotationAngle)
                 
                 for (let row = 0; row < this.rows; row++) {
                     const currentString = this.stringStart + Math.floor(globalPosition / 24)
                     const positionInString = (globalPosition % 24) + 1
                     
                     for (let col = 0; col < this.cols; col++) {
-                        // NOUVEAU: Position dans grille rectangulaire rigide (en pixels)
-                        // Centre du rectangle en pixels
-                        const rectCenterPoint = map.latLngToContainerPoint([centerLat, centerLng])
-                        
-                        // Position relative du module dans la grille (0,0 = centre du rectangle)
+                        // ROTATION RIGIDE EN PIXEL PUR
+                        // Position relative du module dans grille NON pivotée (0,0 = centre)
                         const relX = (col - (this.cols - 1) / 2) * moduleWidthPixels
                         const relY = (row - (this.rows - 1) / 2) * moduleHeightPixels
                         
-                        // Appliquer rotation rigide autour centre rectangle
-                        const cos = Math.cos(rotationAngle)
-                        const sin = Math.sin(rotationAngle)
-                        
+                        // Rotation 2D pure autour centre rectangle
                         const rotatedX = rectCenterPoint.x + (relX * cos - relY * sin)
                         const rotatedY = rectCenterPoint.y + (relX * sin + relY * cos)
                         
-                        // Convertir position pixel en GPS
+                        // Coins du module en pixels (AVANT conversion GPS)
+                        const halfWidth = moduleWidthPixels / 2
+                        const halfHeight = moduleHeightPixels / 2
+                        
+                        // Les 4 coins du module NON pivoté
+                        const corners = [
+                            { x: -halfWidth, y: -halfHeight },  // Top-left
+                            { x: +halfWidth, y: -halfHeight },  // Top-right
+                            { x: +halfWidth, y: +halfHeight },  // Bottom-right
+                            { x: -halfWidth, y: +halfHeight }   // Bottom-left
+                        ]
+                        
+                        // Appliquer rotation aux 4 coins
+                        const rotatedCorners = corners.map(corner => ({
+                            x: rotatedX + (corner.x * cos - corner.y * sin),
+                            y: rotatedY + (corner.x * sin + corner.y * cos)
+                        }))
+                        
+                        // Convertir centre module en GPS
                         const moduleCenter = map.containerPointToLatLng([rotatedX, rotatedY])
                         const moduleCenterLat = moduleCenter.lat
                         const moduleCenterLng = moduleCenter.lng
                         
-                        // Convertir centre en pixels
-                        const centerPoint = map.latLngToContainerPoint([moduleCenterLat, moduleCenterLng])
-                        
-                        // Calculer coins du module en pixels
-                        const moduleTopLeft = L.point(
-                            centerPoint.x - moduleWidthPixels / 2,
-                            centerPoint.y - moduleHeightPixels / 2
-                        )
-                        const moduleBottomRight = L.point(
-                            centerPoint.x + moduleWidthPixels / 2,
-                            centerPoint.y + moduleHeightPixels / 2
-                        )
-                        
-                        // Convertir coins en GPS
-                        const moduleNW = map.containerPointToLatLng(moduleTopLeft)
-                        const moduleSE = map.containerPointToLatLng(moduleBottomRight)
+                        // Convertir coins en GPS (pour bounds précis)
+                        const moduleNW = map.containerPointToLatLng([rotatedCorners[0].x, rotatedCorners[0].y])
+                        const moduleSE = map.containerPointToLatLng([rotatedCorners[2].x, rotatedCorners[2].y])
                         
                         this.modules.push({
                             id: null,
