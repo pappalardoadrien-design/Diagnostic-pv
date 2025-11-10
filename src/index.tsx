@@ -4327,11 +4327,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         
                         // Convertir position pixel en GPS
                         const moduleCenter = map.containerPointToLatLng([rotatedX, rotatedY])
-                        const centerLat = moduleCenter.lat
-                        const centerLng = moduleCenter.lng
+                        const moduleCenterLat = moduleCenter.lat
+                        const moduleCenterLng = moduleCenter.lng
                         
                         // Convertir centre en pixels
-                        const centerPoint = map.latLngToContainerPoint([centerLat, centerLng])
+                        const centerPoint = map.latLngToContainerPoint([moduleCenterLat, moduleCenterLng])
                         
                         // Calculer coins du module en pixels
                         const moduleTopLeft = L.point(
@@ -4351,8 +4351,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             id: null,
                             zone_id: parseInt(zoneId),
                             module_identifier: "S" + currentString + "-P" + (positionInString < 10 ? '0' : '') + positionInString,
-                            latitude: centerLat,
-                            longitude: centerLng,
+                            latitude: moduleCenterLat,
+                            longitude: moduleCenterLng,
                             pos_x_meters: col * 1.7,
                             pos_y_meters: row * 1.0,
                             width_meters: 1.7,
