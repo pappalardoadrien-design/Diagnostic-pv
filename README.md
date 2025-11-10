@@ -159,6 +159,13 @@ diagnostic-hub/
 - Sauvegarde modules individuels (identifier, string, position, lat/lng, statut)
 - Reload page restaure état complet (contour + config + modules)
 
+#### 📦 Export GeoJSON/KML/CSV (IEC 62446-1)
+- **3 formats export** - GeoJSON (cartographie web), KML (Google Earth), CSV (Excel)
+- **Traçabilité GPS normative** - Conformité IEC 62446-1 pour commissioning
+- **Métadonnées complètes** - Date, standard, source DiagPV, données techniques
+- **Téléchargement automatique** - Boutons export dans interface ÉTAPE 5
+- **⚠️ Workflow requis** - Import audit EL → Placement modules carte → Export (coordonnées GPS calculées lors placement)
+
 ### 📋 URLs Module PV Cartography
 
 #### Interface utilisateur
@@ -182,6 +189,9 @@ diagnostic-hub/
 - **`POST /api/pv/plants/:plantId/zones/:zoneId/modules`** - Créer modules (bulk)
 - **`PUT /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId`** - Modifier module
 - **`DELETE /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId`** - Supprimer module
+- **`GET /api/pv/plants/:plantId/zones/:zoneId/export/geojson`** - **Export GeoJSON (traçabilité IEC 62446-1)** ✨
+- **`GET /api/pv/plants/:plantId/zones/:zoneId/export/kml`** - **Export KML (Google Earth)** ✨
+- **`GET /api/pv/plants/:plantId/zones/:zoneId/export/csv`** - **Export CSV (Excel)** ✨
 
 ### 🔧 Implémentation Technique Canvas V2
 
@@ -205,25 +215,26 @@ diagnostic-hub/
 - `/PV_CARTOGRAPHY_COLOR_SYSTEM.md` - Référence 7 statuts couleurs
 - `/GOOGLE_MAPS_API_SETUP.md` - Guide création clé API
 
-### 📊 État Avancement Cartography (06/11/2025)
+### 📊 État Avancement Cartography (10/11/2025)
 
-**Phase 1 - Architecture Base**: ✅ **COMPLÉTÉ**
-- Tables D1 (pv_plants, pv_zones, pv_modules) avec GPS
-- Routes API CRUD centrales/zones/modules
-- Vue stats agrégation 7 statuts
-
-**Phase 2a - Canvas V2 GPS**: ✅ **100% COMPLÉTÉ** 🎉
-- ✅ Carte Leaflet + Esri Satellite zoom 22
+**Phase 1 MVP - Architecture Base + Features**: ✅ **100% COMPLÉTÉ** 🎉
+- ✅ Tables D1 (pv_plants, pv_zones, pv_modules) avec GPS
+- ✅ Routes API CRUD centrales/zones/modules
+- ✅ Vue stats agrégation 7 statuts
+- ✅ Carte Leaflet + Esri Satellite zoom 22 + Street labels overlay
 - ✅ Dessin toiture GPS + calcul surface Turf.js
 - ✅ Modal annotation 7 statuts (couleurs exactes Module EL)
 - ✅ Placement manuel modules avec GPS lat/lng
 - ✅ Placement auto avec validation point-in-polygon
 - ✅ **Strings non réguliers** - Config individuelle par string (S1=26, S2=24, etc.)
-- ✅ **Handles interactifs** - 5 handles (resize + rotation) style SolarEdge
-- ✅ **Import 242 modules** - Rectangle single array 22×11
+- ✅ **Handles interactifs** - 5 handles (resize + rotation) style SolarEdge avec rotation bug fix
+- ✅ **Import 242 modules** - Rectangle single array avec rotation correcte
+- ✅ **Configuration électrique MVP** - Onduleurs + String assignments + Validation électrique
+- ✅ **Export GeoJSON/KML/CSV** - Traçabilité IEC 62446-1 (3 formats) ✨ **NOUVEAU**
+- ✅ **Fix Data JALIBAT** - String 1 restaurée (242 modules complets) ✨ **NOUVEAU**
 - ✅ Export PDF (carte + stats + liste modules)
 - ✅ Sauvegarde/reload persistance DB
-- ⏳ **Tests utilisateur 5 audits** (validation terrain Phase 1B)
+- ⏳ **Tests validation Phase 1** (5 audits terrain + KPIs ROADMAP)
 
 **Phase 2b - Optimisations**: ⏳ **À VENIR**
 - Sauvegarde stringsConfig en DB (colonne JSON ou table)
