@@ -4634,8 +4634,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             
                             draggingRect.rectangle.setBounds(newBounds)
                             
-                            // Mettre à jour les handles si visibles
-                            if (draggingRect.handlesVisible) {
+                            // Mettre à jour les handles si ils existent
+                            if (draggingRect.handles.nw && map.hasLayer(draggingRect.handles.nw)) {
                                 draggingRect.updateHandles()
                             }
                         }
@@ -5451,9 +5451,74 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 console.log("✅ INIT COMPLETED")
+                
+                // CRITIQUE: Forcer réparation des rectangles après init
+                // Les rectangles restaurés depuis localStorage ne sont pas toujours correctement ajoutés à la carte
+                setTimeout(() => {
+                    fixRectanglesOnMap()
+                }, 500)
             } catch (error) {
                 console.error("❌ INIT FAILED:", error)
             }
+        }
+        
+        // ================================================================
+        // FIX: FORCER AJOUT DES RECTANGLES À LA CARTE
+        // ================================================================
+        function fixRectanglesOnMap() {
+            console.log("🔧 Vérification rectangles sur carte...")
+            
+            moduleRectangles.forEach((rect, index) => {
+                // Vérifier si le rectangle est bien sur la carte
+                if (!map.hasLayer(rect.rectangle)) {
+                    console.log("⚠️ Rectangle " + rect.id + " pas sur carte - correction...")
+                    
+                    // Supprimer de partout d'abord
+                    if (drawnItems.hasLayer(rect.rectangle)) {
+                        drawnItems.removeLayer(rect.rectangle)
+                    }
+                    
+                    // Re-créer le rectangle proprement
+                    const bounds = rect.rectangle.getBounds()
+                    rect.rectangle = L.rectangle(bounds, {
+                        color: "#f59e0b",
+                        weight: 3,
+                        fillColor: "#f59e0b",
+                        fillOpacity: 0.15,
+                        interactive: true,
+                        bubblingMouseEvents: false
+                    })
+                    
+                    // Ajouter à la carte
+                    map.addLayer(rect.rectangle)
+                    drawnItems.addLayer(rect.rectangle)
+                    rect.rectangle.bringToFront()
+                    
+                    // Reconfigurer les events
+                    rect.setupDragEvents()
+                    rect.setupMapDragEvents()
+                    
+                    // Event de sélection
+                    rect.rectangle.on('click', (e) => {
+                        console.log('🎯 Rectangle sélectionné:', rect.id)
+                        L.DomEvent.stopPropagation(e.originalEvent)
+                        
+                        // Désélectionner les autres
+                        moduleRectangles.forEach(r => {
+                            if (r.id !== rect.id) r.hideHandles()
+                        })
+                        
+                        // Sélectionner celui-ci
+                        rect.showHandles()
+                    })
+                    
+                    console.log("✅ Rectangle " + rect.id + " corrigé")
+                } else {
+                    console.log("✅ Rectangle " + rect.id + " déjà sur carte")
+                }
+            })
+            
+            console.log("✅ Tous les rectangles vérifiés")
         }
         
         // ================================================================
