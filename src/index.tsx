@@ -4636,8 +4636,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             addToMap() {
-                this.rectangle.addTo(drawnItems)
-                console.log("➕ Rectangle ajouté à la carte, ID:", this.id, "- Visible:", map.hasLayer(this.rectangle))
+                // Ajouter directement à la carte ET à drawnItems
+                this.rectangle.addTo(map)
+                drawnItems.addLayer(this.rectangle)
+                
+                // Forcer z-index élevé pour être au-dessus de tout
+                this.rectangle.bringToFront()
+                
+                console.log("➕ Rectangle ajouté, ID:", this.id, "- onMap:", map.hasLayer(this.rectangle), "- onDrawnItems:", drawnItems.hasLayer(this.rectangle))
                 
                 if (showRectGrid) this.drawGrid()
                 if (showRectInfo) this.updateInfoOverlay()
