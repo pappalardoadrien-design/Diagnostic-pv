@@ -678,3 +678,15 @@ curl http://localhost:3000
 
 *Version 1.0.0 - Dernière mise à jour: 27 octobre 2025*
 *Tag: v1.0.0-unified-platform*
+
+---
+
+## 🌐 URLs de Production
+
+- **Production active**: https://f5da6920.diagnostic-hub.pages.dev
+- **GitHub Repository**: https://github.com/adrienpappalardo/diagnostic-hub
+
+### Dernière Mise à Jour
+- **Date**: 2025-01-10
+- **Migration**: 0013 appliquée en production (table `pv_cartography_audit_links`)
+- **Status**: ✅ Erreur 500 POST /modules corrigée
