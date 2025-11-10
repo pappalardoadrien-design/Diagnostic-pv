@@ -4366,10 +4366,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const sin = Math.sin(rotationAngle)
                 
                 for (let row = 0; row < this.rows; row++) {
-                    const currentString = this.stringStart + Math.floor(globalPosition / 24)
-                    const positionInString = (globalPosition % 24) + 1
-                    
                     for (let col = 0; col < this.cols; col++) {
+                        const currentString = this.stringStart + Math.floor(globalPosition / 24)
+                        const positionInString = (globalPosition % 24) + 1
                         // ROTATION RIGIDE EN PIXEL PUR - Utilise dimensions RECTANGLE
                         // Position relative du module dans grille NON pivotée (0,0 = centre)
                         const relX = (col - (this.cols - 1) / 2) * gridCellWidth
