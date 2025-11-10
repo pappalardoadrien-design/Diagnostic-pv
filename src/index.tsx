@@ -3653,7 +3653,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <span class="text-xs">Les handles restent visibles. Re-cliquez le bouton pour désactiver.</span>
                         </div>
                         <div class="mt-2 p-2 bg-blue-900 rounded text-xs text-blue-200">
-                            <i class="fas fa-info-circle mr-1"></i><strong>Mode edition:</strong> Glissez les coins pour redimensionner, le centre pour pivoter
+                            <i class="fas fa-info-circle mr-1"></i><strong>Mode edition:</strong><br/>
+                            • Coins → redimensionner<br/>
+                            • Centre → rotation (paliers 5°)<br/>
+                            • <strong>Shift + rotation</strong> → rotation libre
                         </div>
                         <div class="space-y-1 text-xs">
                             <div class="flex items-center gap-2">
@@ -4169,6 +4172,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rotationCenter = null
                 this.currentRotation = 0
                 this.rotatedPolygon = null
+                this.angleIndicator = null  // Indicateur angle pendant rotation
                 
                 // Créer rectangle Leaflet EDITABLE avec semi-transparence
                 this.rectangle = L.rectangle(initialBounds, {
@@ -4701,11 +4705,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 if (!this.isRotating) return
                 
                 const currentAngle = this.calculateAngle(this.rotationCenter, e.latlng)
-                const angleDiff = currentAngle - this.rotationStartAngle
+                let angleDiff = currentAngle - this.rotationStartAngle
+                
+                // NOUVEAU: SNAP ANGLE - Rotation par paliers de 5° (sauf si Shift enfoncé)
+                const snapAngle = 5  // Paliers de 5 degrés
+                if (!e.originalEvent.shiftKey) {
+                    angleDiff = Math.round(angleDiff / snapAngle) * snapAngle
+                }
                 
                 // Rotation visuelle du rectangle
                 this.rotateRectangle(angleDiff)
                 this.updateHandles()
+                
+                // Afficher angle actuel en grand (aide visuelle)
+                this.showRotationAngle(angleDiff)
                 
                 // NOUVEAU: Aperçu modules en temps réel pendant rotation
                 if (liveRotationPreview) {
@@ -4728,6 +4741,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 map.off('mousemove', this.onRotationMove, this)
                 map.off('mouseup', this.onRotationEnd, this)
                 
+                // Masquer indicateur angle
+                this.hideRotationAngle()
+                
                 // Régénérer modules après rotation
                 this.regenerateModules()
                 applyRectanglesToModules()
@@ -4739,6 +4755,55 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const dx = point.lng - center.lng
                 const dy = point.lat - center.lat
                 return Math.atan2(dy, dx) * (180 / Math.PI)
+            }
+            
+            showRotationAngle(angleDegrees) {
+                // Afficher angle actuel en grand pendant rotation
+                if (!this.angleIndicator) {
+                    const center = this.rectangle.getBounds().getCenter()
+                    
+                    // Créer marker avec angle en grand format
+                    const angleIcon = L.divIcon({
+                        className: 'rotation-angle-indicator',
+                        html: '<div style="background:rgba(0,0,0,0.85);color:#fbbf24;padding:12px 20px;border-radius:8px;font-size:24px;font-weight:bold;border:3px solid #fbbf24;box-shadow:0 4px 12px rgba(0,0,0,0.5);white-space:nowrap;">' + 
+                              '<div style="font-size:14px;color:#fff;margin-bottom:4px;">🔄 ROTATION</div>' +
+                              '<div>' + Math.round(angleDegrees) + '°</div>' +
+                              '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Shift = rotation libre</div>' +
+                              '</div>',
+                        iconSize: [150, 100],
+                        iconAnchor: [75, 50]
+                    })
+                    
+                    this.angleIndicator = L.marker(center, { 
+                        icon: angleIcon,
+                        interactive: false,
+                        zIndexOffset: 2000
+                    }).addTo(map)
+                } else {
+                    // Mettre à jour angle
+                    const center = this.rectangle.getBounds().getCenter()
+                    this.angleIndicator.setLatLng(center)
+                    
+                    const angleIcon = L.divIcon({
+                        className: 'rotation-angle-indicator',
+                        html: '<div style="background:rgba(0,0,0,0.85);color:#fbbf24;padding:12px 20px;border-radius:8px;font-size:24px;font-weight:bold;border:3px solid #fbbf24;box-shadow:0 4px 12px rgba(0,0,0,0.5);white-space:nowrap;">' + 
+                              '<div style="font-size:14px;color:#fff;margin-bottom:4px;">🔄 ROTATION</div>' +
+                              '<div>' + Math.round(angleDegrees) + '°</div>' +
+                              '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">Shift = rotation libre</div>' +
+                              '</div>',
+                        iconSize: [150, 100],
+                        iconAnchor: [75, 50]
+                    })
+                    
+                    this.angleIndicator.setIcon(angleIcon)
+                }
+            }
+            
+            hideRotationAngle() {
+                if (this.angleIndicator) {
+                    map.removeLayer(this.angleIndicator)
+                    this.angleIndicator = null
+                }
             }
             
             rotateRectangle(angleDegrees) {
