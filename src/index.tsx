@@ -7484,12 +7484,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 }
                 
                 // Sauvegarder modules
-                await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
+                const apiUrl = "/api/pv/plants/" + plantId + "/zones/" + zoneId + "/modules"
+                await fetch(apiUrl, {
                     method: "DELETE"
                 })
                 
                 if (modules.length > 0) {
-                    const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/modules\`, {
+                    const response = await fetch(apiUrl, {
                         method: "POST",
                         headers: { 'Content-Type': "application/json" },
                         body: JSON.stringify({ modules })
@@ -7498,7 +7499,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     const data = await response.json()
                     
                     if (!data.success) {
-                        throw new Error(data.error)
+                        throw new Error(data.error || data.details || "Erreur inconnue")
                     }
                 }
                 
