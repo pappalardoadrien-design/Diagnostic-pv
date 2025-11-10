@@ -3879,19 +3879,24 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     </h3>
                     <div class="space-y-2 text-xs text-orange-100">
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1"> DÉPLACER:</div>
-                            <div>Clic LONG sur rectangle  Glisser</div>
+                            <div class="font-bold text-yellow-300 mb-1">🖱️ SÉLECTIONNER:</div>
+                            <div>Cliquez sur le rectangle orange → Les poignées apparaissent</div>
                         </div>
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1">️ REDIMENSIONNER:</div>
-                            <div>Utiliser poignées jaunes (coins/bords)</div>
+                            <div class="font-bold text-orange-300 mb-1">📍 DÉPLACER:</div>
+                            <div>Glissez le rectangle (drag & drop)</div>
                         </div>
                         <div class="bg-black bg-opacity-40 p-2 rounded">
-                            <div class="font-bold text-orange-300 mb-1"> ROTATION:</div>
-                            <div>Bouton ↻ dans liste rectangles</div>
+                            <div class="font-bold text-orange-300 mb-1">️🔲 REDIMENSIONNER:</div>
+                            <div>Glissez les 4 poignées blanches aux coins</div>
+                        </div>
+                        <div class="bg-black bg-opacity-40 p-2 rounded">
+                            <div class="font-bold text-orange-300 mb-1">🔄 ROTATION:</div>
+                            <div>Cliquez et glissez la poignée ↻ au centre</div>
+                            <div class="text-xs text-orange-300 mt-1">Astuce: Maintenez Shift pour rotation libre</div>
                         </div>
                         <div class="bg-orange-500 text-black p-2 rounded font-bold text-center mt-3">
-                             Alignez avec la photo satellite !
+                            ⚡ Alignez avec la photo satellite !
                         </div>
                     </div>
                     <button id="hideAlignmentHelp" class="w-full bg-gray-700 hover:bg-gray-600 py-1 rounded text-xs mt-2">
