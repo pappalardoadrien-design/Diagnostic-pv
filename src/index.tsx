@@ -4174,6 +4174,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rotatedPolygon = null
                 this.angleIndicator = null  // Indicateur angle pendant rotation
                 
+                // NOUVEAU: Stocker centre et dimensions ORIGINALES (avant rotation)
+                // Pour rotation rigide sans déformation trapèze
+                const bounds = L.latLngBounds(initialBounds)
+                this.originalCenter = bounds.getCenter()  // Centre GPS original
+                this.originalBounds = bounds  // Bounds complets originaux
+                
                 // Créer rectangle Leaflet EDITABLE avec semi-transparence
                 this.rectangle = L.rectangle(initialBounds, {
                     color: "#f59e0b",
@@ -4198,6 +4204,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     map.dragging.enable()
                     map.doubleClickZoom.enable()
                     map.scrollWheelZoom.enable()
+                    
+                    // IMPORTANT: Mettre à jour centre original après drag
+                    this.originalCenter = this.rectangle.getBounds().getCenter()
+                    this.originalBounds = this.rectangle.getBounds()
                     
                     this.regenerateModules()
                     applyRectanglesToModules()
@@ -4248,36 +4258,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.clearVisuals()
                 
                 // ================================================================
-                // CORRECTION ROTATION: Utiliser polygon pivoté si existe
+                // ROTATION RIGIDE: Utiliser CENTRE ORIGINAL (pas trapèze déformé)
                 // ================================================================
-                let nw, ne, sw, se, centerLat, centerLng
                 
-                if (this.rotatedPolygon) {
-                    // Rectangle pivoté → utiliser coordonnées polygon
-                    const coords = this.rotatedPolygon.getLatLngs()[0]
-                    nw = coords[0]  // Nord-Ouest
-                    ne = coords[1]  // Nord-Est
-                    se = coords[2]  // Sud-Est
-                    sw = coords[3]  // Sud-Ouest
-                    
-                    // Calculer centre du polygon
-                    centerLat = (nw.lat + se.lat) / 2
-                    centerLng = (nw.lng + se.lng) / 2
-                    
-                    console.log("✅ Utilisation polygon pivoté pour génération modules")
-                } else {
-                    // Rectangle normal → utiliser bounds classiques
-                    const bounds = this.rectangle.getBounds()
-                    nw = bounds.getNorthWest()
-                    ne = bounds.getNorthEast()
-                    sw = bounds.getSouthWest()
-                    se = bounds.getSouthEast()
-                    
-                    centerLat = bounds.getCenter().lat
-                    centerLng = bounds.getCenter().lng
-                    
-                    console.log("✅ Utilisation rectangle normal pour génération modules")
-                }
+                // Toujours utiliser centre original stocké (avant rotation)
+                const centerLat = this.originalCenter.lat
+                const centerLng = this.originalCenter.lng
+                
+                console.log("✅ Centre rigide:", centerLat.toFixed(6), centerLng.toFixed(6), "| Rotation:", this.currentRotation + "°")
                 
                 // Calculer dimensions réelles du module en coordonnées GPS
                 const zoom = map.getZoom()
@@ -4684,10 +4672,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             onTransformEnd() {
+                // IMPORTANT: Mettre à jour centre original après resize
+                this.originalCenter = this.rectangle.getBounds().getCenter()
+                this.originalBounds = this.rectangle.getBounds()
+                
                 // Régénérer modules après resize
                 this.regenerateModules()
                 applyRectanglesToModules()
-                console.log("✅ Transform terminé - modules régénérés")
+                console.log("✅ Transform terminé - centre original MAJ - modules régénérés")
             }
             
             onRotationStart(e) {
