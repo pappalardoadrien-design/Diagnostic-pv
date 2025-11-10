@@ -3677,8 +3677,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         <button id="createRectangleBtn" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded font-bold">
                             <i class="fas fa-plus-square mr-2"></i>CRÉER RECTANGLE
                         </button>
-                        <button id="import242SingleBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
-                            <i class="fas fa-download mr-2"></i>IMPORTER CONFIGURATION
+                        <button id="importFromELBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-sm mt-2">
+                            <i class="fas fa-file-import mr-2"></i>IMPORTER DEPUIS MODULE EL
                         </button>
                         <button id="togglePersistentEditBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded font-bold text-sm mt-2">
                             <i class="fas fa-lock-open mr-2"></i>MODE ÉDITION CONTINUE
@@ -4143,6 +4143,34 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             </div>
         </div>
 
+        <!-- Modal Import depuis Module EL -->
+        <div id="importELModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-black mb-4 text-center text-purple-400">
+                    <i class="fas fa-file-import mr-2"></i>IMPORTER CONFIGURATION DEPUIS MODULE EL
+                </h3>
+                
+                <div class="mb-4 p-3 bg-purple-900/30 border border-purple-400 rounded text-sm">
+                    <i class="fas fa-info-circle mr-2 text-purple-400"></i>
+                    <strong>Sélectionnez un audit EL</strong> pour importer automatiquement la configuration des rectangles de modules (nombre, dimensions, disposition).
+                </div>
+                
+                <!-- Liste des audits disponibles -->
+                <div id="auditListContainer" class="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                        <p>Chargement des audits EL...</p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 pt-4 border-t border-gray-700">
+                    <button id="cancelImportELBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                        <i class="fas fa-times mr-2"></i>ANNULER
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script>
         // ================================================================
         // VARIABLES GLOBALES
@@ -4601,12 +4629,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     // Clic gauche UNIQUEMENT si pas en rotation
                     if (!this.isRotating && e.originalEvent.button === 0) {
                         this.isDragging = true
-                        this.dragStartLatLng = e.latlng
+                        // CORRECTION: Utiliser coordonnées PIXEL au lieu de lat/lng
+                        this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                         this.dragStartBounds = this.rectangle.getBounds()
                         map.dragging.disable()
                         L.DomEvent.stopPropagation(e.originalEvent)
                         L.DomEvent.preventDefault(e.originalEvent)
-                        console.log("🖱️ Début drag rectangle ID:", this.id)
+                        console.log("🖱️ Début drag rectangle ID:", this.id, "| Pixel:", this.dragStartPixel)
                     }
                 })
             }
@@ -4620,17 +4649,26 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     map.on('mousemove', (e) => {
                         // Trouver le rectangle en cours de drag
                         const draggingRect = moduleRectangles.find(r => r.isDragging)
-                        if (draggingRect && draggingRect.dragStartLatLng && draggingRect.dragStartBounds) {
-                            const latDiff = e.latlng.lat - draggingRect.dragStartLatLng.lat
-                            const lngDiff = e.latlng.lng - draggingRect.dragStartLatLng.lng
+                        if (draggingRect && draggingRect.dragStartPixel && draggingRect.dragStartBounds) {
+                            // CORRECTION: Calculer différence en PIXELS (stable et linéaire)
+                            const currentPixel = map.latLngToContainerPoint(e.latlng)
+                            const pixelDiffX = currentPixel.x - draggingRect.dragStartPixel.x
+                            const pixelDiffY = currentPixel.y - draggingRect.dragStartPixel.y
                             
+                            // Convertir bounds initiaux en pixels
                             const nw = draggingRect.dragStartBounds.getNorthWest()
                             const se = draggingRect.dragStartBounds.getSouthEast()
+                            const nwPixel = map.latLngToContainerPoint(nw)
+                            const sePixel = map.latLngToContainerPoint(se)
                             
-                            const newBounds = L.latLngBounds(
-                                [nw.lat + latDiff, nw.lng + lngDiff],
-                                [se.lat + latDiff, se.lng + lngDiff]
-                            )
+                            // Appliquer offset en pixels
+                            const newNwPixel = L.point(nwPixel.x + pixelDiffX, nwPixel.y + pixelDiffY)
+                            const newSePixel = L.point(sePixel.x + pixelDiffX, sePixel.y + pixelDiffY)
+                            
+                            // Reconvertir en lat/lng
+                            const newNw = map.containerPointToLatLng(newNwPixel)
+                            const newSe = map.containerPointToLatLng(newSePixel)
+                            const newBounds = L.latLngBounds(newNw, newSe)
                             
                             draggingRect.rectangle.setBounds(newBounds)
                             
@@ -4638,7 +4676,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             if (draggingRect.rotatedPolygon && map.hasLayer(draggingRect.rotatedPolygon)) {
                                 const corners = draggingRect.rotatedPolygon.getLatLngs()[0]
                                 const newCorners = corners.map(corner => {
-                                    return L.latLng(corner.lat + latDiff, corner.lng + lngDiff)
+                                    const cornerPixel = map.latLngToContainerPoint(corner)
+                                    const newCornerPixel = L.point(cornerPixel.x + pixelDiffX, cornerPixel.y + pixelDiffY)
+                                    return map.containerPointToLatLng(newCornerPixel)
                                 })
                                 draggingRect.rotatedPolygon.setLatLngs(newCorners)
                             }
@@ -4674,7 +4714,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     map.on('click', (e) => {
                         // Si on clique sur la carte (pas sur un rectangle)
                         console.log("🗺️ Clic sur la carte - désélection tous rectangles")
-                        moduleRectangles.forEach(rect => rect.hideHandles())
+                        // CRITIQUE: Vérifier que rectangle existe avant appel hideHandles()
+                        moduleRectangles.forEach(rect => {
+                            if (rect.rectangle) {
+                                rect.hideHandles()
+                            }
+                        })
                     })
                     
                     console.log("✅ Events globaux drag configurés (une seule fois)")
@@ -4708,7 +4753,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     // Désactiver handles des autres rectangles
                     moduleRectangles.forEach(rect => {
-                        if (rect.id !== this.id) {
+                        if (rect.id !== this.id && rect.rectangle) {
                             rect.hideHandles()
                         }
                     })
@@ -4722,15 +4767,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             removeFromMap() {
+                // CRITIQUE: Cacher handles AVANT de mettre rectangle à null
+                this.hideHandles()
+                this.clearVisuals()
+                
                 // Supprimer le rectangle principal
                 if (this.rectangle) {
                     drawnItems.removeLayer(this.rectangle)
                     this.rectangle = null
                 }
-                
-                // Nettoyer tous les éléments visuels
-                this.clearVisuals()
-                this.hideHandles()
                 
                 // Nettoyer polygon rotatif si existe
                 if (this.rotatedPolygon) {
@@ -4749,13 +4794,22 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // ================================================================
             
             // Helper: Retourner les bounds corrects (rotatedPolygon si rotation active, sinon rectangle)
+            // CRITIQUE: Retourner null si aucune shape valide (après suppression)
             getVisibleShape() {
-                return (this.rotatedPolygon && map.hasLayer(this.rotatedPolygon)) ? this.rotatedPolygon : this.rectangle
+                if (this.rotatedPolygon && map.hasLayer(this.rotatedPolygon)) {
+                    return this.rotatedPolygon
+                }
+                return this.rectangle || null
             }
             
             createHandles() {
-                // CRITIQUE: Utiliser rotatedPolygon si rotation active
+                // CRITIQUE: Vérifier que shape existe (protection null après suppression)
                 const shape = this.getVisibleShape()
+                if (!shape) {
+                    console.warn("⚠️ createHandles() appelé sur rectangle supprimé, ID:", this.id)
+                    return
+                }
+                
                 const bounds = shape.getBounds()
                 const center = bounds.getCenter()
                 const nw = bounds.getNorthWest()
@@ -4835,8 +4889,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateHandles() {
                 if (!this.handles.nw) return
                 
-                // CRITIQUE: Utiliser rotatedPolygon si rotation active
+                // CRITIQUE: Vérifier que shape existe (protection null après suppression)
                 const shape = this.getVisibleShape()
+                if (!shape) {
+                    console.warn("⚠️ updateHandles() appelé sur rectangle supprimé, ID:", this.id)
+                    return
+                }
+                
                 const bounds = shape.getBounds()
                 const center = bounds.getCenter()
                 const nw = bounds.getNorthWest()
@@ -4852,9 +4911,18 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             }
             
             showHandles() {
+                // CRITIQUE: Vérifier que rectangle existe (protection null après suppression)
+                if (!this.rectangle) {
+                    console.warn("⚠️ showHandles() appelé sur rectangle supprimé, ID:", this.id)
+                    return
+                }
+                
                 if (!this.handles.nw) {
                     this.createHandles()
                 }
+                
+                // Vérifier à nouveau après createHandles (peut avoir échoué)
+                if (!this.handles.nw) return
                 
                 this.handles.nw.addTo(map)
                 this.handles.ne.addTo(map)
@@ -4875,8 +4943,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     map.removeLayer(this.handles.rotate)
                 }
                 
-                // Retirer surbrillance
-                this.rectangle.setStyle({ weight: 4, color: '#3b82f6' })
+                // CRITIQUE: Vérifier que rectangle existe avant setStyle (protection null après suppression)
+                if (this.rectangle) {
+                    this.rectangle.setStyle({ weight: 4, color: '#3b82f6' })
+                }
             }
             
             onCornerDrag(corner, newLatLng) {
@@ -5146,7 +5216,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         
                         // Désactiver handles des autres rectangles
                         moduleRectangles.forEach(rect => {
-                            if (rect.id !== this.id) {
+                            if (rect.id !== this.id && rect.rectangle) {
                                 rect.hideHandles()
                             }
                         })
@@ -5159,12 +5229,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     this.rotatedPolygon.on('mousedown', (e) => {
                         if (!this.isRotating && e.originalEvent.button === 0) {
                             this.isDragging = true
-                            this.dragStartLatLng = e.latlng
+                            // CORRECTION: Utiliser coordonnées PIXEL au lieu de lat/lng
+                            this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                             this.dragStartBounds = this.rectangle.getBounds()
                             map.dragging.disable()
                             L.DomEvent.stopPropagation(e.originalEvent)
                             L.DomEvent.preventDefault(e.originalEvent)
-                            console.log("🖱️ Début drag rotatedPolygon ID:", this.id)
+                            console.log("🖱️ Début drag rotatedPolygon ID:", this.id, "| Pixel:", this.dragStartPixel)
                         }
                     })
                 } else {
@@ -5220,6 +5291,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             // SYNCHRONISATION EL: Rafraîchir couleurs modules
             // ================================================================
             refreshModuleColors() {
+                // CRITIQUE: Vérifier que rectangle existe (protection null après suppression)
+                if (!this.rectangle) {
+                    console.warn("⚠️ refreshModuleColors() appelé sur rectangle supprimé, ID:", this.id)
+                    return
+                }
+                
                 // Mettre à jour couleurs des modules affichés après sync EL
                 console.log(" Rectangle", this.id, ":", this.modules.length, "modules - refreshing colors...")
                 
@@ -5524,6 +5601,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             console.log("🔧 Vérification rectangles sur carte...")
             
             moduleRectangles.forEach((rect, index) => {
+                // CRITIQUE: Ignorer rectangles supprimés (rectangle = null)
+                if (!rect.rectangle) {
+                    console.warn("⚠️ fixRectanglesOnMap() skip rectangle supprimé, ID:", rect.id)
+                    return
+                }
+                
                 // Vérifier si le rectangle est bien sur la carte
                 if (!map.hasLayer(rect.rectangle)) {
                     console.log("⚠️ Rectangle " + rect.id + " pas sur carte - correction...")
@@ -5560,7 +5643,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         
                         // Désélectionner les autres
                         moduleRectangles.forEach(r => {
-                            if (r.id !== rect.id) r.hideHandles()
+                            if (r.id !== rect.id && r.rectangle) r.hideHandles()
                         })
                         
                         // Sélectionner celui-ci
@@ -6113,7 +6196,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     
                     // NOUVEAU: Respecter mode édition persistante
                     if (!clickedOnRectangle && !persistentEditMode) {
-                        moduleRectangles.forEach(rect => rect.hideHandles())
+                        // CRITIQUE: Vérifier que rectangle existe avant appel hideHandles()
+                        moduleRectangles.forEach(rect => {
+                            if (rect.rectangle) {
+                                rect.hideHandles()
+                            }
+                        })
                     }
                 }, 10)
             })
@@ -7190,7 +7278,218 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             updateStringsProgress()
         }
         
-        // Fonction import configuration modules sur carte satellite
+        // ================================================================
+        // IMPORT DEPUIS MODULE EL - SYSTÈME DYNAMIQUE
+        // ================================================================
+        
+        // Ouvrir modal sélection audit EL
+        async function openImportELModal() {
+            if (!roofPolygon) {
+                alert("Créez d'abord un polygone de toiture (Étape 0)")
+                return
+            }
+            
+            const modal = document.getElementById('importELModal')
+            const container = document.getElementById('auditListContainer')
+            
+            if (!modal || !container) return
+            
+            modal.classList.remove('hidden')
+            container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p>Chargement des audits EL...</p></div>'
+            
+            try {
+                // Récupérer liste des audits EL disponibles
+                const response = await fetch('/api/pv/available-el-audits')
+                const data = await response.json()
+                
+                if (!data.success || !data.audits || data.audits.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-3xl mb-2"></i><p>Aucun audit EL disponible</p><p class="text-xs mt-2">Créez d\'abord des audits dans Module EL</p></div>'
+                    return
+                }
+                
+                // Afficher la liste des audits
+                container.innerHTML = data.audits.map(audit => {
+                    const configData = audit.configuration_json ? JSON.parse(audit.configuration_json) : null
+                    const rectanglesCount = configData?.rectangles?.length || 1
+                    const linkedBadge = audit.is_linked > 0 ? '<span class="ml-2 px-2 py-1 bg-green-600 rounded text-xs">DÉJÀ LIÉ</span>' : ''
+                    
+                    return '<div class="audit-item bg-gray-800 border border-gray-700 hover:border-purple-400 rounded-lg p-4 cursor-pointer transition-all" ' +
+                             'data-audit-id="' + audit.id + '" ' +
+                             'data-audit-token="' + audit.audit_token + '" ' +
+                             'onclick="selectAuditForImport(\'' + audit.audit_token + '\', ' + audit.string_count + ', ' + audit.modules_per_string + ')">'
+                            '<div class="flex items-start justify-between">' +
+                                '<div class="flex-1">' +
+                                    '<h4 class="font-bold text-lg text-purple-400 mb-1">' +
+                                        '<i class="fas fa-file-alt mr-2"></i>' + audit.project_name +
+                                        linkedBadge +
+                                    '</h4>' +
+                                    '<p class="text-sm text-gray-400 mb-2">' +
+                                        '<i class="fas fa-user mr-2"></i>' + audit.client_name +
+                                        (audit.location ? ' \u2022 ' + audit.location : '') +
+                                    '</p>' +
+                                    '<div class="grid grid-cols-4 gap-4 text-xs">' +
+                                        '<div class="bg-black rounded p-2 text-center">' +
+                                            '<div class="text-xl font-bold text-purple-400">' + audit.total_modules + '</div>' +
+                                            '<div class="text-gray-500">Modules</div>' +
+                                        '</div>' +
+                                        '<div class="bg-black rounded p-2 text-center">' +
+                                            '<div class="text-xl font-bold text-blue-400">' + audit.string_count + '</div>' +
+                                            '<div class="text-gray-500">Strings</div>' +
+                                        '</div>' +
+                                        '<div class="bg-black rounded p-2 text-center">' +
+                                            '<div class="text-xl font-bold text-orange-400">' + rectanglesCount + '</div>' +
+                                            '<div class="text-gray-500">Rectangles</div>' +
+                                        '</div>' +
+                                        '<div class="bg-black rounded p-2 text-center">' +
+                                            '<div class="text-xl font-bold ' + (audit.modules_with_defects > 0 ? 'text-red-400' : 'text-green-400') + '">' + (audit.modules_with_defects || 0) + '</div>' +
+                                            '<div class="text-gray-500">D\u00e9fauts</div>' +
+                                        '</div>' +
+                                    '</div>' +
+                                    '<p class="text-xs text-gray-500 mt-2">' +
+                                        '<i class="fas fa-calendar mr-1"></i>Cr\u00e9\u00e9 le ' + new Date(audit.created_at).toLocaleDateString('fr-FR') +
+                                        '<span class="ml-3"><i class="fas fa-tasks mr-1"></i>Avancement: ' + (audit.completion_rate || 0).toFixed(0) + '%</span>' +
+                                    '</p>' +
+                                '</div>' +
+                                '<div class="ml-4">' +
+                                    '<button class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">' +
+                                        '<i class="fas fa-download mr-2"></i>IMPORTER' +
+                                    '</button>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>'
+                }).join('')
+                
+                console.log("✅ Liste audits EL chargée:", data.audits.length, "audits")
+                
+            } catch (error) {
+                console.error("Erreur chargement audits EL:", error)
+                container.innerHTML = '<div class="text-center py-8 text-red-400"><i class="fas fa-exclamation-triangle text-3xl mb-2"></i><p>Erreur chargement audits</p></div>'
+            }
+        }
+        
+        // Sélectionner et importer un audit EL
+        async function selectAuditForImport(auditToken, stringCount, modulesPerString) {
+            if (!confirm("Importer la configuration depuis cet audit EL ?\n\nStrings: " + stringCount + "\nModules/string: " + modulesPerString + "\nTotal: " + (stringCount * modulesPerString) + " modules")) {
+                return
+            }
+            
+            try {
+                console.log("🚀 Import audit EL:", auditToken)
+                
+                // Fermer modal
+                document.getElementById('importELModal').classList.add('hidden')
+                
+                // Calculer configuration: 1 rectangle avec tous les modules
+                const rows = stringCount
+                const cols = modulesPerString
+                const totalModules = rows * cols
+                
+                console.log("Configuration: " + cols + " colonnes x " + rows + " rangées = " + totalModules + " modules")
+                
+                // Paramètres globaux
+                const roofBounds = roofPolygon.getBounds()
+                const roofCenter = roofBounds.getCenter()
+                const zoom = map.getZoom()
+                const moduleWidth = 1.7   // LANDSCAPE: largeur
+                const moduleHeight = 1.13  // LANDSCAPE: hauteur
+                const spacing = 0.01       // Espacement entre modules
+                
+                const metersPerPixel = 156543.03392 * Math.cos(roofCenter.lat * Math.PI / 180) / Math.pow(2, zoom)
+                const pixelsPerMeter = 1 / metersPerPixel
+                
+                // Calculer dimensions réelles du polygone de toiture
+                const roofNorth = roofBounds.getNorth()
+                const roofSouth = roofBounds.getSouth()
+                const roofEast = roofBounds.getEast()
+                const roofWest = roofBounds.getWest()
+                
+                const roofWidthDegrees = roofEast - roofWest
+                const roofHeightDegrees = roofNorth - roofSouth
+                const roofWidthMeters = roofWidthDegrees * 111320 * Math.cos(roofCenter.lat * Math.PI / 180)
+                const roofHeightMeters = roofHeightDegrees * 110574
+                
+                console.log("Toiture: " + roofWidthMeters.toFixed(1) + "m x " + roofHeightMeters.toFixed(1) + "m")
+                
+                // Calculer dimensions nécessaires pour l'array
+                const arrayWidthNeeded = cols * moduleWidth + (cols - 1) * spacing
+                const arrayHeightNeeded = rows * moduleHeight + (rows - 1) * spacing
+                
+                console.log("Array nécessaire: " + arrayWidthNeeded.toFixed(1) + "m x " + arrayHeightNeeded.toFixed(1) + "m")
+                
+                // ÉCHELLE ADAPTATIVE (92% de la toiture)
+                const widthScale = roofWidthMeters / arrayWidthNeeded
+                const heightScale = roofHeightMeters / arrayHeightNeeded
+                const scaleFactor = Math.min(widthScale, heightScale, 1.0)
+                
+                console.log("Scale factor: " + scaleFactor.toFixed(3) + " (" + (scaleFactor * 100).toFixed(1) + "%)")
+                
+                // Calculer dimensions finales avec scale
+                const rectWidthMeters = arrayWidthNeeded * scaleFactor
+                const rectHeightMeters = arrayHeightNeeded * scaleFactor
+                
+                // Convertir en degrés GPS
+                const rectWidthDegrees = rectWidthMeters / (111320 * Math.cos(roofCenter.lat * Math.PI / 180))
+                const rectHeightDegrees = rectHeightMeters / 110574
+                
+                // Centrer sur la toiture
+                const centerLat = (roofNorth + roofSouth) / 2
+                const centerLng = (roofWest + roofEast) / 2
+                
+                const topLeft = L.latLng(
+                    centerLat + (rectHeightDegrees / 2),
+                    centerLng - (rectWidthDegrees / 2)
+                )
+                const bottomRight = L.latLng(
+                    centerLat - (rectHeightDegrees / 2),
+                    centerLng + (rectWidthDegrees / 2)
+                )
+                const bounds = [topLeft, bottomRight]
+                
+                // Créer le rectangle unique
+                const rectId = moduleRectangles.length + 1
+                const rect = new RectangleModuleGroup(rectId, rows, cols, 1, bounds)
+                rect.addToMap()
+                
+                moduleRectangles.push(rect)
+                
+                // CRITIQUE: Forcer fix après ajout pour garantir visibilité
+                setTimeout(() => {
+                    fixRectanglesOnMap()
+                    rect.showHandles()
+                }, 100)
+                
+                console.log("✅ Rectangle créé: " + cols + "x" + rows + " = " + totalModules + " modules")
+                
+                updateRectanglesList()
+                applyRectanglesToModules()
+                
+                // Afficher panneau aide alignement
+                const helpPanel = document.getElementById('alignmentHelp')
+                if (helpPanel) {
+                    helpPanel.classList.remove('hidden')
+                }
+                
+                alert(
+                    "IMPORT AUDIT EL TERMINÉ" + String.fromCharCode(10,10) +
+                    "Audit: " + auditToken + String.fromCharCode(10) +
+                    "1 rectangle créé:" + String.fromCharCode(10) +
+                    "   - " + cols + " colonnes x " + rows + " rangées" + String.fromCharCode(10) +
+                    "   - Orientation LANDSCAPE (1.7m x 1.13m)" + String.fromCharCode(10,10) +
+                    "Total: " + totalModules + " modules" + String.fromCharCode(10) +
+                    "Dimensions: " + rectWidthMeters.toFixed(1) + "m x " + rectHeightMeters.toFixed(1) + "m" + String.fromCharCode(10) +
+                    "Échelle: " + (scaleFactor * 100).toFixed(1) + "%" + String.fromCharCode(10,10) +
+                    "PROCHAINE ÉTAPE:" + String.fromCharCode(10) +
+                    "Ajustez visuellement le rectangle pour" + String.fromCharCode(10) +
+                    "correspondre à la photo satellite !"
+                )
+                
+            } catch (error) {
+                console.error("❌ Erreur import audit EL:", error)
+                alert("ERREUR IMPORT AUDIT EL" + String.fromCharCode(10,10) + error.message)
+            }
+        }
+        
+        // Fonction legacy import 242 (conservée pour compatibilité)
         async function import242SingleArray() {
             if (!roofPolygon) {
                 alert("Creez d'abord un polygone de toiture (Etape 0)")
@@ -7617,7 +7916,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 indicator.classList.add('hidden')
                 
                 // Cacher tous les handles
-                moduleRectangles.forEach(rect => rect.hideHandles())
+                // CRITIQUE: Vérifier que rectangle existe avant appel hideHandles()
+                moduleRectangles.forEach(rect => {
+                    if (rect.rectangle) {
+                        rect.hideHandles()
+                    }
+                })
                 
                 console.log("❌ Mode édition persistante DÉSACTIVÉ")
             }
@@ -8546,7 +8850,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             
             // Rectangle Modules (SolarEdge style)
             document.getElementById('createRectangleBtn').addEventListener('click', createModuleRectangle)
-            document.getElementById('import242SingleBtn').addEventListener('click', import242SingleArray)
+            document.getElementById('importFromELBtn').addEventListener('click', openImportELModal)
+            document.getElementById('cancelImportELBtn').addEventListener('click', () => {
+                document.getElementById('importELModal').classList.add('hidden')
+            })
             document.getElementById('rectRows').addEventListener('input', updateRectTotal)
             document.getElementById('rectCols').addEventListener('input', updateRectTotal)
             document.getElementById('showModules').addEventListener('change', toggleModulesVisibility)
@@ -8852,7 +9159,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Rafraîchir affichage visuel
                 renderModules()  // Re-render avec nouvelles couleurs
-                moduleRectangles.forEach(rect => rect.refreshModuleColors())
+                // CRITIQUE: Vérifier que rectangle existe avant appel refreshModuleColors()
+                moduleRectangles.forEach(rect => {
+                    if (rect.rectangle) {
+                        rect.refreshModuleColors()
+                    }
+                })
                 updateStats()
                 
                 // Mettre à jour UI

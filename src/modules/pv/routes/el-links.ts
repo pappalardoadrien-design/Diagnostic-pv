@@ -7,6 +7,54 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
+// GET /api/pv/available-el-audits
+// Lister tous les audits EL disponibles pour import
+// ============================================================================
+app.get('/available-el-audits', async (c) => {
+  try {
+    const { DB } = c.env
+    
+    // Récupérer tous les audits EL avec leurs stats
+    const audits = await DB.prepare(`
+      SELECT 
+        a.id,
+        a.audit_token,
+        a.project_name,
+        a.client_name,
+        a.location,
+        a.string_count,
+        a.modules_per_string,
+        a.total_modules,
+        a.configuration_json,
+        a.status,
+        a.completion_rate,
+        a.created_at,
+        a.updated_at,
+        -- Compter modules avec défauts
+        (SELECT COUNT(*) FROM el_modules WHERE el_audit_id = a.id AND defect_type NOT IN ('ok', 'pending')) as modules_with_defects,
+        -- Vérifier si déjà lié à une zone
+        (SELECT COUNT(*) FROM pv_cartography_audit_links WHERE el_audit_id = a.id) as is_linked
+      FROM el_audits a
+      ORDER BY a.created_at DESC
+    `).all()
+    
+    if (!audits.results) {
+      return c.json({ success: true, audits: [] })
+    }
+    
+    return c.json({ 
+      success: true, 
+      audits: audits.results,
+      total: audits.results.length
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur récupération audits EL:', error)
+    return c.json({ error: 'Erreur serveur', details: error.message }, 500)
+  }
+})
+
+// ============================================================================
 // POST /api/pv/plants/:plantId/zones/:zoneId/link-el-audit
 // Lier un audit EL à une zone PV (Canvas V2)
 // ============================================================================
