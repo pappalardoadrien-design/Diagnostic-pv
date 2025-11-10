@@ -232,15 +232,17 @@ diagnostic-hub/
 - ✅ **Configuration électrique MVP** - Onduleurs + String assignments + Validation électrique
 - ✅ **Export GeoJSON/KML/CSV** - Traçabilité IEC 62446-1 (3 formats) ✨ **NOUVEAU**
 - ✅ **Fix Data JALIBAT** - String 1 restaurée (242 modules complets) ✨ **NOUVEAU**
+- ✅ **Persistance rotation rectangles** - Sauvegarde angle rotation en localStorage (pas de perte alignement satellite) ✨ **NOUVEAU**
+- ✅ **Persistance config strings** - Sauvegarde strings non réguliers (S1=26, S2=24...) en localStorage + DB ✨ **NOUVEAU**
 - ✅ Export PDF (carte + stats + liste modules)
 - ✅ Sauvegarde/reload persistance DB
 - ⏳ **Tests validation Phase 1** (5 audits terrain + KPIs ROADMAP)
 
-**Phase 2b - Optimisations**: ⏳ **À VENIR**
-- Sauvegarde stringsConfig en DB (colonne JSON ou table)
-- Chargement stringsConfig depuis DB au reload
-- Export stringsConfig dans PDF (tableau récap)
-- Interface modification config sans tout replacer
+**Phase 2b - Optimisations**: ⏳ **EN COURS**
+- ✅ Sauvegarde stringsConfig en DB (colonne JSON ou table) ✅ **TERMINÉ**
+- ✅ Chargement stringsConfig depuis DB au reload ✅ **TERMINÉ**
+- 🔜 Export stringsConfig dans PDF (tableau récap)
+- 🔜 Interface modification config sans tout replacer
 
 **Phase 3 - Liaison EL**: 🔜 **PLANIFIÉ**
 - Liaison bidirectionnelle PV Cartography ↔ Audits EL

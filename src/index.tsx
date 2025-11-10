@@ -3037,6 +3037,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c) => {
         async function init() {
             await loadZone()
             await loadModules()
+            
+            // Restaurer rectangles sauvegardés (rotation, dimensions, position)
+            restoreRectanglesConfig()
+            
+            // Restaurer config strings depuis localStorage si DB vide
+            if (stringsConfig.length === 0) {
+                restoreStringsConfigFromLocalStorage()
+            }
+            
             render()
             setupEventListeners()
         }
@@ -4812,6 +4821,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.regenerateModules()
                 applyRectanglesToModules()
                 console.log("✅ Rotation terminée - modules régénérés")
+                
+                // NOUVEAU: Sauvegarder config rectangles en localStorage
+                saveRectanglesConfig()
             }
             
             calculateAngle(center, point) {
@@ -4972,6 +4984,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rectangle.setStyle({ weight: 4, color: '#3b82f6' })
                 
                 console.log("✅ Rotation réinitialisée - rectangle restauré")
+                
+                // NOUVEAU: Sauvegarder config rectangles
+                saveRectanglesConfig()
             }
             
             // ================================================================
@@ -6075,6 +6090,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('stringsSummaryText').textContent = summaryText
             document.getElementById('stringsSummary').classList.remove('hidden')
             
+            // NOUVEAU: Sauvegarder config strings en localStorage
+            saveStringsConfigToLocalStorage()
+            
             closeStringsModal()
             alert("OK: Configuration appliquee - " + total + " modules repartis sur " + stringsConfig.length + " strings")
         }
@@ -7056,6 +7074,125 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             if (confirm("Réinitialiser la rotation du rectangle ?" + String.fromCharCode(10) + "Les modules seront repositionnés")) {
                 rect.resetRotation()
                 alert("Rotation réinitialisée !" + String.fromCharCode(10) + "Modules repositionnés sans rotation")
+            }
+        }
+        
+        // ================================================================
+        // SAUVEGARDE / RESTAURATION CONFIG RECTANGLES (localStorage)
+        // ================================================================
+        function saveRectanglesConfig() {
+            try {
+                const config = moduleRectangles.map(rect => ({
+                    id: rect.id,
+                    rows: rect.rows,
+                    cols: rect.cols,
+                    stringStart: rect.stringStart,
+                    rotation: rect.currentRotation || 0,
+                    bounds: [
+                        [rect.originalBounds.getNorthWest().lat, rect.originalBounds.getNorthWest().lng],
+                        [rect.originalBounds.getSouthEast().lat, rect.originalBounds.getSouthEast().lng]
+                    ]
+                }))
+                
+                const key = \`rectangles_\${plantId}_\${zoneId}\`
+                localStorage.setItem(key, JSON.stringify(config))
+                console.log("💾 Config rectangles sauvegardée:", config.length, "rectangles")
+            } catch (error) {
+                console.error("Erreur sauvegarde rectangles:", error)
+            }
+        }
+        
+        function restoreRectanglesConfig() {
+            try {
+                const key = \`rectangles_\${plantId}_\${zoneId}\`
+                const saved = localStorage.getItem(key)
+                
+                if (!saved) {
+                    console.log("Aucune config rectangles sauvegardée")
+                    return false
+                }
+                
+                const config = JSON.parse(saved)
+                console.log("📂 Restauration config rectangles:", config.length, "rectangles")
+                
+                // Recréer rectangles avec rotation
+                config.forEach(cfg => {
+                    const rect = new RectangleModuleGroup(
+                        cfg.id,
+                        cfg.rows,
+                        cfg.cols,
+                        cfg.stringStart,
+                        cfg.bounds
+                    )
+                    rect.addToMap()
+                    
+                    // Appliquer rotation si existe
+                    if (cfg.rotation && cfg.rotation !== 0) {
+                        setTimeout(() => {
+                            rect.rotateRectangle(cfg.rotation)
+                            rect.regenerateModules()
+                        }, 100)
+                    }
+                    
+                    moduleRectangles.push(rect)
+                })
+                
+                updateRectanglesList()
+                applyRectanglesToModules()
+                
+                return true
+            } catch (error) {
+                console.error("Erreur restauration rectangles:", error)
+                return false
+            }
+        }
+        
+        // ================================================================
+        // SAUVEGARDE / RESTAURATION CONFIG STRINGS (localStorage + DB)
+        // ================================================================
+        function saveStringsConfigToLocalStorage() {
+            try {
+                if (stringsConfig.length === 0) {
+                    console.log("⚠️ Config strings vide - pas de sauvegarde localStorage")
+                    return
+                }
+                
+                const key = "stringsConfig_" + plantId + "_" + zoneId
+                localStorage.setItem(key, JSON.stringify(stringsConfig))
+                console.log("💾 Config strings sauvegardée localStorage:", stringsConfig.length, "strings")
+            } catch (error) {
+                console.error("Erreur sauvegarde strings localStorage:", error)
+            }
+        }
+        
+        function restoreStringsConfigFromLocalStorage() {
+            try {
+                const key = "stringsConfig_" + plantId + "_" + zoneId
+                const saved = localStorage.getItem(key)
+                
+                if (!saved) {
+                    console.log("ℹ️ Aucune config strings sauvegardée en localStorage")
+                    return false
+                }
+                
+                const config = JSON.parse(saved)
+                console.log("📂 Restauration config strings localStorage:", config.length, "strings")
+                
+                stringsConfig = config
+                
+                // Mettre à jour affichage summary si existe
+                const summaryEl = document.getElementById('stringsSummaryText')
+                if (summaryEl && stringsConfig.length > 0) {
+                    const total = stringsConfig.reduce((sum, c) => sum + c.modulesCount, 0)
+                    const summaryText = stringsConfig.map(c => "S" + c.stringNum + "=" + c.modulesCount).join(", ") + " (Total: " + total + ")"
+                    summaryEl.textContent = summaryText
+                    document.getElementById('stringsSummary').classList.remove('hidden')
+                }
+                
+                return true
+            } catch (error) {
+                console.error("Erreur restauration strings localStorage:", error)
+                return false
             }
         }
         
