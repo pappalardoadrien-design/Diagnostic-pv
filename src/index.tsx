@@ -4356,9 +4356,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         const moduleCenterLat = moduleCenter.lat
                         const moduleCenterLng = moduleCenter.lng
                         
-                        // Convertir coins en GPS (pour bounds précis)
-                        const moduleNW = map.containerPointToLatLng([rotatedCorners[0].x, rotatedCorners[0].y])
-                        const moduleSE = map.containerPointToLatLng([rotatedCorners[2].x, rotatedCorners[2].y])
+                        // Convertir LES 4 COINS en GPS (pour polygon pivoté)
+                        const moduleCornerNW = map.containerPointToLatLng([rotatedCorners[0].x, rotatedCorners[0].y])
+                        const moduleCornerNE = map.containerPointToLatLng([rotatedCorners[1].x, rotatedCorners[1].y])
+                        const moduleCornerSE = map.containerPointToLatLng([rotatedCorners[2].x, rotatedCorners[2].y])
+                        const moduleCornerSW = map.containerPointToLatLng([rotatedCorners[3].x, rotatedCorners[3].y])
                         
                         this.modules.push({
                             id: null,
@@ -4370,15 +4372,20 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             pos_y_meters: row * 1.0,
                             width_meters: 1.7,
                             height_meters: 1.0,
-                            rotation: 0,
+                            rotation: this.currentRotation || 0,  // Stocker angle rotation
                             string_number: currentString,
                             position_in_string: positionInString,
                             power_wp: 450,
                             module_status: "pending",
                             status_comment: null,
                             rectangleId: this.id,
-                            // Ajouter bounds GPS du module individuel
-                            moduleBounds: [[moduleNW.lat, moduleNW.lng], [moduleSE.lat, moduleSE.lng]]
+                            // CRITIQUE: Stocker les 4 coins pour polygon pivoté
+                            moduleCorners: [
+                                [moduleCornerNW.lat, moduleCornerNW.lng],
+                                [moduleCornerNE.lat, moduleCornerNE.lng],
+                                [moduleCornerSE.lat, moduleCornerSE.lng],
+                                [moduleCornerSW.lat, moduleCornerSW.lng]
+                            ]
                         })
                         
                         globalPosition++
@@ -7152,30 +7159,47 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 console.log( " Render module " + (index + 1) + ":", module.module_identifier, "at", module.latitude, module.longitude)
                 const color = STATUS_COLORS[module.module_status] || STATUS_COLORS.pending
                 
-                // *** NOUVEAU : Utiliser moduleBounds si disponible (depuis rectangles), sinon calculer ***
-                let bounds
-                if (module.moduleBounds) {
-                    // Bounds déjà calculés avec dimensions pixel-based réelles
-                    bounds = module.moduleBounds
+                // CRITIQUE: Utiliser moduleCorners pour polygon pivoté, sinon rectangle axis-aligned
+                let rect
+                if (module.moduleCorners && module.moduleCorners.length === 4) {
+                    // Module pivoté → dessiner polygon avec 4 coins
+                    rect = L.polygon(module.moduleCorners, {
+                        color: color,
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.7,
+                        className: "module-" + module.module_status,
+                        interactive: true
+                    })
+                } else if (module.moduleBounds) {
+                    // Bounds classiques (rectangle non pivoté)
+                    rect = L.rectangle(module.moduleBounds, {
+                        color: color,
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.7,
+                        className: "module-" + module.module_status,
+                        interactive: true
+                    })
                 } else {
                     // Calcul classique GPS pour modules placés manuellement
                     const latOffset = module.height_meters / 111320 / 2
                     const lngOffset = module.width_meters / (111320 * Math.cos(module.latitude * Math.PI / 180)) / 2
                     
-                    bounds = [
+                    const bounds = [
                         [module.latitude - latOffset, module.longitude - lngOffset],
                         [module.latitude + latOffset, module.longitude + lngOffset]
                     ]
+                    
+                    rect = L.rectangle(bounds, {
+                        color: color,
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.7,
+                        className: "module-" + module.module_status,
+                        interactive: true
+                    })
                 }
-                
-                const rect = L.rectangle(bounds, {
-                    color: color,
-                    weight: 2,
-                    fillColor: color,
-                    fillOpacity: 0.7,
-                    className: "module-" + module.module_status,
-                    interactive: true  // Capturer explicitement les clics
-                })
                 
                 // Ajouter label texte au centre du module (format: S1-P15)
                 const labelText = 'S' + module.string_number + "-P" + (module.position_in_string < 10 ? '0' : '') + module.position_in_string
