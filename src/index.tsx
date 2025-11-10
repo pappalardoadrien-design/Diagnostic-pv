@@ -3717,7 +3717,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             <i class="fas fa-sliders-h mr-1"></i>Configurer Strings
                         </button>
                         <div id="stringsSummary" class="p-2 bg-black rounded text-xs text-gray-400 hidden">
-                            <div class="font-bold text-yellow-400 mb-1">Config actuelle:</div>
+                            <div class="flex justify-between items-center mb-1">
+                                <div class="font-bold text-yellow-400">Config actuelle:</div>
+                                <button id="editStringsConfigBtn" class="bg-yellow-600 hover:bg-yellow-700 px-2 py-0.5 rounded text-xs font-bold text-white">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </button>
+                            </div>
                             <div id="stringsSummaryText">2 strings x 10 modules = 20 total</div>
                         </div>
                         <button id="saveConfigBtn" class="w-full bg-green-600 hover:bg-green-700 py-2 rounded font-bold">
@@ -6101,6 +6106,19 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('stringsModal').classList.add('hidden')
         }
         
+        function editStringsConfig() {
+            // Vérifier qu'une config existe
+            if (stringsConfig.length === 0) {
+                alert("ATTENTION: Aucune configuration à modifier. Créez d" + String.fromCharCode(39) + "abord une config avec 'Configurer Strings'")
+                return
+            }
+            
+            // Réouvrir modal avec config existante (pre-remplie automatiquement)
+            openStringsConfigModal()
+            
+            console.log("✏️ Modification config strings:", stringsConfig.length, "strings")
+        }
+        
         async function saveElectricalConfig() {
             // Validation des champs
             const inverterEl = document.getElementById('inverterCount')
@@ -8187,6 +8205,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
             document.getElementById('configureStringsBtn').addEventListener('click', openStringsConfigModal)
             document.getElementById('applyStringsConfigBtn').addEventListener('click', applyStringsConfig)
             document.getElementById('cancelStringsConfigBtn').addEventListener('click', closeStringsModal)
+            document.getElementById('editStringsConfigBtn').addEventListener('click', editStringsConfig)
             
             // Module Placement
             document.getElementById('drawRowBtn').addEventListener('click', drawRowMode)
