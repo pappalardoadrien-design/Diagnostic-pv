@@ -7223,10 +7223,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const rect = new RectangleModuleGroup(rectId, rows, cols, 1, bounds)
                 rect.addToMap()
                 
-                // Activer handles immédiatement pour manipulation
-                rect.showHandles()
-                
                 moduleRectangles.push(rect)
+                
+                // CRITIQUE: Forcer fix après ajout pour garantir visibilité
+                setTimeout(() => {
+                    fixRectanglesOnMap()
+                    // Activer handles après fix
+                    rect.showHandles()
+                }, 100)
                 
                 console.log("Rectangle cree: " + cols + "x" + rows + " = " + totalModules + " modules")
                 
