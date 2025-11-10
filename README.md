@@ -238,10 +238,10 @@ diagnostic-hub/
 - ✅ Sauvegarde/reload persistance DB
 - ⏳ **Tests validation Phase 1** (5 audits terrain + KPIs ROADMAP)
 
-**Phase 2b - Optimisations**: ⏳ **EN COURS**
+**Phase 2b - Optimisations**: ✅ **75% COMPLÉTÉ**
 - ✅ Sauvegarde stringsConfig en DB (colonne JSON ou table) ✅ **TERMINÉ**
 - ✅ Chargement stringsConfig depuis DB au reload ✅ **TERMINÉ**
-- 🔜 Export stringsConfig dans PDF (tableau récap)
+- ✅ Export stringsConfig dans PDF (tableau récap) ✅ **TERMINÉ**
 - 🔜 Interface modification config sans tout replacer
 
 **Phase 3 - Liaison EL**: 🔜 **PLANIFIÉ**

@@ -7681,7 +7681,63 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 yString += 6
             })
             
+            // ========================================
+            // CONFIGURATION ÉLECTRIQUE (si strings config existe)
+            // ========================================
+            if (stringsConfig.length > 0) {
+                yString += 10 // Espacement avant section
+                
+                doc.setFontSize(12)
+                doc.setFont('helvetica', 'bold')
+                doc.setTextColor(0, 0, 0)
+                doc.text('CONFIGURATION ÉLECTRIQUE', 20, yString)
+                
+                yString += 8
+                
+                // En-têtes du tableau
+                doc.setFontSize(9)
+                doc.setFont('helvetica', 'bold')
+                doc.setFillColor(147, 51, 234) // Violet DiagPV
+                doc.rect(20, yString - 4, 170, 8, 'F')
+                doc.setTextColor(255, 255, 255)
+                doc.text('String', 30, yString)
+                doc.text('Modules', 80, yString)
+                doc.text('Puissance', 130, yString)
+                
+                yString += 8
+                
+                // Lignes du tableau
+                doc.setFont('helvetica', 'normal')
+                doc.setTextColor(0, 0, 0)
+                
+                let totalModulesConfig = 0
+                stringsConfig.forEach((config, index) => {
+                    const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255]
+                    doc.setFillColor(...bgColor)
+                    doc.rect(20, yString - 4, 170, 6, 'F')
+                    
+                    doc.text( "String " + config.stringNum, 30, yString)
+                    doc.text(config.modulesCount + " modules", 80, yString)
+                    doc.text((config.modulesCount * 0.45).toFixed(2) + " kWc", 130, yString)
+                    
+                    totalModulesConfig += config.modulesCount
+                    yString += 6
+                })
+                
+                // Total
+                doc.setFont('helvetica', 'bold')
+                doc.setFillColor(147, 51, 234)
+                doc.rect(20, yString - 4, 170, 8, 'F')
+                doc.setTextColor(255, 255, 255)
+                doc.text('TOTAL', 30, yString)
+                doc.text(totalModulesConfig + " modules", 80, yString)
+                doc.text((totalModulesConfig * 0.45).toFixed(2) + " kWc", 130, yString)
+                
+                yString += 10 // Espacement après section
+            }
+            
             // Priorité intervention
+            doc.setTextColor(0, 0, 0)
             doc.setFillColor(220, 38, 38)
             doc.roundedRect(20, yString + 5, 170, 25, 3, 3, 'F')
             doc.setTextColor(255, 255, 255)
