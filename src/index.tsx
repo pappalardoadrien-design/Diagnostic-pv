@@ -4333,9 +4333,9 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         const rotatedX = rectCenterPoint.x + (relX * cos - relY * sin)
                         const rotatedY = rectCenterPoint.y + (relX * sin + relY * cos)
                         
-                        // Coins du module en pixels (AVANT conversion GPS)
-                        const halfWidth = moduleWidthPixels / 2
-                        const halfHeight = moduleHeightPixels / 2
+                        // CRITIQUE: Dimensions module = dimensions cellule grille (pas dimensions physiques)
+                        const halfWidth = gridCellWidth / 2
+                        const halfHeight = gridCellHeight / 2
                         
                         // Les 4 coins du module NON pivoté
                         const corners = [
