@@ -4882,9 +4882,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 const cos = Math.cos(angleRad)
                 const sin = Math.sin(angleRad)
                 
+                // CRITIQUE: Recalculer dimensions pixel au zoom ACTUEL (comme regenerateModules)
+                const currentNWPixel = map.latLngToContainerPoint(this.originalBounds.getNorthWest())
+                const currentSEPixel = map.latLngToContainerPoint(this.originalBounds.getSouthEast())
+                const currentWidthPixels = Math.abs(currentSEPixel.x - currentNWPixel.x)
+                const currentHeightPixels = Math.abs(currentSEPixel.y - currentNWPixel.y)
+                
                 // Calculer les 4 coins du rectangle NON pivoté en pixel
-                const halfWidth = this.originalWidthPixels / 2
-                const halfHeight = this.originalHeightPixels / 2
+                const halfWidth = currentWidthPixels / 2
+                const halfHeight = currentHeightPixels / 2
                 
                 const cornersLocal = [
                     { x: -halfWidth, y: -halfHeight },  // NW (top-left)
