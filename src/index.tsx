@@ -11,6 +11,7 @@ import syncModule from './modules/interconnect/sync'
 import syncReverseModule from './modules/interconnect/sync-reverse'
 import ivCurvesModule from './modules/iv-curves/routes'
 import visualInspectionModule from './modules/visual-inspection/routes'
+import { isolationRoutes } from './modules/isolation/routes.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -126,6 +127,21 @@ app.route('/api/iv-curves', ivCurvesModule)
 // - GET /api/visual/inspections  Liste toutes inspections
 // ============================================================================
 app.route('/api/visual', visualInspectionModule)
+
+// ============================================================================
+// MODULE ISOLATION - TESTS D'ISOLEMENT IEC 62446 (Phase 2 - Module 4/6)
+// ============================================================================
+// Module Tests Isolement DC/AC conformes norme IEC 62446
+// Routes:
+// - POST /api/isolation/test/create  Creer nouveau test isolement
+// - GET /api/isolation/test/:token  Recuperer test par token
+// - PUT /api/isolation/test/:token  Mettre a jour test
+// - DELETE /api/isolation/test/:token  Supprimer test
+// - GET /api/isolation/tests  Lister tests (filtres: plantId, testType, isConform, dates)
+// - GET /api/isolation/plant/:plantId/history  Historique mesures centrale (graphiques)
+// - POST /api/isolation/import/excel  Import Excel Benning (TODO Phase 2)
+// ============================================================================
+app.route('/api/isolation', isolationRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
