@@ -373,7 +373,14 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
     
     const zoneId = zoneResult.meta.last_row_id
     
-    // 5. Créer les modules PV depuis l'audit EL
+    // 5. Obtenir coordonnées GPS de la centrale (ou défaut Paris)
+    const plant = await DB.prepare('SELECT latitude, longitude FROM pv_plants WHERE id = ?')
+      .bind(plantId).first()
+    
+    const baseLat = plant?.latitude || 48.8566
+    const baseLng = plant?.longitude || 2.3522
+    
+    // 6. Créer les modules PV depuis l'audit EL avec grille automatique
     const elModules = await DB.prepare(`
       SELECT id, string_number, position_in_string, defect_type, severity_level, comment
       FROM el_modules
@@ -382,24 +389,47 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
     `).bind(audit.id).all()
     
     if (elModules.results && elModules.results.length > 0) {
-      for (const elMod of elModules.results) {
+      // Dimensions module standard (en mètres)
+      const moduleWidth = 1.05  // ~1m largeur
+      const moduleHeight = 1.70 // ~1.7m hauteur
+      const spacing = 0.02      // 2cm espacement
+      
+      for (let i = 0; i < elModules.results.length; i++) {
+        const elMod = elModules.results[i]
         const moduleId = `S${elMod.string_number}M${elMod.position_in_string}`
+        
+        // Grille simple: colonnes de 10 modules
+        const row = Math.floor(i / 10)
+        const col = i % 10
+        
+        // Calculer offset GPS (approximation: 1 degré ≈ 111km)
+        const latOffset = (row * (moduleHeight + spacing)) / 111320
+        const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(baseLat * Math.PI / 180))
+        
+        const moduleLat = baseLat + latOffset
+        const moduleLng = baseLng + lngOffset
         
         await DB.prepare(`
           INSERT INTO pv_modules (
             zone_id, module_identifier, string_number, position_in_string,
             pos_x_meters, pos_y_meters, rotation,
+            latitude, longitude,
+            width_meters, height_meters,
             el_audit_id, el_audit_token, el_module_id,
             el_defect_type, el_severity_level, el_notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           zoneId,
           moduleId,
           elMod.string_number,
           elMod.position_in_string,
-          0, // pos_x - will be positioned manually in Canvas V2
-          0, // pos_y
-          0, // rotation
+          col * (moduleWidth + spacing),  // pos_x
+          row * (moduleHeight + spacing), // pos_y
+          0,                               // rotation
+          moduleLat,
+          moduleLng,
+          moduleWidth,
+          moduleHeight,
           audit.id,
           auditToken,
           elMod.id,
@@ -409,7 +439,7 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
         ).run()
       }
       
-      console.log(`✅ ${elModules.results.length} modules créés automatiquement`)
+      console.log(`✅ ${elModules.results.length} modules créés avec grille automatique`)
     }
     
     // 6. Créer la liaison
