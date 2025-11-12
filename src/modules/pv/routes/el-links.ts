@@ -497,6 +497,133 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
 })
 
 // ============================================================================
+// POST /api/pv/plant/:plantId/create-el-audit
+// Créer un audit EL depuis une centrale PV existante (workflow inverse)
+// ============================================================================
+app.post('/plant/:plantId/create-el-audit', async (c) => {
+  const plantId = c.req.param('plantId')
+  const startTime = Date.now()
+  
+  try {
+    const { DB } = c.env
+    const body = await c.req.json()
+    
+    // Validation input
+    const projectName = body.project_name || 'Audit EL'
+    const clientName = body.client_name || 'Client'
+    
+    // 1. Récupérer infos centrale PV
+    const plant = await DB.prepare('SELECT * FROM pv_plants WHERE id = ?')
+      .bind(plantId).first()
+    
+    if (!plant) {
+      return c.json({ error: 'Centrale PV introuvable' }, 404)
+    }
+    
+    // 2. Récupérer modules PV de la première zone
+    const modules = await DB.prepare(`
+      SELECT m.*, z.zone_name 
+      FROM pv_modules m
+      JOIN pv_zones z ON m.zone_id = z.id
+      WHERE z.plant_id = ?
+      ORDER BY m.string_number, m.position_in_string
+    `).bind(plantId).all()
+    
+    // Calculer config (strings × modules/string)
+    const stringNumbers = new Set(modules.results?.map((m: any) => m.string_number) || [])
+    const stringCount = stringNumbers.size || 1
+    const modulesPerString = modules.results?.length ? Math.ceil(modules.results.length / stringCount) : 1
+    
+    console.log(`🔄 Création audit EL depuis PV plant ${plantId}: ${stringCount}×${modulesPerString}`)
+    
+    // 3. Générer token unique
+    const auditToken = `PV-${plantId}-${Date.now().toString(36).toUpperCase()}`
+    
+    // 4. Créer audit EL
+    const auditResult = await DB.prepare(`
+      INSERT INTO el_audits (
+        audit_token, project_name, client_name, location,
+        string_count, modules_per_string, total_modules,
+        status, completion_rate
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      auditToken,
+      projectName,
+      clientName,
+      plant.address || 'Localisation non définie',
+      stringCount,
+      modulesPerString,
+      modules.results?.length || 0,
+      'draft',
+      0
+    ).run()
+    
+    const auditId = auditResult.meta.last_row_id
+    
+    // 5. Créer modules EL depuis modules PV
+    if (modules.results && modules.results.length > 0) {
+      for (const pvMod of modules.results) {
+        await DB.prepare(`
+          INSERT INTO el_modules (
+            el_audit_id, audit_token, module_identifier,
+            string_number, position_in_string,
+            defect_type, severity_level, comment
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          auditId,
+          auditToken,
+          pvMod.module_identifier || `S${pvMod.string_number}M${pvMod.position_in_string}`,
+          pvMod.string_number,
+          pvMod.position_in_string,
+          'pending',
+          0,
+          `Module créé depuis PV plant ${plantId}`
+        ).run()
+      }
+    }
+    
+    // 6. Créer lien bidirectionnel
+    const firstZone = await DB.prepare('SELECT id FROM pv_zones WHERE plant_id = ? LIMIT 1')
+      .bind(plantId).first()
+    
+    if (firstZone) {
+      await DB.prepare(`
+        INSERT INTO pv_cartography_audit_links (
+          pv_zone_id, pv_plant_id, el_audit_id, el_audit_token,
+          link_type, sync_direction, sync_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        firstZone.id,
+        plantId,
+        auditId,
+        auditToken,
+        'auto',
+        'pv_to_el',
+        'linked'
+      ).run()
+    }
+    
+    const duration = Date.now() - startTime
+    console.log(`✅ Audit EL ${auditToken} créé depuis PV plant ${plantId} en ${duration}ms (${modules.results?.length || 0} modules)`)
+    
+    return c.json({
+      success: true,
+      audit_token: auditToken,
+      audit_id: auditId,
+      modules_created: modules.results?.length || 0,
+      redirect_url: `/el/zone/${auditId}/editor`
+    })
+    
+  } catch (error: any) {
+    console.error('❌ Erreur create-el-audit:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
 // GET /api/pv/installations-data
 // API endpoint pour récupérer données unifiées (audits EL + centrales PV)
 // ============================================================================

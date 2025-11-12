@@ -3003,6 +3003,9 @@ app.get('/pv/installations', (c) => {
                         '<p class="text-gray-400"><i class="fas fa-map-marker-alt mr-2"></i>' + (plant.address || 'Adresse non définie') + '</p>' +
                     '</div>' +
                     '<div class="flex gap-3">' +
+                        (plant.el_audit_id ? 
+                            '<a href="/el/zone/' + plant.el_audit_id + '/editor" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold"><i class="fas fa-bolt mr-2"></i>AUDIT EL</a>' : 
+                            '<button onclick="createELAudit(' + plant.plant_id + ', \'' + plant.plant_name + '\')" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold"><i class="fas fa-plus mr-2"></i>CRÉER AUDIT EL</button>') +
                         '<a href="/pv/plant/' + plant.plant_id + '" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded font-bold"><i class="fas fa-eye mr-2"></i>VOIR</a>' +
                     '</div>' +
                 '</div>' +
@@ -3050,6 +3053,38 @@ app.get('/pv/installations', (c) => {
             document.getElementById('filterPV').classList.remove('bg-gray-700')
             renderInstallations()
         })
+
+        // Créer audit EL depuis centrale PV
+        async function createELAudit(plantId, plantName) {
+            const projectName = prompt('Nom du projet:', plantName + ' - Audit EL')
+            if (!projectName) return
+            
+            const clientName = prompt('Nom du client:', 'Client')
+            if (!clientName) return
+            
+            try {
+                const response = await fetch('/api/pv/plant/' + plantId + '/create-el-audit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        project_name: projectName, 
+                        client_name: clientName 
+                    })
+                })
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                    alert('✅ Audit EL créé avec succès!\\n' + data.modules_created + ' modules importés')
+                    window.location.href = data.redirect_url
+                } else {
+                    alert('❌ Erreur: ' + data.error)
+                }
+            } catch (error) {
+                console.error('Erreur:', error)
+                alert('❌ Erreur création audit EL')
+            }
+        }
 
         // Charger au démarrage
         loadInstallations()
