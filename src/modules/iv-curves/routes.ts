@@ -280,6 +280,133 @@ ivRoutes.get('/string/:stringNumber/summary', async (c) => {
 });
 
 /**
+ * GET /api/iv-curves/dashboard/overview
+ * Dashboard unifié : Vue d'ensemble de tous les strings avec IV + EL
+ */
+ivRoutes.get('/dashboard/overview', async (c) => {
+  try {
+    const { DB } = c.env;
+    
+    // 1. Récupérer tous les strings distincts avec courbes IV
+    const strings = await DB.prepare(`
+      SELECT DISTINCT string_number 
+      FROM iv_curves 
+      ORDER BY string_number ASC
+    `).all();
+    
+    if (!strings.results || strings.results.length === 0) {
+      return c.json({
+        strings: [],
+        totalStrings: 0,
+        message: 'Aucun string trouvé avec courbes IV'
+      });
+    }
+    
+    // 2. Pour chaque string, récupérer données IV + EL
+    const stringsData = [];
+    
+    for (const stringRow of strings.results) {
+      const stringNumber = stringRow.string_number;
+      
+      // Courbes IV du string
+      const ivCurves = await DB.prepare(`
+        SELECT * FROM iv_curves 
+        WHERE string_number = ? 
+        ORDER BY measurement_date DESC
+      `).bind(stringNumber).all();
+      
+      // Modules EL du string
+      const elModules = await DB.prepare(`
+        SELECT * FROM el_modules 
+        WHERE string_number = ?
+        ORDER BY position_in_string ASC
+      `).bind(stringNumber).all();
+      
+      // Calculer statistiques IV
+      const curvesCount = ivCurves.results?.length || 0;
+      const avgFF = curvesCount > 0 
+        ? ivCurves.results.reduce((sum, c) => sum + (c.fill_factor || 0), 0) / curvesCount 
+        : 0;
+      const avgIsc = curvesCount > 0 
+        ? ivCurves.results.reduce((sum, c) => sum + (c.isc || 0), 0) / curvesCount 
+        : 0;
+      const avgVoc = curvesCount > 0 
+        ? ivCurves.results.reduce((sum, c) => sum + (c.voc || 0), 0) / curvesCount 
+        : 0;
+      const avgPmax = curvesCount > 0 
+        ? ivCurves.results.reduce((sum, c) => sum + (c.pmax || 0), 0) / curvesCount 
+        : 0;
+      
+      // Compter anomalies IV
+      const ivAnomalies = {
+        total: curvesCount,
+        critical: ivCurves.results?.filter(c => c.status === 'critical').length || 0,
+        warning: ivCurves.results?.filter(c => c.status === 'warning').length || 0,
+        ok: ivCurves.results?.filter(c => c.status === 'ok' || c.status === 'pending').length || 0
+      };
+      
+      // Compter défauts EL
+      const modulesCount = elModules.results?.length || 0;
+      const elDefects = {
+        total: modulesCount,
+        critical: elModules.results?.filter(m => m.severity_level === 3).length || 0,
+        warning: elModules.results?.filter(m => m.severity_level === 2).length || 0,
+        ok: elModules.results?.filter(m => m.severity_level === 0 || m.severity_level === 1).length || 0
+      };
+      
+      // Déterminer santé globale du string
+      let healthStatus = 'ok';
+      if (ivAnomalies.critical > 0 || elDefects.critical > 0) {
+        healthStatus = 'critical';
+      } else if (ivAnomalies.warning > 0 || elDefects.warning > 0) {
+        healthStatus = 'warning';
+      }
+      
+      stringsData.push({
+        stringNumber,
+        ivData: {
+          curvesCount,
+          averages: {
+            fillFactor: avgFF,
+            isc: avgIsc,
+            voc: avgVoc,
+            pmax: avgPmax
+          },
+          anomalies: ivAnomalies
+        },
+        elData: {
+          modulesCount,
+          defects: elDefects
+        },
+        healthStatus
+      });
+    }
+    
+    // 3. Statistiques globales
+    const totalIVCurves = stringsData.reduce((sum, s) => sum + s.ivData.curvesCount, 0);
+    const totalELModules = stringsData.reduce((sum, s) => sum + s.elData.modulesCount, 0);
+    const totalIVAnomaliesCritical = stringsData.reduce((sum, s) => sum + s.ivData.anomalies.critical, 0);
+    const totalELDefectsCritical = stringsData.reduce((sum, s) => sum + s.elData.defects.critical, 0);
+    
+    return c.json({
+      totalStrings: stringsData.length,
+      strings: stringsData,
+      globalStats: {
+        totalIVCurves,
+        totalELModules,
+        totalIVAnomaliesCritical,
+        totalELDefectsCritical,
+        stringsWithIssues: stringsData.filter(s => s.healthStatus !== 'ok').length
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur get dashboard overview:', error);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
  * DELETE /api/iv-curves/:id
  * Supprimer une courbe I-V et ses mesures
  */
