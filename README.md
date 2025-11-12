@@ -9,12 +9,13 @@
 ```
 diagnostic-hub/
 ├── src/modules/
-│   ├── el/              ✅ Électroluminescence (OPÉRATIONNEL)
-│   ├── iv/              🔜 Courbes I-V
-│   ├── thermique/       🔜 Thermographie
-│   ├── isolation/       🔜 Tests isolation
-│   ├── visuels/         🔜 Contrôles visuels
-│   └── expertise/       🔜 Expertise post-sinistre
+│   ├── el/                       ✅ Électroluminescence (PRODUCTION)
+│   ├── iv-curves/                ✅ Courbes I-V (PRODUCTION)
+│   ├── visual-inspection/        ✅ Contrôles visuels IEC 62446-1 (PRODUCTION)
+│   ├── pv-cartography/           ✅ Cartographie PV (PRODUCTION)
+│   ├── thermique/                🔜 Thermographie
+│   ├── isolation/                🔜 Tests isolation
+│   └── expertise/                🔜 Expertise post-sinistre
 └── Database D1 unifiée (diagnostic-hub-production)
 ```
 
@@ -670,6 +671,176 @@ curl http://localhost:3000
 - **Collaboration**: Temps réel 4 techniciens opérationnel
 - **Données production**: JALIBAT + Les Forges préservés
 
+## ✅ Module Visual Inspection - Contrôles Visuels IEC 62446-1 (Production)
+
+### 🎯 Objectif
+Module mobile-first pour **contrôles visuels terrain** conformes à la norme **IEC 62446-1** avec checklist standardisée de 36 points (mécanique, électrique, documentation, sécurité).
+
+### 📋 Fonctionnalités Complètes
+
+#### ✅ Checklist IEC 62446-1 (36 Items)
+- **4 catégories normatives** :
+  - 🔧 **MECHANICAL** (13 items) - Modules, structures, câblage
+  - ⚡ **ELECTRICAL** (12 items) - Boîtes jonction, protections, câblage DC/AC
+  - 📄 **DOCUMENTATION** (6 items) - Labels, schémas, conformité
+  - ⚠️ **SAFETY** (5 items) - Masses, parafoudres, risques incendie
+- **Auto-génération** de tous les items à la création d'inspection
+- **Conformité standardisée** : CONFORME / NON CONFORME / N/A
+
+#### 📱 Interface Mobile-First Terrain
+- **Design dark mode** optimisé pour lecture extérieure
+- **Touch-optimized** : boutons larges, scroll fluide, modal tactile
+- **Filtrage catégories** : ALL / MECHANICAL / ELECTRICAL / DOCUMENTATION / SAFETY
+- **Progress bar temps réel** : % d'items cochés
+- **Sticky header** : accès permanent aux filtres
+- **Item modal** : détails complets, boutons conformité, observations
+- **Statuts visuels** :
+  - 🟢 Vert = CONFORME
+  - 🔴 Rouge = NON CONFORME
+  - 🟡 Jaune = N/A (non applicable)
+  - ⚪ Gris = EN ATTENTE
+
+#### 💾 Gestion Inspections
+- **Token unique sécurisé** : `VIS-TIMESTAMP-RANDOM` (ex: `VIS-1762961953742-GCS31P`)
+- **Métadonnées inspection** : projet, client, lieu, date, inspecteur
+- **Observations détaillées** : textarea pour notes terrain
+- **Recommandations** : actions correctives suggérées
+- **Horodatage** : checked_at, checked_by pour traçabilité
+- **Statistiques live** : total items, cochés, conformes, non-conformes
+
+### 📋 URLs Module Visual Inspection
+
+#### Interface utilisateur
+- **`/static/visual-inspection`** - Interface checklist terrain
+- **`/static/visual-inspection?token=XXX`** - Charger inspection existante
+
+#### API Endpoints Visual Inspection
+- **`POST /api/visual/inspection/create`** - Créer nouvelle inspection + 36 items auto
+- **`GET /api/visual/inspection/:token`** - Récupérer inspection complète (inspection + items + defects + stats)
+- **`PUT /api/visual/inspection/:token/item/:itemId`** - Mettre à jour item checklist (status, conformity, observation, recommendation)
+- **`POST /api/visual/inspection/:token/defect`** - Créer défaut mécanique avec photos
+- **`GET /api/visual/checklist`** - Obtenir checklist IEC standardisée (36 items)
+- **`GET /api/visual/inspections`** - Liste toutes inspections
+
+### 🗄️ Structure Database D1
+
+#### Table `visual_inspections`
+- `id` - INTEGER PRIMARY KEY AUTOINCREMENT
+- `inspection_token` - TEXT UNIQUE (VIS-XXX)
+- `project_name`, `client_name`, `location` - TEXT
+- `inspection_date` - DATE
+- `inspector_name` - TEXT
+- `overall_status` - TEXT (pending, completed, validated)
+- `conformity_level` - TEXT (pending, conform, non_conform_minor, non_conform_major)
+- `critical_issues_count` - INTEGER
+- `created_at`, `updated_at` - DATETIME
+
+#### Table `visual_inspection_items`
+- `id` - INTEGER PRIMARY KEY AUTOINCREMENT
+- `inspection_id`, `inspection_token` - Références inspection
+- `category` - TEXT (MECHANICAL, ELECTRICAL, DOCUMENTATION, SAFETY)
+- `subcategory` - TEXT (ex: "Modules PV", "Boites Jonction")
+- `item_code` - TEXT (M01-M13, E01-E12, D01-D06, S01-S05)
+- `item_description` - TEXT (description IEC complète)
+- `status` - TEXT (pending, checked)
+- `conformity` - TEXT (pending, conform, non_conform, not_applicable)
+- `severity` - TEXT (critical, major, minor, info)
+- `observation`, `recommendation` - TEXT
+- `photo_url`, `photo_count` - TEXT, INTEGER
+- `checked_at`, `checked_by` - DATETIME, TEXT
+- `created_at`, `updated_at` - DATETIME
+
+#### Table `visual_defects`
+- `id` - INTEGER PRIMARY KEY AUTOINCREMENT
+- `inspection_id`, `inspection_token`, `item_id` - Références
+- `defect_location`, `module_identifier`, `string_number` - TEXT
+- `equipment_type` - TEXT (MODULE, STRUCTURE, CABLE, PROTECTION, CONNECTOR, JUNCTION_BOX, INVERTER, OTHER)
+- `defect_type`, `defect_category` - TEXT
+- `severity` - TEXT (critical, major, minor)
+- `urgency` - TEXT (immediate, short_term, medium_term, long_term)
+- `description`, `potential_impact`, `recommended_action` - TEXT
+- `norm_reference`, `norm_violation` - TEXT
+- `photo_urls` - TEXT (JSON array)
+- `detected_by`, `detection_date` - TEXT, DATE
+- `created_at` - DATETIME
+
+#### Table `visual_inspection_photos`
+- `id` - INTEGER PRIMARY KEY AUTOINCREMENT
+- `inspection_token`, `item_id`, `defect_id` - Références
+- `photo_url` - TEXT (blob storage)
+- `photo_type` - TEXT (GENERAL, DEFECT, CLOSE_UP, CONTEXT)
+- `caption` - TEXT
+- `captured_at` - DATETIME
+
+### 📊 Exemple Workflow Terrain
+
+#### 1. Création Inspection
+```bash
+POST /api/visual/inspection/create
+{
+  "projectName": "Installation Rooftop 250 kWc",
+  "clientName": "SolarTech Industries",
+  "location": "Toulouse - Batiment B",
+  "inspectionDate": "2025-11-12",
+  "inspectorName": "Adrien PAPPALARDO"
+}
+→ Retourne token VIS-1762961953742-GCS31P + 36 items auto-générés
+```
+
+#### 2. Accès Interface Terrain
+```
+/static/visual-inspection?token=VIS-1762961953742-GCS31P
+→ Charge inspection + 36 items + filtres catégories
+```
+
+#### 3. Contrôle Items (Mobile)
+- Tap sur item → Modal détails
+- Bouton CONFORME (vert) / NON CONFORME (rouge) / N/A (jaune)
+- Textarea observation : "Corrosion visible cadre aluminium partie basse"
+- Textarea recommandation : "Traitement anticorrosion requis 3 mois"
+- Bouton "Enregistrer" → PUT /api/visual/inspection/:token/item/:itemId
+
+#### 4. Statistiques Live
+```
+GET /api/visual/inspection/:token
+→ {
+  stats: {
+    totalItems: 36,
+    checkedItems: 28,
+    nonConformItems: 3,
+    criticalDefects: 1
+  }
+}
+```
+
+### 🎯 Roadmap Module Visual
+
+**Phase 2 - Défauts & Photos**: 🔜 **EN COURS**
+- ⏳ Upload photos défauts mécaniques (endpoint + UI)
+- ⏳ Interface création défauts (modal depuis item)
+- ⏳ Galerie photos par inspection
+
+**Phase 3 - Rapports**: 🔜 **PLANIFIÉ**
+- Génération PDF conforme IEC 62446-1
+- Template DiagPV avec logo + coordonnées
+- Export checklist + photos + recommandations
+- Envoi email automatique client
+
+**Phase 4 - Intégrations**: 🔜 **PLANIFIÉ**
+- Lien vers audits EL (tokens)
+- Lien vers mesures IV (strings)
+- Vue unifiée défauts visuels + EL + IV
+- Export global multi-modules
+
+### ✅ État Actuel (12 novembre 2025)
+- **Backend API** : 6 endpoints opérationnels ✅
+- **Database D1** : 4 tables créées (migration 0016) ✅
+- **Interface Mobile** : checklist 36 items fonctionnelle ✅
+- **Tests API** : création, récupération, mise à jour validés ✅
+- **Conformité IEC** : 36 items standardisés ✅
+- **GitHub** : commit 3f707b4 ✅
+- **Backup** : diagnostic-hub-visual-checklist-working.tar.gz ✅
+
 ---
 
 **🏢 Diagnostic Hub** - *Plateforme unifiée pour tous les audits DiagPV*
@@ -687,6 +858,7 @@ curl http://localhost:3000
 - **GitHub Repository**: https://github.com/adrienpappalardo/diagnostic-hub
 
 ### Dernière Mise à Jour
-- **Date**: 2025-01-10
-- **Migration**: 0013 appliquée en production (table `pv_cartography_audit_links`)
-- **Status**: ✅ Erreur 500 POST /modules corrigée
+- **Date**: 2025-11-12
+- **Migration**: 0016 appliquée (tables visual_inspections, visual_inspection_items, visual_defects, visual_inspection_photos)
+- **Module Visual**: Interface checklist IEC 62446-1 opérationnelle ✅
+- **Status**: Backend + Frontend + Tests validés
