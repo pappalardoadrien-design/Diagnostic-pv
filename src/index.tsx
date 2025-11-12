@@ -4307,6 +4307,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 
                 // Stocker les variables de drag dans l'instance pour y accéder depuis setupDragEvents()
                 this.isDragging = false
+                this.dragPrepared = false
                 this.dragStartLatLng = null
                 this.dragStartBounds = null
                 
@@ -4640,14 +4641,14 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                 this.rectangle.on('mousedown', (e) => {
                     // Clic gauche UNIQUEMENT si pas en rotation
                     if (!this.isRotating && e.originalEvent.button === 0) {
-                        this.isDragging = true
-                        // CORRECTION: Utiliser coordonnées PIXEL au lieu de lat/lng
+                        // Préparer le drag MAIS ne pas encore activer isDragging
+                        // On active seulement après déplacement de 10+ pixels (évite drag accidentel)
+                        this.dragPrepared = true
                         this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                         this.dragStartBounds = this.rectangle.getBounds()
-                        map.dragging.disable()
                         L.DomEvent.stopPropagation(e.originalEvent)
                         L.DomEvent.preventDefault(e.originalEvent)
-                        console.log("🖱️ Début drag rectangle ID:", this.id, "| Pixel:", this.dragStartPixel)
+                        console.log("🖱️ Préparation drag rectangle ID:", this.id)
                     }
                 })
             }
@@ -4659,13 +4660,28 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     window.rectangleDragEventsSetup = true
                     
                     map.on('mousemove', (e) => {
-                        // Trouver le rectangle en cours de drag
-                        const draggingRect = moduleRectangles.find(r => r.isDragging)
+                        // Trouver le rectangle préparé ou en cours de drag
+                        const draggingRect = moduleRectangles.find(r => r.isDragging || r.dragPrepared)
                         if (draggingRect && draggingRect.dragStartPixel && draggingRect.dragStartBounds) {
                             // CORRECTION: Calculer différence en PIXELS (stable et linéaire)
                             const currentPixel = map.latLngToContainerPoint(e.latlng)
                             const pixelDiffX = currentPixel.x - draggingRect.dragStartPixel.x
                             const pixelDiffY = currentPixel.y - draggingRect.dragStartPixel.y
+                            
+                            // SEUIL: Activer drag seulement après 10 pixels de déplacement
+                            const distance = Math.sqrt(pixelDiffX * pixelDiffX + pixelDiffY * pixelDiffY)
+                            if (!draggingRect.isDragging && distance < 10) {
+                                // Pas encore assez bougé, ignorer
+                                return
+                            }
+                            
+                            // Activer le drag maintenant
+                            if (!draggingRect.isDragging) {
+                                draggingRect.isDragging = true
+                                draggingRect.dragPrepared = false
+                                map.dragging.disable()
+                                console.log("✅ Drag activé (seuil 10px atteint)")
+                            }
                             
                             // Convertir bounds initiaux en pixels
                             const nw = draggingRect.dragStartBounds.getNorthWest()
@@ -4703,22 +4719,29 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                     })
                     
                     map.on('mouseup', () => {
-                        // Trouver le rectangle en cours de drag
-                        const draggingRect = moduleRectangles.find(r => r.isDragging)
+                        // Trouver le rectangle préparé ou en cours de drag
+                        const draggingRect = moduleRectangles.find(r => r.isDragging || r.dragPrepared)
                         if (draggingRect) {
-                            draggingRect.isDragging = false
-                            map.dragging.enable()
-                            
-                            // Mettre à jour position finale
-                            const newBounds = draggingRect.rectangle.getBounds()
-                            draggingRect.originalCenter = newBounds.getCenter()
-                            draggingRect.originalBounds = newBounds
-                            
-                            // Régénérer modules
-                            draggingRect.regenerateModules()
-                            saveRectanglesConfig()
-                            
-                            console.log("✅ Rectangle déplacé:", draggingRect.originalCenter.lat.toFixed(6), draggingRect.originalCenter.lng.toFixed(6))
+                            if (draggingRect.isDragging) {
+                                // Drag effectif: sauvegarder position
+                                draggingRect.isDragging = false
+                                map.dragging.enable()
+                                
+                                // Mettre à jour position finale
+                                const newBounds = draggingRect.rectangle.getBounds()
+                                draggingRect.originalCenter = newBounds.getCenter()
+                                draggingRect.originalBounds = newBounds
+                                
+                                // Régénérer modules
+                                draggingRect.regenerateModules()
+                                saveRectanglesConfig()
+                                
+                                console.log("✅ Rectangle déplacé:", draggingRect.originalCenter.lat.toFixed(6), draggingRect.originalCenter.lng.toFixed(6))
+                            } else {
+                                // Juste un clic sans drag: annuler
+                                draggingRect.dragPrepared = false
+                                console.log("🖱️ Clic simple (pas de drag)")
+                            }
                         }
                     })
                     
