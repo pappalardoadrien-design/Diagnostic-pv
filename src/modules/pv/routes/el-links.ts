@@ -314,6 +314,7 @@ app.post('/plants/:plantId/zones/:zoneId/sync-from-el', async (c) => {
 // ============================================================================
 app.get('/el-audit/:auditToken/quick-map', async (c) => {
   const auditToken = c.req.param('auditToken')
+  const startTime = Date.now()
   
   try {
     const { DB } = c.env
@@ -325,6 +326,11 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
     
     if (!audit) {
       return c.json({ error: 'Audit EL introuvable' }, 404)
+    }
+    
+    // 1b. Log info si audit vide (mais continuer le traitement)
+    if (audit.total_modules === 0) {
+      console.log(`⚠️ Audit ${auditToken} vide (0 modules) - Centrale créée sans modules`)
     }
     
     // 2. Vérifier si une centrale existe déjà pour cet audit
@@ -475,11 +481,14 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
       'linked'
     ).run()
     
-    // 7. Rediriger vers l'éditeur Canvas V2
+    // 7. Log performance et rediriger vers l'éditeur Canvas V2
+    const duration = Date.now() - startTime
+    console.log(`✅ Quick-map ${auditToken} terminé en ${duration}ms (${elModules.results?.length || 0} modules)`)
+    
     return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v2`)
     
   } catch (error: any) {
-    console.error('Erreur quick-map:', error)
+    console.error('❌ Erreur quick-map:', error)
     return c.json({ 
       error: 'Erreur création cartographie rapide', 
       details: error.message 
