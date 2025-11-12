@@ -392,19 +392,31 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
       // Dimensions module standard (en mètres)
       const moduleWidth = 1.05  // ~1m largeur
       const moduleHeight = 1.70 // ~1.7m hauteur
-      const spacing = 0.02      // 2cm espacement
+      const spacing = 0.02      // 2cm espacement entre modules
+      const stringSpacing = 0.5 // 50cm espacement entre strings
+      
+      // Configuration de la disposition (strings verticaux par défaut)
+      const stringCount = audit.string_count || Math.ceil(Math.sqrt(elModules.results.length))
+      const modulesPerString = audit.modules_per_string || Math.ceil(elModules.results.length / stringCount)
+      
+      console.log(`📐 Layout: ${stringCount} strings × ${modulesPerString} modules/string`)
       
       for (let i = 0; i < elModules.results.length; i++) {
         const elMod = elModules.results[i]
         const moduleId = `S${elMod.string_number}M${elMod.position_in_string}`
         
-        // Grille simple: colonnes de 10 modules
-        const row = Math.floor(i / 10)
-        const col = i % 10
+        // Disposition intelligente basée sur string_number et position_in_string
+        // String = colonne (axe X), Position = rangée (axe Y)
+        const stringIndex = (elMod.string_number || 1) - 1  // 0-indexed
+        const posInString = (elMod.position_in_string || 1) - 1
         
-        // Calculer offset GPS (approximation: 1 degré ≈ 111km)
-        const latOffset = (row * (moduleHeight + spacing)) / 111320
-        const lngOffset = (col * (moduleWidth + spacing)) / (111320 * Math.cos(baseLat * Math.PI / 180))
+        // Calcul position en mètres (strings verticaux)
+        const posXMeters = stringIndex * (moduleWidth + stringSpacing)
+        const posYMeters = posInString * (moduleHeight + spacing)
+        
+        // Calculer offset GPS (approximation: 1 degré ≈ 111km à équateur)
+        const latOffset = posYMeters / 111320
+        const lngOffset = posXMeters / (111320 * Math.cos(baseLat * Math.PI / 180))
         
         const moduleLat = baseLat + latOffset
         const moduleLng = baseLng + lngOffset
@@ -423,9 +435,9 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
           moduleId,
           elMod.string_number,
           elMod.position_in_string,
-          col * (moduleWidth + spacing),  // pos_x
-          row * (moduleHeight + spacing), // pos_y
-          0,                               // rotation
+          posXMeters,  // pos_x basé sur string_number
+          posYMeters,  // pos_y basé sur position_in_string
+          0,           // rotation
           moduleLat,
           moduleLng,
           moduleWidth,
