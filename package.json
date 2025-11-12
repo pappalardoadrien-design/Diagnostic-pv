@@ -28,7 +28,8 @@
   "dependencies": {
     "dxf-parser": "^1.1.2",
     "hono": "^4.9.9",
-    "leaflet-path-transform": "^1.9.0"
+    "leaflet-path-transform": "^1.9.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251001.0",

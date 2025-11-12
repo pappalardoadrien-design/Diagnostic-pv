@@ -9,6 +9,7 @@ import openSolarModule from './opensolar'
 import interconnectModule from './modules/interconnect'
 import syncModule from './modules/interconnect/sync'
 import syncReverseModule from './modules/interconnect/sync-reverse'
+import ivCurvesModule from './modules/iv-curves/routes'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -96,6 +97,19 @@ app.route('/api/sync-reverse', syncReverseModule)
 // - GET /api/opensolar/test  Test endpoint
 // ============================================================================
 app.route('/api/opensolar', openSolarModule)
+
+// ============================================================================
+// MODULE IV - COURBES I-V (Phase 2 - Module 1/5)
+// ============================================================================
+// Module Courbes I-V pour mesures PVServ (TXT et Excel)
+// Routes:
+// - POST /api/iv-curves/upload  Upload fichier PVServ (TXT/XLSM)
+// - GET /api/iv-curves/:id  Recuperer courbe par ID
+// - GET /api/iv-curves/by-string/:stringNumber  Courbes par string
+// - GET /api/iv-curves  Liste courbes (filtres optionnels)
+// - DELETE /api/iv-curves/:id  Supprimer courbe
+// ============================================================================
+app.route('/api/iv-curves', ivCurvesModule)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE

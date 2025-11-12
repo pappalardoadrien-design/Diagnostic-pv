@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module IV - Courbes I-V | DiagPV Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-chart-line text-3xl text-purple-600"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">Module IV - Courbes I-V</h1>
+                        <p class="text-sm text-gray-500">Analyse des mesures PVServ (TXT + Excel)</p>
+                    </div>
+                </div>
+                <a href="/static/dashboard.html" class="text-sm text-purple-600 hover:underline">
+                    <i class="fas fa-arrow-left mr-1"></i> Retour Dashboard
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">
+                <i class="fas fa-upload text-purple-600 mr-2"></i>
+                Importer fichier PVServ
+            </h2>
+            
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <input 
+                    type="file" 
+                    id="fileInput" 
+                    accept=".txt,.xlsm,.xlsx" 
+                    class="hidden"
+                    onchange="handleFileSelect(event)"
+                >
+                <label for="fileInput" class="cursor-pointer">
+                    <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-lg font-medium text-gray-700">Cliquez pour sélectionner un fichier</p>
+                    <p class="text-sm text-gray-500 mt-2">Formats acceptés : TXT, XLSM, XLSX</p>
+                </label>
+            </div>
+            
+            <div id="uploadStatus" class="mt-4 hidden"></div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 uppercase">Strings détectés</p>
+                            <p id="stringsCount" class="text-3xl font-bold text-gray-900">-</p>
+                        </div>
+                        <i class="fas fa-grip-lines-vertical text-3xl text-blue-500"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 uppercase">Anomalies critiques</p>
+                            <p id="criticalCount" class="text-3xl font-bold text-red-600">-</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-500 uppercase">Fill Factor moyen</p>
+                            <p id="avgFF" class="text-3xl font-bold text-gray-900">-</p>
+                        </div>
+                        <i class="fas fa-percentage text-3xl text-green-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Curves List -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">
+                    <i class="fas fa-list text-purple-600 mr-2"></i>
+                    Courbes analysées
+                </h2>
+                <div id="curvesList" class="space-y-4"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let uploadedCurves = [];
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.className = 'mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg';
+            statusDiv.innerHTML = `
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Analyse en cours de <strong>${file.name}</strong>...
+            `;
+            statusDiv.classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await axios.post('/api/iv-curves/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+
+                uploadedCurves = response.data.curves || [];
+
+                statusDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <strong>Succès !</strong> ${response.data.curvesCount} string(s) analysé(s).
+                `;
+
+                displayResults(uploadedCurves);
+
+            } catch (error) {
+                statusDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+                statusDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                    <strong>Erreur :</strong> ${error.response?.data?.error || error.message}
+                `;
+            }
+        }
+
+        function displayResults(curves) {
+            document.getElementById('resultsSection').classList.remove('hidden');
+
+            // Group curves by string number
+            const groupedByString = {};
+            curves.forEach(curve => {
+                const stringNum = curve.stringNumber;
+                if (!groupedByString[stringNum]) {
+                    groupedByString[stringNum] = [];
+                }
+                groupedByString[stringNum].push(curve);
+            });
+
+            // Summary stats
+            const uniqueStrings = Object.keys(groupedByString).length;
+            const criticalCount = curves.filter(c => c.anomalies?.severity === 'critical').length;
+            const avgFF = curves.reduce((sum, c) => sum + (c.fillFactor || 0), 0) / curves.length;
+
+            document.getElementById('stringsCount').textContent = uniqueStrings;
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('avgFF').textContent = (avgFF * 100).toFixed(1) + '%';
+
+            // Render grouped strings
+            const listDiv = document.getElementById('curvesList');
+            const sortedStrings = Object.keys(groupedByString).sort((a, b) => parseInt(a) - parseInt(b));
+            listDiv.innerHTML = sortedStrings.map(stringNum => 
+                renderStringGroup(parseInt(stringNum), groupedByString[stringNum])
+            ).join('');
+        }
+
+        function renderStringGroup(stringNumber, curves) {
+            // Calculate average values
+            const avgFF = curves.reduce((sum, c) => sum + (c.fillFactor || 0), 0) / curves.length;
+            const avgIsc = curves.reduce((sum, c) => sum + (c.calculated?.isc || 0), 0) / curves.length;
+            const avgVoc = curves.reduce((sum, c) => sum + (c.calculated?.voc || 0), 0) / curves.length;
+            const avgPmax = curves.reduce((sum, c) => sum + (c.calculated?.pmax || 0), 0) / curves.length;
+            
+            // Determine worst severity
+            const severities = curves.map(c => c.anomalies?.severity || 'ok');
+            const worstSeverity = severities.includes('critical') ? 'critical' : 
+                                  severities.includes('warning') ? 'warning' : 'ok';
+            
+            const severityColors = {
+                ok: 'bg-green-50 border-green-200',
+                warning: 'bg-yellow-50 border-yellow-200',
+                critical: 'bg-red-50 border-red-200'
+            };
+            const severityIcons = {
+                ok: 'fa-check-circle text-green-600',
+                warning: 'fa-exclamation-triangle text-yellow-600',
+                critical: 'fa-times-circle text-red-600'
+            };
+
+            return `
+                <div class="border ${severityColors[worstSeverity]} rounded-lg overflow-hidden">
+                    <!-- String Header -->
+                    <div class="p-4 cursor-pointer hover:bg-opacity-80" onclick="toggleString(${stringNumber})">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fas ${severityIcons[worstSeverity]} text-xl"></i>
+                                <div>
+                                    <h3 class="text-xl font-bold text-gray-900">String ${stringNumber}</h3>
+                                    <p class="text-sm text-gray-600">${curves.length} mesure(s)</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Average Stats -->
+                            <div class="grid grid-cols-4 gap-6 text-sm">
+                                <div class="text-center">
+                                    <p class="text-gray-500">FF moyen</p>
+                                    <p class="font-bold text-lg">${(avgFF * 100).toFixed(1)}%</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-gray-500">Isc moyen</p>
+                                    <p class="font-bold text-lg">${avgIsc.toFixed(2)} A</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-gray-500">Voc moyen</p>
+                                    <p class="font-bold text-lg">${avgVoc.toFixed(0)} V</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-gray-500">Pmax moyen</p>
+                                    <p class="font-bold text-lg">${avgPmax.toFixed(0)} W</p>
+                                </div>
+                            </div>
+                            
+                            <i id="toggle-icon-${stringNumber}" class="fas fa-chevron-down text-gray-400"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Individual Curves (collapsed by default) -->
+                    <div id="string-${stringNumber}-details" class="hidden border-t border-gray-200 bg-white bg-opacity-50">
+                        ${curves.map((curve, idx) => renderIndividualCurve(curve, idx + 1)).join('')}
+                        
+                        <!-- EL Modules Section -->
+                        <div class="p-4 border-t-2 border-gray-300 bg-gray-50">
+                            <button 
+                                onclick="loadELModules(${stringNumber})" 
+                                class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold"
+                            >
+                                <i class="fas fa-moon mr-2"></i>
+                                Afficher modules EL du string ${stringNumber}
+                            </button>
+                            <div id="el-modules-${stringNumber}" class="hidden mt-4"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderIndividualCurve(curve, measureIndex) {
+            return `
+                <div class="p-4 border-b border-gray-200 last:border-b-0">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">
+                                    Mesure ${measureIndex}
+                                </span>
+                                <span class="text-xs text-gray-500">${curve.curveType || 'bright'}</span>
+                                ${curve.anomalies?.types?.length > 0 ? `
+                                    <span class="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                        ${curve.anomalies.types.join(', ')}
+                                    </span>
+                                ` : ''}
+                            </div>
+                            
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                <div><span class="text-gray-500">FF:</span> <strong>${(curve.fillFactor * 100).toFixed(1)}%</strong></div>
+                                <div><span class="text-gray-500">Isc:</span> <strong>${curve.calculated?.isc?.toFixed(2) || '-'} A</strong></div>
+                                <div><span class="text-gray-500">Voc:</span> <strong>${curve.calculated?.voc?.toFixed(0) || '-'} V</strong></div>
+                                <div><span class="text-gray-500">Pmax:</span> <strong>${curve.calculated?.pmax?.toFixed(0) || '-'} W</strong></div>
+                                <div><span class="text-gray-500">Vmpp:</span> <strong>${curve.calculated?.vmpp?.toFixed(0) || '-'} V</strong></div>
+                                <div><span class="text-gray-500">Impp:</span> <strong>${curve.calculated?.impp?.toFixed(2) || '-'} A</strong></div>
+                                <div><span class="text-gray-500">Rs:</span> <strong>${curve.calculated?.rs?.toFixed(1) || '-'} Ω</strong></div>
+                                <div><span class="text-gray-500">Rsh:</span> <strong>${curve.calculated?.rsh?.toFixed(1) || '-'} Ω</strong></div>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            onclick="viewCurveDetails(${curve.id})" 
+                            class="ml-4 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm whitespace-nowrap"
+                        >
+                            <i class="fas fa-chart-line mr-1"></i> Graphique
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function toggleString(stringNumber) {
+            const detailsDiv = document.getElementById(`string-${stringNumber}-details`);
+            const icon = document.getElementById(`toggle-icon-${stringNumber}`);
+            
+            if (detailsDiv.classList.contains('hidden')) {
+                detailsDiv.classList.remove('hidden');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                detailsDiv.classList.add('hidden');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+
+        async function viewCurveDetails(curveId) {
+            try {
+                const response = await axios.get(`/api/iv-curves/${curveId}`);
+                const curve = response.data;
+                
+                showGraphModal(curve);
+            } catch (error) {
+                alert('Erreur chargement courbe : ' + error.message);
+            }
+        }
+        
+        function showGraphModal(curve) {
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                    <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                        <h2 class="text-2xl font-bold text-gray-900">
+                            <i class="fas fa-chart-line text-purple-600 mr-2"></i>
+                            Courbe I-V - String ${curve.string_number}
+                        </h2>
+                        <button onclick="closeGraphModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- Stats Summary -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Fill Factor</p>
+                                <p class="text-2xl font-bold text-blue-600">${(curve.fill_factor * 100).toFixed(1)}%</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Pmax</p>
+                                <p class="text-2xl font-bold text-green-600">${curve.pmax?.toFixed(2) || '-'} W</p>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Voc</p>
+                                <p class="text-2xl font-bold text-yellow-600">${curve.voc?.toFixed(2) || '-'} V</p>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-500">Isc</p>
+                                <p class="text-2xl font-bold text-purple-600">${curve.isc?.toFixed(2) || '-'} A</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Graphs -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-3">Courbe I-V</h3>
+                                <canvas id="ivChart"></canvas>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-3">Courbe P-V</h3>
+                                <canvas id="pvChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Technical Details -->
+                        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-bold text-gray-900 mb-2">Paramètres techniques</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                <div><span class="text-gray-500">Vmpp:</span> <strong>${curve.vmpp?.toFixed(2) || '-'} V</strong></div>
+                                <div><span class="text-gray-500">Impp:</span> <strong>${curve.impp?.toFixed(2) || '-'} A</strong></div>
+                                <div><span class="text-gray-500">Rs:</span> <strong>${curve.rs?.toFixed(3) || '-'} Ω</strong></div>
+                                <div><span class="text-gray-500">Rsh:</span> <strong>${curve.rsh?.toFixed(2) || '-'} Ω</strong></div>
+                                <div><span class="text-gray-500">Rds:</span> <strong>${curve.rds?.toFixed(3) || '-'} Ω</strong></div>
+                                <div><span class="text-gray-500">Uf:</span> <strong>${curve.uf_diodes || 0} diodes</strong></div>
+                                <div><span class="text-gray-500">Type:</span> <strong>${curve.curve_type}</strong></div>
+                                <div><span class="text-gray-500">Status:</span> <strong class="text-${curve.status === 'critical' ? 'red' : curve.status === 'warning' ? 'yellow' : 'green'}-600">${curve.status}</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Render charts
+            setTimeout(() => {
+                renderIVChart(curve.measurements);
+                renderPVChart(curve.measurements);
+            }, 100);
+        }
+        
+        function closeGraphModal() {
+            const modal = document.querySelector('.fixed.inset-0');
+            if (modal) modal.remove();
+        }
+        
+        function renderIVChart(measurements) {
+            const ctx = document.getElementById('ivChart').getContext('2d');
+            
+            const data = measurements.map(m => ({
+                x: m.voltage,
+                y: m.current
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Courbe I-V',
+                        data: data,
+                        backgroundColor: 'rgba(147, 51, 234, 0.6)',
+                        borderColor: 'rgba(147, 51, 234, 1)',
+                        borderWidth: 2,
+                        showLine: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Courant vs Tension'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tension (V)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Courant (A)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderPVChart(measurements) {
+            const ctx = document.getElementById('pvChart').getContext('2d');
+            
+            const data = measurements.map(m => ({
+                x: m.voltage,
+                y: Math.abs(m.voltage * m.current)
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Courbe P-V',
+                        data: data,
+                        backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 2,
+                        showLine: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Puissance vs Tension'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tension (V)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Puissance (W)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ============================================================================
+        // LINKING IV ↔ EL: Load EL modules for a string
+        // ============================================================================
+        async function loadELModules(stringNumber) {
+            const container = document.getElementById(`el-modules-${stringNumber}`);
+            
+            // Show loading
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-spinner fa-spin text-2xl text-green-600 mb-2"></i>
+                    <p class="text-gray-600">Chargement modules EL...</p>
+                </div>
+            `;
+            container.classList.remove('hidden');
+            
+            try {
+                const response = await axios.get(`/api/iv-curves/string/${stringNumber}/el-modules`);
+                const { modules, summary } = response.data;
+                
+                if (!modules || modules.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                            <i class="fas fa-info-circle text-yellow-600 text-2xl mb-2"></i>
+                            <p class="text-gray-700">Aucun module EL trouvé pour le string ${stringNumber}</p>
+                            <p class="text-sm text-gray-500 mt-2">Les modules EL doivent être créés dans le Module EL d'abord</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Render EL modules
+                container.innerHTML = `
+                    <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-bold text-gray-900">
+                                <i class="fas fa-moon text-green-600 mr-2"></i>
+                                Modules EL - String ${stringNumber}
+                            </h4>
+                            <div class="flex gap-4 text-sm">
+                                <span class="px-2 py-1 bg-red-100 text-red-700 rounded font-bold">
+                                    ${summary.critical} critique(s)
+                                </span>
+                                <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded font-bold">
+                                    ${summary.warning} warning(s)
+                                </span>
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded font-bold">
+                                    ${summary.ok} OK
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Modules Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            ${modules.map(m => renderELModule(m)).join('')}
+                        </div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                        <i class="fas fa-exclamation-circle text-red-600 text-2xl mb-2"></i>
+                        <p class="text-gray-700">Erreur chargement modules EL</p>
+                        <p class="text-sm text-gray-500 mt-2">${error.response?.data?.error || error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderELModule(module) {
+            const severityColors = {
+                ok: 'bg-green-50 border-green-300 text-green-800',
+                warning: 'bg-yellow-50 border-yellow-300 text-yellow-800',
+                critical: 'bg-red-50 border-red-300 text-red-800'
+            };
+            const severityIcons = {
+                ok: 'fa-check-circle',
+                warning: 'fa-exclamation-triangle',
+                critical: 'fa-times-circle'
+            };
+            
+            const severity = module.severity || 'ok';
+            
+            return `
+                <div class="border-2 ${severityColors[severity]} rounded-lg p-3 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-bold text-lg">${module.module_identifier}</span>
+                        <i class="fas ${severityIcons[severity]} text-xl"></i>
+                    </div>
+                    <div class="text-sm space-y-1">
+                        <p><span class="text-gray-600">Position:</span> ${module.position_in_string}</p>
+                        <p><span class="text-gray-600">Défaut:</span> ${module.defect_type || '-'}</p>
+                        ${module.comment ? `<p class="text-gray-600 italic">${module.comment}</p>` : ''}
+                        ${module.image_url ? `
+                            <a href="${module.image_url}" target="_blank" class="inline-block mt-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                                <i class="fas fa-image mr-1"></i> Voir image
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
