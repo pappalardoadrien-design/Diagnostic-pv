@@ -7371,7 +7371,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                                         '<i class="fas fa-user mr-2"></i>' + audit.client_name +
                                         (audit.location ? ' \u2022 ' + audit.location : '') +
                                     '</p>' +
-                                    '<div class="grid grid-cols-4 gap-4 text-xs">' +
+                                    '<div class="grid grid-cols-5 gap-3 text-xs">' +
                                         '<div class="bg-black rounded p-2 text-center">' +
                                             '<div class="text-xl font-bold text-purple-400">' + audit.total_modules + '</div>' +
                                             '<div class="text-gray-500">Modules</div>' +
@@ -7381,18 +7381,33 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                                             '<div class="text-gray-500">Strings</div>' +
                                         '</div>' +
                                         '<div class="bg-black rounded p-2 text-center">' +
+                                            '<div class="text-lg font-bold text-cyan-400">' + audit.string_count + '×' + audit.modules_per_string + '</div>' +
+                                            '<div class="text-gray-500">Config</div>' +
+                                        '</div>' +
+                                        '<div class="bg-black rounded p-2 text-center">' +
                                             '<div class="text-xl font-bold text-orange-400">' + rectanglesCount + '</div>' +
                                             '<div class="text-gray-500">Rectangles</div>' +
                                         '</div>' +
                                         '<div class="bg-black rounded p-2 text-center">' +
                                             '<div class="text-xl font-bold ' + (audit.modules_with_defects > 0 ? 'text-red-400' : 'text-green-400') + '">' + (audit.modules_with_defects || 0) + '</div>' +
-                                            '<div class="text-gray-500">D\u00e9fauts</div>' +
+                                            '<div class="text-gray-500">Défauts</div>' +
                                         '</div>' +
                                     '</div>' +
-                                    '<p class="text-xs text-gray-500 mt-2">' +
-                                        '<i class="fas fa-calendar mr-1"></i>Cr\u00e9\u00e9 le ' + new Date(audit.created_at).toLocaleDateString('fr-FR') +
-                                        '<span class="ml-3"><i class="fas fa-tasks mr-1"></i>Avancement: ' + (audit.completion_rate || 0).toFixed(0) + '%</span>' +
-                                    '</p>' +
+                                    '<div class="mt-3 flex flex-wrap items-center gap-2 text-xs">' +
+                                        '<span class="px-2 py-1 bg-purple-900/50 border border-purple-500/30 rounded">' +
+                                            '<i class="fas fa-calendar mr-1 text-purple-400"></i>' + new Date(audit.created_at).toLocaleDateString('fr-FR') +
+                                        '</span>' +
+                                        '<span class="px-2 py-1 bg-blue-900/50 border border-blue-500/30 rounded">' +
+                                            '<i class="fas fa-tasks mr-1 text-blue-400"></i>' + (audit.completion_rate || 0).toFixed(0) + '% complet' +
+                                        '</span>' +
+                                        (audit.modules_with_defects > 0 ? 
+                                            '<span class="px-2 py-1 bg-red-900/50 border border-red-500/30 rounded">' +
+                                                '<i class="fas fa-exclamation-triangle mr-1 text-red-400"></i>' + audit.modules_with_defects + ' d\u00e9faut(s) d\u00e9tect\u00e9(s)' +
+                                            '</span>' : 
+                                            '<span class="px-2 py-1 bg-green-900/50 border border-green-500/30 rounded">' +
+                                                '<i class="fas fa-check-circle mr-1 text-green-400"></i>Aucun d\u00e9faut' +
+                                            '</span>') +
+                                    '</div>' +
                                 '</div>' +
                                 '<div class="ml-4">' +
                                     '<button class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">' +
