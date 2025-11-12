@@ -3998,7 +3998,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         </div>
 
         <!-- Modal Annotation Statut -->
-        <div id="statusModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div id="statusModal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4" style="z-index: 10000;">
             <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-md w-full">
                 <h3 id="modalTitle" class="text-xl font-black mb-4 text-center">MODULE M000</h3>
                 
@@ -4042,7 +4042,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         </div>
 
         <!-- Modal Configuration Strings -->
-        <div id="stringsModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div id="stringsModal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4" style="z-index: 10000;">
             <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
                 <h3 class="text-xl font-black mb-4 text-center text-yellow-400">
                     <i class="fas fa-sliders-h mr-2"></i>CONFIGURATION STRINGS NON RÉGULIERS
@@ -4074,7 +4074,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         </div>
 
         <!-- Modal Onduleur (Création/Édition) -->
-        <div id="inverterModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div id="inverterModal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4" style="z-index: 10000;">
             <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                 <h3 class="text-xl font-black mb-4 text-center text-yellow-400">
                     <i class="fas fa-plug mr-2"></i><span id="inverterModalTitle">NOUVEL ONDULEUR</span>
@@ -4156,7 +4156,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
         </div>
 
         <!-- Modal Import depuis Module EL -->
-        <div id="importELModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div id="importELModal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4" style="z-index: 10000;">
             <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-black mb-4 text-center text-purple-400">
                     <i class="fas fa-file-import mr-2"></i>IMPORTER CONFIGURATION DEPUIS MODULE EL
@@ -9402,7 +9402,7 @@ app.get('/pv/plant/:id', async (c) => {
         </div>
 
         <!-- Modal Ajout/Édition Zone -->
-        <div id="zoneModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div id="zoneModal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4" style="z-index: 10000;">
             <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-2xl w-full">
                 <h3 class="text-2xl font-black mb-4 text-purple-400">
                     <i class="fas fa-layer-group mr-2"></i><span id="modalTitle">NOUVELLE ZONE</span>
