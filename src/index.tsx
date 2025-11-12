@@ -10,6 +10,7 @@ import interconnectModule from './modules/interconnect'
 import syncModule from './modules/interconnect/sync'
 import syncReverseModule from './modules/interconnect/sync-reverse'
 import ivCurvesModule from './modules/iv-curves/routes'
+import visualInspectionModule from './modules/visual-inspection/routes'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -108,8 +109,23 @@ app.route('/api/opensolar', openSolarModule)
 // - GET /api/iv-curves/by-string/:stringNumber  Courbes par string
 // - GET /api/iv-curves  Liste courbes (filtres optionnels)
 // - DELETE /api/iv-curves/:id  Supprimer courbe
+// - GET /api/iv-curves/dashboard/overview  Dashboard unifie IV + EL
 // ============================================================================
 app.route('/api/iv-curves', ivCurvesModule)
+
+// ============================================================================
+// MODULE VISUAL INSPECTION - CONTROLES VISUELS IEC 62446-1 (Phase 2 - Module 2/5)
+// ============================================================================
+// Module Controles Visuels terrain conforme norme IEC 62446-1
+// Routes:
+// - POST /api/visual/inspection/create  Creer nouvelle inspection
+// - GET /api/visual/inspection/:token  Recuperer inspection complete
+// - PUT /api/visual/inspection/:token/item/:itemId  Mettre a jour item checklist
+// - POST /api/visual/inspection/:token/defect  Creer defaut mecanique
+// - GET /api/visual/checklist  Obtenir checklist IEC standardisee
+// - GET /api/visual/inspections  Liste toutes inspections
+// ============================================================================
+app.route('/api/visual', visualInspectionModule)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
