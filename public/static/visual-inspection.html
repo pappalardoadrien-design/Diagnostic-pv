@@ -163,11 +163,152 @@
         </div>
     </div>
 
+    <!-- Defect Creation Modal -->
+    <div id="defectModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 overflow-auto p-4">
+        <div class="bg-gray-800 rounded-lg max-w-3xl mx-auto my-8 border-2 border-orange-400">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-orange-400">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>NOUVEAU DÉFAUT
+                </h3>
+                <button onclick="closeDefectModal()" class="text-2xl">&times;</button>
+            </div>
+            <div class="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                
+                <!-- Localisation -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">🎯 LOCALISATION</label>
+                    <input id="defectLocation" type="text" placeholder="Ex: Module String 1 Position 12, Onduleur principal, etc." 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3" />
+                </div>
+
+                <!-- Type Équipement -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">🔧 TYPE ÉQUIPEMENT</label>
+                    <select id="defectEquipmentType" onchange="updateDefectTypes()" 
+                            class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3">
+                        <option value="">-- Sélectionner --</option>
+                        <option value="MODULE">Module PV</option>
+                        <option value="STRUCTURE">Structure Support</option>
+                        <option value="CABLE">Câblage</option>
+                        <option value="PROTECTION">Protection Électrique</option>
+                        <option value="CONNECTOR">Connecteur (MC4, etc.)</option>
+                        <option value="JUNCTION_BOX">Boîte de Jonction</option>
+                        <option value="INVERTER">Onduleur</option>
+                        <option value="OTHER">Autre</option>
+                    </select>
+                </div>
+
+                <!-- Type Défaut -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">⚠️ TYPE DÉFAUT</label>
+                    <select id="defectType" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3">
+                        <option value="">-- Sélectionner type équipement d'abord --</option>
+                    </select>
+                </div>
+
+                <!-- Catégorie -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">📂 CATÉGORIE</label>
+                    <select id="defectCategory" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3">
+                        <option value="MECHANICAL">MECHANICAL - Mécanique</option>
+                        <option value="ELECTRICAL">ELECTRICAL - Électrique</option>
+                        <option value="THERMAL">THERMAL - Thermique</option>
+                        <option value="VISUAL">VISUAL - Visuel</option>
+                    </select>
+                </div>
+
+                <!-- Sévérité -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">🚨 SÉVÉRITÉ</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="selectSeverity('critical')" id="severityCritical"
+                                class="severity-btn bg-gray-700 hover:bg-red-600 border-2 border-gray-600 py-3 rounded-lg font-bold">
+                            🔴 CRITIQUE
+                        </button>
+                        <button onclick="selectSeverity('major')" id="severityMajor"
+                                class="severity-btn bg-gray-700 hover:bg-orange-600 border-2 border-gray-600 py-3 rounded-lg font-bold">
+                            🟠 MAJEUR
+                        </button>
+                        <button onclick="selectSeverity('minor')" id="severityMinor"
+                                class="severity-btn bg-gray-700 hover:bg-yellow-600 border-2 border-gray-600 py-3 rounded-lg font-bold">
+                            🟡 MINEUR
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Urgence -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">⏱️ URGENCE</label>
+                    <select id="defectUrgency" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3">
+                        <option value="immediate">🔥 IMMÉDIATE - Action sous 24h</option>
+                        <option value="short_term">⚡ COURT TERME - Action sous 1 semaine</option>
+                        <option value="medium_term">📅 MOYEN TERME - Action sous 1 mois</option>
+                        <option value="long_term">📆 LONG TERME - Action sous 3 mois</option>
+                    </select>
+                </div>
+
+                <!-- Description -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">📝 DESCRIPTION DÉTAILLÉE</label>
+                    <textarea id="defectDescription" rows="3" placeholder="Décrivez précisément le défaut observé..." 
+                              class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3"></textarea>
+                </div>
+
+                <!-- Impact Potentiel -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">💥 IMPACT POTENTIEL</label>
+                    <textarea id="defectImpact" rows="2" placeholder="Conséquences possibles (perte production, risque sécurité, etc.)..." 
+                              class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3"></textarea>
+                </div>
+
+                <!-- Action Recommandée -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">✅ ACTION RECOMMANDÉE</label>
+                    <textarea id="defectAction" rows="2" placeholder="Action corrective préconisée..." 
+                              class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3"></textarea>
+                </div>
+
+                <!-- Référence Norme -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">📋 RÉFÉRENCE NORME (optionnel)</label>
+                    <input id="defectNormRef" type="text" placeholder="Ex: IEC 62446-1 Section 6.2, NF C 15-100..." 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3" />
+                </div>
+
+                <!-- Violation Norme -->
+                <div class="space-y-2">
+                    <label class="font-bold text-green-400">⚖️ VIOLATION NORME</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="normViolation" value="true" class="mr-2" />
+                            <span>Oui - Non conforme</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="normViolation" value="false" checked class="mr-2" />
+                            <span>Non - Conforme norme</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-2 pt-4 border-t border-gray-700">
+                    <button onclick="closeDefectModal()" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-times mr-2"></i>ANNULER
+                    </button>
+                    <button onclick="submitDefect()" class="flex-1 bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-check mr-2"></i>CRÉER DÉFAUT
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentInspection = null;
         let checklistItems = [];
         let currentFilter = 'ALL';
         let currentItemId = null;
+        let selectedSeverity = null;
 
         // Initialize
         window.addEventListener('DOMContentLoaded', init);
@@ -374,7 +515,173 @@
         }
 
         function addDefect() {
-            alert('Fonction ajout défaut en développement');
+            document.getElementById('defectModal').classList.remove('hidden');
+            // Reset form
+            document.getElementById('defectLocation').value = '';
+            document.getElementById('defectEquipmentType').value = '';
+            document.getElementById('defectType').innerHTML = '<option value="">-- Sélectionner type équipement d\'abord --</option>';
+            document.getElementById('defectCategory').value = 'MECHANICAL';
+            selectedSeverity = null;
+            document.querySelectorAll('.severity-btn').forEach(btn => {
+                btn.classList.remove('bg-red-600', 'bg-orange-600', 'bg-yellow-600');
+                btn.classList.add('bg-gray-700');
+            });
+            document.getElementById('defectUrgency').value = 'medium_term';
+            document.getElementById('defectDescription').value = '';
+            document.getElementById('defectImpact').value = '';
+            document.getElementById('defectAction').value = '';
+            document.getElementById('defectNormRef').value = '';
+            document.querySelector('input[name="normViolation"][value="false"]').checked = true;
+        }
+
+        function closeDefectModal() {
+            document.getElementById('defectModal').classList.add('hidden');
+        }
+
+        function selectSeverity(severity) {
+            selectedSeverity = severity;
+            // Reset all buttons
+            document.querySelectorAll('.severity-btn').forEach(btn => {
+                btn.classList.remove('bg-red-600', 'bg-orange-600', 'bg-yellow-600', 'border-green-400');
+                btn.classList.add('bg-gray-700', 'border-gray-600');
+            });
+            // Highlight selected
+            const btn = document.getElementById(`severity${severity.charAt(0).toUpperCase() + severity.slice(1)}`);
+            btn.classList.remove('bg-gray-700', 'border-gray-600');
+            btn.classList.add('border-green-400');
+            if (severity === 'critical') btn.classList.add('bg-red-600');
+            if (severity === 'major') btn.classList.add('bg-orange-600');
+            if (severity === 'minor') btn.classList.add('bg-yellow-600');
+        }
+
+        const defectTypesByEquipment = {
+            MODULE: [
+                'MICROFISSURE - Fissures cellules',
+                'DELAMINATION - Délamination couches',
+                'SNAIL_TRAIL - Trainées escargot',
+                'HOT_SPOT - Point chaud',
+                'PID - Dégradation induite potentiel',
+                'DISCOLORATION - Décoloration',
+                'BROKEN_GLASS - Verre cassé',
+                'FRAME_DAMAGE - Cadre endommagé',
+                'BYPASS_DIODE - Diode bypass défaillante',
+                'CELL_DAMAGE - Cellule endommagée'
+            ],
+            STRUCTURE: [
+                'CORROSION - Corrosion structure',
+                'LOOSE_MOUNTING - Fixation desserrée',
+                'DEFORMATION - Déformation rails',
+                'CRACK - Fissure structure',
+                'MISSING_PART - Pièce manquante',
+                'IMPROPER_SPACING - Écartement incorrect'
+            ],
+            CABLE: [
+                'EXPOSED_CONDUCTOR - Conducteur exposé',
+                'INSULATION_DAMAGE - Isolation endommagée',
+                'LOOSE_CONNECTION - Connexion desserrée',
+                'UV_DAMAGE - Dégradation UV',
+                'RODENT_DAMAGE - Dégâts rongeurs',
+                'IMPROPER_ROUTING - Cheminement incorrect'
+            ],
+            PROTECTION: [
+                'FUSE_BLOWN - Fusible grillé',
+                'BREAKER_TRIPPED - Disjoncteur déclenché',
+                'MISSING_PROTECTION - Protection manquante',
+                'INCORRECT_RATING - Calibre incorrect',
+                'SURGE_DEVICE_FAILED - Parafoudre défaillant'
+            ],
+            CONNECTOR: [
+                'MC4_NOT_LOCKED - MC4 non verrouillé',
+                'CORROSION - Corrosion connecteur',
+                'CRACKED_HOUSING - Boîtier fissuré',
+                'LOOSE_CONNECTION - Connexion desserrée',
+                'WATER_INGRESS - Infiltration eau'
+            ],
+            JUNCTION_BOX: [
+                'SEAL_FAILURE - Étanchéité défaillante',
+                'CORROSION - Corrosion interne',
+                'LOOSE_COVER - Couvercle desserré',
+                'MISSING_GROMMET - Presse-étoupe manquant',
+                'BURN_MARKS - Traces brûlure'
+            ],
+            INVERTER: [
+                'ERROR_CODE - Code erreur affiché',
+                'OVERHEATING - Surchauffe',
+                'FAN_FAILURE - Ventilateur défaillant',
+                'DISPLAY_ERROR - Défaut affichage',
+                'COMMUNICATION_LOSS - Perte communication',
+                'GROUND_FAULT - Défaut isolation'
+            ],
+            OTHER: [
+                'CUSTOM - Défaut personnalisé'
+            ]
+        };
+
+        function updateDefectTypes() {
+            const equipmentType = document.getElementById('defectEquipmentType').value;
+            const defectTypeSelect = document.getElementById('defectType');
+            
+            defectTypeSelect.innerHTML = '';
+            
+            if (!equipmentType) {
+                defectTypeSelect.innerHTML = '<option value="">-- Sélectionner type équipement d\'abord --</option>';
+                return;
+            }
+            
+            const types = defectTypesByEquipment[equipmentType] || [];
+            types.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.split(' - ')[0];
+                option.textContent = type;
+                defectTypeSelect.appendChild(option);
+            });
+        }
+
+        async function submitDefect() {
+            // Validate required fields
+            const location = document.getElementById('defectLocation').value.trim();
+            const equipmentType = document.getElementById('defectEquipmentType').value;
+            const defectType = document.getElementById('defectType').value;
+            const description = document.getElementById('defectDescription').value.trim();
+            
+            if (!location || !equipmentType || !defectType || !description || !selectedSeverity) {
+                alert('⚠️ Veuillez remplir tous les champs obligatoires:\n\n- Localisation\n- Type équipement\n- Type défaut\n- Sévérité (cliquer sur un bouton)\n- Description');
+                return;
+            }
+
+            try {
+                const defectData = {
+                    defectLocation: location,
+                    equipmentType: equipmentType,
+                    defectType: defectType,
+                    defectCategory: document.getElementById('defectCategory').value,
+                    severity: selectedSeverity,
+                    urgency: document.getElementById('defectUrgency').value,
+                    description: description,
+                    potentialImpact: document.getElementById('defectImpact').value.trim() || null,
+                    recommendedAction: document.getElementById('defectAction').value.trim() || null,
+                    normReference: document.getElementById('defectNormRef').value.trim() || null,
+                    normViolation: document.querySelector('input[name="normViolation"]:checked').value === 'true',
+                    detectedBy: currentInspection.inspector_name || 'Inspector'
+                };
+
+                const response = await axios.post(
+                    `/api/visual/inspection/${currentInspection.inspection_token}/defect`,
+                    defectData
+                );
+
+                if (response.data.success) {
+                    alert('✅ Défaut créé avec succès !');
+                    closeDefectModal();
+                    // Reload inspection to update defect count
+                    await loadInspection(currentInspection.inspection_token);
+                } else {
+                    alert('❌ Erreur lors de la création du défaut');
+                }
+            } catch (error) {
+                console.error('Error creating defect:', error);
+                alert('❌ Erreur serveur lors de la création du défaut');
+            }
         }
 
         function generateReport() {
