@@ -4646,6 +4646,10 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         this.dragPrepared = true
                         this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                         this.dragStartBounds = this.rectangle.getBounds()
+                        // Sauvegarder corners du polygon si rotation active
+                        if (this.rotatedPolygon && map.hasLayer(this.rotatedPolygon)) {
+                            this.dragStartPolygonCorners = this.rotatedPolygon.getLatLngs()[0].map(ll => ({lat: ll.lat, lng: ll.lng}))
+                        }
                         L.DomEvent.stopPropagation(e.originalEvent)
                         L.DomEvent.preventDefault(e.originalEvent)
                         console.log("🖱️ Préparation drag rectangle ID:", this.id)
@@ -4702,7 +4706,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             
                             // CRITIQUE: Si rotation active, mettre à jour aussi le rotatedPolygon
                             if (draggingRect.rotatedPolygon && map.hasLayer(draggingRect.rotatedPolygon)) {
-                                const corners = draggingRect.rotatedPolygon.getLatLngs()[0]
+                                // CORRECTION: Utiliser corners INITIAUX sauvegardés (pas actuels qui changent à chaque frame)
+                                const corners = draggingRect.dragStartPolygonCorners || draggingRect.rotatedPolygon.getLatLngs()[0]
                                 const newCorners = corners.map(corner => {
                                     const cornerPixel = map.latLngToContainerPoint(corner)
                                     const newCornerPixel = L.point(cornerPixel.x + pixelDiffX, cornerPixel.y + pixelDiffY)
@@ -5268,6 +5273,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                             this.dragPrepared = true
                             this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                             this.dragStartBounds = this.rectangle.getBounds()
+                            // CRITIQUE: Sauvegarder AUSSI les corners initiaux du polygon
+                            this.dragStartPolygonCorners = this.rotatedPolygon.getLatLngs()[0].map(ll => ({lat: ll.lat, lng: ll.lng}))
                             L.DomEvent.stopPropagation(e.originalEvent)
                             L.DomEvent.preventDefault(e.originalEvent)
                             console.log("🖱️ Préparation drag rotatedPolygon ID:", this.id)
