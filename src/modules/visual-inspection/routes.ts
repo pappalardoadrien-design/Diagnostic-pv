@@ -141,7 +141,8 @@ visualRoutes.get('/inspection/:token', async (c) => {
  */
 visualRoutes.put('/inspection/:token/item/:itemId', async (c) => {
   try {
-    const { token, itemId } = c.req.params;
+    const token = c.req.param('token');
+    const itemId = c.req.param('itemId');
     const body: UpdateItemRequest = await c.req.json();
     const { DB } = c.env;
     

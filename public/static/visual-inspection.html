@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Contrôles Visuels IEC 62446-1 | DiagPV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        /* Mobile-first optimizations */
+        body { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        .checklist-item { min-height: 60px; }
+        .btn-large { min-height: 48px; min-width: 48px; }
+        .sticky-header { position: sticky; top: 0; z-index: 50; }
+        
+        /* Swipe gestures visual feedback */
+        .swipe-conform { background: linear-gradient(90deg, transparent, #22c55e33); }
+        .swipe-non-conform { background: linear-gradient(90deg, transparent, #ef444433); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header Sticky -->
+    <header class="sticky-header bg-gray-800 border-b-2 border-green-400 shadow-lg">
+        <div class="px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-clipboard-check text-2xl text-green-400"></i>
+                    <div>
+                        <h1 class="text-lg font-bold">Contrôles Visuels</h1>
+                        <p class="text-xs text-gray-400">IEC 62446-1</p>
+                    </div>
+                </div>
+                <button onclick="showMenu()" class="btn-large px-3 bg-gray-700 rounded-lg">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div id="progressBar" class="flex items-center gap-2 text-sm">
+                <div class="flex-1 bg-gray-700 rounded-full h-2">
+                    <div id="progressFill" class="bg-green-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+                <span id="progressText" class="text-xs whitespace-nowrap">0/36</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="pb-20">
+        <!-- Loading State -->
+        <div id="loadingState" class="p-8 text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-green-400 mb-4"></i>
+            <p>Chargement inspection...</p>
+        </div>
+
+        <!-- Create Inspection -->
+        <div id="createForm" class="hidden p-4">
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h2 class="text-xl font-bold mb-4 text-green-400">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Nouvelle Inspection
+                </h2>
+                <form id="newInspectionForm" class="space-y-3">
+                    <input type="text" id="projectName" required placeholder="Nom projet *" 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-3 py-2 text-white">
+                    <input type="text" id="clientName" required placeholder="Client *" 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-3 py-2 text-white">
+                    <input type="text" id="location" required placeholder="Localisation *" 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-3 py-2 text-white">
+                    <input type="date" id="inspectionDate" required 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-3 py-2 text-white">
+                    <input type="text" id="inspectorName" placeholder="Inspecteur" 
+                           class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-3 py-2 text-white">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-rocket mr-2"></i>CRÉER INSPECTION
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Checklist Items -->
+        <div id="checklistContainer" class="hidden">
+            <!-- Category Filter -->
+            <div class="sticky top-[76px] bg-gray-800 border-b border-gray-700 p-2 z-40 overflow-x-auto">
+                <div class="flex gap-2 whitespace-nowrap">
+                    <button onclick="filterCategory('ALL')" class="filter-btn active px-3 py-1 rounded-full text-sm font-bold bg-gray-700">
+                        TOUS (36)
+                    </button>
+                    <button onclick="filterCategory('MECHANICAL')" class="filter-btn px-3 py-1 rounded-full text-sm font-bold bg-gray-700">
+                        <i class="fas fa-cog mr-1"></i>MÉCA (12)
+                    </button>
+                    <button onclick="filterCategory('ELECTRICAL')" class="filter-btn px-3 py-1 rounded-full text-sm font-bold bg-gray-700">
+                        <i class="fas fa-bolt mr-1"></i>ÉLEC (10)
+                    </button>
+                    <button onclick="filterCategory('DOCUMENTATION')" class="filter-btn px-3 py-1 rounded-full text-sm font-bold bg-gray-700">
+                        <i class="fas fa-file-alt mr-1"></i>DOC (8)
+                    </button>
+                    <button onclick="filterCategory('SAFETY')" class="filter-btn px-3 py-1 rounded-full text-sm font-bold bg-gray-700">
+                        <i class="fas fa-shield-alt mr-1"></i>SÉCU (6)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Items List -->
+            <div id="itemsList" class="p-2 space-y-2"></div>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden p-8 text-center">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-4"></i>
+            <p id="errorMessage">Erreur</p>
+            <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-blue-600 rounded-lg">
+                Recharger
+            </button>
+        </div>
+    </main>
+
+    <!-- Bottom Action Bar -->
+    <div id="bottomBar" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t-2 border-green-400 p-3 flex gap-2">
+        <button onclick="showStats()" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold">
+            <i class="fas fa-chart-bar mr-1"></i><span class="hidden sm:inline">STATS</span>
+        </button>
+        <button onclick="addDefect()" class="flex-1 bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-bold">
+            <i class="fas fa-exclamation-triangle mr-1"></i><span class="hidden sm:inline">DÉFAUT</span>
+        </button>
+        <button onclick="generateReport()" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-lg font-bold">
+            <i class="fas fa-file-pdf mr-1"></i><span class="hidden sm:inline">RAPPORT</span>
+        </button>
+    </div>
+
+    <!-- Item Detail Modal -->
+    <div id="itemModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 overflow-auto p-4">
+        <div class="bg-gray-800 rounded-lg max-w-2xl mx-auto my-8 border-2 border-green-400">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="modalTitle" class="text-lg font-bold"></h3>
+                <button onclick="closeModal()" class="text-2xl">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div id="modalContent"></div>
+                
+                <!-- Conformity Buttons -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="updateItem('conform')" class="bg-green-600 hover:bg-green-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-check mr-1"></i>CONFORME
+                    </button>
+                    <button onclick="updateItem('non_conform')" class="bg-red-600 hover:bg-red-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-times mr-1"></i>NON CONFORME
+                    </button>
+                    <button onclick="updateItem('not_applicable')" class="bg-gray-600 hover:bg-gray-700 py-3 rounded-lg font-bold">
+                        <i class="fas fa-ban mr-1"></i>N/A
+                    </button>
+                </div>
+
+                <!-- Observation -->
+                <textarea id="observationText" placeholder="Observations..." rows="3"
+                          class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-2"></textarea>
+                
+                <button onclick="saveObservation()" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold">
+                    <i class="fas fa-save mr-2"></i>ENREGISTRER
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentInspection = null;
+        let checklistItems = [];
+        let currentFilter = 'ALL';
+        let currentItemId = null;
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', init);
+
+        async function init() {
+            // Check URL for inspection token
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            
+            if (token) {
+                await loadInspection(token);
+            } else {
+                showCreateForm();
+            }
+        }
+
+        function showCreateForm() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('createForm').classList.remove('hidden');
+            
+            // Set today's date
+            document.getElementById('inspectionDate').valueAsDate = new Date();
+            
+            document.getElementById('newInspectionForm').onsubmit = createInspection;
+        }
+
+        async function createInspection(e) {
+            e.preventDefault();
+            
+            const formData = {
+                projectName: document.getElementById('projectName').value,
+                clientName: document.getElementById('clientName').value,
+                location: document.getElementById('location').value,
+                inspectionDate: document.getElementById('inspectionDate').value,
+                inspectorName: document.getElementById('inspectorName').value || undefined
+            };
+
+            try {
+                const response = await axios.post('/api/visual/inspection/create', formData);
+                const token = response.data.inspection.inspectionToken;
+                
+                // Redirect to inspection with token
+                window.location.href = `?token=${token}`;
+                
+            } catch (error) {
+                alert('Erreur création : ' + (error.response?.data?.error || error.message));
+            }
+        }
+
+        async function loadInspection(token) {
+            try {
+                const response = await axios.get(`/api/visual/inspection/${token}`);
+                currentInspection = response.data.inspection;
+                checklistItems = response.data.items;
+                
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('checklistContainer').classList.remove('hidden');
+                document.getElementById('bottomBar').classList.remove('hidden');
+                
+                updateProgress();
+                renderItems();
+                
+            } catch (error) {
+                showError(error.response?.data?.error || error.message);
+            }
+        }
+
+        function renderItems() {
+            const container = document.getElementById('itemsList');
+            const filtered = currentFilter === 'ALL' 
+                ? checklistItems 
+                : checklistItems.filter(item => item.category === currentFilter);
+            
+            container.innerHTML = filtered.map(item => `
+                <div onclick="openItem(${item.id})" 
+                     class="checklist-item bg-gray-800 rounded-lg p-3 border-2 ${getItemBorderColor(item)} cursor-pointer active:scale-98">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full ${getItemBgColor(item)} flex items-center justify-center font-bold">
+                            ${item.item_code}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-sm leading-tight mb-1">${item.item_description}</div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="px-2 py-0.5 rounded ${getCategoryColor(item.category)}">${getCategoryLabel(item.category)}</span>
+                                <span class="text-gray-400">${getConformityLabel(item.conformity)}</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-600"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openItem(itemId) {
+            currentItemId = itemId;
+            const item = checklistItems.find(i => i.id === itemId);
+            
+            document.getElementById('modalTitle').textContent = `${item.item_code} - ${item.category}`;
+            document.getElementById('modalContent').innerHTML = `
+                <div class="space-y-2 text-sm">
+                    <p class="font-bold">${item.item_description}</p>
+                    <p class="text-gray-400"><strong>Sous-catégorie:</strong> ${item.subcategory || '-'}</p>
+                    <p class="text-gray-400"><strong>Criticité:</strong> ${item.severity}</p>
+                    ${item.observation ? `<p class="bg-gray-700 p-2 rounded"><strong>Observation:</strong> ${item.observation}</p>` : ''}
+                </div>
+            `;
+            
+            document.getElementById('observationText').value = item.observation || '';
+            document.getElementById('itemModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('itemModal').classList.add('hidden');
+            currentItemId = null;
+        }
+
+        async function updateItem(conformity) {
+            if (!currentItemId) return;
+            
+            try {
+                await axios.put(`/api/visual/inspection/${currentInspection.inspection_token}/item/${currentItemId}`, {
+                    status: 'checked',
+                    conformity: conformity,
+                    checkedBy: currentInspection.inspector_name || 'Inspector'
+                });
+                
+                // Update local data
+                const item = checklistItems.find(i => i.id === currentItemId);
+                if (item) {
+                    item.status = 'checked';
+                    item.conformity = conformity;
+                }
+                
+                updateProgress();
+                renderItems();
+                closeModal();
+                
+            } catch (error) {
+                alert('Erreur : ' + error.message);
+            }
+        }
+
+        async function saveObservation() {
+            if (!currentItemId) return;
+            
+            const observation = document.getElementById('observationText').value;
+            
+            try {
+                await axios.put(`/api/visual/inspection/${currentInspection.inspection_token}/item/${currentItemId}`, {
+                    observation: observation
+                });
+                
+                // Update local data
+                const item = checklistItems.find(i => i.id === currentItemId);
+                if (item) {
+                    item.observation = observation;
+                }
+                
+                alert('Observation enregistrée');
+                
+            } catch (error) {
+                alert('Erreur : ' + error.message);
+            }
+        }
+
+        function filterCategory(category) {
+            currentFilter = category;
+            
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-green-600');
+                btn.classList.add('bg-gray-700');
+            });
+            event.target.closest('.filter-btn').classList.add('active', 'bg-green-600');
+            event.target.closest('.filter-btn').classList.remove('bg-gray-700');
+            
+            renderItems();
+        }
+
+        function updateProgress() {
+            const checked = checklistItems.filter(i => i.status === 'checked').length;
+            const total = checklistItems.length;
+            const percent = Math.round((checked / total) * 100);
+            
+            document.getElementById('progressFill').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = `${checked}/${total}`;
+        }
+
+        function showStats() {
+            const stats = {
+                total: checklistItems.length,
+                checked: checklistItems.filter(i => i.status === 'checked').length,
+                conform: checklistItems.filter(i => i.conformity === 'conform').length,
+                nonConform: checklistItems.filter(i => i.conformity === 'non_conform').length,
+                notApplicable: checklistItems.filter(i => i.conformity === 'not_applicable').length
+            };
+            
+            alert(`STATISTIQUES\n\n` +
+                  `Total: ${stats.total}\n` +
+                  `Vérifiés: ${stats.checked}\n` +
+                  `Conformes: ${stats.conform}\n` +
+                  `Non conformes: ${stats.nonConform}\n` +
+                  `N/A: ${stats.notApplicable}`);
+        }
+
+        function addDefect() {
+            alert('Fonction ajout défaut en développement');
+        }
+
+        function generateReport() {
+            alert('Génération rapport PDF en développement');
+        }
+
+        function showMenu() {
+            const menu = confirm('MENU\n\nVoulez-vous quitter cette inspection ?');
+            if (menu) {
+                window.location.href = '/static/visual-inspection.html';
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorState').classList.remove('hidden');
+        }
+
+        // Helper functions
+        function getItemBorderColor(item) {
+            if (item.conformity === 'conform') return 'border-green-500';
+            if (item.conformity === 'non_conform') return 'border-red-500';
+            if (item.status === 'checked') return 'border-yellow-500';
+            return 'border-gray-600';
+        }
+
+        function getItemBgColor(item) {
+            if (item.conformity === 'conform') return 'bg-green-600';
+            if (item.conformity === 'non_conform') return 'bg-red-600';
+            return 'bg-gray-700';
+        }
+
+        function getCategoryColor(category) {
+            const colors = {
+                MECHANICAL: 'bg-blue-600',
+                ELECTRICAL: 'bg-yellow-600',
+                DOCUMENTATION: 'bg-purple-600',
+                SAFETY: 'bg-orange-600'
+            };
+            return colors[category] || 'bg-gray-600';
+        }
+
+        function getCategoryLabel(category) {
+            const labels = {
+                MECHANICAL: 'MÉCA',
+                ELECTRICAL: 'ÉLEC',
+                DOCUMENTATION: 'DOC',
+                SAFETY: 'SÉCU'
+            };
+            return labels[category] || category;
+        }
+
+        function getConformityLabel(conformity) {
+            const labels = {
+                pending: 'En attente',
+                conform: '✓ Conforme',
+                non_conform: '✗ Non conforme',
+                not_applicable: 'N/A'
+            };
+            return labels[conformity] || conformity;
+        }
+    </script>
+</body>
+</html>
