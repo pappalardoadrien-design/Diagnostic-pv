@@ -513,6 +513,21 @@ app.get('/', (c) => {
                         </div>
                     </a>
                     
+                    <!-- INSTALLATIONS UNIFIÉES - NOUVEAU -->
+                    <a href="/pv/installations" class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-8 border-4 border-blue-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-blue-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-th-large text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">INSTALLATIONS</h3>
+                            <p class="text-lg text-blue-200 mb-3">Vue Unifiée EL + PV</p>
+                            <div class="bg-blue-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
+                            </div>
+                            <p class="text-sm text-blue-100">Gestion centralisée audits EL & centrales PV</p>
+                        </div>
+                    </a>
+                    
                     <!-- Module I-V - À VENIR -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
                         <div class="text-center">
@@ -2797,6 +2812,248 @@ app.get('/pv/plants', (c) => {
         // Init
         loadPlants()
         <\/script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// ROUTE UNIFIED INSTALLATIONS - Vue combinée EL + PV
+// ============================================================================
+app.get('/pv/installations', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Installations - DiagPV Audit</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-950 text-white min-h-screen">
+        <!-- Header -->
+        <header class="bg-gray-900 border-b-2 border-purple-600 py-4 px-6">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-purple-400 hover:text-purple-300">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <h1 class="text-3xl font-black text-white">
+                        <i class="fas fa-th-large mr-3 text-purple-400"></i>INSTALLATIONS
+                    </h1>
+                </div>
+                <div class="flex gap-3">
+                    <button id="filterAll" class="px-4 py-2 bg-purple-600 rounded font-bold">
+                        <i class="fas fa-layer-group mr-2"></i>TOUS
+                    </button>
+                    <button id="filterEL" class="px-4 py-2 bg-gray-700 hover:bg-green-600 rounded font-bold">
+                        <i class="fas fa-bolt mr-2"></i>MODULE EL
+                    </button>
+                    <button id="filterPV" class="px-4 py-2 bg-gray-700 hover:bg-purple-600 rounded font-bold">
+                        <i class="fas fa-solar-panel mr-2"></i>PV CARTO
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-8 px-6">
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="bg-gray-900 border-2 border-green-500 rounded-lg p-6 text-center">
+                    <div class="text-4xl font-black text-green-400" id="statEL">0</div>
+                    <div class="text-gray-400 mt-2">Audits EL</div>
+                </div>
+                <div class="bg-gray-900 border-2 border-purple-500 rounded-lg p-6 text-center">
+                    <div class="text-4xl font-black text-purple-400" id="statPV">0</div>
+                    <div class="text-gray-400 mt-2">Centrales PV</div>
+                </div>
+                <div class="bg-gray-900 border-2 border-blue-500 rounded-lg p-6 text-center">
+                    <div class="text-4xl font-black text-blue-400" id="statLinked">0</div>
+                    <div class="text-gray-400 mt-2">Liens EL ↔ PV</div>
+                </div>
+            </div>
+
+            <!-- Liste installations -->
+            <div id="installationsList" class="space-y-4">
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                    <p class="text-xl">Chargement des installations...</p>
+                </div>
+            </div>
+        </main>
+
+        <script>
+        let allData = { el_audits: [], pv_plants: [] }
+        let currentFilter = 'all'
+
+        // Charger données
+        async function loadInstallations() {
+            try {
+                const response = await fetch('/api/pv/installations-data')
+                const data = await response.json()
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Erreur chargement')
+                }
+                
+                allData = data
+                
+                // Mettre à jour stats
+                document.getElementById('statEL').textContent = data.total_el
+                document.getElementById('statPV').textContent = data.total_pv
+                document.getElementById('statLinked').textContent = 
+                    data.el_audits.filter(a => a.pv_plant_id).length + 
+                    data.pv_plants.filter(p => p.el_audit_id).length
+                
+                // Afficher liste
+                renderInstallations()
+                
+            } catch (error) {
+                console.error('Erreur:', error)
+                document.getElementById('installationsList').innerHTML = 
+                    '<div class="text-center py-12 text-red-400">' +
+                    '<i class="fas fa-exclamation-triangle text-4xl mb-4"></i>' +
+                    '<p class="text-xl">Erreur chargement installations</p>' +
+                    '</div>'
+            }
+        }
+
+        // Afficher installations selon filtre
+        function renderInstallations() {
+            const container = document.getElementById('installationsList')
+            const items = []
+            
+            // Audits EL
+            if (currentFilter === 'all' || currentFilter === 'el') {
+                allData.el_audits.forEach(audit => {
+                    items.push(renderELAudit(audit))
+                })
+            }
+            
+            // Centrales PV
+            if (currentFilter === 'all' || currentFilter === 'pv') {
+                allData.pv_plants.forEach(plant => {
+                    items.push(renderPVPlant(plant))
+                })
+            }
+            
+            if (items.length === 0) {
+                container.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fas fa-inbox text-4xl mb-4"></i><p class="text-xl">Aucune installation</p></div>'
+            } else {
+                container.innerHTML = items.join('')
+            }
+        }
+
+        // Render audit EL
+        function renderELAudit(audit) {
+            const linkedBadge = audit.pv_plant_id ? 
+                '<span class="px-3 py-1 bg-blue-600 rounded text-sm"><i class="fas fa-link mr-1"></i>Lié à ' + audit.linked_plant_name + '</span>' : 
+                '<span class="px-3 py-1 bg-gray-700 rounded text-sm"><i class="fas fa-unlink mr-1"></i>Non lié</span>'
+            
+            const defectsBadge = audit.modules_with_defects > 0 ?
+                '<span class="px-3 py-1 bg-red-900/50 border border-red-500/30 rounded text-sm"><i class="fas fa-exclamation-triangle mr-1 text-red-400"></i>' + audit.modules_with_defects + ' défaut(s)</span>' :
+                '<span class="px-3 py-1 bg-green-900/50 border border-green-500/30 rounded text-sm"><i class="fas fa-check-circle mr-1 text-green-400"></i>Aucun défaut</span>'
+            
+            return '<div class="bg-gray-900 border-l-4 border-green-500 rounded-lg p-6 hover:bg-gray-800 transition-all">' +
+                '<div class="flex items-start justify-between mb-3">' +
+                    '<div class="flex-1">' +
+                        '<div class="flex items-center gap-3 mb-2">' +
+                            '<span class="px-3 py-1 bg-green-600 rounded font-bold text-sm"><i class="fas fa-bolt mr-2"></i>MODULE EL</span>' +
+                            linkedBadge +
+                        '</div>' +
+                        '<h3 class="text-2xl font-bold text-white mb-1">' + audit.project_name + '</h3>' +
+                        '<p class="text-gray-400"><i class="fas fa-user mr-2"></i>' + audit.client_name + (audit.location ? ' • ' + audit.location : '') + '</p>' +
+                    '</div>' +
+                    '<div class="flex gap-3">' +
+                        (audit.pv_plant_id ? 
+                            '<a href="/pv/plant/' + audit.pv_plant_id + '/zone/' + audit.pv_zone_id + '/editor/v2" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded font-bold"><i class="fas fa-map mr-2"></i>CARTO</a>' : 
+                            '<a href="/api/pv/el-audit/' + audit.audit_token + '/quick-map" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold"><i class="fas fa-plus mr-2"></i>CRÉER PV</a>') +
+                        '<a href="/el/zone/' + audit.id + '/editor" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded font-bold"><i class="fas fa-edit mr-2"></i>ÉDITER</a>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="grid grid-cols-4 gap-3 mb-3">' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-purple-400">' + audit.total_modules + '</div><div class="text-xs text-gray-500">Modules</div></div>' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-blue-400">' + audit.string_count + '</div><div class="text-xs text-gray-500">Strings</div></div>' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-cyan-400">' + audit.string_count + '×' + audit.modules_per_string + '</div><div class="text-xs text-gray-500">Config</div></div>' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-orange-400">' + (audit.completion_rate || 0).toFixed(0) + '%</div><div class="text-xs text-gray-500">Avancement</div></div>' +
+                '</div>' +
+                '<div class="flex flex-wrap gap-2">' +
+                    '<span class="px-3 py-1 bg-purple-900/50 border border-purple-500/30 rounded text-sm"><i class="fas fa-calendar mr-1 text-purple-400"></i>' + new Date(audit.created_at).toLocaleDateString('fr-FR') + '</span>' +
+                    defectsBadge +
+                '</div>' +
+            '</div>'
+        }
+
+        // Render centrale PV
+        function renderPVPlant(plant) {
+            const linkedBadge = plant.el_audit_id ? 
+                '<span class="px-3 py-1 bg-blue-600 rounded text-sm"><i class="fas fa-link mr-1"></i>Lié à ' + plant.linked_audit_name + '</span>' : 
+                '<span class="px-3 py-1 bg-gray-700 rounded text-sm"><i class="fas fa-unlink mr-1"></i>Non lié</span>'
+            
+            return '<div class="bg-gray-900 border-l-4 border-purple-500 rounded-lg p-6 hover:bg-gray-800 transition-all">' +
+                '<div class="flex items-start justify-between mb-3">' +
+                    '<div class="flex-1">' +
+                        '<div class="flex items-center gap-3 mb-2">' +
+                            '<span class="px-3 py-1 bg-purple-600 rounded font-bold text-sm"><i class="fas fa-solar-panel mr-2"></i>PV CARTO</span>' +
+                            linkedBadge +
+                        '</div>' +
+                        '<h3 class="text-2xl font-bold text-white mb-1">' + plant.plant_name + '</h3>' +
+                        '<p class="text-gray-400"><i class="fas fa-map-marker-alt mr-2"></i>' + (plant.address || 'Adresse non définie') + '</p>' +
+                    '</div>' +
+                    '<div class="flex gap-3">' +
+                        '<a href="/pv/plant/' + plant.plant_id + '" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded font-bold"><i class="fas fa-eye mr-2"></i>VOIR</a>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="grid grid-cols-3 gap-3 mb-3">' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-purple-400">' + plant.zones_count + '</div><div class="text-xs text-gray-500">Zones</div></div>' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-blue-400">' + plant.modules_count + '</div><div class="text-xs text-gray-500">Modules</div></div>' +
+                    '<div class="bg-black rounded p-3 text-center"><div class="text-2xl font-bold text-orange-400">' + (plant.total_power_kwp || 0) + '</div><div class="text-xs text-gray-500">kWc</div></div>' +
+                '</div>' +
+                '<div class="flex flex-wrap gap-2">' +
+                    '<span class="px-3 py-1 bg-purple-900/50 border border-purple-500/30 rounded text-sm"><i class="fas fa-calendar mr-1 text-purple-400"></i>' + new Date(plant.created_at).toLocaleDateString('fr-FR') + '</span>' +
+                '</div>' +
+            '</div>'
+        }
+
+        // Filtres
+        document.getElementById('filterAll').addEventListener('click', () => {
+            currentFilter = 'all'
+            document.getElementById('filterAll').classList.add('bg-purple-600')
+            document.getElementById('filterAll').classList.remove('bg-gray-700')
+            document.getElementById('filterEL').classList.add('bg-gray-700')
+            document.getElementById('filterEL').classList.remove('bg-green-600')
+            document.getElementById('filterPV').classList.add('bg-gray-700')
+            document.getElementById('filterPV').classList.remove('bg-purple-600')
+            renderInstallations()
+        })
+
+        document.getElementById('filterEL').addEventListener('click', () => {
+            currentFilter = 'el'
+            document.getElementById('filterAll').classList.remove('bg-purple-600')
+            document.getElementById('filterAll').classList.add('bg-gray-700')
+            document.getElementById('filterEL').classList.add('bg-green-600')
+            document.getElementById('filterEL').classList.remove('bg-gray-700')
+            document.getElementById('filterPV').classList.add('bg-gray-700')
+            document.getElementById('filterPV').classList.remove('bg-purple-600')
+            renderInstallations()
+        })
+
+        document.getElementById('filterPV').addEventListener('click', () => {
+            currentFilter = 'pv'
+            document.getElementById('filterAll').classList.remove('bg-purple-600')
+            document.getElementById('filterAll').classList.add('bg-gray-700')
+            document.getElementById('filterEL').classList.add('bg-gray-700')
+            document.getElementById('filterEL').classList.remove('bg-green-600')
+            document.getElementById('filterPV').classList.add('bg-purple-600')
+            document.getElementById('filterPV').classList.remove('bg-gray-700')
+            renderInstallations()
+        })
+
+        // Charger au démarrage
+        loadInstallations()
+        </script>
     </body>
     </html>
   `)

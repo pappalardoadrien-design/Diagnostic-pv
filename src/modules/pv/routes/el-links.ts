@@ -496,4 +496,76 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
   }
 })
 
+// ============================================================================
+// GET /api/pv/installations-data
+// API endpoint pour récupérer données unifiées (audits EL + centrales PV)
+// ============================================================================
+app.get('/installations-data', async (c) => {
+  try {
+    const { DB } = c.env
+    
+    // 1. Récupérer tous les audits EL avec stats et liens
+    const elAudits = await DB.prepare(`
+      SELECT 
+        a.id,
+        a.audit_token,
+        a.project_name,
+        a.client_name,
+        a.location,
+        a.string_count,
+        a.modules_per_string,
+        a.total_modules,
+        a.completion_rate,
+        a.created_at,
+        (SELECT COUNT(*) FROM el_modules WHERE el_audit_id = a.id AND defect_type NOT IN ('ok', 'pending')) as modules_with_defects,
+        -- Lien vers centrale PV
+        l.pv_plant_id,
+        l.pv_zone_id,
+        p.plant_name as linked_plant_name
+      FROM el_audits a
+      LEFT JOIN pv_cartography_audit_links l ON a.id = l.el_audit_id
+      LEFT JOIN pv_plants p ON l.pv_plant_id = p.id
+      ORDER BY a.created_at DESC
+    `).all()
+    
+    // 2. Récupérer toutes les centrales PV avec stats et liens
+    const pvPlants = await DB.prepare(`
+      SELECT 
+        p.id as plant_id,
+        p.plant_name,
+        p.address,
+        p.total_power_kwp,
+        p.created_at,
+        COUNT(DISTINCT z.id) as zones_count,
+        COUNT(DISTINCT m.id) as modules_count,
+        -- Lien vers audit EL
+        l.el_audit_id,
+        l.el_audit_token,
+        a.project_name as linked_audit_name
+      FROM pv_plants p
+      LEFT JOIN pv_zones z ON p.id = z.plant_id
+      LEFT JOIN pv_modules m ON z.id = m.zone_id
+      LEFT JOIN pv_cartography_audit_links l ON p.id = l.pv_plant_id
+      LEFT JOIN el_audits a ON l.el_audit_id = a.id
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `).all()
+    
+    return c.json({
+      success: true,
+      el_audits: elAudits.results || [],
+      pv_plants: pvPlants.results || [],
+      total_el: elAudits.results?.length || 0,
+      total_pv: pvPlants.results?.length || 0
+    })
+    
+  } catch (error: any) {
+    console.error('❌ Erreur installations-data:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
 export default app
