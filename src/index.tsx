@@ -5260,17 +5260,17 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
                         this.showHandles()
                     })
                     
-                    // Attacher drag events au polygon
+                    // Attacher drag events au polygon (AVEC seuil 10px comme rectangle)
                     this.rotatedPolygon.on('mousedown', (e) => {
                         if (!this.isRotating && e.originalEvent.button === 0) {
-                            this.isDragging = true
-                            // CORRECTION: Utiliser coordonnées PIXEL au lieu de lat/lng
+                            // Préparer le drag MAIS ne pas encore activer isDragging
+                            // On active seulement après déplacement de 10+ pixels (évite drag accidentel)
+                            this.dragPrepared = true
                             this.dragStartPixel = map.latLngToContainerPoint(e.latlng)
                             this.dragStartBounds = this.rectangle.getBounds()
-                            map.dragging.disable()
                             L.DomEvent.stopPropagation(e.originalEvent)
                             L.DomEvent.preventDefault(e.originalEvent)
-                            console.log("🖱️ Début drag rotatedPolygon ID:", this.id, "| Pixel:", this.dragStartPixel)
+                            console.log("🖱️ Préparation drag rotatedPolygon ID:", this.id)
                         }
                     })
                 } else {
