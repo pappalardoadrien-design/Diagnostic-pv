@@ -577,14 +577,126 @@ isolationRoutes.get('/plant/:plantId/history', async (c) => {
 });
 
 // ============================================================================
-// POST /api/isolation/import/excel - Import Excel Benning (TODO)
+// POST /api/isolation/import/benning-csv - Import CSV Benning
 // ============================================================================
-isolationRoutes.post('/import/excel', async (c) => {
-  // TODO: Implémenter parsing Excel Benning
-  // Pour l'instant, endpoint placeholder
+isolationRoutes.post('/import/benning-csv', async (c) => {
+  const { DB } = c.env;
   
-  return c.json({
-    success: false,
-    error: 'Import Excel non implémenté - TODO Phase suivante'
-  }, 501);
+  try {
+    const body = await c.req.json();
+    const { csvContent, plantId, zoneId, auditElToken, operatorName, testType, risoMapping } = body;
+    
+    if (!csvContent) {
+      return c.json({
+        success: false,
+        error: 'Contenu CSV requis (field: csvContent)'
+      }, 400);
+    }
+    
+    // Import parser
+    const { parseBenningCSV, benningMeasurementToIsolationTest } = await import('./benning-parser.js');
+    
+    // Parse CSV
+    const parseResult = parseBenningCSV(csvContent);
+    
+    if (!parseResult.success || parseResult.measurements.length === 0) {
+      return c.json({
+        success: false,
+        error: 'Parsing CSV échoué',
+        errors: parseResult.errors
+      }, 400);
+    }
+    
+    // Options import
+    const options = {
+      plantId: plantId ? parseInt(plantId) : undefined,
+      zoneId: zoneId ? parseInt(zoneId) : undefined,
+      auditElToken,
+      operatorName,
+      testType: testType || 'COMMISSIONING',
+      risoMapping: risoMapping || 'dcPositiveToEarth'
+    };
+    
+    // Import chaque mesure comme test isolation
+    const importedTests = [];
+    const failedImports = [];
+    
+    for (const measurement of parseResult.measurements) {
+      try {
+        // Convert to isolation test format
+        const testData = benningMeasurementToIsolationTest(measurement, parseResult.metadata, options);
+        
+        // Generate token
+        const testToken = `ISO_${Date.now()}_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        
+        // Calculate conformity
+        const { calculateTestConformity } = await import('./types/index.js');
+        const threshold = 1.0;
+        const isConform = calculateTestConformity({
+          dcPositiveToEarth: testData.dcPositiveToEarth,
+          dcNegativeToEarth: testData.dcNegativeToEarth,
+          dcPositiveToNegative: testData.dcPositiveToNegative,
+          acToEarth: testData.acToEarth
+        }, threshold);
+        
+        // Insert test
+        await DB.prepare(`
+          INSERT INTO isolation_tests (
+            test_token, plant_id, zone_id, audit_el_token,
+            test_date, test_type, operator_name, equipment_used,
+            dc_positive_to_earth, dc_negative_to_earth, dc_positive_to_negative, ac_to_earth,
+            is_conform, threshold_mohm,
+            notes, imported_from_file, raw_data_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          testToken,
+          testData.plantId || null,
+          testData.zoneId || null,
+          testData.auditElToken || null,
+          testData.testDate,
+          testData.testType,
+          testData.operatorName || null,
+          testData.equipmentUsed,
+          testData.dcPositiveToEarth || null,
+          testData.dcNegativeToEarth || null,
+          testData.dcPositiveToNegative || null,
+          testData.acToEarth || null,
+          isConform ? 1 : 0,
+          threshold,
+          testData.notes || null,
+          'Benning CSV Import',
+          JSON.stringify(measurement)
+        ).run();
+        
+        importedTests.push({
+          testToken,
+          index: measurement.index,
+          riso: measurement.riso_mohm,
+          isConform
+        });
+        
+      } catch (error) {
+        failedImports.push({
+          index: measurement.index,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    return c.json({
+      success: true,
+      imported: importedTests.length,
+      failed: failedImports.length,
+      metadata: parseResult.metadata,
+      tests: importedTests,
+      errors: failedImports
+    }, 201);
+    
+  } catch (error) {
+    console.error('Erreur import Benning CSV:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    }, 500);
+  }
 });
