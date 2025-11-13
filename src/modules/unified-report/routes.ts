@@ -110,7 +110,11 @@ unifiedReportRoutes.get('/preview', async (c) => {
       }
     } else if (plantId) {
       const elAudits = await DB.prepare(`
-        SELECT COUNT(*) as count, project_name FROM el_audits WHERE plant_id = ? GROUP BY project_name
+        SELECT COUNT(*) as count, ea.project_name 
+        FROM el_audits ea
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ? 
+        GROUP BY ea.project_name
       `).bind(plantId).first();
       
       if (elAudits) {
@@ -121,21 +125,27 @@ unifiedReportRoutes.get('/preview', async (c) => {
     
     // Module IV
     if (plantId || auditElToken) {
-      const ivQuery = auditElToken 
-        ? 'SELECT COUNT(*) as count FROM iv_curves WHERE audit_token = ?'
-        : 'SELECT COUNT(*) as count FROM iv_curves WHERE plant_id = ?';
-      
-      const ivCurves = await DB.prepare(ivQuery).bind(auditElToken || plantId).first();
+      let ivCurves;
+      if (auditElToken) {
+        ivCurves = await DB.prepare(`
+          SELECT COUNT(*) as count FROM iv_curves WHERE audit_token = ?
+        `).bind(auditElToken).first();
+      } else {
+        // Via el_audits linkage
+        ivCurves = await DB.prepare(`
+          SELECT COUNT(*) as count 
+          FROM iv_curves ic
+          JOIN el_audits ea ON ic.audit_token = ea.audit_token
+          JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+          WHERE pcal.pv_plant_id = ?
+        `).bind(plantId).first();
+      }
       ivCount = (ivCurves as any)?.count || 0;
     }
     
-    // Module Visuels
-    if (plantId) {
-      const visualInspections = await DB.prepare(`
-        SELECT COUNT(*) as count FROM visual_inspections WHERE plant_id = ?
-      `).bind(plantId).first();
-      visualCount = (visualInspections as any)?.count || 0;
-    }
+    // Module Visuels - Note: visual_inspections are standalone, not linked to plants yet
+    // TODO: Add plant_id column to visual_inspections table for linkage
+    visualCount = 0;
     
     // Module Isolation
     if (plantId) {

@@ -101,9 +101,14 @@ async function aggregateELModule(
         SELECT * FROM el_audits WHERE audit_token = ?
       `).bind(request.auditElToken).first();
     } else {
-      // Dernier audit pour cette centrale
+      // Dernier audit pour cette centrale via table de liaison
       audit = await DB.prepare(`
-        SELECT * FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1
+        SELECT ea.* 
+        FROM el_audits ea
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ? 
+        ORDER BY ea.created_at DESC 
+        LIMIT 1
       `).bind(request.plantId).first();
     }
     
