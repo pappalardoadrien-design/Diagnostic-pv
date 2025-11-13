@@ -118,20 +118,20 @@ async function aggregateELModule(
     const stats = await DB.prepare(`
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as ok,
-        SUM(CASE WHEN status = 'inequality' THEN 1 ELSE 0 END) as inequality,
-        SUM(CASE WHEN status = 'microcracks' THEN 1 ELSE 0 END) as microcracks,
-        SUM(CASE WHEN status = 'dead' THEN 1 ELSE 0 END) as dead,
-        SUM(CASE WHEN status = 'string_open' THEN 1 ELSE 0 END) as string_open,
-        SUM(CASE WHEN status = 'not_connected' THEN 1 ELSE 0 END) as not_connected
+        SUM(CASE WHEN defect_type = 'ok' OR defect_type IS NULL THEN 1 ELSE 0 END) as ok,
+        SUM(CASE WHEN defect_type = 'inequality' THEN 1 ELSE 0 END) as inequality,
+        SUM(CASE WHEN defect_type = 'microcracks' THEN 1 ELSE 0 END) as microcracks,
+        SUM(CASE WHEN defect_type = 'dead' THEN 1 ELSE 0 END) as dead,
+        SUM(CASE WHEN defect_type = 'string_open' THEN 1 ELSE 0 END) as string_open,
+        SUM(CASE WHEN defect_type = 'not_connected' THEN 1 ELSE 0 END) as not_connected
       FROM el_modules WHERE audit_token = ?
     `).bind(audit.audit_token).first();
     
     // Défauts critiques (dead + string_open)
     const criticalDefects = await DB.prepare(`
-      SELECT module_id, status, comment 
+      SELECT module_identifier, defect_type, comment 
       FROM el_modules 
-      WHERE audit_token = ? AND (status = 'dead' OR status = 'string_open')
+      WHERE audit_token = ? AND (defect_type = 'dead' OR defect_type = 'string_open')
       ORDER BY string_number, position_in_string
       LIMIT 20
     `).bind(audit.audit_token).all();
@@ -195,21 +195,36 @@ async function aggregateIVModule(
 ): Promise<IVModuleData> {
   
   try {
-    // Récupérer courbes I-V
-    let query = 'SELECT * FROM iv_curves';
-    const params: any[] = [];
+    // Déterminer audit_token pour récupérer courbes IV
+    let auditToken = request.auditElToken;
     
-    if (request.auditElToken) {
-      query += ' WHERE audit_token = ?';
-      params.push(request.auditElToken);
-    } else if (request.plantId) {
-      query += ' WHERE plant_id = ?';
-      params.push(request.plantId);
+    if (!auditToken && request.plantId) {
+      // Trouver audit EL via table de liaison
+      const audit = await DB.prepare(`
+        SELECT ea.audit_token 
+        FROM el_audits ea
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ? 
+        ORDER BY ea.created_at DESC 
+        LIMIT 1
+      `).bind(request.plantId).first();
+      
+      if (audit) {
+        auditToken = (audit as any).audit_token;
+      }
     }
     
-    query += ' ORDER BY created_at DESC LIMIT 500';
+    if (!auditToken) {
+      return createEmptyIVData();
+    }
     
-    const curves = await DB.prepare(query).bind(...params).all();
+    // Récupérer courbes I-V via audit_token
+    const curves = await DB.prepare(`
+      SELECT * FROM iv_curves 
+      WHERE audit_token = ? 
+      ORDER BY created_at DESC 
+      LIMIT 500
+    `).bind(auditToken).all();
     
     if (!curves.results || curves.results.length === 0) {
       return createEmptyIVData();
