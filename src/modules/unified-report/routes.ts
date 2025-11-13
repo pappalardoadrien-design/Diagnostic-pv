@@ -56,8 +56,38 @@ unifiedReportRoutes.post('/generate', async (c) => {
     // Génération HTML
     const htmlContent = generateReportHTML(reportData);
     
-    // TODO: Stocker rapport en DB pour récupération ultérieure
-    // await DB.prepare(`INSERT INTO unified_reports ...`).run();
+    // Stockage persistant en DB (Phase 4B)
+    const modulesIncluded: string[] = [];
+    if (reportData.elModule.hasData) modulesIncluded.push('el');
+    if (reportData.ivModule.hasData) modulesIncluded.push('iv');
+    if (reportData.visualModule.hasData) modulesIncluded.push('visual');
+    if (reportData.isolationModule.hasData) modulesIncluded.push('isolation');
+    if (reportData.thermalModule.hasData) modulesIncluded.push('thermal');
+    
+    await DB.prepare(`
+      INSERT INTO unified_reports (
+        report_token, plant_id, audit_el_token, inspection_token,
+        report_title, client_name, audit_date, auditor_name,
+        overall_conformity_rate, critical_issues_count, major_issues_count, minor_issues_count,
+        modules_included, html_content, generated_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      reportData.reportToken,
+      request.plantId || null,
+      reportData.elModule.hasData ? reportData.elModule.auditToken : null,
+      reportData.visualModule.hasData ? reportData.visualModule.inspectionToken : null,
+      request.reportTitle || 'Rapport Audit PV',
+      reportData.clientName,
+      request.auditDate || new Date().toISOString().split('T')[0],
+      request.auditorName || null,
+      reportData.summary.overallConformityRate,
+      reportData.summary.criticalIssuesCount,
+      reportData.summary.majorIssuesCount,
+      reportData.summary.minorIssuesCount,
+      JSON.stringify(modulesIncluded),
+      htmlContent,
+      request.auditorName || null
+    ).run();
     
     const response: GenerateUnifiedReportResponse = {
       success: true,
@@ -143,9 +173,13 @@ unifiedReportRoutes.get('/preview', async (c) => {
       ivCount = (ivCurves as any)?.count || 0;
     }
     
-    // Module Visuels - Note: visual_inspections are standalone, not linked to plants yet
-    // TODO: Add plant_id column to visual_inspections table for linkage
-    visualCount = 0;
+    // Module Visuels - Maintenant lié via plant_id
+    if (plantId) {
+      const visualInspections = await DB.prepare(`
+        SELECT COUNT(*) as count FROM visual_inspections WHERE plant_id = ?
+      `).bind(plantId).first();
+      visualCount = (visualInspections as any)?.count || 0;
+    }
     
     // Module Isolation
     if (plantId) {
@@ -190,14 +224,105 @@ unifiedReportRoutes.get('/preview', async (c) => {
 });
 
 // ============================================================================
-// GET /api/report/unified/:token - Récupérer rapport par token (TODO)
+// GET /api/report/unified/:token - Récupérer rapport par token
 // ============================================================================
 unifiedReportRoutes.get('/:token', async (c) => {
+  const { DB } = c.env;
   const token = c.req.param('token');
   
-  // TODO: Implémenter récupération depuis DB
-  return c.json({
-    success: false,
-    error: 'Récupération rapport non implémentée - TODO stockage DB'
-  }, 501);
+  try {
+    const report = await DB.prepare(`
+      SELECT * FROM unified_reports WHERE report_token = ?
+    `).bind(token).first();
+    
+    if (!report) {
+      return c.json({
+        success: false,
+        error: 'Rapport non trouvé'
+      }, 404);
+    }
+    
+    return c.json({
+      success: true,
+      report: {
+        reportToken: (report as any).report_token,
+        plantId: (report as any).plant_id,
+        auditElToken: (report as any).audit_el_token,
+        inspectionToken: (report as any).inspection_token,
+        reportTitle: (report as any).report_title,
+        clientName: (report as any).client_name,
+        auditDate: (report as any).audit_date,
+        auditorName: (report as any).auditor_name,
+        overallConformityRate: (report as any).overall_conformity_rate,
+        criticalIssuesCount: (report as any).critical_issues_count,
+        majorIssuesCount: (report as any).major_issues_count,
+        minorIssuesCount: (report as any).minor_issues_count,
+        modulesIncluded: JSON.parse((report as any).modules_included),
+        htmlContent: (report as any).html_content,
+        createdAt: (report as any).created_at,
+        generatedBy: (report as any).generated_by,
+        reportVersion: (report as any).report_version
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération rapport:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/report/unified/plant/:plantId - Lister rapports d'une centrale
+// ============================================================================
+unifiedReportRoutes.get('/plant/:plantId', async (c) => {
+  const { DB } = c.env;
+  const plantId = parseInt(c.req.param('plantId'));
+  
+  if (isNaN(plantId)) {
+    return c.json({
+      success: false,
+      error: 'plantId invalide'
+    }, 400);
+  }
+  
+  try {
+    const reports = await DB.prepare(`
+      SELECT 
+        id, report_token, report_title, client_name, audit_date,
+        overall_conformity_rate, critical_issues_count, major_issues_count, minor_issues_count,
+        modules_included, created_at, auditor_name
+      FROM unified_reports 
+      WHERE plant_id = ?
+      ORDER BY created_at DESC
+    `).bind(plantId).all();
+    
+    return c.json({
+      success: true,
+      plantId,
+      reports: (reports.results || []).map((r: any) => ({
+        id: r.id,
+        reportToken: r.report_token,
+        reportTitle: r.report_title,
+        clientName: r.client_name,
+        auditDate: r.audit_date,
+        overallConformityRate: r.overall_conformity_rate,
+        criticalIssuesCount: r.critical_issues_count,
+        majorIssuesCount: r.major_issues_count,
+        minorIssuesCount: r.minor_issues_count,
+        modulesIncluded: JSON.parse(r.modules_included),
+        createdAt: r.created_at,
+        auditorName: r.auditor_name
+      }))
+    });
+    
+  } catch (error) {
+    console.error('Erreur liste rapports centrale:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    }, 500);
+  }
 });

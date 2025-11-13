@@ -13,6 +13,7 @@ import ivCurvesModule from './modules/iv-curves/routes'
 import visualInspectionModule from './modules/visual-inspection/routes'
 import { isolationRoutes } from './modules/isolation/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
+import { getRapportsPage } from './pages/rapports.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -721,6 +722,13 @@ app.get('/', (c) => {
     </body>
     </html>
   `)
+})
+
+// ============================================================================
+// ROUTE /RAPPORTS - INTERFACE GESTION RAPPORTS UNIFIÉS (Phase 4C)
+// ============================================================================
+app.get('/rapports', (c) => {
+  return c.html(getRapportsPage())
 })
 
 // ============================================================================

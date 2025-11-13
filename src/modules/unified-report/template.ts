@@ -23,6 +23,7 @@ export function generateReportHTML(data: UnifiedReportData): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rapport Audit PV - ${data.plantName}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         @media print {
             body { margin: 0; padding: 15px; }
@@ -156,6 +157,14 @@ export function generateReportHTML(data: UnifiedReportData): string {
                     <p class="text-red-700 mt-2">Intervention immédiate recommandée pour défauts critiques identifiés.</p>
                 </div>
                 ` : ''}
+                
+                <!-- Graphique Conformité par Module -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Conformité par Module</h3>
+                    <div class="bg-white p-4 rounded-lg" style="height: 300px;">
+                        <canvas id="conformityChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -226,6 +235,16 @@ export function generateReportHTML(data: UnifiedReportData): string {
                             `).join('')}
                         </tbody>
                     </table>
+                </div>
+                ` : ''}
+                
+                <!-- Graphique Défauts EL (Camembert) -->
+                ${data.elModule.totalModules > 0 ? `
+                <div class="mt-6">
+                    <h3 class="text-xl font-bold mb-4">Répartition Défauts</h3>
+                    <div class="bg-white p-4 rounded-lg" style="height: 300px;">
+                        <canvas id="elDefectsChart"></canvas>
+                    </div>
                 </div>
                 ` : ''}
             </div>
@@ -440,6 +459,48 @@ export function generateReportHTML(data: UnifiedReportData): string {
         ` : ''}
         
         <!-- ====================================================================
+             SIGNATURES
+        ==================================================================== -->
+        <div class="module-section">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 text-center">
+                <i class="fas fa-signature text-blue-600 mr-3"></i>
+                SIGNATURES & CERTIFICATION
+            </h2>
+            
+            <div class="grid grid-cols-2 gap-8 mb-6">
+                <div class="border-2 border-gray-300 rounded-lg p-6 text-center">
+                    <div class="text-lg font-bold text-gray-800 mb-4">Auditeur Terrain</div>
+                    <div class="h-24 flex items-center justify-center mb-4">
+                        <div class="text-6xl text-gray-300">
+                            <i class="fas fa-pen-fancy"></i>
+                        </div>
+                    </div>
+                    <div class="text-gray-700 font-semibold">${data.generatedBy || 'Diagnostic Photovoltaïque'}</div>
+                    <div class="text-sm text-gray-500">Expert Indépendant</div>
+                </div>
+                
+                <div class="border-2 border-gray-300 rounded-lg p-6 text-center">
+                    <div class="text-lg font-bold text-gray-800 mb-4">Validation Technique</div>
+                    <div class="h-24 flex items-center justify-center mb-4">
+                        <div class="text-6xl text-gray-300">
+                            <i class="fas fa-stamp"></i>
+                        </div>
+                    </div>
+                    <div class="text-gray-700 font-semibold">Fabien CORRERA</div>
+                    <div class="text-sm text-gray-500">Fondateur DiagPV</div>
+                </div>
+            </div>
+            
+            <div class="bg-green-50 border-2 border-green-500 rounded-lg p-4 text-center">
+                <div class="flex items-center justify-center text-green-800 font-bold text-xl mb-2">
+                    <i class="fas fa-certificate text-3xl mr-3"></i>
+                    RAPPORT CERTIFIÉ DIAGPV
+                </div>
+                <p class="text-green-700 text-sm">Ce rapport a été établi conformément aux normes IEC 62446-1 et reflète l'état de l'installation au moment de l'audit.</p>
+            </div>
+        </div>
+        
+        <!-- ====================================================================
              FOOTER DIAGPV
         ==================================================================== -->
         <div class="module-section text-center">
@@ -473,8 +534,150 @@ export function generateReportHTML(data: UnifiedReportData): string {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
+        // ========================================================================
+        // GRAPHIQUES CHART.JS
+        // ========================================================================
+        
+        // Graphique Conformité par Module (Barres)
+        const conformityCtx = document.getElementById('conformityChart');
+        if (conformityCtx) {
+            new Chart(conformityCtx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        ${data.elModule.hasData ? `'EL (${data.elModule.conformityRate}%)',` : ''}
+                        ${data.ivModule.hasData ? `'IV (${Math.round(((data.ivModule.totalCurves - data.ivModule.outOfToleranceCount) / data.ivModule.totalCurves) * 100)}%)',` : ''}
+                        ${data.visualModule.hasData ? `'Visuels (${data.visualModule.checklist.conformityRate}%)',` : ''}
+                        ${data.isolationModule.hasData ? `'Isolation (${data.isolationModule.conformityRate}%)',` : ''}
+                        ${data.thermalModule.hasData ? `'Thermique',` : ''}
+                    ],
+                    datasets: [{
+                        label: 'Conformité (%)',
+                        data: [
+                            ${data.elModule.hasData ? `${data.elModule.conformityRate},` : ''}
+                            ${data.ivModule.hasData ? `${Math.round(((data.ivModule.totalCurves - data.ivModule.outOfToleranceCount) / data.ivModule.totalCurves) * 100)},` : ''}
+                            ${data.visualModule.hasData ? `${data.visualModule.checklist.conformityRate},` : ''}
+                            ${data.isolationModule.hasData ? `${data.isolationModule.conformityRate},` : ''}
+                            ${data.thermalModule.hasData ? `0,` : ''}
+                        ],
+                        backgroundColor: [
+                            ${data.elModule.hasData ? `'rgba(34, 197, 94, 0.8)',` : ''}
+                            ${data.ivModule.hasData ? `'rgba(59, 130, 246, 0.8)',` : ''}
+                            ${data.visualModule.hasData ? `'rgba(251, 146, 60, 0.8)',` : ''}
+                            ${data.isolationModule.hasData ? `'rgba(234, 179, 8, 0.8)',` : ''}
+                            ${data.thermalModule.hasData ? `'rgba(168, 85, 247, 0.8)',` : ''}
+                        ],
+                        borderColor: [
+                            ${data.elModule.hasData ? `'rgb(34, 197, 94)',` : ''}
+                            ${data.ivModule.hasData ? `'rgb(59, 130, 246)',` : ''}
+                            ${data.visualModule.hasData ? `'rgb(251, 146, 60)',` : ''}
+                            ${data.isolationModule.hasData ? `'rgb(234, 179, 8)',` : ''}
+                            ${data.thermalModule.hasData ? `'rgb(168, 85, 247)',` : ''}
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Taux de Conformité par Module',
+                            font: { size: 16, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Graphique Défauts EL (Camembert)
+        const elDefectsCtx = document.getElementById('elDefectsChart');
+        if (elDefectsCtx && ${data.elModule.hasData && data.elModule.totalModules > 0}) {
+            new Chart(elDefectsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['OK', 'Inégalités', 'Microfissures', 'HS', 'String Ouvert', 'Non Raccordé'],
+                    datasets: [{
+                        data: [
+                            ${data.elModule.stats.ok},
+                            ${data.elModule.stats.inequality},
+                            ${data.elModule.stats.microcracks},
+                            ${data.elModule.stats.dead},
+                            ${data.elModule.stats.string_open},
+                            ${data.elModule.stats.not_connected}
+                        ],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(234, 179, 8, 0.8)',
+                            'rgba(251, 146, 60, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgb(34, 197, 94)',
+                            'rgb(234, 179, 8)',
+                            'rgb(251, 146, 60)',
+                            'rgb(239, 68, 68)',
+                            'rgb(59, 130, 246)',
+                            'rgb(156, 163, 175)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Répartition des Défauts Électroluminescence',
+                            font: { size: 14, weight: 'bold' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ========================================================================
+        // EXPORT PDF
+        // ========================================================================
         async function downloadPDF() {
-            alert('Fonction PDF téléchargement : Utilisez Ctrl+P puis "Enregistrer en PDF" pour l\'instant. Export automatique html2canvas à venir.');
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Génération PDF...';
+            
+            try {
+                // Utiliser window.print() pour génération PDF navigateur
+                // Plus fiable que html2pdf pour grands documents
+                window.print();
+                
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-download mr-2"></i>TÉLÉCHARGER';
+                }, 2000);
+            } catch (error) {
+                console.error('Erreur génération PDF:', error);
+                alert('Erreur génération PDF. Utilisez Ctrl+P puis "Enregistrer en PDF".');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-download mr-2"></i>TÉLÉCHARGER';
+            }
         }
     </script>
     
