@@ -12,6 +12,7 @@ import syncReverseModule from './modules/interconnect/sync-reverse'
 import ivCurvesModule from './modules/iv-curves/routes'
 import visualInspectionModule from './modules/visual-inspection/routes'
 import { isolationRoutes } from './modules/isolation/routes.js'
+import { unifiedReportRoutes } from './modules/unified-report/routes.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -139,9 +140,21 @@ app.route('/api/visual', visualInspectionModule)
 // - DELETE /api/isolation/test/:token  Supprimer test
 // - GET /api/isolation/tests  Lister tests (filtres: plantId, testType, isConform, dates)
 // - GET /api/isolation/plant/:plantId/history  Historique mesures centrale (graphiques)
-// - POST /api/isolation/import/excel  Import Excel Benning (TODO Phase 2)
+// - POST /api/isolation/import/benning-csv  Import CSV Benning IT 130 (✅ OPÉRATIONNEL)
 // ============================================================================
 app.route('/api/isolation', isolationRoutes)
+
+// ============================================================================
+// MODULE RAPPORT UNIFIÉ - AGGREGATION MULTI-MODULES (Phase 2 - Module 6/6)
+// ============================================================================
+// Module Rapport Unifié pour génération rapports professionnels multi-modules
+// Agrège données de: EL, IV, Visuels, Isolation, Thermique
+// Routes:
+// - POST /api/report/unified/generate  Générer rapport unifié (PDF HTML)
+// - GET /api/report/unified/preview  Aperçu données disponibles par centrale
+// - GET /api/report/unified/:reportToken  Récupérer rapport généré (TODO Phase 3)
+// ============================================================================
+app.route('/api/report/unified', unifiedReportRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
