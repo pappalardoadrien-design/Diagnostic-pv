@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport Audit PV - Test Central</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @media print {
+            body { margin: 0; padding: 15px; }
+            .page-break { page-break-after: always; }
+            .no-print { display: none; }
+        }
+        
+        .diagpv-header {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+        }
+        
+        .module-section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border-left: 4px solid;
+        }
+        
+        .priority-urgent { border-left-color: #ef4444; }
+        .priority-high { border-left-color: #f97316; }
+        .priority-medium { border-left-color: #eab308; }
+        .priority-low { border-left-color: #3b82f6; }
+        
+        .conformity-bar {
+            height: 30px;
+            background: linear-gradient(90deg, #ef4444 0%, #eab308 50%, #22c55e 100%);
+            border-radius: 15px;
+            position: relative;
+        }
+        
+        .conformity-indicator {
+            position: absolute;
+            top: -5px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: 3px solid #1f2937;
+            border-radius: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    
+    <!-- BOUTONS ACTIONS (no-print) -->
+    <div class="no-print fixed top-4 right-4 z-50 space-x-2">
+        <button onclick="window.print()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold shadow-lg">
+            <i class="fas fa-print mr-2"></i>IMPRIMER PDF
+        </button>
+        <button onclick="downloadPDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold shadow-lg">
+            <i class="fas fa-download mr-2"></i>TÉLÉCHARGER
+        </button>
+    </div>
+    
+    <div class="max-w-5xl mx-auto p-6">
+        
+        <!-- ====================================================================
+             PAGE 1 - PAGE DE GARDE
+        ==================================================================== -->
+        <div class="page-break">
+            <div class="diagpv-header text-center mb-8">
+                <div class="mb-4">
+                    <div class="text-6xl font-black mb-2">DIAGNOSTIC PHOTOVOLTAÏQUE</div>
+                    <div class="text-2xl opacity-90">www.diagnosticphotovoltaique.fr</div>
+                </div>
+                
+                <div class="text-4xl font-bold my-8 py-4 border-y-2 border-white/30">
+                    RAPPORT D'AUDIT UNIFIÉ
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur rounded-lg p-6 text-left mt-8">
+                    <div class="grid grid-cols-2 gap-4 text-lg">
+                        <div><strong>Client :</strong> EDF</div>
+                        <div><strong>Centrale :</strong> Test Central</div>
+                        <div><strong>Localisation :</strong> Localisation non définie</div>
+                        <div><strong>Date rapport :</strong> 13 novembre 2025</div>
+                        
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Conformité Globale -->
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                    <i class="fas fa-chart-pie text-green-600 mr-3"></i>
+                    SYNTHÈSE GLOBALE
+                </h2>
+                
+                <div class="mb-6">
+                    <div class="text-lg font-bold mb-2">Conformité Globale</div>
+                    <div class="conformity-bar">
+                        <div class="conformity-indicator" style="left: 58%"></div>
+                    </div>
+                    <div class="text-center mt-2 text-4xl font-black text-red-600">
+                        58%
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 mt-6">
+                    <div class="stat-card border-l-red-500">
+                        <div class="text-4xl font-black text-red-600 mb-2">0</div>
+                        <div class="text-sm font-bold text-gray-700">Défauts Critiques</div>
+                    </div>
+                    <div class="stat-card border-l-yellow-500">
+                        <div class="text-4xl font-black text-yellow-600 mb-2">0</div>
+                        <div class="text-sm font-bold text-gray-700">Défauts Majeurs</div>
+                    </div>
+                    <div class="stat-card border-l-blue-500">
+                        <div class="text-4xl font-black text-blue-600 mb-2">0</div>
+                        <div class="text-sm font-bold text-gray-700">Défauts Mineurs</div>
+                    </div>
+                </div>
+                
+                
+                
+                <!-- Graphique Conformité par Module -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Conformité par Module</h3>
+                    <div class="bg-white p-4 rounded-lg" style="height: 300px;">
+                        <canvas id="conformityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ====================================================================
+             MODULE EL - ÉLECTROLUMINESCENCE
+        ==================================================================== -->
+        
+        <div class="page-break">
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-4 border-green-500 pb-3">
+                    <i class="fas fa-moon text-green-600 mr-3"></i>
+                    MODULE ÉLECTROLUMINESCENCE
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div><strong>Token Audit :</strong> PV-1-MHVVUA5J</div>
+                    <div><strong>Date Audit :</strong> 12/11/2025</div>
+                    <div><strong>Total Modules :</strong> 0</div>
+                    <div><strong>Conformité :</strong> <span class="text-2xl font-bold text-red-600">0%</span></div>
+                </div>
+                
+                <h3 class="text-xl font-bold mb-4">Statistiques Défauts</h3>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="stat-card border-l-green-500">
+                        <div class="text-3xl font-black text-green-600">0</div>
+                        <div class="text-sm">Modules OK</div>
+                    </div>
+                    <div class="stat-card border-l-yellow-500">
+                        <div class="text-3xl font-black text-yellow-600">0</div>
+                        <div class="text-sm">Inégalités</div>
+                    </div>
+                    <div class="stat-card border-l-orange-500">
+                        <div class="text-3xl font-black text-orange-600">0</div>
+                        <div class="text-sm">Microfissures</div>
+                    </div>
+                    <div class="stat-card border-l-red-500">
+                        <div class="text-3xl font-black text-red-600">0</div>
+                        <div class="text-sm">Modules HS</div>
+                    </div>
+                    <div class="stat-card border-l-blue-500">
+                        <div class="text-3xl font-black text-blue-600">0</div>
+                        <div class="text-sm">Strings Ouverts</div>
+                    </div>
+                    <div class="stat-card border-l-gray-500">
+                        <div class="text-3xl font-black text-gray-600">0</div>
+                        <div class="text-sm">Non Raccordés</div>
+                    </div>
+                </div>
+                
+                
+                
+                <!-- Graphique Défauts EL (Camembert) -->
+                
+            </div>
+        </div>
+        
+        
+        <!-- ====================================================================
+             MODULE IV - COURBES I-V
+        ==================================================================== -->
+        
+        <div class="page-break">
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-4 border-blue-500 pb-3">
+                    <i class="fas fa-chart-line text-blue-600 mr-3"></i>
+                    MODULE COURBES I-V
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div><strong>Total Courbes :</strong> 5</div>
+                    <div><strong>Hors Tolérance :</strong> <span class="text-xl font-bold text-red-600">0</span></div>
+                </div>
+                
+                <h3 class="text-xl font-bold mb-4">Moyennes Mesures</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="stat-card border-l-purple-500">
+                        <div class="text-3xl font-black text-purple-600">-0.14</div>
+                        <div class="text-sm">Fill Factor Moyen</div>
+                    </div>
+                    <div class="stat-card border-l-indigo-500">
+                        <div class="text-3xl font-black text-indigo-600">0.00 Ω</div>
+                        <div class="text-sm">Rds Moyen</div>
+                    </div>
+                    <div class="stat-card border-l-cyan-500">
+                        <div class="text-3xl font-black text-cyan-600">0.00 V</div>
+                        <div class="text-sm">Uf Moyen</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        
+        <!-- ====================================================================
+             MODULE VISUELS - CONTRÔLES IEC 62446-1
+        ==================================================================== -->
+        
+        <div class="page-break">
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-4 border-orange-500 pb-3">
+                    <i class="fas fa-eye text-orange-600 mr-3"></i>
+                    MODULE CONTRÔLES VISUELS IEC 62446-1
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div><strong>Token Inspection :</strong> VIS-TEST-4MODULES</div>
+                    <div><strong>Date Inspection :</strong> 13/01/2025</div>
+                </div>
+                
+                <h3 class="text-xl font-bold mb-4">Checklist IEC 62446-1</h3>
+                <div class="grid grid-cols-4 gap-3 mb-6">
+                    <div class="stat-card border-l-gray-500">
+                        <div class="text-2xl font-black">10</div>
+                        <div class="text-xs">Items Total</div>
+                    </div>
+                    <div class="stat-card border-l-blue-500">
+                        <div class="text-2xl font-black">10</div>
+                        <div class="text-xs">Vérifiés</div>
+                    </div>
+                    <div class="stat-card border-l-green-500">
+                        <div class="text-2xl font-black">6</div>
+                        <div class="text-xs">Conformes</div>
+                    </div>
+                    <div class="stat-card border-l-red-500">
+                        <div class="text-2xl font-black">4</div>
+                        <div class="text-xs">Non-Conformes</div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="text-lg font-bold mb-2">Conformité Checklist: <span class="text-red-600">60%</span></div>
+                    <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-red-600" style="width: 60%"></div>
+                    </div>
+                </div>
+                
+                
+            </div>
+        </div>
+        
+        
+        <!-- ====================================================================
+             MODULE ISOLATION - TESTS DC/AC
+        ==================================================================== -->
+        
+        <div class="page-break">
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-4 border-yellow-500 pb-3">
+                    <i class="fas fa-bolt text-yellow-600 mr-3"></i>
+                    MODULE TESTS ISOLATION IEC 62446
+                </h2>
+                
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="stat-card border-l-gray-500">
+                        <div class="text-3xl font-black">8</div>
+                        <div class="text-sm">Tests Total</div>
+                    </div>
+                    <div class="stat-card border-l-green-500">
+                        <div class="text-3xl font-black text-green-600">8</div>
+                        <div class="text-sm">Conformes (>1 MΩ)</div>
+                    </div>
+                    <div class="stat-card border-l-red-500">
+                        <div class="text-3xl font-black text-red-600">0</div>
+                        <div class="text-sm">Non-Conformes</div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <div class="text-lg font-bold mb-2">Conformité Isolation: <span class="text-green-600">100%</span></div>
+                    <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-600" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <h3 class="text-xl font-bold mb-4">Moyennes Mesures</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="stat-card border-l-purple-500">
+                        <div class="text-2xl font-black text-purple-600">3.68 MΩ</div>
+                        <div class="text-sm">DC+ vers Terre</div>
+                    </div>
+                    <div class="stat-card border-l-indigo-500">
+                        <div class="text-2xl font-black text-indigo-600">0 MΩ</div>
+                        <div class="text-sm">DC- vers Terre</div>
+                    </div>
+                    <div class="stat-card border-l-blue-500">
+                        <div class="text-2xl font-black text-blue-600">0 MΩ</div>
+                        <div class="text-sm">DC+ vers DC-</div>
+                    </div>
+                    <div class="stat-card border-l-cyan-500">
+                        <div class="text-2xl font-black text-cyan-600">0 MΩ</div>
+                        <div class="text-sm">AC vers Terre</div>
+                    </div>
+                </div>
+                
+                
+                <h3 class="text-xl font-bold mb-4 mt-6">Dernier Test</h3>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div><strong>Date:</strong> 03/10/2019</div>
+                        <div><strong>Conformité:</strong> <span class="font-bold text-green-600">CONFORME</span></div>
+                        <div><strong>DC+ Terre:</strong> 3.9 MΩ</div>
+                        
+                        
+                        
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        
+        <!-- ====================================================================
+             RECOMMANDATIONS
+        ==================================================================== -->
+        
+        <div class="page-break">
+            <div class="module-section">
+                <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-4 border-red-500 pb-3">
+                    <i class="fas fa-clipboard-check text-red-600 mr-3"></i>
+                    RECOMMANDATIONS & PLAN D'ACTION
+                </h2>
+                
+                <div class="space-y-4">
+                    
+                    <div class="stat-card priority-high">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex-1">
+                                <div class="text-xl font-bold text-gray-800">#1 - Plan de maintenance préventive</div>
+                                <div class="text-sm text-gray-600 mt-1">Conformité globale 58% < 80%. Mise en place d'un plan de maintenance préventive recommandée.</div>
+                            </div>
+                            <span class="px-3 py-1 rounded text-xs font-bold bg-orange-200 text-orange-800">
+                                HIGH
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-sm mt-3">
+                            <div><strong>Catégorie:</strong> maintenance</div>
+                            <div><strong>Délai:</strong> 3 mois</div>
+                            <div></div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+        
+        
+        <!-- ====================================================================
+             SIGNATURES
+        ==================================================================== -->
+        <div class="module-section">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 text-center">
+                <i class="fas fa-signature text-blue-600 mr-3"></i>
+                SIGNATURES & CERTIFICATION
+            </h2>
+            
+            <div class="grid grid-cols-2 gap-8 mb-6">
+                <div class="border-2 border-gray-300 rounded-lg p-6 text-center">
+                    <div class="text-lg font-bold text-gray-800 mb-4">Auditeur Terrain</div>
+                    <div class="h-24 flex items-center justify-center mb-4">
+                        <div class="text-6xl text-gray-300">
+                            <i class="fas fa-pen-fancy"></i>
+                        </div>
+                    </div>
+                    <div class="text-gray-700 font-semibold">Diagnostic Photovoltaïque</div>
+                    <div class="text-sm text-gray-500">Expert Indépendant</div>
+                </div>
+                
+                <div class="border-2 border-gray-300 rounded-lg p-6 text-center">
+                    <div class="text-lg font-bold text-gray-800 mb-4">Validation Technique</div>
+                    <div class="h-24 flex items-center justify-center mb-4">
+                        <div class="text-6xl text-gray-300">
+                            <i class="fas fa-stamp"></i>
+                        </div>
+                    </div>
+                    <div class="text-gray-700 font-semibold">Fabien CORRERA</div>
+                    <div class="text-sm text-gray-500">Fondateur DiagPV</div>
+                </div>
+            </div>
+            
+            <div class="bg-green-50 border-2 border-green-500 rounded-lg p-4 text-center">
+                <div class="flex items-center justify-center text-green-800 font-bold text-xl mb-2">
+                    <i class="fas fa-certificate text-3xl mr-3"></i>
+                    RAPPORT CERTIFIÉ DIAGPV
+                </div>
+                <p class="text-green-700 text-sm">Ce rapport a été établi conformément aux normes IEC 62446-1 et reflète l'état de l'installation au moment de l'audit.</p>
+            </div>
+        </div>
+        
+        <!-- ====================================================================
+             FOOTER DIAGPV
+        ==================================================================== -->
+        <div class="module-section text-center">
+            <div class="text-2xl font-bold text-green-600 mb-2">DIAGNOSTIC PHOTOVOLTAÏQUE</div>
+            <div class="text-gray-600 mb-4">Expertise Indépendante Photovoltaïque</div>
+            <div class="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                    <div class="font-bold">Adresse</div>
+                    <div>3 rue d'Apollo</div>
+                    <div>31240 L'Union</div>
+                </div>
+                <div>
+                    <div class="font-bold">Contact</div>
+                    <div>📞 05.81.10.16.59</div>
+                    <div>📧 contact@diagpv.fr</div>
+                </div>
+                <div>
+                    <div class="font-bold">Web</div>
+                    <div>www.diagnosticphotovoltaique.fr</div>
+                    <div>RCS 792972309</div>
+                </div>
+            </div>
+            <div class="text-xs text-gray-500 mt-4 pt-4 border-t border-gray-300">
+                Rapport généré le 13 novembre 2025 - Token: RPT_1763039370310_N9HH9S94<br>
+                Conformité normes: IEC 62446-1, IEC 61215, IEC 61730, NF C 15-100, UTE C 15-712-1
+            </div>
+        </div>
+        
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        // ========================================================================
+        // GRAPHIQUES CHART.JS
+        // ========================================================================
+        
+        // Graphique Conformité par Module (Barres)
+        const conformityCtx = document.getElementById('conformityChart');
+        if (conformityCtx) {
+            new Chart(conformityCtx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        'EL (0%)',
+                        'IV (100%)',
+                        'Visuels (60%)',
+                        'Isolation (100%)',
+                        
+                    ],
+                    datasets: [{
+                        label: 'Conformité (%)',
+                        data: [
+                            0,
+                            100,
+                            60,
+                            100,
+                            
+                        ],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(251, 146, 60, 0.8)',
+                            'rgba(234, 179, 8, 0.8)',
+                            
+                        ],
+                        borderColor: [
+                            'rgb(34, 197, 94)',
+                            'rgb(59, 130, 246)',
+                            'rgb(251, 146, 60)',
+                            'rgb(234, 179, 8)',
+                            
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Taux de Conformité par Module',
+                            font: { size: 16, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Graphique Défauts EL (Camembert)
+        const elDefectsCtx = document.getElementById('elDefectsChart');
+        if (elDefectsCtx && false) {
+            new Chart(elDefectsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['OK', 'Inégalités', 'Microfissures', 'HS', 'String Ouvert', 'Non Raccordé'],
+                    datasets: [{
+                        data: [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(234, 179, 8, 0.8)',
+                            'rgba(251, 146, 60, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgb(34, 197, 94)',
+                            'rgb(234, 179, 8)',
+                            'rgb(251, 146, 60)',
+                            'rgb(239, 68, 68)',
+                            'rgb(59, 130, 246)',
+                            'rgb(156, 163, 175)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Répartition des Défauts Électroluminescence',
+                            font: { size: 14, weight: 'bold' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ========================================================================
+        // EXPORT PDF
+        // ========================================================================
+        async function downloadPDF() {
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Génération PDF...';
+            
+            try {
+                // Utiliser window.print() pour génération PDF navigateur
+                // Plus fiable que html2pdf pour grands documents
+                window.print();
+                
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-download mr-2"></i>TÉLÉCHARGER';
+                }, 2000);
+            } catch (error) {
+                console.error('Erreur génération PDF:', error);
+                alert('Erreur génération PDF. Utilisez Ctrl+P puis "Enregistrer en PDF".');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-download mr-2"></i>TÉLÉCHARGER';
+            }
+        }
+    </script>
+    
+</body>
+</html>

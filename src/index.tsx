@@ -13,7 +13,9 @@ import ivCurvesModule from './modules/iv-curves/routes'
 import visualInspectionModule from './modules/visual-inspection/routes'
 import { isolationRoutes } from './modules/isolation/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
+import customReportRoutes from './modules/custom-report/routes.js'
 import { getRapportsPage } from './pages/rapports.js'
+import { getRapportsCustomPage } from './pages/rapports-custom.js'
 import { getIVCurvesPage } from './pages/iv-curves.js'
 import { getVisualPage } from './pages/visual.js'
 import { getIsolationPage } from './pages/isolation.js'
@@ -159,6 +161,18 @@ app.route('/api/isolation', isolationRoutes)
 // - GET /api/report/unified/:reportToken  Récupérer rapport généré (TODO Phase 3)
 // ============================================================================
 app.route('/api/report/unified', unifiedReportRoutes)
+
+// ============================================================================
+// MODULE RAPPORT CUSTOM - RAPPORTS FLEXIBLES ADAPTÉS (Phase 5 - Option C)
+// ============================================================================
+// Module Rapport Flexible pour génération de rapports adaptés au type d'audit
+// Sélection dynamique des modules selon cahier des charges
+// Routes:
+// - GET /api/report/custom/templates  Liste templates disponibles
+// - POST /api/report/custom/check-availability  Vérifier données disponibles
+// - POST /api/report/custom/generate  Générer rapport flexible
+// ============================================================================
+app.route('/api/report/custom', customReportRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
@@ -732,6 +746,13 @@ app.get('/', (c) => {
 // ============================================================================
 app.get('/rapports', (c) => {
   return c.html(getRapportsPage())
+})
+
+// ============================================================================
+// ROUTE /RAPPORTS/CUSTOM - INTERFACE BUILDER RAPPORTS FLEXIBLES (Phase 5 - Option C)
+// ============================================================================
+app.get('/rapports/custom', (c) => {
+  return c.html(getRapportsCustomPage())
 })
 
 // ============================================================================
