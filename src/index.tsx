@@ -14,6 +14,9 @@ import visualInspectionModule from './modules/visual-inspection/routes'
 import { isolationRoutes } from './modules/isolation/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
 import { getRapportsPage } from './pages/rapports.js'
+import { getIVCurvesPage } from './pages/iv-curves.js'
+import { getVisualPage } from './pages/visual.js'
+import { getIsolationPage } from './pages/isolation.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -729,6 +732,27 @@ app.get('/', (c) => {
 // ============================================================================
 app.get('/rapports', (c) => {
   return c.html(getRapportsPage())
+})
+
+// ============================================================================
+// ROUTE /IV-CURVES - INTERFACE MODULE COURBES I-V
+// ============================================================================
+app.get('/iv-curves', (c) => {
+  return c.html(getIVCurvesPage())
+})
+
+// ============================================================================
+// ROUTE /VISUAL - INTERFACE MODULE CONTRÔLES VISUELS IEC 62446-1
+// ============================================================================
+app.get('/visual', (c) => {
+  return c.html(getVisualPage())
+})
+
+// ============================================================================
+// ROUTE /ISOLATION - INTERFACE MODULE TESTS ISOLATION
+// ============================================================================
+app.get('/isolation', (c) => {
+  return c.html(getIsolationPage())
 })
 
 // ============================================================================
