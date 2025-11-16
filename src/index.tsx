@@ -14,11 +14,13 @@ import visualInspectionModule from './modules/visual-inspection/routes'
 import { isolationRoutes } from './modules/isolation/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
 import customReportRoutes from './modules/custom-report/routes.js'
+import picselliaRoutes from './modules/picsellia-integration/routes.js'
 import { getRapportsPage } from './pages/rapports.js'
 import { getRapportsCustomPage } from './pages/rapports-custom.js'
 import { getIVCurvesPage } from './pages/iv-curves.js'
 import { getVisualPage } from './pages/visual.js'
 import { getIsolationPage } from './pages/isolation.js'
+import { getAuditPhotosPage } from './pages/audit-photos.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -173,6 +175,22 @@ app.route('/api/report/unified', unifiedReportRoutes)
 // - POST /api/report/custom/generate  Générer rapport flexible
 // ============================================================================
 app.route('/api/report/custom', customReportRoutes)
+
+// ============================================================================
+// MODULE PICSELLIA AI - INTÉGRATION IA ANALYSE PHOTOS EL (Phase 1)
+// ============================================================================
+// Module Picsellia AI pour analyse automatique photos électroluminescence
+// Architecture 100% additive - Aucune modification code existant
+// Mode MOCK intégré pour développement sans API keys
+// Routes:
+// - POST /api/picsellia/upload-photos  Upload photos vers R2 + DB
+// - GET /api/picsellia/photos/:auditToken  Liste photos audit
+// - POST /api/picsellia/analyze-audit  Lancer analyse IA batch
+// - GET /api/picsellia/review/:auditToken  Comparer IA vs saisie manuelle
+// - POST /api/picsellia/validate  Validation humaine résultats IA
+// - GET /api/picsellia/statistics/:auditToken  Statistiques analyse IA
+// ============================================================================
+app.route('/api/picsellia', picselliaRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
@@ -605,20 +623,20 @@ app.get('/', (c) => {
                         </div>
                     </a>
                     
-                    <!-- Module I-V - À VENIR -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module I-V - OPÉRATIONNEL -->
+                    <a href="/iv-curves" class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-8 border-4 border-blue-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-blue-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-chart-line text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE I-V</h3>
-                            <p class="text-lg text-gray-300 mb-3">Courbes I-V</p>
-                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            <p class="text-lg text-blue-200 mb-3">Courbes I-V</p>
+                            <div class="bg-blue-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Mesures électriques et analyse performances</p>
+                            <p class="text-sm text-blue-100">Mesures PVServ - Fill Factor & Résistance Série</p>
                         </div>
-                    </div>
+                    </a>
                     
                     <!-- Module Thermographie -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
@@ -635,35 +653,35 @@ app.get('/', (c) => {
                         </div>
                     </div>
                     
-                    <!-- Module Visuels -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module Visuels - OPÉRATIONNEL -->
+                    <a href="/visual" class="bg-gradient-to-br from-amber-900 to-amber-700 rounded-lg p-8 border-4 border-amber-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-amber-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-eye text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE VISUELS</h3>
-                            <p class="text-lg text-gray-300 mb-3">Contrôles Visuels</p>
-                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            <p class="text-lg text-amber-200 mb-3">Contrôles Visuels</p>
+                            <div class="bg-amber-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Inspection visuelle et défauts mécaniques</p>
+                            <p class="text-sm text-amber-100">Inspection visuelle IEC 62446-1 & défauts mécaniques</p>
                         </div>
-                    </div>
+                    </a>
                     
-                    <!-- Module Isolation -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module Isolation - OPÉRATIONNEL -->
+                    <a href="/isolation" class="bg-gradient-to-br from-yellow-900 to-yellow-700 rounded-lg p-8 border-4 border-yellow-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-yellow-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-bolt text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE ISOLATION</h3>
-                            <p class="text-lg text-gray-300 mb-3">Tests d'Isolation</p>
+                            <p class="text-lg text-yellow-200 mb-3">Tests d'Isolation</p>
                             <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Mesures résistance isolation et défauts électriques</p>
+                            <p class="text-sm text-yellow-100">Mesures résistance isolation DC/AC & défauts électriques</p>
                         </div>
-                    </div>
+                    </a>
                     
                     <!-- Module Expertise Post-Sinistre -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
@@ -723,6 +741,18 @@ app.get('/', (c) => {
                                 GÉRER CENTRALES PV
                             </a>
                         </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-blue-400 hover:bg-gray-750 transition-colors">
+                            <h3 class="text-xl font-bold mb-3 text-blue-400 flex items-center">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                COURBES I-V
+                            </h3>
+                            <p class="text-gray-300 mb-4">Upload fichiers PVServ et analyse Fill Factor</p>
+                            <a href="/iv-curves" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                                <i class="fas fa-bolt mr-2"></i>
+                                MESURES I-V
+                            </a>
+                        </div>
                     </div>
                 </div>
                 
@@ -774,6 +804,14 @@ app.get('/visual', (c) => {
 // ============================================================================
 app.get('/isolation', (c) => {
   return c.html(getIsolationPage())
+})
+
+// ============================================================================
+// ROUTE /AUDIT/:TOKEN/PHOTOS - INTERFACE UPLOAD PHOTOS EL + IA PICSELLIA
+// ============================================================================
+app.get('/audit/:token/photos', (c) => {
+  const token = c.req.param('token')
+  return c.html(getAuditPhotosPage(token))
 })
 
 // ============================================================================
@@ -1181,6 +1219,9 @@ app.get('/audit/:token', async (c) => {
                 <div class="flex space-x-2 flex-wrap">
                     <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold flex items-center border-2 border-orange-400 shadow-lg" title="Accéder au tableau de bord - Vue d'ensemble audits">
                         <i class="fas fa-tachometer-alt mr-2 text-lg"></i>TABLEAU DE BORD
+                    </a>
+                    <a href="/audit/${token}/photos" class="bg-pink-600 hover:bg-pink-700 px-4 py-2 rounded font-bold flex items-center border-2 border-pink-400 shadow-lg" title="Upload et analyse IA des photos EL">
+                        <i class="fas fa-camera mr-2 text-lg"></i>PHOTOS EL
                     </a>
                     <button id="pvCartoBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold flex items-center" style="display:none;" title="Cartographie PV de cette centrale">
                         <i class="fas fa-solar-panel mr-1"></i>PV CARTO
