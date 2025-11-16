@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
+import authRoutes from './modules/auth/routes'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -21,6 +22,11 @@ app.use('/api/*', cors({
 
 // Serveur de fichiers statiques
 app.use('/static/*', serveStatic({ root: './public' }))
+
+// ============================================================================
+// MODULE AUTH - AUTHENTIFICATION & PERMISSIONS (Phase 6)
+// ============================================================================
+app.route('/api/auth', authRoutes)
 
 // ============================================================================
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
@@ -185,6 +191,19 @@ app.get('/api/audit/:token/report', async (c) => {
 // ============================================================================
 // INTERFACE FRONTEND
 // ============================================================================
+
+// ============================================================================
+// PAGE LOGIN - AUTHENTIFICATION
+// IMPORTANT: Auth DÉSACTIVÉ par défaut (AUTH_ENABLED=false dans middleware)
+// Cette page existe mais l'authentification n'est pas requise pour l'instant
+// ============================================================================
+app.get('/login', (c) => {
+  return c.json({ 
+    message: 'Page login - En développement',
+    auth_status: 'disabled',
+    note: 'Infrastructure auth installée mais désactivée (AUTH_ENABLED=false)'
+  })
+})
 
 // ============================================================================
 // PAGE D'ACCUEIL - DIAGNOSTIC HUB
