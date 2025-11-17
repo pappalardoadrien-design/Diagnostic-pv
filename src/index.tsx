@@ -7,6 +7,7 @@ import authRoutes from './modules/auth/routes'
 import adminAuthRoutes from './modules/auth/admin-routes'
 import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
+import { getAdminUsersPage } from './pages/admin-users'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -211,6 +212,14 @@ app.get('/login', (c) => {
 // ============================================================================
 app.get('/change-password', (c) => {
   return c.html(getChangePasswordPage())
+})
+
+// ============================================================================
+// PAGE ADMIN USERS - GESTION UTILISATEURS
+// Interface admin pour CRUD des 20+ sous-traitants
+// ============================================================================
+app.get('/admin/users', (c) => {
+  return c.html(getAdminUsersPage())
 })
 
 // ============================================================================
