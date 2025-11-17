@@ -1,448 +1,585 @@
-# 🏢 Diagnostic Hub - Plateforme Unifiée DiagPV
+# 🔋 DiagPV - Plateforme Unifiée de Diagnostic Photovoltaïque
 
-## 🎯 Vue d'ensemble
-
-**Diagnostic Hub** est la plateforme unifiée pour tous les outils d'audit de **Diagnostic Photovoltaïque** (www.diagnosticphotovoltaique.fr). Cette architecture monolithe modulaire centralise 6 modules métier avec partage de ressources communes (clients, projets, interventions, utilisateurs).
-
-### 🏗️ Architecture Monolithe Modulaire
-
-```
-diagnostic-hub/
-├── src/modules/
-│   ├── auth/            ✅ Authentification Multi-role (OPÉRATIONNEL)
-│   ├── crm/             ✅ Gestion Clients CRM (OPÉRATIONNEL)
-│   ├── planning/        ✅ Planning & Attribution (OPÉRATIONNEL - Phase 7)
-│   ├── el/              ✅ Électroluminescence (OPÉRATIONNEL)
-│   ├── iv/              🔜 Courbes I-V
-│   ├── thermique/       🔜 Thermographie
-│   ├── isolation/       🔜 Tests isolation
-│   ├── visuels/         🔜 Contrôles visuels
-│   └── expertise/       🔜 Expertise post-sinistre
-└── Database D1 unifiée (diagnostic-hub-production)
-```
-
-## 🆕 Module Planning - Planning & Attribution (Phase 7 ✅)
-
-### Fonctionnalités Complètes
-
-#### 📊 Planning Dashboard
-- **Statistiques temps réel** : Total, planifiées, en cours, terminées, annulées
-- **Filtres avancés** : Statut, type, période, non assignées
-- **Table dynamique** : Liste interventions avec navigation
-- **Auto-refresh 30s** : Stats mises à jour automatiquement
-
-#### ➕ Création Intervention Dynamique
-- **Workflow guidé 5 étapes** :
-  1. Sélection Client CRM (dropdown)
-  2. Sélection Projet (cascading select dynamique)
-  3. Affichage infos projet (localisation, puissance)
-  4. Type intervention + Date + Durée
-  5. Sélection technicien disponible (cascading select)
-- **Détection conflits automatique** : Avertissement si technicien déjà assigné même date
-- **Validation serveur** : Vérification project_id, technician_id, date
-
-#### 🔗 Architecture Unifiée
-- **Traçabilité complète** : Client → Projet → Intervention → Audit → Module
-- **View workflow** : `v_complete_workflow` pour requêtes globales
-- **Foreign Keys cohérentes** : CASCADE deletes, SET NULL appropriés
-- **Table unique clients** : `crm_clients` (SIRET, TVA, contacts riches)
-
-#### 🛠️ API REST Planning
-- `GET /api/planning/dashboard` - Stats temps réel
-- `GET /api/planning/interventions` - Liste filtrable
-- `POST /api/planning/interventions` - Création
-- `POST /api/planning/assign` - Attribution technicien + conflits
-- `GET /api/planning/technicians/available` - Disponibilités
-
-### URLs Clés
-- **Dashboard Planning** : http://localhost:3000/planning
-- **Créer Intervention** : http://localhost:3000/planning/create
+**Expertise indépendante depuis 2012 | Plus de 500 interventions**
 
 ---
 
-## ✅ Module EL - Électroluminescence (Production)
+## 📊 Vue d'Ensemble
 
-### Fonctionnalités Complètes
+**DiagPV** est une plateforme web complète de gestion d'audits photovoltaïques développée pour **Diagnostic Photovoltaïque**, intégrant :
 
-#### 🔧 Création d'audit
-- Configuration manuelle: strings × modules par string
-- Configuration avancée: strings différents (mode MPPT)
-- Upload plan PDF/image avec génération grille automatique
-- Token unique sécurisé pour partage équipe
-- Support jusqu'à 20 000 modules
+- **CRM Clients & Sites** avec configuration PV détaillée
+- **Planning & Attribution** interventions sous-traitants
+- **Module Électroluminescence (EL)** - Diagnostic défauts modules
+- **Module Courbes I-V** - Mesures référence & sombres
+- **Module Inspections Visuelles** - Checklist terrain
+- **Module Tests d'Isolement** - Conformité électrique
+- **Génération PDF** - Ordres de mission & rapports techniques
 
-#### 🌙 Interface audit terrain nocturne
-- **Thème sombre exclusif** (fond #000000, texte #FFFFFF)
-- **Optimisation tactile** tablettes + gants épais
-- Boutons 60×60px, espacement 10px, police 18px gras
-- Navigation fluide par strings avec scroll natif
-- Réaction <0.2s pour diagnostic modules
+---
 
-#### ⚡ Système diagnostic 6 états
-- 🟢 **OK** - Aucun défaut
-- 🟡 **Inégalité** - Qualité cellules
-- 🟠 **Microfissures** - Visibles EL
-- 🔴 **HS** - Module défaillant
-- 🔵 **String ouvert** - Sous-string ouvert
-- ⚫ **Non raccordé** - Non connecté
-- Commentaires optionnels + validation instantanée
+## 🚀 URLs Déployées
 
-#### 🤝 Collaboration temps réel
-- URL partagée = accès immédiat équipe (4 techniciens max)
-- Synchronisation <1s via Server-Sent Events
-- Indicateurs visuels techniciens actifs
-- Gestion conflits: dernier clic gagne
+- **Production**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev
+- **API Base**: `/api/*`
+- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`
 
-#### 📊 Import mesures PVserv
-- Parser intelligent format PVserv
-- Extraction: FF, Rds, Uf, courbes I-V
-- Validation données + statistiques auto
-- Intégration rapport sans interprétation
+---
 
-#### 📄 Génération rapports auto
-- Format professionnel Diagnostic Photovoltaïque
-- **🗺️ Plan de calepinage physique** - Grille visuelle avec localisation exacte
-- **Codes couleur** - Identification immédiate modules à remplacer
-- **Légende complète** - 7 états visuels (OK, Inégalité, Microfissures, HS, etc.)
-- Statistiques par état (%, nombres)
-- Listing détaillé modules non-conformes avec commentaires
-- Export PDF imprimable pour intervention sur site
-- Mesures PVserv intégrées
-- Génération <5s pour 1000 modules
+## 🏗️ Architecture Technique
 
-#### 💾 Mode offline complet
-- Sauvegarde auto continue localStorage
-- Service Worker PWA cache intelligent
-- Sync différée automatique
-- Recovery auto après crash
+### **Stack Technologique**
+- **Framework**: Hono (TypeScript) - Lightweight edge framework
+- **Runtime**: Cloudflare Workers/Pages
+- **Database**: Cloudflare D1 (SQLite distribué)
+- **Frontend**: HTML/CSS/JavaScript (TailwindCSS, FontAwesome)
+- **Process Manager**: PM2 (développement sandbox)
+- **Version Control**: Git
 
-### 📋 URLs Production Module EL
-
-#### Interface utilisateur
-- **`/`** - Dashboard création audits + audits récents
-- **`/audit/{token}`** - Interface terrain nocturne collaborative
-- **`/dashboard`** - Tableau de bord audits temps réel
-
-#### API Endpoints Module EL
-- **`POST /api/el/audit/create`** - Création nouvel audit
-- **`POST /api/el/audit/create-from-json`** - Import configuration JSON
-- **`GET /api/el/audit/:token`** - Données audit + modules + progression
-- **`GET /api/el/audit/:token/report`** - **Génération rapport PDF avec impression** ✅
-- **`PUT /api/el/audit/:token`** - Modifier informations audit
-- **`DELETE /api/el/audit/:token`** - Supprimer audit complet
-- **`POST /api/el/audit/:token/module/:moduleId`** - Mise à jour module individuel ✅
-- **`POST /api/el/audit/:token/module`** - Créer module individuel
-- **`POST /api/el/audit/:token/bulk-update`** - Mise à jour en lot (max 100)
-- **`GET /api/el/dashboard/audits`** - Liste audits avec statistiques
-- **`GET /api/el/dashboard/overview`** - Vue d'ensemble globale
-
-#### API Endpoints PVserv (legacy routes)
-- **`POST /api/audit/:token/parse-pvserv`** - Parser fichier PVserv
-- **`POST /api/audit/:token/save-measurements`** - Sauvegarder mesures
-- **`GET /api/audit/:token/measurements`** - Récupérer mesures
-
-## 📊 Architecture Données D1 Unifiée
-
-### Tables CORE (partagées tous modules)
-- **`users`** - Techniciens et utilisateurs
-- **`clients`** - Clients DiagPV
-- **`projects`** - Projets clients (1 client → N projets)
-- **`interventions`** - Interventions sur projets (N modules peuvent partager)
-
-### Tables Module EL
-- **`el_audits`** - Audits électroluminescence
-- **`el_modules`** - Modules diagnostiqués
-- **`el_collaborative_sessions`** - Sessions temps réel
-- **`el_measurements`** - Mesures spécifiques EL
-
-### Tables Modules Futurs
-- **`iv_measurements`** - Courbes I-V
-- **`thermal_measurements`** - Thermographie
-- **`isolation_tests`** - Tests isolation
-- **`visual_inspections`** - Contrôles visuels
-- **`post_incident_expertise`** - Expertise sinistres
-
-### Vues Précalculées (Performance)
-- **`v_el_audit_statistics`** - Stats audit EL temps réel
-- **`v_intervention_summary`** - Résumé interventions multi-modules
-
-### Triggers Automatiques
-- `trg_el_audit_update_timestamp` - Mise à jour auto timestamp
-- `trg_el_module_update_timestamp` - Tracking modifications modules
-- `trg_update_audit_completion` - Calcul progression audit
-- `trg_sync_intervention_dates` - Sync dates intervention
-- `trg_cascade_delete_modules` - Suppression cascade
-- `trg_validate_el_audit_intervention` - Validation FK
-- `trg_validate_el_module_fk` - Validation intégrité
-
-## 🚀 Déploiement Production
-
-### URLs de production
-- **Production**: https://e66e71cb.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT (17/11/2025 - Phase 6 Auth)**
-- **Domaine principal**: https://diagnostic-hub.pages.dev
-- **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
-- **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
-
-### Plateforme
-- **Hébergement**: Cloudflare Pages (edge global)
-- **Base données**: Cloudflare D1 SQLite (serverless)
-- **Performance**: <3s chargement, <0.2s réaction
-- **Scalabilité**: Jusqu'à 20 000 modules/audit
-
-### Tech Stack
-- **Backend**: Hono TypeScript + Cloudflare Workers
-- **Frontend**: Vanilla JavaScript + TailwindCSS CDN
-- **Database**: Cloudflare D1 SQLite unified
-- **Storage**: Cloudflare R2 + KV
-- **PWA**: Service Worker offline-first
-
-### Statistiques Production (27/10/2025)
-- ✅ 2 audits migrés: JALIBAT (242 modules) + Les Forges (220 modules)
-- ✅ 462 modules totaux avec 100% d'intégrité
-- ✅ Distribution: 58 OK, 87 microcracks, 182 dead, 135 inequality
-- ✅ Tokens préservés, configurations avancées intactes
-- ✅ Database size: 0.44 MB
-- ✅ **Édition modules opérationnelle** - Tests validation réussis
-- ✅ **Génération rapports PDF** - Imprimables avec stats complètes
-- ✅ **Plan de calepinage physique** - Grille visuelle pour localisation sur site
-
-## 🔧 Développement Local
-
-### Prérequis
-```bash
-# Node.js 18+ et npm
-node --version  # v18.0.0+
-npm --version   # 9.0.0+
+### **Structure Projet**
+```
+webapp/
+├── src/
+│   ├── index.tsx                    # Application principale (routes)
+│   ├── modules/
+│   │   ├── auth/                    # Authentification & permissions
+│   │   ├── crm/                     # CRM Clients & Contacts
+│   │   ├── planning/                # Planning interventions
+│   │   ├── el/                      # Module Électroluminescence
+│   │   ├── iv/                      # Module Courbes I-V
+│   │   ├── visual/                  # Module Inspections Visuelles
+│   │   ├── isolation/               # Module Tests d'Isolement
+│   │   └── unified-modules-routes/  # API unifiée modules
+│   ├── pages/                       # Pages UI (SSR)
+│   │   ├── crm-*.ts                 # Pages CRM (8 pages)
+│   │   ├── planning-*.ts            # Pages Planning (4 pages)
+│   │   └── ...
+│   └── pvserv-parser.js             # Parser fichiers PVserv
+├── migrations/                      # Migrations SQL D1
+│   ├── 0001_*.sql ... 0029_*.sql
+├── public/                          # Assets statiques
+│   └── static/
+├── wrangler.jsonc                   # Configuration Cloudflare
+├── package.json                     # Dépendances npm
+├── ecosystem.config.cjs             # Configuration PM2
+└── README.md                        # Cette documentation
 ```
 
-### Installation
-```bash
-cd /home/user/diagnostic-hub
-npm install
+---
+
+## 📦 Modules Fonctionnels
+
+### **1. CRM - Gestion Clients & Sites** ✅
+
+**Pages UI**:
+- `/crm/clients` - Liste clients (stats, filtres, recherche)
+- `/crm/clients/create` - Créer client
+- `/crm/clients/detail?id=X` - Détail client (3 onglets: Sites, Interventions, Audits)
+- `/crm/clients/edit?id=X` - Modifier client
+- `/crm/projects` - Liste sites PV
+- `/crm/projects/create` - Créer site **avec config PV détaillée**
+- `/crm/projects/detail?id=X` - Détail site
+- `/crm/projects/edit?id=X` - Modifier site **avec config PV**
+
+**API Routes**:
+```
+GET    /api/crm/clients              Liste clients
+GET    /api/crm/clients/:id          Détail client
+POST   /api/crm/clients              Créer client
+PUT    /api/crm/clients/:id          Modifier client
+DELETE /api/crm/clients/:id          Supprimer client
+
+GET    /api/crm/projects             Liste sites
+GET    /api/crm/projects/:id         Détail site
+GET    /api/crm/clients/:id/projects Sites d'un client
+POST   /api/crm/projects             Créer site (avec config PV)
+PUT    /api/crm/projects/:id         Modifier site
+DELETE /api/crm/projects/:id         Supprimer site
 ```
 
-### Scripts disponibles
-```bash
-npm run dev              # Vite dev server (local machine)
-npm run dev:sandbox      # Wrangler pages dev (sandbox)
-npm run dev:d1           # Wrangler avec D1 local
-npm run build            # Build production
-npm run preview          # Preview build local
-npm run deploy           # Deploy vers Cloudflare
-npm run deploy:prod      # Deploy production avec project name
-
-# Database D1
-npm run db:migrate:local  # Appliquer migrations local
-npm run db:migrate:prod   # Appliquer migrations production
-npm run db:seed           # Seed local database
-npm run db:reset          # Reset local + migrate + seed
-npm run db:console:local  # Console SQL local
-npm run db:console:prod   # Console SQL production
-
-# Git
-npm run git:init         # Init git + commit initial
-npm run git:commit       # Commit avec message
-npm run git:status       # Git status
-npm run git:log          # Git log oneline
-
-# Utilities
-npm run clean-port       # Kill port 3000
-npm run test             # Test local health
-```
-
-### PM2 Development (Sandbox)
-```bash
-# Build first (required)
-npm run build
-
-# Start avec PM2 (daemon)
-pm2 start ecosystem.config.cjs
-
-# Monitoring
-pm2 list                     # Liste services
-pm2 logs diagnostic-hub --nostream
-pm2 restart diagnostic-hub
-pm2 delete diagnostic-hub
-
-# Test santé
-curl http://localhost:3000
-```
-
-### Configuration Database D1
-```jsonc
-// wrangler.jsonc
+**Configuration PV Site** (stockée en JSON):
+```json
 {
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "diagnostic-hub-production",
-    "database_id": "72be68d4-c5c5-4854-9ead-3bbcc131d199"
-  }]
+  "mode": "advanced",
+  "strings": [
+    {"mpptNumber": 1, "moduleCount": 20},
+    {"mpptNumber": 2, "moduleCount": 18}
+  ]
 }
 ```
 
-## 📈 Migration Module EL Standalone
-
-### Processus Migration (27/10/2025)
-1. **Export données production** - 2 audits, 462 modules sauvegardés
-2. **Création schéma unifié** - Migration 0004 avec 90 commandes SQL
-3. **Transformation données** - Script TypeScript avec mapping statuts
-4. **Application production** - Import 3275 rows en 11.34ms
-5. **Validation intégrité** - 12 tests automatisés 100% réussis
-6. **Déploiement production** - Build + deploy Cloudflare Pages
-
-### Statistiques Migration
-- **Audits migrés**: 2 (JALIBAT + Les Forges)
-- **Modules migrés**: 462 avec 100% intégrité
-- **Mapping statuts**: ok→none, microcracks→microcrack, dead→dead_module
-- **Severity levels**: 0=OK, 1=Minor, 2=Medium, 3=Critical
-- **Tokens préservés**: a4e19950-c73c-412c-be4d-699c9de1dde1, 76e6eb36-8b49-4255-99d3-55fc1adfc1c9
-- **Database size**: 0.44 MB après migration
-
-### Backward Compatibility
-- ✅ Anciens statuts transformés automatiquement (ok, inequality, microcracks, dead)
-- ✅ Nouveaux defect_types supportés (none, microcrack, dead_module, luminescence_inequality)
-- ✅ Frontend peut envoyer anciens ou nouveaux formats
-- ✅ API accepte les deux formats avec transformation transparente
-
-## 🔒 Sécurité et Conformité
-
-### Protection données
-- **Tokens uniques** sécurisés par audit (UUID v4)
-- **Chiffrement** données sensibles locales
-- **RGPD** conformité intégrée
-- **Sauvegarde triple**: Local + Cloud + Export
-
-### Robustesse système
-- **Auto-recovery** crash avec restauration état
-- **Messages erreur** français clairs techniciens
-- **Validation** complète inputs utilisateur
-- **Logging** détaillé pour debug production
-
-## 🔐 Système d'Authentification (Phase 6)
-
-### Vue d'ensemble
-Système d'authentification multi-rôles pour gestion de 20+ sous-traitants avec permissions granulaires sur audits EL.
-
-**Statut** : ✅ Déployé en production (AUTH_ENABLED=false par défaut)  
-**Documentation complète** : `AUTH_SYSTEM_STATUS.md`
-
-### Fonctionnalités
-- **4 rôles** : admin, subcontractor, client, auditor
-- **Permissions granulaires** : can_view, can_edit, can_delete par audit
-- **Session management** : Token UUID v4 + KV cache
-- **Activity logs** : Traçabilité complète (audit trail)
-- **Soft delete** : Préservation historique
-
-### Pages Web
-- `/login` - Authentification
-- `/change-password` - Changement mot de passe avec indicateur force
-- `/admin/users` - Gestion utilisateurs (CRUD)
-- `/admin/assignments` - Assignation sous-traitants aux audits
-
-### API Routes
-- **Auth** : `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`
-- **Admin Users** : `/api/auth/admin/users` (GET/POST/PUT/DELETE)
-- **Assignments** : `/api/auth/admin/assignments` (GET/POST/PUT/DELETE)
-
-### Base de Données
-- `auth_users` - Utilisateurs (1 admin créé)
-- `sessions` - Sessions actives
-- `audit_assignments` - Assignations audit ↔ user
-- `activity_logs` - Logs d'activité
-
-### Compte Admin Initial
-- **Email** : a.pappalardo@diagnosticphotovoltaique.fr
-- **Password temporaire** : DiagPV2025!Temp
-- **Must change password** : ✅ Oui
-
-### ⚠️ Avant Activation (AUTH_ENABLED=true)
-1. Remplacer hash SHA-256 par bcrypt (voir AUTH_SYSTEM_STATUS.md)
-2. Configurer SESSION_SECRET et JWT_SECRET
-3. Tester workflow complet avec sous-traitants tests
-4. Ajouter rate limiting sur /login
-
-### Activation
-```typescript
-// src/modules/auth/middleware.ts
-export const AUTH_ENABLED = true; // Passer à true
-```
-
-## 📋 Roadmap Modules Futurs
-
-### Module I-V (Courbes I-V) - Priorité 1
-- Mesures électriques complètes
-- Analyse courbes caractéristiques
-- Détection anomalies automatique
-- Comparaison courbes référence
-
-### Module Thermique - Priorité 2
-- Import images thermographie
-- Analyse points chauds
-- Corrélation avec défauts EL
-- Rapports thermographiques
-
-### Module Contrôles Visuels - Priorité 3
-- Checklist contrôles normatifs
-- Upload photos défauts
-- Annotations images
-- Conformité NF C 15-100
-
-### Module Expertise Post-Sinistre - Priorité 4
-- Analyse causes sinistre
-- Évaluation dommages
-- Préconisations réparations
-- Rapports expertise judiciaire
-
-### Module Isolation - Priorité 5
-- Tests isolation DC/AC
-- Mesures résistance isolement
-- Historique tests
-- Alarmes dégradation
-
-## 📞 Support et Contact
-
-### Équipe Projet
-- **Développement**: Claude AI Assistant
-- **Validation métier**: Adrien - Diagnostic Photovoltaïque
-- **Production**: DiagPV (www.diagnosticphotovoltaique.fr)
-
-### Resources
-- **Code source**: https://github.com/pappalardoadrien-design/Diagnostic-pv
-- **Documentation**: README + commentaires code + docs/ folder
-- **Production**: https://d93b2917.diagnostic-hub.pages.dev
-
-### Documentation Technique
-- `PLAN_FUSION_ARCHITECTURE.md` - Plan détaillé 21 points validation
-- `SCHEMA_D1_UNIFIE_DOCUMENTATION.md` - Schéma database complet
-- `EXPORT_DONNEES_PRODUCTION_2025-10-27.md` - Export données migration
-- `VALIDATION_MIGRATION_2025-10-27.md` - Rapport validation 100%
-- `AUTH_SYSTEM_STATUS.md` - Documentation système authentification complet ✅ **NOUVEAU**
-- `src/modules/README.md` - Guide architecture modulaire
-- `src/modules/el/README.md` - Documentation Module EL
-
-## 🎯 Statut Projet
-
-### Production (17/11/2025)
-- **État**: ✅ **PRODUCTION OPÉRATIONNELLE + SYSTÈME AUTH DÉPLOYÉ**
-- **Module EL**: 100% fonctionnel avec données réelles
-- **Authentification**: Système multi-rôles déployé (désactivé par défaut)
-- **Tests**: Validation complète fonctionnalités critiques + auth API
-- **Migration**: 462 modules migrés avec intégrité 100%
-- **Architecture**: Monolithe modulaire prêt pour 5 modules futurs
-- **Utilisateurs**: 1 admin créé (a.pappalardo@diagnosticphotovoltaique.fr)
-
-### Validation Métier
-- **Spécifications**: 100% requirements DiagPV Module EL
-- **Interface nocturne**: Optimisation totale conditions terrain
-- **Workflow**: Élimination 80% temps administratif
-- **Collaboration**: Temps réel 4 techniciens opérationnel
-- **Données production**: JALIBAT + Les Forges préservés
+**Base de Données**:
+- Table `crm_clients`: Clients (raison sociale, SIRET, contacts)
+- Table `projects`: Sites PV (puissance, modules, config PV JSON, adresse GPS)
 
 ---
 
-**🏢 Diagnostic Hub** - *Plateforme unifiée pour tous les audits DiagPV*
+### **2. Planning & Attribution** ✅
 
-**Diagnostic Photovoltaïque** - www.diagnosticphotovoltaique.fr
+**Pages UI**:
+- `/planning` - Dashboard interventions (stats, liste)
+- `/planning/create` - Créer intervention
+- `/planning/detail?id=X` - Détail intervention + **Bouton Ordre de Mission**
+- `/planning/calendar` - Vue calendrier mensuel
 
-*Version 1.1.0 - Dernière mise à jour: 17 novembre 2025*  
-*Tag: v1.1.0-auth-system (Phase 6 - Authentification Multi-rôles)*
+**API Routes**:
+```
+GET    /api/planning/interventions                  Liste interventions (filtres)
+GET    /api/planning/interventions/:id              Détail intervention
+POST   /api/planning/interventions                  Créer intervention
+PUT    /api/planning/interventions/:id              Modifier intervention
+DELETE /api/planning/interventions/:id              Supprimer intervention
+
+POST   /api/planning/assign                         Assigner technicien
+GET    /api/planning/technicians/available?date=X   Techniciens disponibles
+GET    /api/planning/dashboard                      Stats dashboard
+GET    /api/planning/calendar?month=YYYY-MM         Vue calendrier
+GET    /api/planning/conflicts                      Conflits planning
+
+🆕 GET /api/planning/interventions/:id/ordre-mission  PDF Ordre de Mission
+```
+
+**Ordre de Mission PDF**:
+- Informations client complètes
+- Configuration site PV (modules, onduleurs, BJ, strings)
+- Détails intervention (type, date, technicien)
+- Espace signatures (client + technicien)
+- Format professionnel avec logo DiagPV
+
+---
+
+### **3. Module Électroluminescence (EL)** ✅
+
+**API Routes**:
+```
+POST   /api/el/audit/create                          Créer audit EL
+🆕 POST /api/el/audits/create-from-intervention       Créer audit depuis intervention
+                                                       → Hérite config PV site
+                                                       → Génère modules auto
+GET    /api/el/audit/:token                          Détail audit
+PUT    /api/el/audit/:token                          Modifier audit
+DELETE /api/el/audit/:token                          Supprimer audit
+GET    /api/el/audit/:token/report                   Rapport PDF audit EL
+
+POST   /api/el/audit/:token/module                   Diagnostiquer module
+POST   /api/el/audit/:token/bulk-update              Diagnostic en masse
+GET    /api/el/dashboard/audits                      Liste audits (stats)
+```
+
+**Workflow Automatisé**:
+1. Intervention créée depuis Planning (type=el, site associé)
+2. Bouton "Créer audit EL" → charge config PV du site
+3. Génère automatiquement `el_modules` selon strings configuration
+4. Module_identifier format: "S{mppt}-{position}" (ex: "S1-15")
+
+**Base de Données**:
+- Table `el_audits`: Audits (token, client, site, config JSON)
+- Table `el_modules`: Modules diagnostiqués (identifier, défaut, sévérité, image)
+
+---
+
+### **4. Module Courbes I-V** ✅ 🆕
+
+**API Routes**:
+```
+GET    /api/iv/measurements/:token                   Liste mesures I-V audit
+POST   /api/iv/measurements/:token                   Import CSV (auto-liaison)
+                                                       → Génère module_identifier
+                                                       → Vérifie liaison el_modules
+GET    /api/iv/measurements/:token/module/:id        Mesures module spécifique
+DELETE /api/iv/measurements/:token                   Supprimer mesures
+GET    /api/iv/report/:token                         Rapport PDF courbes I-V
+```
+
+**Types de Mesures**:
+- **Référence (lumière)**: Isc, Voc, Pmax, Impp, Vmpp, FF, Rs, Rsh
+- **Sombre (dark)**: Rs, Rsh, courbe I-V sombre
+
+**Import Automatisé**:
+```javascript
+// Lors import CSV PVserv ou I-V:
+// 1. Génère module_identifier = "S" + string_number + "-" + module_number
+// 2. Vérifie existence dans el_modules
+// 3. Retourne stats liaison: linked_to_el_modules, unlinked
+```
+
+**Base de Données**:
+- Table `iv_measurements`: Mesures I-V (identifier, type, paramètres, courbes JSON)
+
+---
+
+### **5. Module Inspections Visuelles** ✅ 🆕
+
+**API Routes**:
+```
+GET    /api/visual/inspections/:token               Liste inspections
+POST   /api/visual/inspections/:token               Créer inspection
+GET    /api/visual/report/:token                    Rapport PDF inspections
+```
+
+**Données Capturées**:
+- Type inspection (general, structural, electrical, mechanical)
+- Observations texte
+- Photos (URLs JSON array)
+- Défauts détectés
+- Sévérité (low, medium, high, critical)
+
+**Base de Données**:
+- Table `visual_inspections`: Inspections (type, observations, photos JSON, severity)
+
+---
+
+### **6. Module Tests d'Isolement** ✅ 🆕
+
+**API Routes**:
+```
+GET    /api/isolation/tests/:token                  Liste tests isolement
+POST   /api/isolation/tests/:token                  Créer test
+GET    /api/isolation/report/:token                 Rapport PDF tests
+```
+
+**Données Capturées**:
+- Type test (DC, AC, Earth)
+- Tension test (V)
+- Résistance mesurée (MΩ)
+- Pass/Fail (conformité)
+- Conditions (température, humidité)
+
+**Base de Données**:
+- Table `isolation_tests`: Tests (type, voltage, resistance, pass, conditions)
+
+---
+
+### **7. API Unifiée Modules** ✅
+
+**Routes**:
+```
+GET /api/modules/:identifier               Module complet (EL + I-V + PVserv)
+GET /api/modules/audit/:token              Tous modules audit (summary)
+```
+
+**Exemple Response** (GET /api/modules/S1-15):
+```json
+{
+  "success": true,
+  "module": {
+    "identifier": "S1-15",
+    "string_number": 1,
+    "position_in_string": 15,
+    "el": {
+      "defect_type": "pid",
+      "severity": 3,
+      "image_url": "...",
+      "comment": "PID détecté"
+    },
+    "iv_reference": {
+      "isc": 9.45,
+      "voc": 45.2,
+      "pmax": 325.8,
+      "fill_factor": 0.78
+    },
+    "iv_dark": {
+      "rs": 0.42,
+      "rsh": 1200
+    },
+    "pvserv": {
+      "fill_factor": 0.78,
+      "rds": 0.35,
+      "uf": 0.92
+    }
+  }
+}
+```
+
+**Views Database**:
+- `v_module_complete`: JOIN EL + I-V ref + I-V dark + PVserv
+- `v_module_performance_summary`: Health score global (0-100)
+
+---
+
+## 🔄 Workflow Automatisé Complet
+
+```
+1. CRM - Créer Client
+   └─ Raison sociale, SIRET, contacts
+
+2. CRM - Créer Site PV
+   ├─ Puissance, modules, onduleurs
+   ├─ Configuration PV détaillée:
+   │  ├─ Nombre onduleurs, marque
+   │  ├─ Boîtes de jonction (BJ)
+   │  └─ Strings par MPPT: [S1: 20 modules, S2: 18 modules, ...]
+   └─ Format JSON stocké: {"mode": "advanced", "strings": [...]}
+
+3. Planning - Créer Intervention
+   ├─ Type: el, iv, visual, isolation
+   ├─ Date, durée
+   ├─ Associé au site (project_id)
+   └─ Assigner technicien (optionnel)
+
+4. Planning - Générer Ordre de Mission PDF
+   └─ PDF complet: client + site + config PV + technicien + signatures
+
+5. Intervention - Créer Audit EL
+   ├─ Bouton "Créer audit EL" (si type=el)
+   ├─ API: POST /api/el/audits/create-from-intervention
+   ├─ Hérite automatiquement:
+   │  ├─ Config PV site → configuration_json audit
+   │  ├─ Onduleurs, BJ → inverter_count, junction_boxes
+   │  └─ Strings → génère el_modules automatiquement
+   └─ Génère 120 modules (par ex): S1-1, S1-2, ..., S10-12
+
+6. Audit EL - Diagnostiquer Modules
+   ├─ Interface collaborative temps réel
+   ├─ Défauts: none, pid, microcrack, dead_module, string_open, etc.
+   ├─ Sévérité: 0-5
+   └─ Photos + commentaires
+
+7. Import Données PVserv
+   ├─ API: POST /api/audit/:token/save-measurements
+   ├─ Génère auto module_identifier = "S{string}-{module}"
+   ├─ Vérifie liaison avec el_modules
+   └─ Stats: "✅ 115/120 mesures liées aux modules EL"
+
+8. Import Courbes I-V
+   ├─ API: POST /api/iv/measurements/:token
+   ├─ Type: reference ou dark
+   ├─ Génère auto module_identifier
+   └─ Liaison automatique avec el_modules
+
+9. Consultation Data Unifiée
+   ├─ API: GET /api/modules/S1-15
+   └─ Retourne: EL + I-V référence + I-V sombre + PVserv
+
+10. Génération Rapports PDF
+    ├─ Rapport EL: /api/el/audit/:token/report
+    ├─ Rapport I-V: /api/iv/report/:token
+    ├─ Rapport Visuels: /api/visual/report/:token
+    └─ Rapport Isolation: /api/isolation/report/:token
+```
+
+---
+
+## 🗄️ Base de Données - Tables Principales
+
+### **CRM**
+- `crm_clients`: Clients (company_name, siret, contacts, adresse)
+- `projects`: Sites PV (puissance, modules, **config PV JSON**, adresse GPS)
+
+### **Planning**
+- `interventions`: Interventions (project_id, client_id, type, date, technicien)
+
+### **Module EL**
+- `el_audits`: Audits EL (token, client, site, config JSON, intervention_id)
+- `el_modules`: Modules diagnostiqués (**module_identifier**, défaut, sévérité)
+
+### **Module I-V**
+- `iv_measurements`: Mesures I-V (**module_identifier**, type, Isc, Voc, Pmax, courbes JSON)
+
+### **Module PVserv**
+- `pvserv_measurements`: Mesures PVserv (**module_identifier**, FF, RDS, UF, courbes JSON)
+
+### **Modules Visuels & Isolation**
+- `visual_inspections`: Inspections (type, observations, photos JSON, severity)
+- `isolation_tests`: Tests (type, voltage, resistance, pass/fail, conditions)
+
+### **Authentification**
+- `auth_users`: Utilisateurs (email, role, password_hash)
+- `auth_user_assignments`: Assignations interventions
+
+---
+
+## 🔐 Authentification & Rôles
+
+**Rôles Disponibles**:
+- `admin`: Accès complet plateforme
+- `subcontractor`: Sous-traitant (interventions assignées)
+- `client`: Client (consultation rapports uniquement)
+- `auditor`: Auditeur (création audits, diagnostics)
+
+**Pages Admin**:
+- `/admin/users` - Gestion utilisateurs
+- `/admin/assignments` - Attribution permissions
+
+**Note**: Authentification **actuellement désactivée** en développement (AUTH_ENABLED=false).
+
+---
+
+## 🛠️ Commandes Développement
+
+### **Installation**
+```bash
+cd /home/user/webapp
+npm install
+```
+
+### **Développement Local**
+```bash
+# Build
+npm run build
+
+# Démarrer avec PM2 (daemon)
+pm2 start ecosystem.config.cjs
+
+# Vérifier status
+pm2 list
+pm2 logs diagnostic-hub --nostream
+
+# Tester
+curl http://localhost:3000
+```
+
+### **Migrations Database**
+```bash
+# Appliquer migrations locales
+npm run db:migrate:local
+
+# Appliquer migrations production
+npm run db:migrate:prod
+
+# Seed data
+npm run db:seed
+
+# Reset database
+npm run db:reset
+```
+
+### **Déploiement Cloudflare Pages**
+```bash
+# Setup API key (une seule fois)
+setup_cloudflare_api_key
+
+# Vérifier auth
+npx wrangler whoami
+
+# Build
+npm run build
+
+# Deploy
+npm run deploy
+
+# Custom domain
+npx wrangler pages domain add example.com --project-name webapp
+```
+
+### **Git**
+```bash
+# Status
+git status
+
+# Commit
+git add .
+git commit -m "Description changements"
+
+# Push GitHub
+setup_github_environment  # Une seule fois
+git push origin main
+```
+
+---
+
+## 📊 Scripts Package.json
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "dev:sandbox": "wrangler pages dev dist --ip 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "deploy:prod": "npm run build && wrangler pages deploy dist --project-name webapp",
+    
+    "db:migrate:local": "wrangler d1 migrations apply webapp-production --local",
+    "db:migrate:prod": "wrangler d1 migrations apply webapp-production",
+    "db:seed": "wrangler d1 execute webapp-production --local --file=./seed.sql",
+    "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed",
+    
+    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
+    "test": "curl http://localhost:3000"
+  }
+}
+```
+
+---
+
+## 🎯 Prochaines Améliorations (Roadmap)
+
+### **Phase 3 - Fonctionnalités Avancées**
+- [ ] Pages UI Module I-V (liste, import CSV, détail module)
+- [ ] Pages UI Module Visuels (formulaire checklist, galerie photos)
+- [ ] Pages UI Module Isolation (formulaire tests, dashboard conformité)
+- [ ] Graphiques courbes I-V (Chart.js ou Canvas)
+- [ ] Upload images EL modules (Cloudflare R2)
+- [ ] Génération rapports PDF enrichis (graphiques, photos annotées)
+
+### **Phase 4 - Optimisations**
+- [ ] Cache API (Cloudflare KV)
+- [ ] Pagination résultats (API + UI)
+- [ ] Recherche full-text (clients, sites, audits)
+- [ ] Notifications email (SendGrid/Resend)
+- [ ] Export Excel/CSV (audits, mesures)
+- [ ] Historique modifications (audit trail)
+
+### **Phase 5 - Modules Supplémentaires**
+- [ ] Module Thermographie
+- [ ] Module Post-Sinistre (expertise judiciaire)
+- [ ] Module Commissioning
+- [ ] Module Repowering & Optimisation
+
+---
+
+## 📞 Support & Contact
+
+**Diagnostic Photovoltaïque**  
+3 rue d'Apollo, 31240 L'Union  
+📧 contact@diagpv.fr  
+☎ 05.81.10.16.59  
+🌐 www.diagnosticphotovoltaique.fr  
+RCS 792972309
+
+**Contact Développeur**:  
+Adrien PAPPALARDO - Business Developer  
+📧 info@diagnosticphotovoltaique.fr  
+📱 06 07 29 22 12
+
+---
+
+## 📝 Changelog
+
+### **v2.0.0 - 2025-11-17** 🎉
+- ✅ Phase 1C: Automatisation workflow CRM → Planning → Audits
+- ✅ Phase 1D: Ordres de Mission PDF
+- ✅ Phase 2A: Module I-V complet (API + rapports)
+- ✅ Phase 2B: Module Inspections Visuelles (API)
+- ✅ Phase 2C: Module Tests d'Isolement (API)
+- ✅ Héritage config PV site → audit EL
+- ✅ Génération auto modules EL selon config strings
+- ✅ Import PVserv/I-V avec auto-liaison module_identifier
+- ✅ API unifiée modules (EL + I-V + PVserv)
+- ✅ Configuration PV formulaire édition site
+
+### **v1.0.0 - 2024-11-06**
+- ✅ Module Électroluminescence opérationnel
+- ✅ CRM Clients & Sites (8 pages)
+- ✅ Planning & Attribution (4 pages)
+- ✅ Authentification multi-rôles
+- ✅ Déploiement Cloudflare Pages
+
+---
+
+## ⚖️ Licence & Confidentialité
+
+**Propriété intellectuelle**: Diagnostic Photovoltaïque  
+**Confidentialité**: Méthodologie propriétaire protégée  
+**Usage**: Réservé exclusivement aux activités DiagPV
+
+❌ **Interdictions**:
+- Divulgation méthodologie sans NDA
+- Partage données clients
+- Reproduction code source
+- Usage commercial tiers
+
+---
+
+**Développé avec ❤️ pour Diagnostic Photovoltaïque**  
+*Excellence technique depuis 2012 | Plus de 500 interventions*
