@@ -9,46 +9,39 @@
 import type { User, PermissionCheck } from './types';
 
 // ============================================================
-// Password Hashing (bcrypt simulation)
-// IMPORTANT: En production, utiliser vraie lib bcrypt
-// Pour MVP, utiliser hashing simple mais noter qu'il faut bcrypt
+// Password Hashing (bcrypt - PRODUCTION READY)
+// bcrypt avec 10 rounds = sécurisé et performant
 // ============================================================
+
+import bcrypt from 'bcryptjs';
 
 /**
  * Hash un mot de passe avec bcrypt (10 rounds)
- * MOCK: En attente d'installation bcrypt package
+ * 10 rounds = 2^10 = 1024 iterations (bon équilibre sécurité/performance)
+ * 
+ * @param password - Mot de passe en clair
+ * @returns Hash bcrypt format $2b$10$...
  */
 export async function hashPassword(password: string): Promise<string> {
-  // TODO: Installer bcrypt package
-  // const bcrypt = await import('bcryptjs');
-  // return bcrypt.hash(password, 10);
-  
-  // TEMPORARY: Simple hash pour MVP (À REMPLACER par bcrypt)
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'DIAGPV_SALT_2025');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return '$MOCK$' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return await bcrypt.hash(password, 10);
 }
 
 /**
- * Vérifie un mot de passe contre son hash
- * MOCK: En attente d'installation bcrypt package
+ * Vérifie un mot de passe contre son hash bcrypt
+ * Résistant aux timing attacks (bcrypt.compare est constant-time)
+ * 
+ * @param password - Mot de passe en clair à vérifier
+ * @param hash - Hash bcrypt stocké en base
+ * @returns true si match, false sinon
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // TODO: Installer bcrypt package
-  // const bcrypt = await import('bcryptjs');
-  // return bcrypt.compare(password, hash);
-  
-  // TEMPORARY: Vérification simple pour MVP
-  if (hash.startsWith('$2b$')) {
-    // Hash bcrypt réel (comme celui du compte admin initial)
-    // Pour l'instant, accepter mot de passe temporaire
-    return password === 'DiagPV2025!Temp';
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (error) {
+    // Hash invalide ou corrompu
+    console.error('Erreur vérification password:', error);
+    return false;
   }
-  
-  const expectedHash = await hashPassword(password);
-  return hash === expectedHash;
 }
 
 // ============================================================
