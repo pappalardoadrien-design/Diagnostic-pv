@@ -9,13 +9,16 @@ Context: Analyse complète database + Vision future
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Projet local:
-   /home/user/webapp/ROADMAP_VISION_GLOBALE.md
+   a) /home/user/webapp/ROADMAP_VISION_GLOBALE.md (Analyse compatibilité)
+   b) /home/user/webapp/ROADMAP_SESSION_ARTHUR.md (8 phases détaillées)
 
 2. Hub AI Drive (permanent):
-   /mnt/aidrive/ROADMAP_VISION_GLOBALE_DiagPV_2025-11-17.md
+   a) /mnt/aidrive/ROADMAP_VISION_GLOBALE_DiagPV_2025-11-17.md
+   b) /mnt/aidrive/ROADMAP_SESSION_ARTHUR_2025-11-17.md
 
-3. Git commit:
-   19e6f34 - "SAUVEGARDE: Roadmap Vision Globale"
+3. Git commits:
+   a) 19e6f34 - "SAUVEGARDE: Roadmap Vision Globale"
+   b) f933886 - "ROADMAP Session Arthur - 8 phases"
 
 4. Backup complet:
    https://www.genspark.ai/api/files/s/LEURJ40R
