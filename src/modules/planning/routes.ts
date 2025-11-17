@@ -207,7 +207,7 @@ planningRoutes.post('/interventions', async (c) => {
       INSERT INTO interventions (
         project_id,
         intervention_type,
-        description,
+        notes,
         intervention_date,
         duration_hours,
         status,
@@ -218,7 +218,7 @@ planningRoutes.post('/interventions', async (c) => {
     const result = await DB.prepare(query).bind(
       body.project_id,
       body.intervention_type,
-      body.description || null,
+      body.notes || null,
       body.intervention_date,
       body.duration_hours || null,
       body.notes || null
@@ -279,9 +279,9 @@ planningRoutes.put('/interventions/:id', async (c) => {
       updates.push('intervention_type = ?');
       params.push(body.intervention_type);
     }
-    if (body.description !== undefined) {
-      updates.push('description = ?');
-      params.push(body.description);
+    if (body.notes !== undefined) {
+      updates.push('notes = ?');
+      params.push(body.notes);
     }
     if (body.intervention_date !== undefined) {
       updates.push('intervention_date = ?');
@@ -676,7 +676,7 @@ planningRoutes.get('/calendar', async (c) => {
         i.intervention_date,
         i.duration_hours,
         i.status,
-        i.description,
+        i.notes,
         p.name as project_name,
         u.email as technician_email
       FROM interventions i
@@ -704,7 +704,7 @@ planningRoutes.get('/calendar', async (c) => {
         status: row.status,
         technician_name: row.technician_email,
         project_name: row.project_name || 'Projet',
-        description: row.description
+        notes: row.notes
       };
     });
 

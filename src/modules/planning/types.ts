@@ -22,7 +22,7 @@ export interface Intervention {
   project_id: number;
   technician_id: number | null;
   intervention_type: InterventionType;
-  description: string | null;
+  notes: string | null;
   intervention_date: string; // ISO date YYYY-MM-DD
   duration_hours: number | null;
   status: InterventionStatus;
@@ -43,7 +43,7 @@ export interface InterventionWithDetails extends Intervention {
 export interface CreateInterventionRequest {
   project_id: number;
   intervention_type: InterventionType;
-  description?: string;
+  notes?: string;
   intervention_date: string; // ISO date YYYY-MM-DD
   duration_hours?: number;
   notes?: string;
@@ -51,7 +51,7 @@ export interface CreateInterventionRequest {
 
 export interface UpdateInterventionRequest {
   intervention_type?: InterventionType;
-  description?: string;
+  notes?: string;
   intervention_date?: string;
   duration_hours?: number;
   status?: InterventionStatus;
@@ -108,7 +108,7 @@ export interface CalendarEvent {
   status: InterventionStatus;
   technician_name?: string;
   project_name: string;
-  description?: string;
+  notes?: string;
 }
 
 // Filtres pour recherche interventions

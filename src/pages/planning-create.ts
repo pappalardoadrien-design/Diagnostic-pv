@@ -215,13 +215,13 @@ export function getPlanningCreatePage() {
 
             <!-- Description / Notes -->
             <div>
-                <label for="description" class="block text-sm font-semibold text-gray-900 mb-2">
+                <label for="notes" class="block text-sm font-semibold text-gray-900 mb-2">
                     <i class="fas fa-comment-alt text-gray-600 mr-2"></i>
                     Description / Consignes (optionnel)
                 </label>
                 <textarea 
-                    id="description" 
-                    name="description"
+                    id="notes" 
+                    name="notes"
                     rows="4"
                     placeholder="Détails, consignes de sécurité, équipements nécessaires..."
                     class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -472,7 +472,7 @@ export function getPlanningCreatePage() {
                 intervention_type: document.getElementById('intervention_type').value,
                 intervention_date: document.getElementById('intervention_date').value,
                 duration_hours: parseFloat(document.getElementById('duration_hours').value) || null,
-                description: document.getElementById('description').value || null,
+                notes: document.getElementById('notes').value || null,
                 status: 'scheduled'
             };
 
