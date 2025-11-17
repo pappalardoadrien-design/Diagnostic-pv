@@ -653,6 +653,36 @@ app.get('/', (c) => {
                         </div>
                     </a>
                     
+                    <!-- Module CRM - OPÉRATIONNEL -->
+                    <a href="/crm/clients" class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-8 border-4 border-blue-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-blue-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-users text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE CRM</h3>
+                            <p class="text-lg text-blue-200 mb-3">Gestion Clients</p>
+                            <div class="bg-blue-500 text-white px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
+                            </div>
+                            <p class="text-sm text-blue-100">Gestion clients, sites et projets photovoltaïques</p>
+                        </div>
+                    </a>
+                    
+                    <!-- Module Planning - OPÉRATIONNEL -->
+                    <a href="/planning" class="bg-gradient-to-br from-purple-900 to-purple-700 rounded-lg p-8 border-4 border-purple-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-purple-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-calendar-alt text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-2xl font-black mb-2 text-white">MODULE PLANNING</h3>
+                            <p class="text-lg text-purple-200 mb-3">Interventions</p>
+                            <div class="bg-purple-500 text-white px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
+                            </div>
+                            <p class="text-sm text-purple-100">Planification audits et attribution techniciens</p>
+                        </div>
+                    </a>
+                    
                     <!-- Module I-V - À VENIR -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
                         <div class="text-center">
