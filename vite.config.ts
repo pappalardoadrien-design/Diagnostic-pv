@@ -10,5 +10,9 @@ export default defineConfig({
       adapter,
       entry: 'src/index.tsx'
     })
-  ]
+  ],
+  server: {
+    host: '0.0.0.0',
+    port: 3000
+  }
 })
