@@ -444,4 +444,203 @@ crmRoutes.delete('/contacts/:id', async (c) => {
   }
 });
 
+// ============================================================================
+// PROJECTS / SITES ROUTES
+// ============================================================================
+
+// GET /api/crm/projects - Liste tous les projets/sites
+crmRoutes.get('/projects', async (c) => {
+  try {
+    const { DB } = c.env;
+    
+    const result = await DB.prepare(`
+      SELECT * FROM projects ORDER BY created_at DESC
+    `).all();
+
+    return c.json({
+      success: true,
+      projects: result.results
+    });
+
+  } catch (error: any) {
+    console.error('GET /projects error:', error);
+    return c.json({ success: false, error: 'Erreur serveur' }, 500);
+  }
+});
+
+// GET /api/crm/projects/:id - Détails projet
+crmRoutes.get('/projects/:id', async (c) => {
+  try {
+    const { DB } = c.env;
+    const projectId = c.req.param('id');
+
+    const project = await DB.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `).bind(projectId).first();
+
+    if (!project) {
+      return c.json({ success: false, error: 'Projet non trouvé' }, 404);
+    }
+
+    return c.json({
+      success: true,
+      project
+    });
+
+  } catch (error: any) {
+    console.error('GET /projects/:id error:', error);
+    return c.json({ success: false, error: 'Erreur serveur' }, 500);
+  }
+});
+
+// GET /api/crm/clients/:id/projects - Liste projets d'un client
+crmRoutes.get('/clients/:id/projects', async (c) => {
+  try {
+    const { DB } = c.env;
+    const clientId = c.req.param('id');
+
+    const result = await DB.prepare(`
+      SELECT * FROM projects WHERE client_id = ? ORDER BY created_at DESC
+    `).bind(clientId).all();
+
+    return c.json({
+      success: true,
+      projects: result.results
+    });
+
+  } catch (error: any) {
+    console.error('GET /clients/:id/projects error:', error);
+    return c.json({ success: false, error: 'Erreur serveur' }, 500);
+  }
+});
+
+// POST /api/crm/projects - Créer un projet/site
+crmRoutes.post('/projects', async (c) => {
+  try {
+    const { DB } = c.env;
+    const body = await c.req.json();
+
+    if (!body.client_id || !body.project_name) {
+      return c.json({ success: false, error: 'client_id et project_name requis' }, 400);
+    }
+
+    const result = await DB.prepare(`
+      INSERT INTO projects (
+        client_id, project_name, total_power_kwp, module_count, module_type,
+        inverter_type, installation_date, status,
+        address_street, address_postal_code, address_city,
+        gps_latitude, gps_longitude, notes,
+        inverter_count, inverter_brand, junction_box_count,
+        strings_configuration, technical_notes,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).bind(
+      body.client_id,
+      body.project_name,
+      body.total_power_kwp,
+      body.module_count,
+      body.module_type,
+      body.inverter_type,
+      body.installation_date,
+      body.status || 'active',
+      body.address_street,
+      body.address_postal_code,
+      body.address_city,
+      body.gps_latitude,
+      body.gps_longitude,
+      body.notes,
+      body.inverter_count,
+      body.inverter_brand,
+      body.junction_box_count,
+      body.strings_configuration,
+      body.technical_notes
+    ).run();
+
+    const project = await DB.prepare('SELECT * FROM projects WHERE id = ?')
+      .bind(result.meta.last_row_id)
+      .first();
+
+    return c.json({
+      success: true,
+      project,
+      message: 'Projet créé avec succès'
+    });
+
+  } catch (error: any) {
+    console.error('POST /projects error:', error);
+    return c.json({ success: false, error: 'Erreur serveur: ' + error.message }, 500);
+  }
+});
+
+// PUT /api/crm/projects/:id - Modifier un projet
+crmRoutes.put('/projects/:id', async (c) => {
+  try {
+    const { DB } = c.env;
+    const projectId = c.req.param('id');
+    const body = await c.req.json();
+
+    await DB.prepare(`
+      UPDATE projects SET
+        project_name = ?, total_power_kwp = ?, module_count = ?, module_type = ?,
+        inverter_type = ?, installation_date = ?, status = ?,
+        address_street = ?, address_postal_code = ?, address_city = ?,
+        gps_latitude = ?, gps_longitude = ?, notes = ?,
+        inverter_count = ?, inverter_brand = ?, junction_box_count = ?,
+        strings_configuration = ?, technical_notes = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(
+      body.project_name,
+      body.total_power_kwp,
+      body.module_count,
+      body.module_type,
+      body.inverter_type,
+      body.installation_date,
+      body.status,
+      body.address_street,
+      body.address_postal_code,
+      body.address_city,
+      body.gps_latitude,
+      body.gps_longitude,
+      body.notes,
+      body.inverter_count,
+      body.inverter_brand,
+      body.junction_box_count,
+      body.strings_configuration,
+      body.technical_notes,
+      projectId
+    ).run();
+
+    return c.json({
+      success: true,
+      message: 'Projet modifié avec succès'
+    });
+
+  } catch (error: any) {
+    console.error('PUT /projects/:id error:', error);
+    return c.json({ success: false, error: 'Erreur serveur' }, 500);
+  }
+});
+
+// DELETE /api/crm/projects/:id - Supprimer un projet
+crmRoutes.delete('/projects/:id', async (c) => {
+  try {
+    const { DB } = c.env;
+    const projectId = c.req.param('id');
+
+    await DB.prepare('DELETE FROM projects WHERE id = ?')
+      .bind(projectId)
+      .run();
+
+    return c.json({
+      success: true,
+      message: 'Projet supprimé avec succès'
+    });
+
+  } catch (error: any) {
+    console.error('DELETE /projects/:id error:', error);
+    return c.json({ success: false, error: 'Erreur serveur' }, 500);
+  }
+});
+
 export default crmRoutes;

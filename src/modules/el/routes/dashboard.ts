@@ -17,21 +17,35 @@ const dashboardRouter = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
 // GET /api/el/dashboard/audits - Liste tous les audits avec statistiques
+// Supporte filtre ?intervention_id=X pour retrouver audits liés à une intervention
 // ============================================================================
 dashboardRouter.get('/audits', async (c) => {
   const { env } = c
+  const interventionId = c.req.query('intervention_id')
   
   try {
-    // Utilisation de la vue précalculée + données additionnelles de el_audits
-    const audits = await env.DB.prepare(`
+    let query = `
       SELECT 
         v.*,
         ea.location,
-        ea.string_count
+        ea.string_count,
+        ea.intervention_id
       FROM v_el_audit_statistics v
       LEFT JOIN el_audits ea ON v.audit_id = ea.id
-      ORDER BY v.created_at DESC
-    `).all()
+    `
+    
+    // Filtre par intervention_id si fourni
+    if (interventionId) {
+      query += ` WHERE ea.intervention_id = ?`
+    }
+    
+    query += ` ORDER BY v.created_at DESC`
+    
+    const statement = interventionId 
+      ? env.DB.prepare(query).bind(parseInt(interventionId))
+      : env.DB.prepare(query)
+    
+    const audits = await statement.all()
     
     // Calcul statistiques globales
     let totalAudits = 0

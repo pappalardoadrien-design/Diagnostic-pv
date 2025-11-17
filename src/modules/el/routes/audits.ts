@@ -226,6 +226,185 @@ auditsRouter.post('/create-from-json', async (c) => {
 })
 
 // ============================================================================
+// POST /api/el/audits/create-from-intervention - Créer audit depuis intervention Planning
+// Récupère les données de l'intervention (client, projet, site) et crée un audit EL automatiquement
+// HÉRITE la configuration PV du site (onduleurs, BJ, strings) pour pré-remplir l'audit
+// ============================================================================
+auditsRouter.post('/create-from-intervention', async (c) => {
+  const { env } = c
+  const { intervention_id } = await c.req.json()
+  
+  if (!intervention_id) {
+    return c.json({ error: 'intervention_id requis' }, 400)
+  }
+  
+  try {
+    // 1. Charger l'intervention avec les données client et projet + CONFIGURATION PV
+    const intervention = await env.DB.prepare(`
+      SELECT 
+        i.id,
+        i.intervention_date,
+        i.intervention_type,
+        i.project_id,
+        i.client_id,
+        p.project_name,
+        p.module_count,
+        p.total_power_kwp,
+        p.address_street,
+        p.address_postal_code,
+        p.address_city,
+        p.inverter_count,
+        p.inverter_brand,
+        p.junction_box_count,
+        p.strings_configuration,
+        p.technical_notes,
+        c.company_name as client_name
+      FROM interventions i
+      LEFT JOIN projects p ON i.project_id = p.id
+      LEFT JOIN crm_clients c ON i.client_id = c.id
+      WHERE i.id = ?
+    `).bind(intervention_id).first()
+    
+    if (!intervention) {
+      return c.json({ error: 'Intervention non trouvée' }, 404)
+    }
+    
+    // 2. Vérifier qu'un audit EL n'existe pas déjà pour cette intervention
+    const existingAudit = await env.DB.prepare(`
+      SELECT audit_token FROM el_audits WHERE intervention_id = ?
+    `).bind(intervention_id).first()
+    
+    if (existingAudit) {
+      return c.json({ 
+        error: 'Un audit EL existe déjà pour cette intervention',
+        audit_token: existingAudit.audit_token
+      }, 409)
+    }
+    
+    // 3. Parser la configuration PV du site (strings_configuration)
+    let stringsConfig: any = null
+    let totalModules = intervention.module_count || 0
+    let stringCount = 0
+    let configJson: string | null = null
+    
+    if (intervention.strings_configuration) {
+      try {
+        stringsConfig = JSON.parse(intervention.strings_configuration)
+        
+        // Format attendu: {"mode": "advanced", "strings": [{mpptNumber, moduleCount, id}, ...]}
+        if (stringsConfig.mode === 'advanced' && stringsConfig.strings) {
+          // Calculer total modules depuis config
+          totalModules = stringsConfig.strings.reduce((sum: number, s: any) => sum + (s.moduleCount || 0), 0)
+          stringCount = stringsConfig.strings.length
+          configJson = intervention.strings_configuration
+        }
+      } catch (parseError) {
+        console.warn('Erreur parsing strings_configuration, fallback mode simple:', parseError)
+        stringsConfig = null
+      }
+    }
+    
+    // 4. Créer l'audit EL avec les données de l'intervention + config PV
+    const auditToken = crypto.randomUUID()
+    const projectName = intervention.project_name || 'Projet sans nom'
+    const clientName = intervention.client_name || 'Client sans nom'
+    const location = [
+      intervention.address_street,
+      intervention.address_postal_code,
+      intervention.address_city
+    ].filter(Boolean).join(', ') || 'Localisation non renseignée'
+    
+    await env.DB.prepare(`
+      INSERT INTO el_audits (
+        audit_token, project_name, client_name, location,
+        intervention_id, total_modules,
+        string_count, modules_per_string,
+        configuration_json, inverter_count, junction_boxes,
+        status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+    `).bind(
+      auditToken, projectName, clientName, location,
+      intervention_id, totalModules,
+      stringCount, configJson,
+      intervention.inverter_count || null,
+      intervention.junction_box_count || null
+    ).run()
+    
+    // 5. Récupérer l'audit créé avec ID
+    const auditResult = await env.DB.prepare(`
+      SELECT id FROM el_audits WHERE audit_token = ?
+    `).bind(auditToken).first()
+    
+    const auditId = auditResult ? (auditResult as any).id : null
+    
+    if (!auditId) {
+      throw new Error('Impossible de récupérer l\'ID de l\'audit créé')
+    }
+    
+    // 6. Générer les modules EL selon la configuration strings héritée du site
+    let modulesCreated = 0
+    
+    if (stringsConfig && stringsConfig.mode === 'advanced' && stringsConfig.strings) {
+      // Mode avancé: génération selon configuration strings du site
+      for (const stringConfig of stringsConfig.strings) {
+        if (stringConfig.moduleCount > 0) {
+          const stringNumber = stringConfig.mpptNumber || stringConfig.id
+          
+          for (let modulePos = 1; modulePos <= stringConfig.moduleCount; modulePos++) {
+            const moduleIdentifier = `S${stringNumber}-${modulePos}`
+            
+            await env.DB.prepare(`
+              INSERT INTO el_modules (
+                el_audit_id, audit_token, module_identifier, 
+                string_number, position_in_string,
+                defect_type, severity_level, physical_row, physical_col,
+                created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, datetime('now'), datetime('now'))
+            `).bind(
+              auditId,
+              auditToken, 
+              moduleIdentifier, 
+              stringNumber, 
+              modulePos,
+              stringNumber, // physical_row = stringNumber par défaut
+              modulePos - 1 // physical_col = position - 1
+            ).run()
+            
+            modulesCreated++
+          }
+        }
+      }
+      
+      console.log(`✅ ${modulesCreated} modules EL créés depuis configuration site (${stringsConfig.strings.length} strings)`)
+    } else {
+      // Fallback: pas de configuration ou mode simple
+      console.log('⚠️ Aucune configuration strings détaillée, modules non générés automatiquement')
+    }
+    
+    return c.json({
+      success: true,
+      audit: {
+        audit_token: auditToken,
+        project_name: projectName,
+        client_name: clientName,
+        location: location,
+        total_modules: totalModules,
+        intervention_id: intervention_id,
+        inverter_count: intervention.inverter_count,
+        junction_box_count: intervention.junction_box_count,
+        modules_created: modulesCreated,
+        configuration_inherited: !!stringsConfig
+      },
+      message: `Audit EL créé depuis intervention avec succès${modulesCreated > 0 ? ` (${modulesCreated} modules générés)` : ''}`
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur création audit depuis intervention:', error)
+    return c.json({ error: 'Erreur création audit: ' + error.message }, 500)
+  }
+})
+
+// ============================================================================
 // GET /api/el/audit/:token - Récupérer les informations d'un audit
 // ============================================================================
 auditsRouter.get('/:token', async (c) => {

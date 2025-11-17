@@ -394,9 +394,10 @@ export function getPlanningDetailPage() {
         // Charger audit EL associé
         async function loadAssociatedAudit() {
             try {
-                const response = await fetch(\`/api/el/audits?intervention_id=\${interventionId}\`);
+                const response = await fetch(\`/api/el/dashboard/audits?intervention_id=\${interventionId}\`);
                 const data = await response.json();
 
+                // Si audit existe déjà, l'afficher
                 if (data.success && data.audits && data.audits.length > 0) {
                     const audit = data.audits[0];
                     document.getElementById('auditCard').classList.remove('hidden');
@@ -453,9 +454,75 @@ export function getPlanningDetailPage() {
                             </a>
                         </div>
                     \`;
+                } else {
+                    // Si pas d'audit et intervention type=el, afficher bouton création
+                    if (currentIntervention && currentIntervention.intervention_type === 'el') {
+                        document.getElementById('auditCard').classList.remove('hidden');
+                        document.getElementById('auditInfo').innerHTML = \`
+                            <div class="p-8 text-center">
+                                <i class="fas fa-microscope text-gray-300 text-6xl mb-4"></i>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                                    Aucun audit EL créé pour cette intervention
+                                </h3>
+                                <p class="text-gray-600 mb-6">
+                                    Créez un audit électroluminescence pour commencer le diagnostic
+                                </p>
+                                <button 
+                                    id="btnCreateAudit"
+                                    class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg shadow-md"
+                                >
+                                    <i class="fas fa-plus-circle mr-2"></i>
+                                    Créer l'audit EL
+                                </button>
+                            </div>
+                        \`;
+
+                        // Ajouter event listener pour création
+                        document.getElementById('btnCreateAudit').addEventListener('click', createAuditFromIntervention);
+                    }
                 }
             } catch (error) {
                 console.error('Erreur chargement audit:', error);
+            }
+        }
+
+        // Créer audit EL depuis intervention
+        async function createAuditFromIntervention() {
+            if (!currentIntervention) {
+                alert('Erreur: Données intervention manquantes');
+                return;
+            }
+
+            const confirmCreate = confirm(\`Créer un audit EL pour cette intervention ?\n\nClient: \${currentIntervention.client_name || 'N/A'}\nSite: \${currentIntervention.project_name || 'N/A'}\nDate: \${new Date(currentIntervention.intervention_date).toLocaleDateString('fr-FR')}\`);
+            
+            if (!confirmCreate) return;
+
+            try {
+                const response = await fetch('/api/el/audit/create-from-intervention', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        intervention_id: parseInt(interventionId)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Erreur création audit');
+                }
+
+                alert('Audit EL créé avec succès !');
+                
+                // Ouvrir l'audit dans un nouvel onglet
+                window.open(\`/el/audit?token=\${data.audit.audit_token}\`, '_blank');
+                
+                // Recharger l'affichage
+                loadAssociatedAudit();
+
+            } catch (error) {
+                console.error('Erreur création audit:', error);
+                alert('Erreur: ' + error.message);
             }
         }
 

@@ -8,6 +8,7 @@ import adminAuthRoutes from './modules/auth/admin-routes'
 import assignmentsRoutes from './modules/auth/assignments-routes'
 import crmRoutes from './modules/crm/routes'
 import planningRoutes from './modules/planning/routes'
+import unifiedModulesRoutes from './modules/unified-modules-routes'
 import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
 import { getAdminUsersPage } from './pages/admin-users'
@@ -16,6 +17,14 @@ import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getPlanningDetailPage } from './pages/planning-detail'
 import { getPlanningCalendarPage } from './pages/planning-calendar'
+import { getCrmClientsListPage } from './pages/crm-clients-list'
+import { getCrmClientsCreatePage } from './pages/crm-clients-create'
+import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
+import { getCrmClientsEditPage } from './pages/crm-clients-edit'
+import { getCrmProjectsListPage } from './pages/crm-projects-list'
+import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
+import { getCrmProjectsDetailPage } from './pages/crm-projects-detail'
+import { getCrmProjectsEditPage } from './pages/crm-projects-edit'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -56,6 +65,12 @@ app.route('/api/planning', planningRoutes)
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
 // ============================================================================
 app.route('/api/el', elModule)
+
+// ============================================================================
+// MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)
+// Vue unifiée de tous les diagnostics d'un module physique
+// ============================================================================
+app.route('/api/modules', unifiedModulesRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
@@ -107,7 +122,7 @@ app.post('/api/audit/:token/parse-pvserv', async (c) => {
   }
 })
 
-// Sauvegarder mesures PVserv
+// Sauvegarder mesures PVserv avec génération automatique module_identifier
 app.post('/api/audit/:token/save-measurements', async (c) => {
   const { env } = c
   const token = c.req.param('token')
@@ -123,18 +138,46 @@ app.post('/api/audit/:token/save-measurements', async (c) => {
       'DELETE FROM pvserv_measurements WHERE audit_token = ?'
     ).bind(token).run()
 
-    // Insertion nouvelles mesures
+    // Insertion nouvelles mesures avec génération module_identifier
     const parser = new PVservParser()
     const dbData = parser.formatForDatabase(measurements, token)
 
+    let linkedCount = 0
+    let unlinkedCount = 0
+
     for (const measurement of dbData) {
+      // Génération module_identifier depuis string_number + module_number
+      const moduleIdentifier = measurement.string_number && measurement.module_number
+        ? `S${measurement.string_number}-${measurement.module_number}`
+        : null
+
+      // Vérifier si ce module existe dans el_modules
+      let elModuleExists = false
+      if (moduleIdentifier) {
+        const elModule = await env.DB.prepare(`
+          SELECT id FROM el_modules 
+          WHERE audit_token = ? AND module_identifier = ?
+        `).bind(token, moduleIdentifier).first()
+        
+        elModuleExists = !!elModule
+        if (elModuleExists) {
+          linkedCount++
+        } else {
+          unlinkedCount++
+        }
+      } else {
+        unlinkedCount++
+      }
+
       await env.DB.prepare(`
         INSERT INTO pvserv_measurements (
-          audit_token, string_number, module_number, ff, rds, uf,
+          audit_token, string_number, module_number, module_identifier,
+          ff, rds, uf,
           measurement_type, iv_curve_data, raw_line, line_number, valid
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         measurement.audit_token, measurement.string_number, measurement.module_number,
+        moduleIdentifier, // NOUVEAU: module_identifier généré
         measurement.ff, measurement.rds, measurement.uf, measurement.measurement_type,
         measurement.iv_curve_data, measurement.raw_line, measurement.line_number,
         measurement.valid ? 1 : 0
@@ -143,10 +186,15 @@ app.post('/api/audit/:token/save-measurements', async (c) => {
 
     return c.json({ 
       success: true, 
-      saved: dbData.length 
+      saved: dbData.length,
+      linked_to_el_modules: linkedCount,
+      unlinked: unlinkedCount,
+      message: linkedCount > 0 
+        ? `✅ ${linkedCount}/${dbData.length} mesures liées à des modules EL existants`
+        : `⚠️ Aucun module EL trouvé pour cet audit (${unlinkedCount} mesures non liées)`
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erreur sauvegarde mesures:', error)
     return c.json({ 
       error: 'Erreur sauvegarde: ' + error.message 
@@ -279,6 +327,70 @@ app.get('/planning/detail', (c) => {
 // ============================================================================
 app.get('/planning/calendar', (c) => {
   return c.html(getPlanningCalendarPage())
+})
+
+// ============================================================================
+// PAGE CRM CLIENTS LIST - LISTE CLIENTS
+// Interface CRM centralisée avec stats, recherche, filtres et CRUD
+// ============================================================================
+app.get('/crm/clients', (c) => {
+  return c.html(getCrmClientsListPage())
+})
+
+// ============================================================================
+// PAGE CRM CLIENTS CREATE - CRÉER CLIENT
+// Formulaire création client avec infos société, contact, adresse
+// ============================================================================
+app.get('/crm/clients/create', (c) => {
+  return c.html(getCrmClientsCreatePage())
+})
+
+// ============================================================================
+// PAGE CRM CLIENTS DETAIL - DÉTAIL CLIENT
+// Vue complète avec sites, contacts, interventions et audits
+// ============================================================================
+app.get('/crm/clients/detail', (c) => {
+  return c.html(getCrmClientsDetailPage())
+})
+
+// ============================================================================
+// PAGE CRM CLIENTS EDIT - MODIFIER CLIENT
+// Formulaire édition pré-rempli avec validation
+// ============================================================================
+app.get('/crm/clients/edit', (c) => {
+  return c.html(getCrmClientsEditPage())
+})
+
+// ============================================================================
+// PAGE CRM PROJECTS LIST - LISTE SITES/PROJETS
+// Vue d'ensemble tous sites avec stats et filtres
+// ============================================================================
+app.get('/crm/projects', (c) => {
+  return c.html(getCrmProjectsListPage())
+})
+
+// ============================================================================
+// PAGE CRM PROJECTS CREATE - CRÉER SITE/PROJET
+// Formulaire création site lié à client
+// ============================================================================
+app.get('/crm/projects/create', (c) => {
+  return c.html(getCrmProjectsCreatePage())
+})
+
+// ============================================================================
+// PAGE CRM PROJECTS DETAIL - DÉTAIL SITE/PROJET
+// Vue complète avec interventions et audits
+// ============================================================================
+app.get('/crm/projects/detail', (c) => {
+  return c.html(getCrmProjectsDetailPage())
+})
+
+// ============================================================================
+// PAGE CRM PROJECTS EDIT - MODIFIER SITE/PROJET
+// Formulaire édition site pré-rempli
+// ============================================================================
+app.get('/crm/projects/edit', (c) => {
+  return c.html(getCrmProjectsEditPage())
 })
 
 // ============================================================================
