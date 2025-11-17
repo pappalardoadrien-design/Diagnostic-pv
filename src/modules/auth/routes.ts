@@ -20,6 +20,7 @@ import {
   getUserAgent,
   isStrongPassword
 } from './utils';
+import { checkRateLimit, resetRateLimit, getRateLimitStatus } from './rate-limiter';
 import type { 
   Bindings, 
   LoginRequest, 
@@ -40,6 +41,19 @@ authRoutes.post('/login', async (c) => {
     const { DB, KV } = c.env;
     const body = await c.req.json<LoginRequest>();
     const { email, password, remember_me = false } = body;
+
+    // ⚡ PROTECTION RATE LIMITING (brute-force)
+    const ipAddress = getClientIP(c.req.raw);
+    
+    if (!checkRateLimit(ipAddress)) {
+      const status = getRateLimitStatus(ipAddress);
+      console.warn(`[AUTH] Rate limit dépassé pour IP ${ipAddress} (${status.totalAttempts} tentatives)`);
+      
+      return c.json<LoginResponse>({ 
+        success: false, 
+        message: `Trop de tentatives de connexion. Réessayez dans ${Math.ceil(status.resetInSeconds / 60)} minutes.`,
+      }, 429);
+    }
 
     // Validation
     if (!email || !password) {
@@ -65,16 +79,19 @@ authRoutes.post('/login', async (c) => {
     // Vérifier mot de passe
     const passwordValid = await verifyPassword(password, user.password_hash);
     if (!passwordValid) {
+      // ⚠️ Ne PAS reset le rate limit en cas d'échec (c'est le but)
       return c.json<LoginResponse>({ 
         success: false, 
         message: 'Email ou mot de passe incorrect' 
       }, 401);
     }
 
+    // ✅ Mot de passe valide : reset rate limit pour cette IP
+    resetRateLimit(ipAddress);
+
     // Générer session
     const sessionToken = generateSessionToken();
     const expiresAt = getSessionExpiry(remember_me);
-    const ipAddress = getClientIP(c.req.raw);
     const userAgent = getUserAgent(c.req.raw);
 
     // Sauvegarder session en DB
