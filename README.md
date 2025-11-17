@@ -136,7 +136,7 @@ diagnostic-hub/
 ## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production**: https://925dfced.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
+- **Production**: https://e66e71cb.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT (17/11/2025 - Phase 6 Auth)**
 - **Domaine principal**: https://diagnostic-hub.pages.dev
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
@@ -276,6 +276,55 @@ curl http://localhost:3000
 - **Validation** complète inputs utilisateur
 - **Logging** détaillé pour debug production
 
+## 🔐 Système d'Authentification (Phase 6)
+
+### Vue d'ensemble
+Système d'authentification multi-rôles pour gestion de 20+ sous-traitants avec permissions granulaires sur audits EL.
+
+**Statut** : ✅ Déployé en production (AUTH_ENABLED=false par défaut)  
+**Documentation complète** : `AUTH_SYSTEM_STATUS.md`
+
+### Fonctionnalités
+- **4 rôles** : admin, subcontractor, client, auditor
+- **Permissions granulaires** : can_view, can_edit, can_delete par audit
+- **Session management** : Token UUID v4 + KV cache
+- **Activity logs** : Traçabilité complète (audit trail)
+- **Soft delete** : Préservation historique
+
+### Pages Web
+- `/login` - Authentification
+- `/change-password` - Changement mot de passe avec indicateur force
+- `/admin/users` - Gestion utilisateurs (CRUD)
+- `/admin/assignments` - Assignation sous-traitants aux audits
+
+### API Routes
+- **Auth** : `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`
+- **Admin Users** : `/api/auth/admin/users` (GET/POST/PUT/DELETE)
+- **Assignments** : `/api/auth/admin/assignments` (GET/POST/PUT/DELETE)
+
+### Base de Données
+- `auth_users` - Utilisateurs (1 admin créé)
+- `sessions` - Sessions actives
+- `audit_assignments` - Assignations audit ↔ user
+- `activity_logs` - Logs d'activité
+
+### Compte Admin Initial
+- **Email** : a.pappalardo@diagnosticphotovoltaique.fr
+- **Password temporaire** : DiagPV2025!Temp
+- **Must change password** : ✅ Oui
+
+### ⚠️ Avant Activation (AUTH_ENABLED=true)
+1. Remplacer hash SHA-256 par bcrypt (voir AUTH_SYSTEM_STATUS.md)
+2. Configurer SESSION_SECRET et JWT_SECRET
+3. Tester workflow complet avec sous-traitants tests
+4. Ajouter rate limiting sur /login
+
+### Activation
+```typescript
+// src/modules/auth/middleware.ts
+export const AUTH_ENABLED = true; // Passer à true
+```
+
 ## 📋 Roadmap Modules Futurs
 
 ### Module I-V (Courbes I-V) - Priorité 1
@@ -325,17 +374,20 @@ curl http://localhost:3000
 - `SCHEMA_D1_UNIFIE_DOCUMENTATION.md` - Schéma database complet
 - `EXPORT_DONNEES_PRODUCTION_2025-10-27.md` - Export données migration
 - `VALIDATION_MIGRATION_2025-10-27.md` - Rapport validation 100%
+- `AUTH_SYSTEM_STATUS.md` - Documentation système authentification complet ✅ **NOUVEAU**
 - `src/modules/README.md` - Guide architecture modulaire
 - `src/modules/el/README.md` - Documentation Module EL
 
 ## 🎯 Statut Projet
 
-### Production (27/10/2025)
-- **État**: ✅ **PRODUCTION OPÉRATIONNELLE**
+### Production (17/11/2025)
+- **État**: ✅ **PRODUCTION OPÉRATIONNELLE + SYSTÈME AUTH DÉPLOYÉ**
 - **Module EL**: 100% fonctionnel avec données réelles
-- **Tests**: Validation complète fonctionnalités critiques
+- **Authentification**: Système multi-rôles déployé (désactivé par défaut)
+- **Tests**: Validation complète fonctionnalités critiques + auth API
 - **Migration**: 462 modules migrés avec intégrité 100%
 - **Architecture**: Monolithe modulaire prêt pour 5 modules futurs
+- **Utilisateurs**: 1 admin créé (a.pappalardo@diagnosticphotovoltaique.fr)
 
 ### Validation Métier
 - **Spécifications**: 100% requirements DiagPV Module EL
@@ -350,5 +402,5 @@ curl http://localhost:3000
 
 **Diagnostic Photovoltaïque** - www.diagnosticphotovoltaique.fr
 
-*Version 1.0.0 - Dernière mise à jour: 27 octobre 2025*
-*Tag: v1.0.0-unified-platform*
+*Version 1.1.0 - Dernière mise à jour: 17 novembre 2025*  
+*Tag: v1.1.0-auth-system (Phase 6 - Authentification Multi-rôles)*
