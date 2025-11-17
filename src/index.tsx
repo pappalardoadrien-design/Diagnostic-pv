@@ -695,20 +695,20 @@ app.get('/', (c) => {
                         </div>
                     </a>
                     
-                    <!-- Module I-V - À VENIR -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module I-V - OPÉRATIONNEL -->
+                    <a href="/iv" class="bg-gradient-to-br from-orange-900 to-orange-700 rounded-lg p-8 border-4 border-orange-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-orange-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-chart-line text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE I-V</h3>
-                            <p class="text-lg text-gray-300 mb-3">Courbes I-V</p>
-                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            <p class="text-lg text-orange-200 mb-3">Courbes I-V</p>
+                            <div class="bg-orange-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Mesures électriques et analyse performances</p>
+                            <p class="text-sm text-orange-100">Import PVserv, mesures électriques et analyse performances</p>
                         </div>
-                    </div>
+                    </a>
                     
                     <!-- Module Thermographie -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
@@ -725,35 +725,35 @@ app.get('/', (c) => {
                         </div>
                     </div>
                     
-                    <!-- Module Visuels -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module Visuels - OPÉRATIONNEL -->
+                    <a href="/visual" class="bg-gradient-to-br from-teal-900 to-teal-700 rounded-lg p-8 border-4 border-teal-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-teal-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-eye text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE VISUELS</h3>
-                            <p class="text-lg text-gray-300 mb-3">Contrôles Visuels</p>
-                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            <p class="text-lg text-teal-200 mb-3">Contrôles Visuels</p>
+                            <div class="bg-teal-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Inspection visuelle et défauts mécaniques</p>
+                            <p class="text-sm text-teal-100">Inspection visuelle terrain et défauts mécaniques</p>
                         </div>
-                    </div>
+                    </a>
                     
-                    <!-- Module Isolation -->
-                    <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
+                    <!-- Module Isolation - OPÉRATIONNEL -->
+                    <a href="/isolation" class="bg-gradient-to-br from-red-900 to-red-700 rounded-lg p-8 border-4 border-red-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
                         <div class="text-center">
-                            <div class="bg-gray-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <div class="bg-red-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
                                 <i class="fas fa-bolt text-4xl text-white"></i>
                             </div>
                             <h3 class="text-2xl font-black mb-2 text-white">MODULE ISOLATION</h3>
-                            <p class="text-lg text-gray-300 mb-3">Tests d'Isolation</p>
-                            <div class="bg-yellow-500 text-black px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-clock mr-1"></i> PROCHAINEMENT
+                            <p class="text-lg text-red-200 mb-3">Tests d'Isolation</p>
+                            <div class="bg-red-500 text-white px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
+                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
-                            <p class="text-sm text-gray-300">Mesures résistance isolation et défauts électriques</p>
+                            <p class="text-sm text-red-100">Mesures résistance isolation et défauts électriques</p>
                         </div>
-                    </div>
+                    </a>
                     
                     <!-- Module Expertise Post-Sinistre -->
                     <div class="bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-500 opacity-75">
@@ -1007,6 +1007,180 @@ app.get('/el', (c) => {
         </div>
 
         <script src="/static/diagpv-app.js"></script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// PAGE MODULE I-V - COURBES I-V
+// ============================================================================
+app.get('/iv', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module I-V - Courbes I-V</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-black text-white min-h-screen font-bold">
+        <div class="container mx-auto p-6">
+            <div class="mb-6">
+                <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Retour au Diagnostic Hub
+                </a>
+            </div>
+            
+            <header class="mb-8 text-center">
+                <div class="inline-flex items-center mb-4">
+                    <i class="fas fa-chart-line text-4xl text-orange-400 mr-4"></i>
+                    <h1 class="text-4xl font-black">MODULE I-V - COURBES I-V</h1>
+                </div>
+                <p class="text-xl text-gray-300">Mesures Électriques & Analyse Performances</p>
+            </header>
+            
+            <div class="max-w-4xl mx-auto bg-gray-900 rounded-lg p-8 border-2 border-orange-400">
+                <div class="text-center">
+                    <i class="fas fa-tools text-6xl text-orange-400 mb-6"></i>
+                    <h2 class="text-3xl font-black mb-4">Interface en construction</h2>
+                    <p class="text-xl text-gray-300 mb-6">L'API est opérationnelle, l'interface utilisateur arrive bientôt !</p>
+                    <p class="text-lg text-gray-400 mb-8">
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Import CSV PVserv
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Auto-liaison modules EL
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Génération rapports PDF
+                    </p>
+                    <a href="/" class="inline-block bg-orange-600 hover:bg-orange-700 px-8 py-4 rounded-lg font-black text-lg">
+                        <i class="fas fa-home mr-2"></i>
+                        Retour au Hub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// PAGE MODULE VISUELS - CONTRÔLES VISUELS
+// ============================================================================
+app.get('/visual', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module Visuels - Contrôles Visuels</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-black text-white min-h-screen font-bold">
+        <div class="container mx-auto p-6">
+            <div class="mb-6">
+                <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Retour au Diagnostic Hub
+                </a>
+            </div>
+            
+            <header class="mb-8 text-center">
+                <div class="inline-flex items-center mb-4">
+                    <i class="fas fa-eye text-4xl text-teal-400 mr-4"></i>
+                    <h1 class="text-4xl font-black">MODULE VISUELS - CONTRÔLES VISUELS</h1>
+                </div>
+                <p class="text-xl text-gray-300">Inspection Visuelle & Défauts Mécaniques</p>
+            </header>
+            
+            <div class="max-w-4xl mx-auto bg-gray-900 rounded-lg p-8 border-2 border-teal-400">
+                <div class="text-center">
+                    <i class="fas fa-tools text-6xl text-teal-400 mb-6"></i>
+                    <h2 class="text-3xl font-black mb-4">Interface en construction</h2>
+                    <p class="text-xl text-gray-300 mb-6">L'API est opérationnelle, l'interface utilisateur arrive bientôt !</p>
+                    <p class="text-lg text-gray-400 mb-8">
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Saisie observations terrain
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Photos géolocalisées
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Génération rapports PDF
+                    </p>
+                    <a href="/" class="inline-block bg-teal-600 hover:bg-teal-700 px-8 py-4 rounded-lg font-black text-lg">
+                        <i class="fas fa-home mr-2"></i>
+                        Retour au Hub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================================================
+// PAGE MODULE ISOLATION - TESTS D'ISOLATION
+// ============================================================================
+app.get('/isolation', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module Isolation - Tests d'Isolation</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-black text-white min-h-screen font-bold">
+        <div class="container mx-auto p-6">
+            <div class="mb-6">
+                <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Retour au Diagnostic Hub
+                </a>
+            </div>
+            
+            <header class="mb-8 text-center">
+                <div class="inline-flex items-center mb-4">
+                    <i class="fas fa-bolt text-4xl text-red-400 mr-4"></i>
+                    <h1 class="text-4xl font-black">MODULE ISOLATION - TESTS D'ISOLATION</h1>
+                </div>
+                <p class="text-xl text-gray-300">Mesures Résistance Isolation & Défauts Électriques</p>
+            </header>
+            
+            <div class="max-w-4xl mx-auto bg-gray-900 rounded-lg p-8 border-2 border-red-400">
+                <div class="text-center">
+                    <i class="fas fa-tools text-6xl text-red-400 mb-6"></i>
+                    <h2 class="text-3xl font-black mb-4">Interface en construction</h2>
+                    <p class="text-xl text-gray-300 mb-6">L'API est opérationnelle, l'interface utilisateur arrive bientôt !</p>
+                    <p class="text-lg text-gray-400 mb-8">
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Tests DC/AC terrain
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Seuils automatiques
+                        <br>
+                        <i class="fas fa-check-circle text-green-400 mr-2"></i>
+                        Génération rapports PDF
+                    </p>
+                    <a href="/" class="inline-block bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-black text-lg">
+                        <i class="fas fa-home mr-2"></i>
+                        Retour au Hub
+                    </a>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
   `)
