@@ -265,6 +265,32 @@ crmRoutes.delete('/clients/:id', async (c) => {
 });
 
 // ============================================================================
+// GET /api/crm/clients/:id/projects - Projets du client
+// ============================================================================
+crmRoutes.get('/clients/:id/projects', async (c) => {
+  try {
+    const { DB } = c.env;
+    const clientId = c.req.param('id');
+
+    const projects = await DB.prepare(`
+      SELECT * FROM projects 
+      WHERE client_id = ?
+      ORDER BY created_at DESC
+    `).bind(clientId).all();
+
+    return c.json({
+      success: true,
+      projects: projects.results,
+      total: projects.results.length
+    });
+
+  } catch (error: any) {
+    console.error('GET /clients/:id/projects error:', error);
+    return c.json({ success: false, message: 'Erreur serveur' }, 500);
+  }
+});
+
+// ============================================================================
 // GET /api/crm/clients/:id/audits - Audits du client
 // ============================================================================
 crmRoutes.get('/clients/:id/audits', async (c) => {

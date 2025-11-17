@@ -12,6 +12,8 @@ import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
 import { getAdminUsersPage } from './pages/admin-users'
 import { getAdminAssignmentsPage } from './pages/admin-assignments'
+import { getPlanningDashboardPage } from './pages/planning-dashboard'
+import { getPlanningCreatePage } from './pages/planning-create'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -243,6 +245,22 @@ app.get('/admin/users', (c) => {
 // ============================================================================
 app.get('/admin/assignments', (c) => {
   return c.html(getAdminAssignmentsPage())
+})
+
+// ============================================================================
+// PAGE PLANNING DASHBOARD - PLANNING & ATTRIBUTION SOUS-TRAITANTS
+// Interface planning/calendrier avec filtres et statistiques temps réel
+// ============================================================================
+app.get('/planning', (c) => {
+  return c.html(getPlanningDashboardPage())
+})
+
+// ============================================================================
+// PAGE PLANNING CREATE - CRÉATION INTERVENTION
+// Formulaire avec selects dynamiques CRM → Projets → Techniciens + conflits
+// ============================================================================
+app.get('/planning/create', (c) => {
+  return c.html(getPlanningCreatePage())
 })
 
 // ============================================================================
@@ -569,7 +587,7 @@ app.get('/', (c) => {
                         <i class="fas fa-rocket mr-2 text-green-400"></i>
                         ACCÈS RAPIDES
                     </h2>
-                    <div class="grid md:grid-cols-2 gap-6">
+                    <div class="grid md:grid-cols-3 gap-6">
                         <div class="bg-gray-800 rounded-lg p-6 border border-green-400 hover:bg-gray-750 transition-colors">
                             <h3 class="text-xl font-bold mb-3 text-green-400 flex items-center">
                                 <i class="fas fa-plus-circle mr-2"></i>
@@ -579,6 +597,18 @@ app.get('/', (c) => {
                             <a href="/el" class="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
                                 <i class="fas fa-moon mr-2"></i>
                                 CRÉER AUDIT EL
+                            </a>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-blue-400 hover:bg-gray-750 transition-colors">
+                            <h3 class="text-xl font-bold mb-3 text-blue-400 flex items-center">
+                                <i class="fas fa-calendar-alt mr-2"></i>
+                                PLANNING
+                            </h3>
+                            <p class="text-gray-300 mb-4">Planifier interventions et attribuer sous-traitants</p>
+                            <a href="/planning" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-black text-lg transition-colors flex items-center justify-center">
+                                <i class="fas fa-calendar-check mr-2"></i>
+                                ACCÉDER AU PLANNING
                             </a>
                         </div>
                         
