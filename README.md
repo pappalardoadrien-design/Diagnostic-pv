@@ -9,6 +9,9 @@
 ```
 diagnostic-hub/
 ├── src/modules/
+│   ├── auth/            ✅ Authentification Multi-role (OPÉRATIONNEL)
+│   ├── crm/             ✅ Gestion Clients CRM (OPÉRATIONNEL)
+│   ├── planning/        ✅ Planning & Attribution (OPÉRATIONNEL - Phase 7)
 │   ├── el/              ✅ Électroluminescence (OPÉRATIONNEL)
 │   ├── iv/              🔜 Courbes I-V
 │   ├── thermique/       🔜 Thermographie
@@ -17,6 +20,45 @@ diagnostic-hub/
 │   └── expertise/       🔜 Expertise post-sinistre
 └── Database D1 unifiée (diagnostic-hub-production)
 ```
+
+## 🆕 Module Planning - Planning & Attribution (Phase 7 ✅)
+
+### Fonctionnalités Complètes
+
+#### 📊 Planning Dashboard
+- **Statistiques temps réel** : Total, planifiées, en cours, terminées, annulées
+- **Filtres avancés** : Statut, type, période, non assignées
+- **Table dynamique** : Liste interventions avec navigation
+- **Auto-refresh 30s** : Stats mises à jour automatiquement
+
+#### ➕ Création Intervention Dynamique
+- **Workflow guidé 5 étapes** :
+  1. Sélection Client CRM (dropdown)
+  2. Sélection Projet (cascading select dynamique)
+  3. Affichage infos projet (localisation, puissance)
+  4. Type intervention + Date + Durée
+  5. Sélection technicien disponible (cascading select)
+- **Détection conflits automatique** : Avertissement si technicien déjà assigné même date
+- **Validation serveur** : Vérification project_id, technician_id, date
+
+#### 🔗 Architecture Unifiée
+- **Traçabilité complète** : Client → Projet → Intervention → Audit → Module
+- **View workflow** : `v_complete_workflow` pour requêtes globales
+- **Foreign Keys cohérentes** : CASCADE deletes, SET NULL appropriés
+- **Table unique clients** : `crm_clients` (SIRET, TVA, contacts riches)
+
+#### 🛠️ API REST Planning
+- `GET /api/planning/dashboard` - Stats temps réel
+- `GET /api/planning/interventions` - Liste filtrable
+- `POST /api/planning/interventions` - Création
+- `POST /api/planning/assign` - Attribution technicien + conflits
+- `GET /api/planning/technicians/available` - Disponibilités
+
+### URLs Clés
+- **Dashboard Planning** : http://localhost:3000/planning
+- **Créer Intervention** : http://localhost:3000/planning/create
+
+---
 
 ## ✅ Module EL - Électroluminescence (Production)
 
