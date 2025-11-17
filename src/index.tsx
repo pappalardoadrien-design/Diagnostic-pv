@@ -5,6 +5,7 @@ import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import authRoutes from './modules/auth/routes'
 import adminAuthRoutes from './modules/auth/admin-routes'
+import assignmentsRoutes from './modules/auth/assignments-routes'
 import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
 import { getAdminUsersPage } from './pages/admin-users'
@@ -32,6 +33,7 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // ============================================================================
 app.route('/api/auth', authRoutes)
 app.route('/api/auth/admin', adminAuthRoutes)
+app.route('/api/auth/admin/assignments', assignmentsRoutes)
 
 // ============================================================================
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
