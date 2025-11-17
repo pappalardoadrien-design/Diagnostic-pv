@@ -800,4 +800,444 @@ planningRoutes.get('/conflicts', async (c) => {
   }
 });
 
+// ============================================================================
+// GET /api/planning/interventions/:id/ordre-mission - Générer PDF Ordre de Mission
+// ============================================================================
+planningRoutes.get('/interventions/:id/ordre-mission', async (c) => {
+  try {
+    const { DB } = c.env;
+    const id = parseInt(c.req.param('id'));
+
+    // Récupérer intervention complète avec toutes les données
+    const intervention = await DB.prepare(`
+      SELECT 
+        i.*,
+        p.project_name,
+        p.total_power_kwp,
+        p.module_count,
+        p.module_type,
+        p.inverter_type,
+        p.installation_date,
+        p.address_street,
+        p.address_postal_code,
+        p.address_city,
+        p.gps_latitude,
+        p.gps_longitude,
+        p.inverter_count,
+        p.inverter_brand,
+        p.junction_box_count,
+        p.strings_configuration,
+        p.technical_notes,
+        cc.company_name as client_name,
+        cc.siret,
+        cc.email as client_email,
+        cc.phone as client_phone,
+        cc.address_street as client_street,
+        cc.address_postal_code as client_postal,
+        cc.address_city as client_city,
+        cc.main_contact_name,
+        cc.main_contact_email,
+        cc.main_contact_phone,
+        u.email as technician_email
+      FROM interventions i
+      LEFT JOIN projects p ON i.project_id = p.id
+      LEFT JOIN crm_clients cc ON i.client_id = cc.id
+      LEFT JOIN auth_users u ON u.id = i.technician_id
+      WHERE i.id = ?
+    `).bind(id).first();
+
+    if (!intervention) {
+      return c.json({ 
+        success: false, 
+        error: 'Intervention introuvable' 
+      }, 404);
+    }
+
+    // Générer HTML PDF
+    const interventionTypeLabel = {
+      'el': 'Électroluminescence (EL)',
+      'iv': 'Courbes I-V',
+      'visual': 'Inspection Visuelle',
+      'isolation': 'Tests d\'Isolement',
+      'thermography': 'Thermographie',
+      'commissioning': 'Commissioning',
+      'post_incident': 'Expertise Post-Sinistre'
+    }[intervention.intervention_type as string] || intervention.intervention_type;
+
+    const statusLabel = {
+      'scheduled': 'Planifiée',
+      'in_progress': 'En cours',
+      'completed': 'Terminée',
+      'cancelled': 'Annulée'
+    }[intervention.status as string] || intervention.status;
+
+    // Parser strings configuration si disponible
+    let stringsConfigHTML = '';
+    if (intervention.strings_configuration) {
+      try {
+        const config = JSON.parse(intervention.strings_configuration as string);
+        if (config.mode === 'advanced' && config.strings) {
+          stringsConfigHTML = `
+            <h3 style="color: #ea580c; margin-top: 20px;">Configuration Strings (MPPT)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+              <thead>
+                <tr style="background: #f3f4f6;">
+                  <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">MPPT/String #</th>
+                  <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Nombre de Modules</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${config.strings.map((s: any) => `
+                  <tr>
+                    <td style="border: 1px solid #d1d5db; padding: 8px;">String ${s.mpptNumber || s.id}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 8px;">${s.moduleCount} modules</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      } catch (e) {
+        console.warn('Erreur parsing strings_configuration:', e);
+      }
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordre de Mission #${intervention.id}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #1f2937;
+            background: white;
+            padding: 40px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #ea580c;
+        }
+        .logo-section h1 {
+            color: #ea580c;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .logo-section p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .doc-info {
+            text-align: right;
+        }
+        .doc-info h2 {
+            color: #1f2937;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .doc-info p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 30px;
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ea580c;
+        }
+        .section h3 {
+            color: #ea580c;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-size: 15px;
+            color: #1f2937;
+            font-weight: 600;
+        }
+        .mission-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-scheduled { background: #dbeafe; color: #1e40af; }
+        .status-in_progress { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .signature-section {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 60px;
+        }
+        .signature-box {
+            text-align: center;
+        }
+        .signature-line {
+            border-top: 2px solid #1f2937;
+            width: 200px;
+            margin: 60px auto 10px;
+        }
+        @media print {
+            body { padding: 20px; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px;">
+        <button onclick="window.print()" style="background: #ea580c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-right: 10px;">
+            📄 Imprimer / Enregistrer PDF
+        </button>
+        <button onclick="window.close()" style="background: #666; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+            ✕ Fermer
+        </button>
+    </div>
+
+    <div class="header">
+        <div class="logo-section">
+            <h1>🔋 DiagPV</h1>
+            <p>Diagnostic Photovoltaïque Expert</p>
+            <p style="margin-top: 10px;">
+                3 rue d'Apollo, 31240 L'Union<br>
+                📧 contact@diagpv.fr | ☎ 05.81.10.16.59<br>
+                RCS 792972309
+            </p>
+        </div>
+        <div class="doc-info">
+            <h2>ORDRE DE MISSION</h2>
+            <p><strong>#${intervention.id}</strong></p>
+            <p>Émis le ${new Date().toLocaleDateString('fr-FR')}</p>
+            <p>à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+        </div>
+    </div>
+
+    <div class="mission-badge">
+        ⚡ ${interventionTypeLabel}
+    </div>
+    <span class="status-badge status-${intervention.status}">
+        ${statusLabel}
+    </span>
+
+    <!-- Informations Client -->
+    <div class="section">
+        <h3>👤 Informations Client</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Raison Sociale</span>
+                <span class="info-value">${intervention.client_name || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">SIRET</span>
+                <span class="info-value">${intervention.siret || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Email</span>
+                <span class="info-value">${intervention.client_email || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Téléphone</span>
+                <span class="info-value">${intervention.client_phone || 'N/A'}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Adresse</span>
+                <span class="info-value">${[intervention.client_street, intervention.client_postal, intervention.client_city].filter(Boolean).join(', ') || 'N/A'}</span>
+            </div>
+            ${intervention.main_contact_name ? `
+            <div class="info-item">
+                <span class="info-label">Contact Principal</span>
+                <span class="info-value">${intervention.main_contact_name}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Contact Email</span>
+                <span class="info-value">${intervention.main_contact_email || 'N/A'}</span>
+            </div>
+            ` : ''}
+        </div>
+    </div>
+
+    <!-- Informations Site PV -->
+    <div class="section">
+        <h3>🏭 Informations Site Photovoltaïque</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Nom du Site</span>
+                <span class="info-value">${intervention.project_name || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Puissance Installée</span>
+                <span class="info-value">${intervention.total_power_kwp ? intervention.total_power_kwp + ' kWp' : 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Nombre de Modules</span>
+                <span class="info-value">${intervention.module_count || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Type de Module</span>
+                <span class="info-value">${intervention.module_type || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Type d'Onduleur</span>
+                <span class="info-value">${intervention.inverter_type || 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Date d'Installation</span>
+                <span class="info-value">${intervention.installation_date ? new Date(intervention.installation_date as string).toLocaleDateString('fr-FR') : 'N/A'}</span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Adresse du Site</span>
+                <span class="info-value">${[intervention.address_street, intervention.address_postal_code, intervention.address_city].filter(Boolean).join(', ') || 'N/A'}</span>
+            </div>
+            ${intervention.gps_latitude && intervention.gps_longitude ? `
+            <div class="info-item">
+                <span class="info-label">Coordonnées GPS</span>
+                <span class="info-value">${intervention.gps_latitude}, ${intervention.gps_longitude}</span>
+            </div>
+            ` : ''}
+            ${intervention.inverter_count ? `
+            <div class="info-item">
+                <span class="info-label">Nombre d'Onduleurs</span>
+                <span class="info-value">${intervention.inverter_count}</span>
+            </div>
+            ` : ''}
+            ${intervention.inverter_brand ? `
+            <div class="info-item">
+                <span class="info-label">Marque/Modèle Onduleur</span>
+                <span class="info-value">${intervention.inverter_brand}</span>
+            </div>
+            ` : ''}
+            ${intervention.junction_box_count ? `
+            <div class="info-item">
+                <span class="info-label">Boîtes de Jonction</span>
+                <span class="info-value">${intervention.junction_box_count}</span>
+            </div>
+            ` : ''}
+        </div>
+        ${stringsConfigHTML}
+        ${intervention.technical_notes ? `
+        <div style="margin-top: 15px;">
+            <span class="info-label">Notes Techniques</span>
+            <p style="margin-top: 5px; padding: 10px; background: white; border-radius: 4px;">${intervention.technical_notes}</p>
+        </div>
+        ` : ''}
+    </div>
+
+    <!-- Détails Intervention -->
+    <div class="section">
+        <h3>📋 Détails de l'Intervention</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Type d'Intervention</span>
+                <span class="info-value">${interventionTypeLabel}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Date Prévue</span>
+                <span class="info-value">${intervention.intervention_date ? new Date(intervention.intervention_date as string).toLocaleDateString('fr-FR') : 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Durée Estimée</span>
+                <span class="info-value">${intervention.duration_hours ? intervention.duration_hours + ' heures' : 'N/A'}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Technicien Assigné</span>
+                <span class="info-value">${intervention.technician_email || 'Non assigné'}</span>
+            </div>
+            ${intervention.description ? `
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Description</span>
+                <p style="margin-top: 5px; padding: 10px; background: white; border-radius: 4px;">${intervention.description}</p>
+            </div>
+            ` : ''}
+            ${intervention.notes ? `
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Notes</span>
+                <p style="margin-top: 5px; padding: 10px; background: white; border-radius: 4px;">${intervention.notes}</p>
+            </div>
+            ` : ''}
+        </div>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signature-section">
+        <div class="signature-box">
+            <p style="font-weight: bold; margin-bottom: 5px;">Signature Client</p>
+            <p style="font-size: 12px; color: #6b7280;">Lu et approuvé</p>
+            <div class="signature-line"></div>
+            <p style="font-size: 12px;">Date et signature</p>
+        </div>
+        <div class="signature-box">
+            <p style="font-weight: bold; margin-bottom: 5px;">Signature Technicien</p>
+            <p style="font-size: 12px; color: #6b7280;">Prise en charge</p>
+            <div class="signature-line"></div>
+            <p style="font-size: 12px;">Date et signature</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Diagnostic Photovoltaïque - DiagPV</strong></p>
+        <p>Expertise indépendante depuis 2012 | Plus de 500 interventions</p>
+        <p>Ce document a été généré automatiquement le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+    </div>
+</body>
+</html>
+    `;
+
+    return c.html(html);
+
+  } catch (error: any) {
+    console.error('Erreur génération ordre de mission:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erreur lors de la génération de l\'ordre de mission',
+      details: error.message 
+    }, 500);
+  }
+});
+
 export default planningRoutes;

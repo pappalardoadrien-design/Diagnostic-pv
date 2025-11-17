@@ -147,6 +147,14 @@ export function getPlanningDetailPage() {
                 </a>
                 <div class="flex space-x-3">
                     <button 
+                        id="btnOrdreMission" 
+                        class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                        title="Générer PDF Ordre de Mission"
+                    >
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        Ordre de Mission
+                    </button>
+                    <button 
                         id="btnEdit" 
                         class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                     >
@@ -644,6 +652,11 @@ export function getPlanningDetailPage() {
 
         // Event listeners
         document.getElementById('btnCancelAssign').addEventListener('click', closeAssignModal);
+        document.getElementById('btnOrdreMission').addEventListener('click', () => {
+            // Ouvrir ordre de mission dans nouvelle fenêtre
+            window.open(\`/api/planning/interventions/\${interventionId}/ordre-mission\`, '_blank');
+        });
+        
         document.getElementById('btnConfirmAssign').addEventListener('click', assignTechnician);
         document.getElementById('btnDelete').addEventListener('click', deleteIntervention);
         document.getElementById('btnEdit').addEventListener('click', () => {

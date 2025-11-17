@@ -67,6 +67,24 @@ app.route('/api/planning', planningRoutes)
 app.route('/api/el', elModule)
 
 // ============================================================================
+// MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
+// ============================================================================
+import ivRoutes from './modules/iv/routes'
+app.route('/api/iv', ivRoutes)
+
+// ============================================================================
+// MODULE VISUAL - INSPECTIONS VISUELLES
+// ============================================================================
+import visualRoutes from './modules/visual/routes'
+app.route('/api/visual', visualRoutes)
+
+// ============================================================================
+// MODULE ISOLATION - TESTS D'ISOLEMENT
+// ============================================================================
+import isolationRoutes from './modules/isolation/routes'
+app.route('/api/isolation', isolationRoutes)
+
+// ============================================================================
 // MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)
 // Vue unifiée de tous les diagnostics d'un module physique
 // ============================================================================
