@@ -630,12 +630,54 @@ app.get('/', (c) => {
                 </p>
             </header>
             
-            <!-- Modules disponibles -->
-            <div class="max-w-6xl mx-auto">
-                <h2 class="text-3xl font-black mb-8 text-center text-yellow-400">
-                    <i class="fas fa-th mr-2"></i>
-                    MODULES DISPONIBLES
+            <!-- SECTION GESTION (BASE) -->
+            <div class="max-w-6xl mx-auto mb-12">
+                <h2 class="text-3xl font-black mb-6 text-center text-blue-400">
+                    <i class="fas fa-cogs mr-2"></i>
+                    GESTION & ORGANISATION
                 </h2>
+                <p class="text-center text-gray-400 mb-6">Base de données clients et planification des interventions</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- CRM - GESTION CLIENTS -->
+                    <a href="/crm/clients" class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-8 border-4 border-blue-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-blue-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-users text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-3xl font-black mb-2 text-white">CRM CLIENTS</h3>
+                            <p class="text-lg text-blue-200 mb-3">Base Clients & Sites</p>
+                            <div class="bg-blue-500 text-white px-6 py-3 rounded-full font-black text-base inline-block mb-4">
+                                <i class="fas fa-database mr-2"></i> BASE DE DONNÉES
+                            </div>
+                            <p class="text-base text-blue-100">Gestion clients, sites et projets photovoltaïques</p>
+                        </div>
+                    </a>
+                    
+                    <!-- PLANNING - INTERVENTIONS -->
+                    <a href="/planning" class="bg-gradient-to-br from-purple-900 to-purple-700 rounded-lg p-8 border-4 border-purple-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
+                        <div class="text-center">
+                            <div class="bg-purple-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                <i class="fas fa-calendar-alt text-4xl text-white"></i>
+                            </div>
+                            <h3 class="text-3xl font-black mb-2 text-white">PLANNING</h3>
+                            <p class="text-lg text-purple-200 mb-3">Interventions Terrain</p>
+                            <div class="bg-purple-500 text-white px-6 py-3 rounded-full font-black text-base inline-block mb-4">
+                                <i class="fas fa-calendar-check mr-2"></i> PLANIFICATION
+                            </div>
+                            <p class="text-base text-purple-100">Planification audits et attribution sous-traitants</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- SECTION MODULES D'AUDIT -->
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-3xl font-black mb-6 text-center text-yellow-400">
+                    <i class="fas fa-th mr-2"></i>
+                    MODULES D'AUDIT
+                </h2>
+                <p class="text-center text-gray-400 mb-6">Outils techniques d'inspection et mesures terrain</p>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     <!-- Module EL - OPÉRATIONNEL -->
@@ -650,36 +692,6 @@ app.get('/', (c) => {
                                 <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
                             </div>
                             <p class="text-sm text-green-100">Audit nocturne EL terrain avec cartographie temps réel</p>
-                        </div>
-                    </a>
-                    
-                    <!-- Module CRM - OPÉRATIONNEL -->
-                    <a href="/crm/clients" class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-8 border-4 border-blue-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
-                        <div class="text-center">
-                            <div class="bg-blue-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                <i class="fas fa-users text-4xl text-white"></i>
-                            </div>
-                            <h3 class="text-2xl font-black mb-2 text-white">MODULE CRM</h3>
-                            <p class="text-lg text-blue-200 mb-3">Gestion Clients</p>
-                            <div class="bg-blue-500 text-white px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
-                            </div>
-                            <p class="text-sm text-blue-100">Gestion clients, sites et projets photovoltaïques</p>
-                        </div>
-                    </a>
-                    
-                    <!-- Module Planning - OPÉRATIONNEL -->
-                    <a href="/planning" class="bg-gradient-to-br from-purple-900 to-purple-700 rounded-lg p-8 border-4 border-purple-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
-                        <div class="text-center">
-                            <div class="bg-purple-600 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                                <i class="fas fa-calendar-alt text-4xl text-white"></i>
-                            </div>
-                            <h3 class="text-2xl font-black mb-2 text-white">MODULE PLANNING</h3>
-                            <p class="text-lg text-purple-200 mb-3">Interventions</p>
-                            <div class="bg-purple-500 text-white px-4 py-2 rounded-full font-black text-sm inline-block mb-4">
-                                <i class="fas fa-check-circle mr-1"></i> OPÉRATIONNEL
-                            </div>
-                            <p class="text-sm text-purple-100">Planification audits et attribution techniciens</p>
                         </div>
                     </a>
                     
