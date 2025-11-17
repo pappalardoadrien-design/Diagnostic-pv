@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import authRoutes from './modules/auth/routes'
+import adminAuthRoutes from './modules/auth/admin-routes'
 import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
 
@@ -29,6 +30,7 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // MODULE AUTH - AUTHENTIFICATION & PERMISSIONS (Phase 6)
 // ============================================================================
 app.route('/api/auth', authRoutes)
+app.route('/api/auth/admin', adminAuthRoutes)
 
 // ============================================================================
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
