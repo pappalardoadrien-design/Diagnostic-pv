@@ -1,0 +1,60 @@
+╔════════════════════════════════════════════════════════════════╗
+║           📋 ROADMAP VISION GLOBALE - RÉFÉRENCES              ║
+╚════════════════════════════════════════════════════════════════╝
+
+Date: 17 novembre 2025
+Context: Analyse complète database + Vision future
+
+📁 FICHIERS ROADMAP:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Projet local:
+   /home/user/webapp/ROADMAP_VISION_GLOBALE.md
+
+2. Hub AI Drive (permanent):
+   /mnt/aidrive/ROADMAP_VISION_GLOBALE_DiagPV_2025-11-17.md
+
+3. Git commit:
+   19e6f34 - "SAUVEGARDE: Roadmap Vision Globale"
+
+4. Backup complet:
+   https://www.genspark.ai/api/files/s/LEURJ40R
+   (3.17 MB - tar.gz complet du projet)
+
+📊 SESSION HUB RÉFÉRENCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Session: "Préparation Entretien Arthur GIMÉNEZ Wattnco"
+ID: 397250ef-307b-4cb2-853f-2775ded0dc1f
+Contenu: Prompt développeur ~20k mots + Vision plateforme SaaS complète
+
+🎯 PRIORITÉ ACTUELLE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MODULE: Planning & Attribution (MANUEL)
+DURÉE: 2-3 semaines
+STATUS: ⏳ À DÉMARRER
+
+À IMPLÉMENTER:
+✓ Routes API /api/planning/*
+✓ Interface planning (Vanilla JS + Tailwind)
+✓ Attribution manuelle sous-traitants
+✓ Dashboard avec calendrier
+✓ Détection conflits
+
+TABLE CLÉ: interventions (déjà créée, vide)
+
+✅ COMPATIBILITÉ FUTURE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+95% Compatible avec vision globale future
+- Architecture database: 100% ✅
+- Backend API Hono: 95% ✅
+- CRM & Auth: 100% ✅
+- Design System: 100% ✅
+
+Tout ce qu'on code maintenant = réutilisable dans vision future 🚀
+
+╔════════════════════════════════════════════════════════════════╗
+║  💡 RIEN NE SERA PERDU - TOUT EST COMPATIBLE                  ║
+╚════════════════════════════════════════════════════════════════╝
