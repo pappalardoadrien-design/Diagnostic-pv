@@ -41,6 +41,10 @@ export function getPlanningDashboardPage() {
                     </h1>
                 </div>
                 <div class="flex items-center space-x-3">
+                    <a href="/planning/calendar" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
+                        <i class="fas fa-calendar mr-2"></i>
+                        Vue Calendrier
+                    </a>
                     <a href="/planning/create" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
                         <i class="fas fa-plus mr-2"></i>
                         Nouvelle Intervention
@@ -281,7 +285,7 @@ export function getPlanningDashboardPage() {
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 \${data.interventions.map(intervention => \`
-                                    <tr class="intervention-row cursor-pointer" onclick="window.location.href='/planning/interventions/\${intervention.id}'">
+                                    <tr class="intervention-row cursor-pointer" onclick="window.location.href='/planning/detail?id=\${intervention.id}'"
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <i class="far fa-calendar text-gray-400 mr-2"></i>
@@ -329,7 +333,7 @@ export function getPlanningDashboardPage() {
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <div class="flex space-x-2">
-                                                <button onclick="event.stopPropagation(); window.location.href='/planning/interventions/\${intervention.id}'" class="text-blue-600 hover:text-blue-800" title="Voir détails">
+                                                <button onclick="event.stopPropagation(); window.location.href='/planning/detail?id=\${intervention.id}'" class="text-blue-600 hover:text-blue-800" title="Voir détails">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                                 <button onclick="event.stopPropagation(); editIntervention(\${intervention.id})" class="text-gray-600 hover:text-gray-800" title="Modifier">

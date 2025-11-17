@@ -14,6 +14,8 @@ import { getAdminUsersPage } from './pages/admin-users'
 import { getAdminAssignmentsPage } from './pages/admin-assignments'
 import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
+import { getPlanningDetailPage } from './pages/planning-detail'
+import { getPlanningCalendarPage } from './pages/planning-calendar'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -261,6 +263,22 @@ app.get('/planning', (c) => {
 // ============================================================================
 app.get('/planning/create', (c) => {
   return c.html(getPlanningCreatePage())
+})
+
+// ============================================================================
+// PAGE PLANNING DETAIL - DÉTAIL INTERVENTION
+// Affichage complet intervention + Attribution technicien + Lien audit EL
+// ============================================================================
+app.get('/planning/detail', (c) => {
+  return c.html(getPlanningDetailPage())
+})
+
+// ============================================================================
+// PAGE PLANNING CALENDAR - VUE CALENDRIER
+// Calendrier mensuel avec filtres technicien et type d'intervention
+// ============================================================================
+app.get('/planning/calendar', (c) => {
+  return c.html(getPlanningCalendarPage())
 })
 
 // ============================================================================
