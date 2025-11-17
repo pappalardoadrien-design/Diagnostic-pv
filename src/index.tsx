@@ -9,6 +9,7 @@ import assignmentsRoutes from './modules/auth/assignments-routes'
 import { getLoginPage } from './pages/login'
 import { getChangePasswordPage } from './pages/change-password'
 import { getAdminUsersPage } from './pages/admin-users'
+import { getAdminAssignmentsPage } from './pages/admin-assignments'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -222,6 +223,14 @@ app.get('/change-password', (c) => {
 // ============================================================================
 app.get('/admin/users', (c) => {
   return c.html(getAdminUsersPage())
+})
+
+// ============================================================================
+// PAGE ADMIN ASSIGNMENTS - GESTION ASSIGNATIONS
+// Interface admin pour assigner sous-traitants aux audits EL
+// ============================================================================
+app.get('/admin/assignments', (c) => {
+  return c.html(getAdminAssignmentsPage())
 })
 
 // ============================================================================
