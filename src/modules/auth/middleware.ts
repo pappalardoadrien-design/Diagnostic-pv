@@ -77,7 +77,7 @@ export async function requireAuth(c: Context<{ Bindings: Bindings }>, next: Next
     }
 
     // Récupérer utilisateur depuis DB
-    const user = await DB.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1')
+    const user = await DB.prepare('SELECT * FROM auth_users WHERE id = ? AND is_active = 1')
       .bind(session.user_id)
       .first();
 

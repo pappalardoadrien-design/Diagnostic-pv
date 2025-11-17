@@ -50,7 +50,7 @@ authRoutes.post('/login', async (c) => {
     }
 
     // Récupérer utilisateur
-    const stmt = DB.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1');
+    const stmt = DB.prepare('SELECT * FROM auth_users WHERE email = ? AND is_active = 1');
     const result = await stmt.bind(email).first();
 
     if (!result) {
@@ -98,7 +98,7 @@ authRoutes.post('/login', async (c) => {
     );
 
     // Update last_login_at
-    await DB.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?')
+    await DB.prepare('UPDATE auth_users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?')
       .bind(user.id)
       .run();
 
@@ -203,7 +203,7 @@ authRoutes.get('/me', async (c) => {
     const session = JSON.parse(sessionData);
 
     // Récupérer utilisateur
-    const user = await DB.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1')
+    const user = await DB.prepare('SELECT * FROM auth_users WHERE id = ? AND is_active = 1')
       .bind(session.user_id)
       .first();
 
@@ -265,7 +265,7 @@ authRoutes.post('/change-password', async (c) => {
     }
 
     // Récupérer utilisateur
-    const user = await DB.prepare('SELECT * FROM users WHERE id = ?')
+    const user = await DB.prepare('SELECT * FROM auth_users WHERE id = ?')
       .bind(session.user_id)
       .first() as any;
 
@@ -287,7 +287,7 @@ authRoutes.post('/change-password', async (c) => {
 
     // Update en DB
     await DB.prepare(`
-      UPDATE users 
+      UPDATE auth_users 
       SET password_hash = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(newPasswordHash, user.id).run();

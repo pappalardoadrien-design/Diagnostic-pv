@@ -4,16 +4,16 @@
 -- Description: Tables pour gestion utilisateurs, sessions, permissions audit
 
 -- ============================================================
--- ATTENTION: Drop ancienne table users (structure techniciens)
--- La nouvelle structure auth inclut password_hash, company, etc.
+-- ATTENTION: En production, table "users" existe déjà (techniciens EL)
+-- Pour éviter conflit, on crée "auth_users" pour l'authentification
 -- ============================================================
-DROP TABLE IF EXISTS users;
 
 -- ============================================================
--- Table: users
+-- Table: auth_users
+-- Utilisateurs système avec authentification
 -- Rôles: admin, subcontractor, client, auditor
 -- ============================================================
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS auth_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at DATETIME
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+CREATE INDEX IF NOT EXISTS idx_auth_users_role ON auth_users(role);
+CREATE INDEX IF NOT EXISTS idx_auth_users_active ON auth_users(is_active);
 
 -- ============================================================
 -- Table: sessions
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   ip_address TEXT,
   user_agent TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
@@ -53,6 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 -- ============================================================
 -- Table: audit_assignments
 -- Permissions granulaires: qui peut accéder à quel audit
+-- NOTE: audit_token n'a PAS de FOREIGN KEY car table el_audits 
+--       peut ne pas exister (migrations 0002-0021 manquantes)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS audit_assignments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,9 +69,9 @@ CREATE TABLE IF NOT EXISTS audit_assignments (
   status TEXT DEFAULT 'active' CHECK(status IN ('active', 'revoked', 'expired')),
   expires_at DATETIME,
   notes TEXT,
-  FOREIGN KEY (audit_token) REFERENCES el_audits(audit_token) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (assigned_by) REFERENCES users(id),
+  -- FOREIGN KEY (audit_token) REFERENCES el_audits(audit_token) ON DELETE CASCADE,  -- Désactivé: table el_audits peut ne pas exister
+  FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (assigned_by) REFERENCES auth_users(id),
   UNIQUE(audit_token, user_id)
 );
 
@@ -91,7 +93,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   ip_address TEXT,
   user_agent TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_logs_user_id ON activity_logs(user_id);
@@ -105,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_resource ON activity_logs(resource_type, res
 -- Password: DiagPV2025!Temp (MUST CHANGE après premier login)
 -- Hash bcrypt (10 rounds): $2b$10$rKzN5Y3vHZ8xQ7LmN9qXPOK3fH2jX8vZ1wY4pT6mR5qW7nL3kJ9uK
 -- ============================================================
-INSERT OR IGNORE INTO users (email, password_hash, full_name, company, role, must_change_password) 
+INSERT OR IGNORE INTO auth_users (email, password_hash, full_name, company, role, must_change_password) 
 VALUES (
   'a.pappalardo@diagnosticphotovoltaique.fr',
   '$2b$10$rKzN5Y3vHZ8xQ7LmN9qXPOK3fH2jX8vZ1wY4pT6mR5qW7nL3kJ9uK',
