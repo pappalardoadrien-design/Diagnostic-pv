@@ -4,6 +4,8 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
 import authRoutes from './modules/auth/routes'
+import { getLoginPage } from './pages/login'
+import { getChangePasswordPage } from './pages/change-password'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -198,11 +200,15 @@ app.get('/api/audit/:token/report', async (c) => {
 // Cette page existe mais l'authentification n'est pas requise pour l'instant
 // ============================================================================
 app.get('/login', (c) => {
-  return c.json({ 
-    message: 'Page login - En développement',
-    auth_status: 'disabled',
-    note: 'Infrastructure auth installée mais désactivée (AUTH_ENABLED=false)'
-  })
+  return c.html(getLoginPage())
+})
+
+// ============================================================================
+// PAGE CHANGE PASSWORD
+// Force changement si must_change_password=true après login
+// ============================================================================
+app.get('/change-password', (c) => {
+  return c.html(getChangePasswordPage())
 })
 
 // ============================================================================
