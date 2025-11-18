@@ -78,6 +78,12 @@ import auditsRoutes from './modules/audits/routes'
 app.route('/api/audits', auditsRoutes)
 
 // ============================================================================
+// MODULE MISSION ORDERS - ORDRES DE MISSION PDF
+// ============================================================================
+import missionOrdersRoutes from './modules/mission-orders/routes'
+app.route('/api/mission-orders', missionOrdersRoutes)
+
+// ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
 // ============================================================================
 import ivRoutes from './modules/iv/routes'
@@ -344,9 +350,9 @@ app.get('/planning/create', (c) => {
 
 // ============================================================================
 // PAGE PLANNING DETAIL - DÉTAIL INTERVENTION
-// Affichage complet intervention + Attribution technicien + Lien audit EL
+// Affichage complet intervention + Attribution technicien + Ordre de Mission PDF
 // ============================================================================
-app.get('/planning/detail', (c) => {
+app.get('/planning/interventions/:id', (c) => {
   return c.html(getPlanningDetailPage())
 })
 
