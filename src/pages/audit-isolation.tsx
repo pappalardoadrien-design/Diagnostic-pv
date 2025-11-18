@@ -1,8 +1,8 @@
 // ============================================================================
 // PAGE MODULE ISOLATION - TESTS D'ISOLATION
 // ============================================================================
-// Interface de saisie tests d'isolation DC/AC/Terre
-// Mesures résistance + seuils automatiques
+// Interface de saisie tests isolation DC/AC
+// Mesures résistance + conformité seuils
 // ============================================================================
 
 export function getAuditIsolationPage() {
@@ -32,20 +32,10 @@ export function getAuditIsolationPage() {
             
             <!-- Bouton Ajout -->
             <div class="max-w-6xl mx-auto mb-8">
-                <div class="grid md:grid-cols-3 gap-4">
-                    <button onclick="addTest('DC')" class="bg-red-600 hover:bg-red-700 px-6 py-4 rounded-lg font-black text-xl">
-                        <i class="fas fa-plus-circle mr-2"></i>
-                        TEST DC
-                    </button>
-                    <button onclick="addTest('AC')" class="bg-orange-600 hover:bg-orange-700 px-6 py-4 rounded-lg font-black text-xl">
-                        <i class="fas fa-plus-circle mr-2"></i>
-                        TEST AC
-                    </button>
-                    <button onclick="addTest('Earth')" class="bg-yellow-600 hover:bg-yellow-700 px-6 py-4 rounded-lg font-black text-xl">
-                        <i class="fas fa-plus-circle mr-2"></i>
-                        TEST TERRE
-                    </button>
-                </div>
+                <button id="btnAddTest" class="w-full bg-red-600 hover:bg-red-700 px-6 py-4 rounded-lg font-black text-xl">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    AJOUTER UN TEST D'ISOLATION
+                </button>
             </div>
             
             <!-- Statistiques -->
@@ -72,7 +62,7 @@ export function getAuditIsolationPage() {
                     <div class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-4 border-2 border-blue-400">
                         <div class="text-center">
                             <p class="text-3xl font-black" id="stat-avg">-</p>
-                            <p class="text-blue-200">Résistance Moy. (MΩ)</p>
+                            <p class="text-blue-200">Moy. (MΩ)</p>
                         </div>
                     </div>
                 </div>
@@ -95,7 +85,7 @@ export function getAuditIsolationPage() {
                     <div id="tests-list" class="space-y-4">
                         <div class="text-center text-gray-400 py-8">
                             <i class="fas fa-inbox text-4xl mb-4"></i>
-                            <p class="text-lg">Aucun test. Ajoutez vos mesures terrain.</p>
+                            <p class="text-lg">Aucun test. Ajoutez vos mesures d'isolation.</p>
                         </div>
                     </div>
                 </div>
@@ -106,53 +96,53 @@ export function getAuditIsolationPage() {
                 <div class="bg-gray-900 rounded-lg p-8 max-w-2xl w-full mx-4 border-2 border-red-400">
                     <h3 class="text-2xl font-black mb-6 text-red-400">
                         <i class="fas fa-plus-circle mr-2"></i>
-                        AJOUTER TEST ISOLATION <span id="modal-test-type"></span>
+                        AJOUTER TEST D'ISOLATION
                     </h3>
                     
                     <form id="testForm" class="space-y-4">
-                        <input type="hidden" id="test-type">
-                        
-                        <div class="grid md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block font-bold mb-2">Tension test (V) :</label>
-                                <input type="number" step="0.1" id="voltage" required class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
-                                <p class="text-xs text-gray-400 mt-1">Ex: 500V, 1000V</p>
-                            </div>
-                            <div>
-                                <label class="block font-bold mb-2">Résistance (MΩ) :</label>
-                                <input type="number" step="0.01" id="resistance" required class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
-                            </div>
+                        <div>
+                            <label class="block font-bold mb-2">Type de test :</label>
+                            <select id="test-type" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                                <option value="DC">DC - Isolement côté continu</option>
+                                <option value="AC">AC - Isolement côté alternatif</option>
+                                <option value="Earth">Terre - Continuité masse</option>
+                            </select>
                         </div>
                         
                         <div class="grid md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block font-bold mb-2">Seuil minimum (MΩ) :</label>
-                                <input type="number" step="0.1" id="threshold" value="1.0" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
-                                <p class="text-xs text-gray-400 mt-1">NF C 15-100: ≥1 MΩ</p>
+                                <label class="block font-bold mb-2">Tension test (V) :</label>
+                                <input type="number" step="0.1" id="voltage" required placeholder="Ex: 500" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
                             </div>
                             <div>
-                                <label class="block font-bold mb-2">Résultat :</label>
-                                <select id="pass-result" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
-                                    <option value="1" selected>✓ Conforme</option>
-                                    <option value="0">✗ Non Conforme</option>
-                                </select>
+                                <label class="block font-bold mb-2">Résistance mesurée (MΩ) :</label>
+                                <input type="number" step="0.01" id="resistance" required placeholder="Ex: 250.5" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
                             </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block font-bold mb-2">Seuil minimum requis (MΩ) :</label>
+                            <input type="number" step="0.01" id="threshold" placeholder="Ex: 1 (défaut selon NF C 15-100)" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                            <p class="text-sm text-gray-400 mt-1">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                NF C 15-100: Min 1 MΩ (recommandé ≥ 50 MΩ)
+                            </p>
                         </div>
                         
                         <div class="grid md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block font-bold mb-2">Température (°C) :</label>
-                                <input type="number" step="0.1" id="temperature" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                                <input type="number" step="0.1" id="temperature" placeholder="Ex: 25" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
                             </div>
                             <div>
                                 <label class="block font-bold mb-2">Humidité (%) :</label>
-                                <input type="number" step="0.1" id="humidity" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                                <input type="number" step="0.1" id="humidity" placeholder="Ex: 65" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
                             </div>
                         </div>
                         
                         <div>
-                            <label class="block font-bold mb-2">Notes / Observations :</label>
-                            <textarea id="notes" rows="3" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2"></textarea>
+                            <label class="block font-bold mb-2">Notes :</label>
+                            <textarea id="notes" rows="3" placeholder="Observations, conditions de mesure..." class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2"></textarea>
                         </div>
                         
                         <div class="flex gap-4 mt-6">
@@ -210,13 +200,16 @@ export function getAuditIsolationPage() {
                     
                     // Stats
                     document.getElementById('stat-total').textContent = tests.length
-                    const pass = tests.filter(t => t.resistance >= (t.pass_threshold || 1)).length
-                    document.getElementById('stat-pass').textContent = pass
-                    document.getElementById('stat-fail').textContent = tests.length - pass
                     
                     if (tests.length > 0) {
-                        const avgRes = tests.reduce((sum, t) => sum + (t.resistance || 0), 0) / tests.length
-                        document.getElementById('stat-avg').textContent = avgRes.toFixed(2)
+                        const avgResistance = tests.reduce((sum, t) => sum + (t.resistance || 0), 0) / tests.length
+                        document.getElementById('stat-avg').textContent = avgResistance.toFixed(2)
+                        
+                        // Calcul conformité (résistance >= seuil)
+                        const pass = tests.filter(t => !t.pass_threshold || t.resistance >= t.pass_threshold).length
+                        const fail = tests.length - pass
+                        document.getElementById('stat-pass').textContent = pass
+                        document.getElementById('stat-fail').textContent = fail
                     }
                     
                     // Liste
@@ -226,47 +219,44 @@ export function getAuditIsolationPage() {
                         return
                     }
                     
-                    const typeColors = {DC: 'red', AC: 'orange', Earth: 'yellow'}
-                    const typeIcons = {DC: 'bolt', AC: 'plug', Earth: 'ground'}
+                    const testTypeLabels = {DC: 'DC - Isolement côté continu', AC: 'AC - Isolement côté alternatif', Earth: 'Terre - Continuité'}
                     
                     container.innerHTML = tests.map(t => {
-                        const isPass = t.resistance >= (t.pass_threshold || 1)
+                        const threshold = t.pass_threshold || 1
+                        const pass = t.resistance >= threshold
+                        
                         return \`
-                            <div class="bg-gray-800 rounded-lg p-4 border border-\${isPass ? 'green' : 'red'}-600">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div class="flex items-center gap-3">
-                                        <i class="fas fa-\${typeIcons[t.test_type]} text-2xl text-\${typeColors[t.test_type]}-400"></i>
-                                        <div>
-                                            <h4 class="text-lg font-bold">TEST \${t.test_type}</h4>
-                                            <p class="text-sm text-gray-400">\${new Date(t.test_date).toLocaleDateString('fr-FR')}</p>
-                                        </div>
+                            <div class="bg-gray-800 rounded-lg p-4 border border-\${pass ? 'green' : 'red'}-600">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h4 class="text-lg font-bold text-red-300">\${testTypeLabels[t.test_type] || t.test_type}</h4>
+                                        <p class="text-sm text-gray-400">\${new Date(t.test_date).toLocaleDateString('fr-FR')}</p>
                                     </div>
-                                    <div class="text-right">
-                                        \${isPass ? 
-                                            '<span class="bg-green-600 px-4 py-2 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>CONFORME</span>' : 
-                                            '<span class="bg-red-600 px-4 py-2 rounded font-bold"><i class="fas fa-exclamation-triangle mr-1"></i>NON CONFORME</span>'
-                                        }
+                                    <div>
+                                        \${pass ? '<span class="bg-green-600 px-3 py-1 rounded font-bold"><i class="fas fa-check-circle mr-1"></i>CONFORME</span>' : '<span class="bg-red-600 px-3 py-1 rounded font-bold"><i class="fas fa-times-circle mr-1"></i>NON CONFORME</span>'}
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-4 gap-4 text-sm">
+                                
+                                <div class="grid grid-cols-4 gap-4 mb-3">
                                     <div>
-                                        <p class="text-gray-400">Tension</p>
+                                        <p class="text-sm text-gray-400">Tension</p>
                                         <p class="font-bold">\${t.voltage || '-'} V</p>
                                     </div>
                                     <div>
-                                        <p class="text-gray-400">Résistance</p>
-                                        <p class="font-bold text-\${isPass ? 'green' : 'red'}-400">\${t.resistance?.toFixed(2) || '-'} MΩ</p>
+                                        <p class="text-sm text-gray-400">Résistance</p>
+                                        <p class="font-bold text-\${pass ? 'green' : 'red'}-400">\${t.resistance?.toFixed(2) || '-'} MΩ</p>
                                     </div>
                                     <div>
-                                        <p class="text-gray-400">Seuil</p>
-                                        <p class="font-bold">\${t.pass_threshold?.toFixed(1) || '1.0'} MΩ</p>
+                                        <p class="text-sm text-gray-400">Seuil</p>
+                                        <p class="font-bold">\${threshold} MΩ</p>
                                     </div>
                                     <div>
-                                        <p class="text-gray-400">Conditions</p>
-                                        <p class="font-bold">\${t.temperature ? t.temperature+'°C' : '-'} / \${t.humidity ? t.humidity+'%' : '-'}</p>
+                                        <p class="text-sm text-gray-400">Conditions</p>
+                                        <p class="font-bold text-sm">\${t.temperature ? t.temperature+'°C' : ''} \${t.humidity ? t.humidity+'%' : ''}</p>
                                     </div>
                                 </div>
-                                \${t.notes ? '<p class="text-sm text-gray-300 mt-3 border-t border-gray-700 pt-3">'+t.notes+'</p>' : ''}
+                                
+                                \${t.notes ? '<p class="text-sm text-gray-300 bg-gray-900 p-2 rounded">'+t.notes+'</p>' : ''}
                             </div>
                         \`
                     }).join('')
@@ -276,24 +266,13 @@ export function getAuditIsolationPage() {
             }
             
             // Modal
-            window.addTest = function(type) {
-                document.getElementById('test-type').value = type
-                document.getElementById('modal-test-type').textContent = type
+            document.getElementById('btnAddTest').addEventListener('click', () => {
                 document.getElementById('modalTest').classList.remove('hidden')
                 document.getElementById('modalTest').classList.add('flex')
-            }
+            })
             
             document.getElementById('btnCancelTest').addEventListener('click', () => {
                 document.getElementById('modalTest').classList.add('hidden')
-            })
-            
-            // Auto-calcul conformité
-            document.getElementById('resistance').addEventListener('input', () => {
-                const res = parseFloat(document.getElementById('resistance').value)
-                const threshold = parseFloat(document.getElementById('threshold').value)
-                if (res && threshold) {
-                    document.getElementById('pass-result').value = res >= threshold ? '1' : '0'
-                }
             })
             
             document.getElementById('testForm').addEventListener('submit', async (e) => {
@@ -303,10 +282,10 @@ export function getAuditIsolationPage() {
                     test_type: document.getElementById('test-type').value,
                     voltage: parseFloat(document.getElementById('voltage').value),
                     resistance: parseFloat(document.getElementById('resistance').value),
-                    pass_threshold: parseFloat(document.getElementById('threshold').value),
+                    pass_threshold: parseFloat(document.getElementById('threshold').value) || 1,
                     temperature: parseFloat(document.getElementById('temperature').value) || null,
                     humidity: parseFloat(document.getElementById('humidity').value) || null,
-                    notes: document.getElementById('notes').value
+                    notes: document.getElementById('notes').value || null
                 }
                 
                 try {
