@@ -30,6 +30,7 @@ import { getCrmProjectsListPage } from './pages/crm-projects-list'
 import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
 import { getCrmProjectsDetailPage } from './pages/crm-projects-detail'
 import { getCrmProjectsEditPage } from './pages/crm-projects-edit'
+import { getSubcontractorsListPage } from './pages/subcontractors-list'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -82,6 +83,12 @@ app.route('/api/audits', auditsRoutes)
 // ============================================================================
 import missionOrdersRoutes from './modules/mission-orders/routes'
 app.route('/api/mission-orders', missionOrdersRoutes)
+
+// ============================================================================
+// MODULE SUBCONTRACTORS - GESTION SOUS-TRAITANTS (CRM BASE)
+// ============================================================================
+import subcontractorsRoutes from './modules/subcontractors/routes'
+app.route('/api/subcontractors', subcontractorsRoutes)
 
 // ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
@@ -461,6 +468,14 @@ app.get('/crm/projects/detail', (c) => {
 // ============================================================================
 app.get('/crm/projects/edit', (c) => {
   return c.html(getCrmProjectsEditPage())
+})
+
+// ============================================================================
+// PAGE SUBCONTRACTORS LIST - GESTION SOUS-TRAITANTS
+// Liste partenaires techniques avec filtres, stats, et création
+// ============================================================================
+app.get('/subcontractors', (c) => {
+  return c.html(getSubcontractorsListPage())
 })
 
 // ============================================================================
