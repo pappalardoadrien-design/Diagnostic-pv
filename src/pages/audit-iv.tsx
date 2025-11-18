@@ -31,6 +31,15 @@ export function getAuditIvPage() {
             </header>
             
             <!-- Actions -->
+            <div class="max-w-6xl mx-auto mb-6">
+                <div class="flex gap-4 justify-end mb-4">
+                    <button onclick="generateMultiModuleReport()" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-black">
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        RAPPORT PDF MULTI-MODULES
+                    </button>
+                </div>
+            </div>
+
             <div class="max-w-6xl mx-auto mb-8">
                 <div class="bg-gray-900 rounded-lg p-6 border-2 border-orange-400">
                     <h2 class="text-2xl font-black mb-4">
@@ -340,6 +349,11 @@ export function getAuditIvPage() {
                     alert('Erreur ajout: ' + (error.response?.data?.error || error.message))
                 }
             })
+            
+            // Générer rapport multi-modules
+            function generateMultiModuleReport() {
+                window.open(\`/api/reports/multi-module/\${auditToken}\`, '_blank')
+            }
             
             // Générer rapport
             document.getElementById('btnGenerateReport').addEventListener('click', () => {

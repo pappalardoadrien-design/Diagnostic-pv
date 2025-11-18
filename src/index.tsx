@@ -91,6 +91,12 @@ import subcontractorsRoutes from './modules/subcontractors/routes'
 app.route('/api/subcontractors', subcontractorsRoutes)
 
 // ============================================================================
+// MODULE REPORTS - RAPPORTS PDF MULTI-MODULES
+// ============================================================================
+import multiModulePdfRoutes from './modules/reports/multi-module-pdf'
+app.route('/api/reports/multi-module', multiModulePdfRoutes)
+
+// ============================================================================
 // MODULE CONSOLIDATED REPORTS - RAPPORTS PDF MULTI-MODULES
 // ============================================================================
 import consolidatedReportsRoutes from './modules/reports/consolidated-routes'

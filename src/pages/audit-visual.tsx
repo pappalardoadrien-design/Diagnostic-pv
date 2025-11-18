@@ -30,8 +30,12 @@ export function getAuditVisualPage() {
                 <p class="text-xl text-gray-300" id="audit-info">Inspection Visuelle & Défauts Mécaniques</p>
             </header>
             
-            <!-- Bouton Ajout -->
-            <div class="max-w-6xl mx-auto mb-8">
+            <!-- Boutons Actions -->
+            <div class="max-w-6xl mx-auto mb-8 space-y-4">
+                <button onclick="generateMultiModuleReport()" class="w-full bg-green-600 hover:bg-green-700 px-6 py-4 rounded-lg font-black text-xl">
+                    <i class="fas fa-file-pdf mr-2"></i>
+                    RAPPORT PDF MULTI-MODULES
+                </button>
                 <button id="btnAddInspection" class="w-full bg-teal-600 hover:bg-teal-700 px-6 py-4 rounded-lg font-black text-xl">
                     <i class="fas fa-plus-circle mr-2"></i>
                     AJOUTER UNE OBSERVATION
@@ -316,6 +320,10 @@ export function getAuditVisualPage() {
                     alert('Erreur: ' + (error.response?.data?.error || error.message))
                 }
             })
+            
+            function generateMultiModuleReport() {
+                window.open(\`/api/reports/multi-module/\${auditToken}\`, '_blank')
+            }
             
             document.getElementById('btnGenerateReport').addEventListener('click', () => {
                 window.open(\`/api/visual/report/\${auditToken}\`, '_blank')
