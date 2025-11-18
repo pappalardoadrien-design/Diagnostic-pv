@@ -17,6 +17,8 @@ import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getPlanningDetailPage } from './pages/planning-detail'
 import { getPlanningCalendarPage } from './pages/planning-calendar'
+import { getCrmDashboardPage } from './pages/crm-dashboard'
+import { getAuditsCreatePage } from './pages/audits-create'
 import { getCrmClientsListPage } from './pages/crm-clients-list'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
 import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
@@ -65,6 +67,12 @@ app.route('/api/planning', planningRoutes)
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
 // ============================================================================
 app.route('/api/el', elModule)
+
+// ============================================================================
+// MODULE AUDITS - GESTION AUDITS MULTI-MODULES (MASTER)
+// ============================================================================
+import auditsRoutes from './modules/audits/routes'
+app.route('/api/audits', auditsRoutes)
 
 // ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
@@ -348,6 +356,22 @@ app.get('/planning/calendar', (c) => {
 })
 
 // ============================================================================
+// PAGE CRM DASHBOARD - PAGE CENTRALE APPLICATION
+// Hub central avec KPIs, audits en cours, planning, actions rapides
+// ============================================================================
+app.get('/crm/dashboard', (c) => {
+  return c.html(getCrmDashboardPage())
+})
+
+// ============================================================================
+// PAGE CRÉATION AUDIT MULTI-MODULES
+// Formulaire avec sélection intervention OU saisie manuelle + modules
+// ============================================================================
+app.get('/audits/create', (c) => {
+  return c.html(getAuditsCreatePage())
+})
+
+// ============================================================================
 // PAGE CRM CLIENTS LIST - LISTE CLIENTS
 // Interface CRM centralisée avec stats, recherche, filtres et CRUD
 // ============================================================================
@@ -414,7 +438,17 @@ app.get('/crm/projects/edit', (c) => {
 // ============================================================================
 // PAGE D'ACCUEIL - DIAGNOSTIC HUB
 // ============================================================================
+// ============================================================================
+// HOMEPAGE - REDIRECTION VERS CRM DASHBOARD
+// ============================================================================
 app.get('/', (c) => {
+  return c.redirect('/crm/dashboard')
+})
+
+// ============================================================================
+// ANCIENNE HOMEPAGE (Conservée pour référence si besoin)
+// ============================================================================
+app.get('/old-home', (c) => {
   return c.html(`
     <!DOCTYPE html>
     <html lang="fr">
