@@ -91,6 +91,12 @@ import subcontractorsRoutes from './modules/subcontractors/routes'
 app.route('/api/subcontractors', subcontractorsRoutes)
 
 // ============================================================================
+// MODULE CONSOLIDATED REPORTS - RAPPORTS PDF MULTI-MODULES
+// ============================================================================
+import consolidatedReportsRoutes from './modules/reports/consolidated-routes'
+app.route('/api/reports/consolidated', consolidatedReportsRoutes)
+
+// ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
 // ============================================================================
 import ivRoutes from './modules/iv/routes'
