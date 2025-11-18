@@ -19,6 +19,9 @@ import { getPlanningDetailPage } from './pages/planning-detail'
 import { getPlanningCalendarPage } from './pages/planning-calendar'
 import { getCrmDashboardPage } from './pages/crm-dashboard'
 import { getAuditsCreatePage } from './pages/audits-create'
+import { getAuditIvPage } from './pages/audit-iv'
+import { getAuditVisualPage } from './pages/audit-visual'
+import { getAuditIsolationPage } from './pages/audit-isolation'
 import { getCrmClientsListPage } from './pages/crm-clients-list'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
 import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
@@ -369,6 +372,25 @@ app.get('/crm/dashboard', (c) => {
 // ============================================================================
 app.get('/audits/create', (c) => {
   return c.html(getAuditsCreatePage())
+})
+
+// ============================================================================
+// PAGES MODULES AUDIT - INTERFACES SAISIE DONNÉES
+// ============================================================================
+
+// Module I-V - Courbes I-V
+app.get('/audit/:token/iv', (c) => {
+  return c.html(getAuditIvPage())
+})
+
+// Module Visuels - Contrôles Visuels
+app.get('/audit/:token/visual', (c) => {
+  return c.html(getAuditVisualPage())
+})
+
+// Module Isolation - Tests d'Isolation
+app.get('/audit/:token/isolation', (c) => {
+  return c.html(getAuditIsolationPage())
 })
 
 // ============================================================================
