@@ -55,9 +55,9 @@ girasoleImportRoutes.post('/import-csv', async (c) => {
     if (!client) {
       const clientResult = await DB.prepare(`
         INSERT INTO crm_clients (
-          company_name, client_type, siret, email, phone,
-          address, city, postal_code, country, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          company_name, client_type, siret, main_contact_email, main_contact_phone,
+          address, city, postal_code, country, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).bind(
         client_name,
         'client',
@@ -67,7 +67,8 @@ girasoleImportRoutes.post('/import-csv', async (c) => {
         'Adresse GIRASOLE',
         'Paris',
         '75000',
-        'France'
+        'France',
+        'active'
       ).run();
 
       client = { id: clientResult.meta.last_row_id };
@@ -102,21 +103,18 @@ girasoleImportRoutes.post('/import-csv', async (c) => {
         // Create project (site PV)
         const projectResult = await DB.prepare(`
           INSERT INTO projects (
-            client_id, project_name, site_type, installed_power, total_modules,
-            city, postal_code, gps_latitude, gps_longitude,
-            project_status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            client_id, name, site_address, installation_power, total_modules,
+            latitude, longitude, notes, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `).bind(
           clientId,
           row.nom_centrale,
-          row.type || 'SOL',
+          `${row.ville} ${row.code_postal || ''}`,
           parseFloat(row.puissance_kwc) || 0,
           parseInt(row.nombre_modules) || 0,
-          row.ville,
-          row.code_postal,
           parseFloat(row.latitude) || null,
           parseFloat(row.longitude) || null,
-          'active'
+          `Type: ${row.type || 'SOL'} - Ville: ${row.ville}`
         ).run();
 
         const projectId = projectResult.meta.last_row_id;
@@ -125,16 +123,16 @@ girasoleImportRoutes.post('/import-csv', async (c) => {
         // Create intervention
         const interventionResult = await DB.prepare(`
           INSERT INTO interventions (
-            client_id, project_id, intervention_type,
-            scheduled_date, duration_hours, status, created_at
+            project_id, intervention_type, intervention_date,
+            duration_hours, status, notes, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
         `).bind(
-          clientId,
           projectId,
           'audit_qualite',
           row.date_intervention || '2025-01-15',
           4, // 4 heures par défaut
-          'scheduled'
+          'scheduled',
+          `GIRASOLE - ${row.nom_centrale}`
         ).run();
 
         const interventionId = interventionResult.meta.last_row_id;
@@ -143,17 +141,24 @@ girasoleImportRoutes.post('/import-csv', async (c) => {
         // Create audit with token
         const auditToken = `GIRASOLE-${row.type}-${projectId}-${Date.now()}`;
         
+        // Get client name for audit
+        const clientData = await DB.prepare(`
+          SELECT company_name FROM crm_clients WHERE id = ?
+        `).bind(clientId).first();
+        
         await DB.prepare(`
           INSERT INTO audits (
             audit_token, client_id, project_id, intervention_id,
-            audit_type, audit_status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            project_name, client_name, location, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `).bind(
           auditToken,
           clientId,
           projectId,
           interventionId,
-          row.type === 'TOITURE' ? 'visual_toiture' : 'visual_conformite',
+          row.nom_centrale,
+          clientData?.company_name || 'GIRASOLE Energies',
+          row.ville,
           'pending'
         ).run();
 
