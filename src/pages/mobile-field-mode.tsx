@@ -16,6 +16,10 @@ export function getMobileFieldModePage() {
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <title>Mode Terrain - DiagPV</title>
+        <link rel="manifest" href="/static/manifest.json">
+        <link rel="icon" type="image/png" href="/static/icon-192.png">
+        <link rel="apple-touch-icon" href="/static/icon-192.png">
+        <meta name="theme-color" content="#fbbf24">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
@@ -618,6 +622,82 @@ export function getMobileFieldModePage() {
             
             // Init
             loadAudits()
+            
+            // ===================================================================
+            // PWA - SERVICE WORKER REGISTRATION
+            // ===================================================================
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/static/sw.js')
+                        .then(registration => {
+                            console.log('✅ SW registered:', registration.scope)
+                            
+                            // Vérifier les updates toutes les heures
+                            setInterval(() => {
+                                registration.update()
+                            }, 3600000)
+                            
+                            // Background Sync pour synchronisation offline
+                            if ('sync' in registration) {
+                                console.log('✅ Background Sync supported')
+                            }
+                        })
+                        .catch(error => {
+                            console.error('❌ SW registration failed:', error)
+                        })
+                })
+                
+                // Détecter quand une nouvelle version est disponible
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('🔄 New version detected, reloading...')
+                    if (confirm('Une nouvelle version est disponible. Recharger ?')) {
+                        window.location.reload()
+                    }
+                })
+            }
+            
+            // ===================================================================
+            // PWA - INSTALL PROMPT
+            // ===================================================================
+            let deferredPrompt
+            
+            window.addEventListener('beforeinstallprompt', (e) => {
+                // Empêcher l'affichage automatique
+                e.preventDefault()
+                deferredPrompt = e
+                
+                // Afficher un bouton d'installation personnalisé
+                console.log('💾 PWA installation available')
+                
+                // Créer et afficher le bouton d'installation
+                const installBtn = document.createElement('button')
+                installBtn.innerHTML = '<i class="fas fa-download mr-2"></i>INSTALLER L\'APP'
+                installBtn.className = 'mobile-touch-btn w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 rounded-xl font-black shadow-lg mb-3 px-4'
+                
+                const actionsContainer = document.querySelector('#quick-actions .px-4')
+                if (actionsContainer) {
+                    actionsContainer.insertBefore(installBtn, actionsContainer.firstChild)
+                }
+                
+                installBtn.addEventListener('click', async () => {
+                    if (!deferredPrompt) return
+                    
+                    deferredPrompt.prompt()
+                    const { outcome } = await deferredPrompt.userChoice
+                    
+                    if (outcome === 'accepted') {
+                        console.log('✅ PWA installed')
+                        installBtn.remove()
+                    }
+                    
+                    deferredPrompt = null
+                })
+            })
+            
+            window.addEventListener('appinstalled', () => {
+                console.log('🎉 PWA installed successfully')
+                deferredPrompt = null
+            })
         </script>
     </body>
     </html>

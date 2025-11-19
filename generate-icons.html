@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate DiagPV Icons</title>
+</head>
+<body>
+    <canvas id="canvas-192" width="192" height="192"></canvas>
+    <canvas id="canvas-512" width="512" height="512"></canvas>
+    
+    <script>
+        function generateIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId)
+            const ctx = canvas.getContext('2d')
+            
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size)
+            gradient.addColorStop(0, '#fbbf24') // yellow-400
+            gradient.addColorStop(1, '#f59e0b') // yellow-500
+            ctx.fillStyle = gradient
+            ctx.fillRect(0, 0, size, size)
+            
+            // DiagPV text
+            ctx.fillStyle = '#000000'
+            ctx.font = `bold ${size * 0.15}px Arial`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText('DiagPV', size / 2, size / 2)
+            
+            // Solar panel icon (simplified)
+            ctx.strokeStyle = '#000000'
+            ctx.lineWidth = size * 0.02
+            const iconSize = size * 0.4
+            const x = (size - iconSize) / 2
+            const y = size * 0.6
+            
+            // Panel rectangle
+            ctx.strokeRect(x, y, iconSize, iconSize * 0.6)
+            // Grid lines
+            ctx.beginPath()
+            ctx.moveTo(x + iconSize / 3, y)
+            ctx.lineTo(x + iconSize / 3, y + iconSize * 0.6)
+            ctx.moveTo(x + iconSize * 2 / 3, y)
+            ctx.lineTo(x + iconSize * 2 / 3, y + iconSize * 0.6)
+            ctx.moveTo(x, y + iconSize * 0.3)
+            ctx.lineTo(x + iconSize, y + iconSize * 0.3)
+            ctx.stroke()
+            
+            // Download link
+            const link = document.createElement('a')
+            link.download = `icon-${size}.png`
+            link.href = canvas.toDataURL('image/png')
+            link.textContent = `Download icon-${size}.png`
+            link.style.display = 'block'
+            link.style.margin = '10px'
+            document.body.appendChild(link)
+        }
+        
+        generateIcon('canvas-192', 192)
+        generateIcon('canvas-512', 512)
+    </script>
+</body>
+</html>
