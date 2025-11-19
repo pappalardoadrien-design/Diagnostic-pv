@@ -268,7 +268,13 @@ export function getGirasoleDashboardPage() {
                             type: project.site_type || (project.project_name?.includes('SOL') ? 'SOL' : 'TOITURE')
                         };
                     } catch (err) {
-                        return { ...project, type: 'SOL' };
+                        console.warn('[WARN] Erreur chargement intervention pour project', project.id, ':', err.message);
+                        return { 
+                            ...project, 
+                            intervention: null, 
+                            audit: null,
+                            type: 'SOL' 
+                        };
                     }
                 });
 
@@ -413,42 +419,64 @@ export function getGirasoleDashboardPage() {
         // Créer audit puis rediriger vers checklist
         async function createAuditAndOpenChecklist(projectId, type) {
             try {
+                console.log('[DEBUG] Création audit pour project_id:', projectId, 'type:', type);
+                
                 const project = centrales.find(c => c.id === projectId);
-                if (!project || !project.intervention) {
-                    alert('❌ Impossible : intervention non trouvée pour cette centrale');
+                console.log('[DEBUG] Projet trouvé:', project);
+                
+                if (!project) {
+                    alert('❌ Impossible : projet ID ' + projectId + ' non trouvé');
+                    console.error('[DEBUG] Centrales disponibles:', centrales);
+                    return;
+                }
+                
+                if (!project.intervention) {
+                    alert('❌ Impossible : intervention non trouvée pour centrale ' + (project.project_name || project.name));
+                    console.error('[DEBUG] Projet sans intervention:', project);
                     return;
                 }
                 
                 // Générer token unique
                 const auditToken = \`GIRASOLE-\${type}-\${projectId}-\${Date.now()}\`;
+                console.log('[DEBUG] Token généré:', auditToken);
                 
                 // Créer audit
                 const { data: clientsData } = await axios.get('/api/crm/clients');
                 const girasoleClient = clientsData.clients?.find(c => 
                     c.company_name?.toLowerCase().includes('girasole')
                 );
+                console.log('[DEBUG] Client GIRASOLE:', girasoleClient);
                 
-                await axios.post('/api/audits', {
+                const payload = {
                     audit_token: auditToken,
                     client_id: girasoleClient?.id,
                     project_id: projectId,
                     intervention_id: project.intervention.id,
-                    project_name: project.project_name || project.name,
+                    project_name: project.project_name || project.name || 'Centrale sans nom',
                     client_name: girasoleClient?.company_name || 'GIRASOLE Energies',
                     location: project.site_address || '',
                     status: 'pending'
-                });
+                };
+                console.log('[DEBUG] Payload POST /api/audits:', payload);
+                
+                const response = await axios.post('/api/audits', payload);
+                console.log('[DEBUG] Réponse création audit:', response.data);
                 
                 // Rediriger vers checklist
                 const checklistUrl = type === 'SOL' 
                     ? \`/audit/\${auditToken}/visual/girasole/conformite\`
                     : \`/audit/\${auditToken}/visual/girasole/toiture\`;
                 
+                console.log('[DEBUG] Redirection vers:', checklistUrl);
                 window.location.href = checklistUrl;
                 
             } catch (error) {
-                console.error('Create audit error:', error);
-                alert('❌ Erreur création audit : ' + error.message);
+                console.error('[ERROR] Création audit échouée:', error);
+                console.error('[ERROR] Response data:', error.response?.data);
+                console.error('[ERROR] Response status:', error.response?.status);
+                
+                const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message;
+                alert('❌ Erreur création audit : ' + errorMsg);
             }
         }
 
