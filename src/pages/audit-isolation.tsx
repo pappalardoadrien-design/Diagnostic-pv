@@ -161,36 +161,9 @@ export function getAuditIsolationPage() {
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/module-nav.js"></script>
         <script>
             const auditToken = window.location.pathname.split('/')[2]
-            
-            // Navigation modules
-            async function loadModuleNav() {
-                try {
-                    const response = await axios.get(\`/api/audits/\${auditToken}\`)
-                    const audit = response.data.audit
-                    const modules = JSON.parse(audit.modules_enabled || '[]')
-                    
-                    document.getElementById('audit-info').textContent = \`\${audit.project_name} - \${audit.client_name}\`
-                    
-                    const nav = document.getElementById('module-nav')
-                    nav.innerHTML = \`
-                        <div class="bg-gray-900 rounded-lg p-4 border border-yellow-400 flex flex-wrap gap-3 items-center justify-between">
-                            <div class="flex flex-wrap gap-3">
-                                \${modules.includes('EL') ? '<a href="/audit/'+auditToken+'" class="bg-green-700 hover:bg-green-600 px-4 py-2 rounded font-bold"><i class="fas fa-moon mr-2"></i>EL</a>' : ''}
-                                \${modules.includes('IV') ? '<a href="/audit/'+auditToken+'/iv" class="bg-orange-700 hover:bg-orange-600 px-4 py-2 rounded font-bold"><i class="fas fa-chart-line mr-2"></i>I-V</a>' : ''}
-                                \${modules.includes('VISUAL') ? '<a href="/audit/'+auditToken+'/visual" class="bg-teal-700 hover:bg-teal-600 px-4 py-2 rounded font-bold"><i class="fas fa-eye mr-2"></i>Visuels</a>' : ''}
-                                \${modules.includes('ISOLATION') ? '<a href="/audit/'+auditToken+'/isolation" class="bg-red-700 border-2 border-red-400 px-4 py-2 rounded font-bold"><i class="fas fa-bolt mr-2"></i>Isolation</a>' : ''}
-                            </div>
-                            <a href="/crm/dashboard" class="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded font-bold">
-                                <i class="fas fa-home mr-2"></i>Dashboard
-                            </a>
-                        </div>
-                    \`
-                } catch (error) {
-                    console.error('Erreur:', error)
-                }
-            }
             
             // Charger tests
             async function loadTests() {
@@ -303,7 +276,7 @@ export function getAuditIsolationPage() {
             })
             
             // Init
-            loadModuleNav()
+            loadModuleNavigation(auditToken, 'ISOLATION')
             loadTests()
         </script>
     </body>

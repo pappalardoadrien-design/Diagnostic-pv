@@ -198,6 +198,7 @@ export function getAuditVisualPage() {
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/module-nav.js"></script>
         <script>
             const auditToken = window.location.pathname.split('/')[2]
             
@@ -330,7 +331,7 @@ export function getAuditVisualPage() {
             })
             
             // Init
-            loadModuleNav()
+            loadModuleNavigation(auditToken, 'VISUAL')
             loadInspections()
         </script>
     </body>
