@@ -171,6 +171,31 @@ visualRoutes.get('/report/:token', async (c) => {
       );
       return inspection?.conformite === 'non_conforme';
     }) || [];
+    
+    // Helper: Get photos HTML for an inspection
+    const getPhotosHtml = (photoUrl: string | null) => {
+      if (!photoUrl || photoUrl === 'null') return '';
+      
+      try {
+        const photoIds = JSON.parse(photoUrl);
+        const inspectionPhotos = photos?.filter((p: any) => photoIds.includes(p.id)) || [];
+        
+        if (inspectionPhotos.length === 0) return '';
+        
+        return `
+          <div class="photos-grid">
+            ${inspectionPhotos.map((photo: any) => `
+              <div class="photo-item">
+                <img src="${photo.photo_data}" alt="Photo inspection" />
+                <p class="photo-caption">${photo.description || 'Photo'}</p>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (e) {
+        return '';
+      }
+    };
 
     // Determine type
     const auditType = project?.notes?.includes('Type: TOITURE') ? 'TOITURE' : 'SOL';
@@ -329,8 +354,37 @@ visualRoutes.get('/report/:token', async (c) => {
             font-weight: bold;
             color: #16a34a;
         }
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 12px;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .photo-item {
+            text-align: center;
+        }
+        .photo-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 2px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .photo-caption {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
         @media print {
             body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .photo-item img { 
+                max-height: 120px;
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
@@ -390,7 +444,7 @@ visualRoutes.get('/report/:token', async (c) => {
                 </span>
             </div>
             ${item.notes ? `<div class="inspection-notes">📝 ${item.notes}</div>` : ''}
-            ${item.photo_url && item.photo_url !== 'null' ? `<div class="inspection-notes">📸 ${JSON.parse(item.photo_url).length} photo(s)</div>` : ''}
+            ${getPhotosHtml(item.photo_url)}
         </div>
         `).join('')}
     </div>
@@ -405,8 +459,29 @@ visualRoutes.get('/report/:token', async (c) => {
                 <div class="inspection-label">${item.checklist_section} - ${item.location_description}</div>
             </div>
             ${item.notes ? `<div class="inspection-notes">📝 ${item.notes}</div>` : ''}
+            ${getPhotosHtml(item.photo_url)}
         </div>
         `).join('')}
+    </div>
+    ` : ''}
+
+    ${photos && photos.length > 0 ? `
+    <div class="section" style="page-break-before: always;">
+        <h3>📸 Annexe Photographique</h3>
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
+            Total de ${photos.length} photo(s) capturée(s) lors de l'audit
+        </p>
+        <div class="photos-grid" style="grid-template-columns: repeat(2, 1fr); gap: 20px;">
+            ${photos.map((photo: any) => `
+                <div class="photo-item">
+                    <img src="${photo.photo_data}" alt="Photo audit" style="height: 250px;" />
+                    <p class="photo-caption">
+                        <strong>${photo.description || 'Photo audit'}</strong><br>
+                        ${photo.created_at ? new Date(photo.created_at).toLocaleString('fr-FR') : ''}
+                    </p>
+                </div>
+            `).join('')}
+        </div>
     </div>
     ` : ''}
 
