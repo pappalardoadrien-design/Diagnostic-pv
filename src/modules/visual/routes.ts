@@ -37,17 +37,52 @@ visualRoutes.post('/inspections/:token', async (c) => {
   try {
     const { DB } = c.env;
     const token = c.req.param('token');
-    const { inspection_type, observations, photos } = await c.req.json();
+    const { 
+      inspection_type, 
+      string_number,
+      module_number,
+      location_description,
+      defect_found,
+      defect_type,
+      severity_level,
+      notes,
+      photo_url,
+      gps_latitude,
+      gps_longitude,
+      corrective_action_required,
+      corrective_action_description
+    } = await c.req.json();
+
+    // Récupérer intervention_id depuis audit master
+    const audit = await DB.prepare(`
+      SELECT intervention_id FROM audits WHERE audit_token = ?
+    `).bind(token).first<{ intervention_id: number | null }>();
 
     const result = await DB.prepare(`
       INSERT INTO visual_inspections (
-        audit_token, inspection_type, observations, photos, 
-        inspection_date, created_at
-      ) VALUES (?, ?, ?, ?, date('now'), datetime('now'))
+        audit_token, intervention_id, inspection_type,
+        string_number, module_number, location_description,
+        defect_found, defect_type, severity_level,
+        photo_url, gps_latitude, gps_longitude,
+        corrective_action_required, corrective_action_description,
+        notes, inspection_date, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), datetime('now'))
     `).bind(
-      token, inspection_type || 'general',
-      observations || null,
-      photos ? JSON.stringify(photos) : null
+      token,
+      audit?.intervention_id || null,
+      inspection_type || 'general',
+      string_number || null,
+      module_number || null,
+      location_description || null,
+      defect_found ? 1 : 0,
+      defect_type || null,
+      severity_level || null,
+      photo_url || null,
+      gps_latitude || null,
+      gps_longitude || null,
+      corrective_action_required ? 1 : 0,
+      corrective_action_description || null,
+      notes || null
     ).run();
 
     return c.json({

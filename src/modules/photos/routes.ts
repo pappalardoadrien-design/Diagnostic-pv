@@ -213,4 +213,67 @@ app.get('/:auditToken/module/:moduleType', async (c) => {
   }
 })
 
+// ============================================================================
+// POST /api/photos/observations
+// Créer une observation terrain (texte seul, sans photo)
+// ============================================================================
+app.post('/observations', async (c) => {
+  const { env } = c
+  
+  try {
+    const body = await c.req.json()
+    const { 
+      audit_token, 
+      module_type, 
+      observation_text,
+      string_number,
+      module_number,
+      latitude,
+      longitude,
+      accuracy
+    } = body
+
+    if (!audit_token || !observation_text) {
+      return c.json({ error: 'audit_token and observation_text required' }, 400)
+    }
+
+    // Créer une entrée "photo" avec une image placeholder pour les observations texte
+    const placeholderImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzMzMzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+T0JTPC90ZXh0Pjwvc3ZnPg=='
+
+    const result = await env.DB.prepare(`
+      INSERT INTO photos (
+        audit_token, module_type, 
+        photo_data, photo_format, photo_size,
+        description, 
+        string_number, module_number,
+        latitude, longitude, gps_accuracy,
+        captured_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      audit_token,
+      module_type || 'GENERAL',
+      placeholderImage,
+      'svg',
+      placeholderImage.length,
+      observation_text,
+      string_number || null,
+      module_number || null,
+      latitude || null,
+      longitude || null,
+      accuracy || null
+    ).run()
+
+    return c.json({
+      success: true,
+      observation_id: result.meta.last_row_id,
+      message: 'Observation saved successfully'
+    })
+
+  } catch (error: any) {
+    console.error('Create observation error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 export default app

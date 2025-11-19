@@ -23,4 +23,7 @@ elModule.route('/dashboard', dashboardRouter)
 // Routes pour la gestion des audits (inclut les routes modules intégrées)
 elModule.route('/audit', auditsRouter)
 
+// Routes pour les modules (GET/PUT modules individuels)
+elModule.route('/modules', modulesRouter)
+
 export default elModule
