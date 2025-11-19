@@ -24,6 +24,7 @@ import { getAuditVisualPage } from './pages/audit-visual'
 import { getAuditIsolationPage } from './pages/audit-isolation'
 import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
 import { getGirasoleToitureChecklistPage } from './pages/audit-visual-girasole-toiture'
+import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
 import { getCrmClientsListPage } from './pages/crm-clients-list'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
 import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
@@ -433,8 +434,13 @@ app.get('/audit/:token/isolation', (c) => {
 })
 
 // ============================================================================
-// CHECKLISTS GIRASOLE - AUDITS QUALITÉ CONFORMITÉ
+// GIRASOLE - MISSION 52 CENTRALES PV
 // ============================================================================
+// Dashboard GIRASOLE - Vue d'ensemble mission 52 centrales
+app.get('/girasole/dashboard', (c) => {
+  return c.html(getGirasoleDashboardPage())
+})
+
 // Checklist Conformité NF C 15-100 + UTE C 15-712 (centrales SOL)
 app.get('/audit/:token/visual/girasole/conformite', (c) => {
   return c.html(getGirasoleConformiteChecklistPage())
