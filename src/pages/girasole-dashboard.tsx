@@ -188,10 +188,14 @@ export function getGirasoleDashboardPage() {
             </h3>
             
             <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p class="text-sm text-blue-800">
+                <p class="text-sm text-blue-800 mb-2">
                     <i class="fas fa-info-circle"></i>
-                    Format CSV attendu : <code class="bg-white px-2 py-1 rounded">nom_centrale,type,ville,puissance_kwc,date_intervention</code>
+                    Format CSV attendu : <code class="bg-white px-2 py-1 rounded">nom_centrale,type,ville,code_postal,puissance_kwc,nombre_modules,latitude,longitude,date_intervention</code>
                 </p>
+                <a href="/api/girasole/template" download="girasole_template.csv" class="text-sm text-blue-600 hover:underline">
+                    <i class="fas fa-download mr-1"></i>
+                    Télécharger le template CSV avec exemples
+                </a>
             </div>
 
             <input type="file" id="csv-file-input" accept=".csv" class="border rounded-lg px-4 py-2 w-full mb-4" />
@@ -477,11 +481,42 @@ export function getGirasoleDashboardPage() {
 
             try {
                 const text = await file.text();
-                alert('Import CSV en cours de développement');
-                // TODO: Implement /api/planning/import-girasole-csv
+                
+                // Show loading
+                const confirmBtn = document.getElementById('btn-confirm-import');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Import en cours...';
+                
+                // Call import API
+                const { data } = await axios.post('/api/girasole/import-csv', {
+                    csv_content: text,
+                    client_name: 'GIRASOLE Energies'
+                });
+                
                 hideImportModal();
+                
+                if (data.success) {
+                    alert(\`✅ Import réussi !
+                    
+\${data.projects_created} centrales créées
+\${data.interventions_created} interventions créées
+\${data.audits_created} audits créés
+
+\${data.errors.length > 0 ? 'Erreurs : ' + data.errors.length : ''}\`);
+                    
+                    // Reload dashboard
+                    loadCentrales();
+                } else {
+                    alert('❌ Erreur import : ' + data.error);
+                }
+                
             } catch (error) {
-                alert('Erreur import : ' + error.message);
+                alert('❌ Erreur import : ' + error.message);
+            } finally {
+                // Reset button
+                const confirmBtn = document.getElementById('btn-confirm-import');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'Importer';
             }
         }
 

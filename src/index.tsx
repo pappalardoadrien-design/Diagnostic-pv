@@ -142,6 +142,12 @@ app.route('/api/isolation', isolationRoutes)
 app.route('/api/modules', unifiedModulesRoutes)
 
 // ============================================================================
+// GIRASOLE - IMPORT & BATCH OPERATIONS
+// ============================================================================
+import girasoleImportRoutes from './modules/girasole/import-routes'
+app.route('/api/girasole', girasoleImportRoutes)
+
+// ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
 // ============================================================================
 // Les routes suivantes ont été migrées vers src/modules/el/ (Point 4.1)
