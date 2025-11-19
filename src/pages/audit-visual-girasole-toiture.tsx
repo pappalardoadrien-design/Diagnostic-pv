@@ -318,6 +318,8 @@ export function getGirasoleToitureChecklistPage() {
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = async (event) => {
+                        console.log('[PHOTO] Début upload pour item:', itemId);
+                        
                         try {
                             const response = await axios.post('/api/photos/upload', {
                                 audit_token: auditToken,
@@ -326,13 +328,21 @@ export function getGirasoleToitureChecklistPage() {
                                 description: itemId
                             });
                             
+                            console.log('[PHOTO] Upload réussi, photo_id:', response.data.photo_id);
+                            
                             if (!photos[itemId]) photos[itemId] = [];
                             photos[itemId].push({ id: response.data.photo_id, data: event.target.result });
                             
+                            console.log('[PHOTO] Total photos:', photos[itemId].length);
+                            
                             renderPhotos(itemId);
                             saveDraft();
+                            
+                            alert('✅ Photo ajoutée avec succès !');
                         } catch (error) {
-                            alert('Erreur upload photo');
+                            console.error('[PHOTO] Erreur:', error);
+                            console.error('[PHOTO] Détails:', error.response?.data);
+                            alert('❌ Erreur upload : ' + (error.response?.data?.error || error.message));
                         }
                     };
                     reader.readAsDataURL(file);

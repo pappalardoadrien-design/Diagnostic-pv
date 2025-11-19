@@ -310,12 +310,14 @@ export function getGirasoleConformiteChecklistPage() {
                         <div class="mt-2">
                             <button 
                                 type="button" 
-                                class="text-sm text-blue-600 hover:underline" 
+                                class="text-sm text-blue-600 hover:underline font-medium" 
                                 onclick="addPhoto('\${item.id}')">
                                 <i class="fas fa-camera mr-1"></i>
                                 Ajouter photo
                             </button>
-                            <div id="photos-\${item.id}" class="mt-2 flex gap-2 flex-wrap"></div>
+                            <div id="photos-\${item.id}" class="mt-3 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300 min-h-[80px] flex gap-3 flex-wrap items-center">
+                                <p class="text-xs text-gray-400 italic">Aucune photo ajoutée</p>
+                            </div>
                         </div>
                     </div>
                 \`;
@@ -399,6 +401,13 @@ export function getGirasoleConformiteChecklistPage() {
                         const photoData = event.target.result;
                         
                         // Upload photo
+                        console.log('[PHOTO] Début upload pour item:', itemId);
+                        const btn = document.querySelector(\`button[onclick*="addPhoto('\${itemId}')"]\`);
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Upload...';
+                        }
+                        
                         try {
                             const response = await axios.post('/api/photos/upload', {
                                 audit_token: auditToken,
@@ -409,14 +418,33 @@ export function getGirasoleConformiteChecklistPage() {
                                 longitude: null
                             });
                             
+                            console.log('[PHOTO] Upload réussi, photo_id:', response.data.photo_id);
+                            
                             if (!photos[itemId]) photos[itemId] = [];
                             photos[itemId].push({ id: response.data.photo_id, data: photoData });
                             
+                            console.log('[PHOTO] Total photos pour', itemId, ':', photos[itemId].length);
+                            
                             renderPhotos(itemId);
                             saveDraft();
+                            
+                            // Feedback visuel
+                            if (btn) {
+                                btn.innerHTML = '<i class="fas fa-check text-green-500"></i> Photo ajoutée !';
+                                setTimeout(() => {
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-camera mr-2"></i>Ajouter photo';
+                                }, 2000);
+                            }
                         } catch (error) {
-                            console.error('Upload error:', error);
-                            alert('Erreur upload photo');
+                            console.error('[PHOTO] Erreur upload:', error);
+                            console.error('[PHOTO] Détails:', error.response?.data);
+                            alert('❌ Erreur upload photo : ' + (error.response?.data?.error || error.message));
+                            
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-camera mr-2"></i>Ajouter photo';
+                            }
                         }
                     };
                     reader.readAsDataURL(file);
@@ -427,20 +455,35 @@ export function getGirasoleConformiteChecklistPage() {
 
         function renderPhotos(itemId) {
             const container = document.getElementById(\`photos-\${itemId}\`);
-            if (!container) return;
+            console.log('[PHOTO] renderPhotos pour', itemId, 'container trouvé:', !!container);
+            
+            if (!container) {
+                console.warn('[PHOTO] Container photos-' + itemId + ' introuvable dans DOM');
+                return;
+            }
             
             const itemPhotos = photos[itemId] || [];
+            console.log('[PHOTO] Nombre de photos à afficher:', itemPhotos.length);
+            
+            if (itemPhotos.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400 italic">Aucune photo</p>';
+                return;
+            }
+            
             container.innerHTML = itemPhotos.map((photo, idx) => \`
-                <div class="relative">
-                    <img src="\${photo.data}" class="w-20 h-20 object-cover rounded border">
+                <div class="relative inline-block">
+                    <img src="\${photo.data}" class="w-20 h-20 object-cover rounded border shadow-sm">
                     <button 
                         type="button" 
-                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs"
+                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600"
                         onclick="deletePhoto('\${itemId}', \${idx})">
                         ×
                     </button>
+                    <p class="text-xs text-center text-gray-500 mt-1">Photo \${idx + 1}</p>
                 </div>
             \`).join('');
+            
+            console.log('[PHOTO] HTML injecté dans container');
         }
 
         function deletePhoto(itemId, index) {
