@@ -497,6 +497,16 @@ app.get('/subcontractors', (c) => {
 })
 
 // ============================================================================
+// MODE TERRAIN MOBILE - INTERFACE OPTIMISÉE SMARTPHONE
+// ============================================================================
+// Saisie rapide sur site avec photo, GPS, notes vocales
+// ============================================================================
+import { getMobileFieldModePage } from './pages/mobile-field-mode'
+app.get('/mobile/field', (c) => {
+  return c.html(getMobileFieldModePage())
+})
+
+// ============================================================================
 // PAGE D'ACCUEIL - DIAGNOSTIC HUB
 // ============================================================================
 // ============================================================================
