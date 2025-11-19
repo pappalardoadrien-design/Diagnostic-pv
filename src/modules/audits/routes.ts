@@ -15,6 +15,72 @@ type Bindings = {
 const auditsRouter = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
+// POST /api/audits
+// Créer un audit simple (pour dashboard GIRASOLE)
+// ============================================================================
+auditsRouter.post('/', async (c) => {
+  const { env } = c
+  const requestData = await c.req.json()
+  
+  const {
+    audit_token,
+    client_id,
+    project_id,
+    intervention_id,
+    project_name,
+    client_name,
+    location,
+    status = 'pending',
+    modules_enabled = '["VISUAL"]'
+  } = requestData
+  
+  try {
+    // Validation
+    if (!audit_token || !project_name) {
+      return c.json({ error: 'audit_token et project_name requis' }, 400)
+    }
+    
+    // Créer audit simple
+    const auditInsert = await env.DB.prepare(`
+      INSERT INTO audits (
+        audit_token, intervention_id, client_id, project_id,
+        project_name, client_name, location,
+        modules_enabled, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).bind(
+      audit_token,
+      intervention_id || null,
+      client_id || null,
+      project_id || null,
+      project_name,
+      client_name || 'Client sans nom',
+      location || '',
+      typeof modules_enabled === 'string' ? modules_enabled : JSON.stringify(modules_enabled),
+      status
+    ).run()
+    
+    const auditId = auditInsert.meta.last_row_id
+    
+    return c.json({
+      success: true,
+      audit_id: auditId,
+      audit_token: audit_token,
+      project_name,
+      client_name,
+      location,
+      status
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur création audit simple:', error)
+    return c.json({ 
+      error: 'Erreur lors de la création de l\'audit',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
 // POST /api/audits/create-multi-modules
 // Créer un audit multi-modules depuis intervention OU saisie manuelle
 // ============================================================================

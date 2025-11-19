@@ -373,27 +373,83 @@ export function getGirasoleDashboardPage() {
         }
 
         function getActionButtons(centrale) {
-            const checklistUrl = centrale.type === 'SOL' 
-                ? \`/audit/\${centrale.audit?.token || 'NEW'}/visual/girasole/conformite\`
-                : \`/audit/\${centrale.audit?.token || 'NEW'}/visual/girasole/toiture\`;
+            let buttons = '';
             
-            let buttons = \`
-                <a href="\${checklistUrl}" class="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
-                    <i class="fas fa-clipboard-check mr-1"></i>
-                    Checklist
-                </a>
-            \`;
-
-            if (centrale.audit) {
-                buttons += \`
-                    <a href="/api/visual/report/\${centrale.audit.token}" target="_blank" class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg">
-                        <i class="fas fa-file-pdf mr-1"></i>
-                        PDF
+            if (centrale.audit?.token) {
+                // Audit existe déjà - lien direct vers checklist
+                const checklistUrl = centrale.type === 'SOL' 
+                    ? \`/audit/\${centrale.audit.token}/visual/girasole/conformite\`
+                    : \`/audit/\${centrale.audit.token}/visual/girasole/toiture\`;
+                
+                buttons = \`
+                    <a href="\${checklistUrl}" class="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
+                        <i class="fas fa-clipboard-check mr-1"></i>
+                        Checklist
                     </a>
+                \`;
+                
+                // Bouton PDF si audit a des inspections
+                if (centrale.audit.stats && centrale.audit.stats.total > 0) {
+                    buttons += \`
+                        <a href="/api/visual/report/\${centrale.audit.token}" target="_blank" class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg ml-2">
+                            <i class="fas fa-file-pdf mr-1"></i>
+                            PDF
+                        </a>
+                    \`;
+                }
+            } else {
+                // Pas d'audit - bouton pour créer audit d'abord
+                buttons = \`
+                    <button onclick="createAuditAndOpenChecklist(\${centrale.id}, '\${centrale.type}')" class="inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg">
+                        <i class="fas fa-plus-circle mr-1"></i>
+                        Créer Audit
+                    </button>
                 \`;
             }
 
             return buttons;
+        }
+        
+        // Créer audit puis rediriger vers checklist
+        async function createAuditAndOpenChecklist(projectId, type) {
+            try {
+                const project = centrales.find(c => c.id === projectId);
+                if (!project || !project.intervention) {
+                    alert('❌ Impossible : intervention non trouvée pour cette centrale');
+                    return;
+                }
+                
+                // Générer token unique
+                const auditToken = \`GIRASOLE-\${type}-\${projectId}-\${Date.now()}\`;
+                
+                // Créer audit
+                const { data: clientsData } = await axios.get('/api/crm/clients');
+                const girasoleClient = clientsData.clients?.find(c => 
+                    c.company_name?.toLowerCase().includes('girasole')
+                );
+                
+                await axios.post('/api/audits', {
+                    audit_token: auditToken,
+                    client_id: girasoleClient?.id,
+                    project_id: projectId,
+                    intervention_id: project.intervention.id,
+                    project_name: project.project_name || project.name,
+                    client_name: girasoleClient?.company_name || 'GIRASOLE Energies',
+                    location: project.site_address || '',
+                    status: 'pending'
+                });
+                
+                // Rediriger vers checklist
+                const checklistUrl = type === 'SOL' 
+                    ? \`/audit/\${auditToken}/visual/girasole/conformite\`
+                    : \`/audit/\${auditToken}/visual/girasole/toiture\`;
+                
+                window.location.href = checklistUrl;
+                
+            } catch (error) {
+                console.error('Create audit error:', error);
+                alert('❌ Erreur création audit : ' + error.message);
+            }
         }
 
         function renderEmptyState(message) {
