@@ -20,9 +20,10 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev
+- **Production**: https://40a80360.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://40a80360.diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
-- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`
+- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`
 
 ---
 
@@ -250,7 +251,41 @@ GET    /api/isolation/report/:token                 Rapport PDF tests
 
 ---
 
-### **7. API Unifiée Modules** ✅
+### **7. Mode Terrain Mobile (PWA)** ✅ 🆕
+
+**Page UI**:
+- `/mobile/field` - Interface mobile terrain (PWA installable)
+
+**Fonctionnalités**:
+- 📸 **Capture photo** - Camera API avec preview temps réel
+- 🎙️ **Observations vocales** - Web Speech API (reconnaissance français)
+- 📍 **Géolocalisation GPS** - Position automatique + précision
+- 📱 **QR Code Scanner** - Scan codes modules (STRING:X-MODULE:Y)
+- ⚡ **Mode hors ligne** - Service Worker + localStorage
+- 🔄 **Sync automatique** - Envoi différé quand connexion rétablie
+- 📊 **Compteurs temps réel** - Photos/observations par audit
+
+**API Routes**:
+```
+GET    /api/photos/:token                       Liste photos audit
+POST   /api/photos/upload                       Upload photo (base64 + GPS)
+POST   /api/photos/observations                 Créer observation texte
+GET    /api/photos/:token/:photoId              Photo individuelle
+DELETE /api/photos/:token/:photoId              Supprimer photo
+```
+
+**PWA Configuration**:
+- Manifest.json: `/static/manifest.json`
+- Service Worker: `/static/sw.js`
+- Icons: `/static/icon-192.png`, `/static/icon-512.png`
+- Installable: Chrome, Edge, Safari iOS
+
+**Base de Données**:
+- Table `photos`: Photos (audit_token, module_type, photo_data base64, description, GPS, string_number, module_number)
+
+---
+
+### **8. API Unifiée Modules** ✅
 
 **Routes**:
 ```
@@ -545,6 +580,26 @@ Adrien PAPPALARDO - Business Developer
 ---
 
 ## 📝 Changelog
+
+### **v3.0.0 - 2025-11-19** 🚀
+- ✅ **Mode Terrain Mobile (PWA)**
+  - Interface mobile optimisée touch
+  - Capture photo Camera API
+  - Observations vocales Web Speech API
+  - Géolocalisation GPS précise
+  - QR Code Scanner
+  - Mode hors ligne Service Worker
+  - Installable comme app native
+- ✅ **Architecture Multi-Modules Unifiée**
+  - 1 audit_token → N modules (EL, IV, Visual, Isolation)
+  - Foreign Keys CASCADE pour intégrité
+  - API photos centralisée
+  - Interconnexion dynamique complète
+- ✅ **Vérification 100% Production**
+  - Tests end-to-end complets
+  - Corrections schéma database
+  - Migrations production appliquées
+  - URL stable: https://40a80360.diagnostic-hub.pages.dev
 
 ### **v2.0.0 - 2025-11-17** 🎉
 - ✅ Phase 1C: Automatisation workflow CRM → Planning → Audits
