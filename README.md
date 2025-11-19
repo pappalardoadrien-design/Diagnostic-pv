@@ -218,15 +218,31 @@ POST   /api/visual/inspections/:token               Créer inspection
 GET    /api/visual/report/:token                    Rapport PDF inspections
 ```
 
+**Pages UI**:
+```
+GET    /audit/:token/visual/girasole/conformite     Checklist Conformité NF C 15-100 + UTE C 15-712 (SOL)
+GET    /audit/:token/visual/girasole/toiture        Checklist Toiture DTU 40.35 + ETN (TOITURE)
+```
+
 **Données Capturées**:
 - Type inspection (general, structural, electrical, mechanical)
+- **Catégorie audit** (conformite_nfc15100, toiture_dtu4035, bureau_etudes)
+- **Conformité** (conforme, non_conforme, s.o.)
+- **Section checklist** (identification, autocontrôle, protection, etc.)
 - Observations texte
 - Photos (URLs JSON array)
 - Défauts détectés
 - Sévérité (low, medium, high, critical)
 
+**🆕 Checklists GIRASOLE (52 centrales)**:
+- **39 SOL**: Conformité NF C 15-100 + UTE C 15-712 (12 sections, 80+ items)
+- **13 TOITURE**: DTU 40.35 + ETN (7 sections, sécurité renforcée)
+- **Workflow**: Photo + Conformité + Commentaire par item
+- **Brouillons**: localStorage + offline-first
+- **Mission**: 66.885€ HT, janvier-mars 2025
+
 **Base de Données**:
-- Table `visual_inspections`: Inspections (type, observations, photos JSON, severity)
+- Table `visual_inspections`: Inspections (type, observations, photos JSON, severity, **conformite, audit_category, checklist_section, item_order**)
 
 ---
 
@@ -540,8 +556,15 @@ git push origin main
 ## 🎯 Prochaines Améliorations (Roadmap)
 
 ### **Phase 3 - Fonctionnalités Avancées**
+- [ ] **GIRASOLE - Fonctionnalités Manquantes** (PRIORITÉ)
+  - [ ] Export Excel ANNEXE 2 (47 colonnes) - Route: `GET /api/visual/export-annexe2/:token`
+  - [ ] Génération rapports PDF individuels (52 rapports) - Route: `POST /api/visual/batch-reports`
+  - [ ] Rapport synthèse général client - Route: `GET /api/visual/synthesis-report/client/:clientId`
+  - [ ] Import planificateur CSV GIRASOLE - Route: `POST /api/planning/import-girasole-csv`
+  - [ ] Dashboard marges client - Page: `/planning/client/:id/marges`
+  - [ ] Checklist BE (Bureau d'Études) - Page: `/audit/:token/visual/girasole/be` (si nécessaire)
 - [ ] Pages UI Module I-V (liste, import CSV, détail module)
-- [ ] Pages UI Module Visuels (formulaire checklist, galerie photos)
+- [ ] Pages UI Module Visuels généraux (formulaire checklist, galerie photos)
 - [ ] Pages UI Module Isolation (formulaire tests, dashboard conformité)
 - [ ] Graphiques courbes I-V (Chart.js ou Canvas)
 - [ ] Upload images EL modules (Cloudflare R2)
@@ -580,6 +603,16 @@ Adrien PAPPALARDO - Business Developer
 ---
 
 ## 📝 Changelog
+
+### **v3.1.0 - 2025-11-19** 🌟
+- ✅ **Mission GIRASOLE (52 centrales PV)**
+  - Extension Module Visuels pour audits qualité multi-sites
+  - Checklist Conformité NF C 15-100 + UTE C 15-712 (39 centrales SOL)
+  - Checklist Toiture DTU 40.35 + ETN (13 centrales TOITURE)
+  - Migration DB 0035: 6 nouvelles colonnes (conformite, audit_category, etc.)
+  - Architecture extensible pour futurs clients multi-sites
+  - Budget: 66.885€ HT, période janvier-mars 2025
+  - Documentation complète: `GIRASOLE_INTEGRATION.md`
 
 ### **v3.0.0 - 2025-11-19** 🚀
 - ✅ **Mode Terrain Mobile (PWA)**
