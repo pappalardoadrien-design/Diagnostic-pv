@@ -72,10 +72,10 @@ visualRoutes.post('/inspections/:token', async (c) => {
         defect_found, defect_type, severity_level,
         photo_url, gps_latitude, gps_longitude,
         corrective_action_required, corrective_action_description,
-        notes, inspection_date, created_at,
+        notes,
         conformite, prescriptions_girasole, bonnes_pratiques,
         audit_category, checklist_section, item_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), datetime('now'), ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       token,
       audit?.intervention_id || null,
