@@ -579,37 +579,97 @@ crmRoutes.put('/projects/:id', async (c) => {
     const projectId = c.req.param('id');
     const body = await c.req.json();
 
+    // Construire dynamiquement UPDATE si seulement audit_types fourni
+    const fields = [];
+    const values = [];
+
+    if (body.audit_types !== undefined) {
+      fields.push('audit_types = ?');
+      values.push(body.audit_types);
+    }
+    if (body.project_name !== undefined) {
+      fields.push('project_name = ?');
+      values.push(body.project_name);
+    }
+    if (body.total_power_kwp !== undefined) {
+      fields.push('total_power_kwp = ?');
+      values.push(body.total_power_kwp);
+    }
+    if (body.module_count !== undefined) {
+      fields.push('module_count = ?');
+      values.push(body.module_count);
+    }
+    if (body.module_type !== undefined) {
+      fields.push('module_type = ?');
+      values.push(body.module_type);
+    }
+    if (body.inverter_type !== undefined) {
+      fields.push('inverter_type = ?');
+      values.push(body.inverter_type);
+    }
+    if (body.installation_date !== undefined) {
+      fields.push('installation_date = ?');
+      values.push(body.installation_date);
+    }
+    if (body.status !== undefined) {
+      fields.push('status = ?');
+      values.push(body.status);
+    }
+    if (body.address_street !== undefined) {
+      fields.push('address_street = ?');
+      values.push(body.address_street);
+    }
+    if (body.address_postal_code !== undefined) {
+      fields.push('address_postal_code = ?');
+      values.push(body.address_postal_code);
+    }
+    if (body.address_city !== undefined) {
+      fields.push('address_city = ?');
+      values.push(body.address_city);
+    }
+    if (body.gps_latitude !== undefined) {
+      fields.push('gps_latitude = ?');
+      values.push(body.gps_latitude);
+    }
+    if (body.gps_longitude !== undefined) {
+      fields.push('gps_longitude = ?');
+      values.push(body.gps_longitude);
+    }
+    if (body.notes !== undefined) {
+      fields.push('notes = ?');
+      values.push(body.notes);
+    }
+    if (body.inverter_count !== undefined) {
+      fields.push('inverter_count = ?');
+      values.push(body.inverter_count);
+    }
+    if (body.inverter_brand !== undefined) {
+      fields.push('inverter_brand = ?');
+      values.push(body.inverter_brand);
+    }
+    if (body.junction_box_count !== undefined) {
+      fields.push('junction_box_count = ?');
+      values.push(body.junction_box_count);
+    }
+    if (body.strings_configuration !== undefined) {
+      fields.push('strings_configuration = ?');
+      values.push(body.strings_configuration);
+    }
+    if (body.technical_notes !== undefined) {
+      fields.push('technical_notes = ?');
+      values.push(body.technical_notes);
+    }
+
+    if (fields.length === 0) {
+      return c.json({ success: false, error: 'Aucune modification fournie' }, 400);
+    }
+
+    fields.push('updated_at = datetime(\'now\')');
+    values.push(projectId);
+
     await DB.prepare(`
-      UPDATE projects SET
-        project_name = ?, total_power_kwp = ?, module_count = ?, module_type = ?,
-        inverter_type = ?, installation_date = ?, status = ?,
-        address_street = ?, address_postal_code = ?, address_city = ?,
-        gps_latitude = ?, gps_longitude = ?, notes = ?,
-        inverter_count = ?, inverter_brand = ?, junction_box_count = ?,
-        strings_configuration = ?, technical_notes = ?,
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(
-      body.project_name,
-      body.total_power_kwp,
-      body.module_count,
-      body.module_type,
-      body.inverter_type,
-      body.installation_date,
-      body.status,
-      body.address_street,
-      body.address_postal_code,
-      body.address_city,
-      body.gps_latitude,
-      body.gps_longitude,
-      body.notes,
-      body.inverter_count,
-      body.inverter_brand,
-      body.junction_box_count,
-      body.strings_configuration,
-      body.technical_notes,
-      projectId
-    ).run();
+      UPDATE projects SET ${fields.join(', ')} WHERE id = ?
+    `).bind(...values).run();
 
     return c.json({
       success: true,

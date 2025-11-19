@@ -124,6 +124,10 @@ export function getGirasoleDashboardPage() {
                 </div>
 
                 <div class="flex gap-2">
+                    <a href="/girasole/config-audits" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">
+                        <i class="fas fa-cog"></i>
+                        Config Audits
+                    </a>
                     <button id="btn-export-excel" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">
                         <i class="fas fa-file-excel"></i>
                         Export Excel
@@ -382,35 +386,48 @@ export function getGirasoleDashboardPage() {
         function getActionButtons(centrale) {
             let buttons = '';
             
-            if (centrale.audit?.token) {
-                // Audit existe déjà - lien direct vers checklist
-                const checklistUrl = centrale.type === 'SOL' 
-                    ? \`/audit/\${centrale.audit.token}/visual/girasole/conformite\`
-                    : \`/audit/\${centrale.audit.token}/visual/girasole/toiture\`;
+            // Parser audit_types (par défaut ["CONFORMITE"])
+            let auditTypes = [];
+            try {
+                auditTypes = JSON.parse(centrale.audit_types || '["CONFORMITE"]');
+            } catch (e) {
+                auditTypes = ['CONFORMITE'];
+            }
+            
+            // Générer boutons par type d'audit
+            auditTypes.forEach(auditType => {
+                const typeLabel = auditType === 'CONFORMITE' ? 'Conformité' : 'Toiture';
+                const typeColor = auditType === 'CONFORMITE' ? 'blue' : 'purple';
+                const checklistUrl = auditType === 'CONFORMITE'
+                    ? \`/audit/\${centrale.audit?.token || 'NEW'}/visual/girasole/conformite\`
+                    : \`/audit/\${centrale.audit?.token || 'NEW'}/visual/girasole/toiture\`;
                 
-                buttons = \`
-                    <a href="\${checklistUrl}" class="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
-                        <i class="fas fa-clipboard-check mr-1"></i>
-                        Checklist
-                    </a>
-                \`;
-                
-                // Bouton PDF si audit a des inspections
-                if (centrale.audit.stats && centrale.audit.stats.total > 0) {
+                if (centrale.audit?.token) {
+                    // Audit existe - bouton checklist
                     buttons += \`
-                        <a href="/api/visual/report/\${centrale.audit.token}" target="_blank" class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg ml-2">
-                            <i class="fas fa-file-pdf mr-1"></i>
-                            PDF
+                        <a href="\${checklistUrl}" class="inline-flex items-center px-3 py-1 bg-\${typeColor}-600 hover:bg-\${typeColor}-700 text-white text-sm rounded-lg mr-1 mb-1">
+                            <i class="fas fa-clipboard-check mr-1"></i>
+                            \${typeLabel}
                         </a>
                     \`;
+                } else {
+                    // Pas d'audit - bouton créer
+                    buttons += \`
+                        <button onclick="createAuditAndOpenChecklist(\${centrale.id}, '\${auditType}')" class="inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg mr-1 mb-1">
+                            <i class="fas fa-plus-circle mr-1"></i>
+                            Créer \${typeLabel}
+                        </button>
+                    \`;
                 }
-            } else {
-                // Pas d'audit - bouton pour créer audit d'abord
-                buttons = \`
-                    <button onclick="createAuditAndOpenChecklist(\${centrale.id}, '\${centrale.type}')" class="inline-flex items-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg">
-                        <i class="fas fa-plus-circle mr-1"></i>
-                        Créer Audit
-                    </button>
+            });
+            
+            // Bouton PDF si audit existe avec données
+            if (centrale.audit?.token && centrale.audit.stats && centrale.audit.stats.total > 0) {
+                buttons += \`
+                    <a href="/api/visual/report/\${centrale.audit.token}" target="_blank" class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg">
+                        <i class="fas fa-file-pdf mr-1"></i>
+                        PDF
+                    </a>
                 \`;
             }
 
