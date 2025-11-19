@@ -452,10 +452,23 @@ export function getGirasoleDashboardPage() {
         // ========================================================================
         async function exportExcel() {
             try {
-                alert('Export Excel en cours de développement (ANNEXE 2)');
-                // TODO: Implement /api/visual/export-annexe2-batch
+                // Get GIRASOLE client ID
+                const { data: clientsData } = await axios.get('/api/crm/clients');
+                const girasoleClient = clientsData.clients?.find(c => 
+                    c.company_name?.toLowerCase().includes('girasole')
+                );
+
+                if (!girasoleClient) {
+                    alert('❌ Client GIRASOLE non trouvé');
+                    return;
+                }
+
+                // Download Excel export
+                window.location.href = \`/api/girasole/export-annexe2/\${girasoleClient.id}\`;
+                
+                alert('✅ Export Excel ANNEXE 2 lancé ! Le téléchargement va démarrer...');
             } catch (error) {
-                alert('Erreur export : ' + error.message);
+                alert('❌ Erreur export : ' + error.message);
             }
         }
 
