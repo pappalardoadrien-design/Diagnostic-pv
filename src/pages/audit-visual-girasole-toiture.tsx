@@ -236,12 +236,12 @@ export function getGirasoleToitureChecklistPage() {
                                 S.O
                             </button>
                         </div>
-                        <input 
-                            type="text" 
+                        <textarea 
                             id="comment-\${item.id}" 
-                            placeholder="Commentaire" 
-                            class="w-full px-3 py-2 border rounded text-sm mt-2"
-                            onchange="updateComment('\${item.id}', this.value)">
+                            placeholder="Commentaire détaillé (optionnel) - Décrivez l'état de la toiture, les observations, recommandations..." 
+                            class="w-full px-3 py-2 border rounded text-sm mt-2 resize-y"
+                            rows="3"
+                            onchange="updateComment('\${item.id}', this.value)"></textarea>
                         <button 
                             type="button" 
                             class="text-sm text-orange-600 hover:underline mt-2" 

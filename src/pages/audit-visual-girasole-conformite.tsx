@@ -300,12 +300,12 @@ export function getGirasoleConformiteChecklistPage() {
                             </button>
                         </div>
                         <div class="mt-2">
-                            <input 
-                                type="text" 
+                            <textarea 
                                 id="comment-\${item.id}" 
-                                placeholder="Commentaire (optionnel)" 
-                                class="w-full px-3 py-2 border rounded text-sm"
-                                onchange="updateComment('\${item.id}', this.value)">
+                                placeholder="Commentaire détaillé (optionnel) - Décrivez la non-conformité, les observations, recommandations..." 
+                                class="w-full px-3 py-2 border rounded text-sm resize-y"
+                                rows="3"
+                                onchange="updateComment('\${item.id}', this.value)"></textarea>
                         </div>
                         <div class="mt-2">
                             <button 
