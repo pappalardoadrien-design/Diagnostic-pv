@@ -50,7 +50,14 @@ visualRoutes.post('/inspections/:token', async (c) => {
       gps_latitude,
       gps_longitude,
       corrective_action_required,
-      corrective_action_description
+      corrective_action_description,
+      // 🆕 GIRASOLE fields
+      conformite,
+      prescriptions_girasole,
+      bonnes_pratiques,
+      audit_category,
+      checklist_section,
+      item_order
     } = await c.req.json();
 
     // Récupérer intervention_id depuis audit master
@@ -65,8 +72,10 @@ visualRoutes.post('/inspections/:token', async (c) => {
         defect_found, defect_type, severity_level,
         photo_url, gps_latitude, gps_longitude,
         corrective_action_required, corrective_action_description,
-        notes, inspection_date, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), datetime('now'))
+        notes, inspection_date, created_at,
+        conformite, prescriptions_girasole, bonnes_pratiques,
+        audit_category, checklist_section, item_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), datetime('now'), ?, ?, ?, ?, ?, ?)
     `).bind(
       token,
       audit?.intervention_id || null,
@@ -82,7 +91,14 @@ visualRoutes.post('/inspections/:token', async (c) => {
       gps_longitude || null,
       corrective_action_required ? 1 : 0,
       corrective_action_description || null,
-      notes || null
+      notes || null,
+      // 🆕 GIRASOLE fields
+      conformite || null,
+      prescriptions_girasole || null,
+      bonnes_pratiques || null,
+      audit_category || null,
+      checklist_section || null,
+      item_order || null
     ).run();
 
     return c.json({
