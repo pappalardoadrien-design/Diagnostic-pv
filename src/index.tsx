@@ -109,6 +109,12 @@ import csvExportRoutes from './modules/exports/csv-routes'
 app.route('/api/exports/csv', csvExportRoutes)
 
 // ============================================================================
+// MODULE PHOTOS - UPLOAD ET GESTION PHOTOS TERRAIN
+// ============================================================================
+import photosRoutes from './modules/photos/routes'
+app.route('/api/photos', photosRoutes)
+
+// ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
 // ============================================================================
 import ivRoutes from './modules/iv/routes'

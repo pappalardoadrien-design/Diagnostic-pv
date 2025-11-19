@@ -478,10 +478,52 @@ export function getMobileFieldModePage() {
             document.getElementById('btn-save-photo').addEventListener('click', async () => {
                 const description = document.getElementById('photo-description').value
                 const preview = document.getElementById('photo-preview')
+                const photoData = preview.src // Base64 data URL
                 
-                // TODO: Upload photo to server
-                alert('Photo enregistrée! (TODO: upload serveur)')
+                if (!currentAudit) {
+                    alert('Erreur: Aucun audit sélectionné')
+                    return
+                }
                 
+                // Afficher loading
+                const btn = document.getElementById('btn-save-photo')
+                const originalText = btn.innerHTML
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Upload...'
+                btn.disabled = true
+                
+                try {
+                    // Upload photo to server
+                    const uploadData = {
+                        audit_token: currentAudit,
+                        module_type: currentModule,
+                        photo_data: photoData,
+                        description: description,
+                        latitude: currentPosition?.lat || null,
+                        longitude: currentPosition?.lng || null,
+                        accuracy: currentPosition?.accuracy || null
+                    }
+                    
+                    const response = await axios.post('/api/photos/upload', uploadData)
+                    
+                    if (response.data.success) {
+                        alert(\`✅ Photo enregistrée! (ID: \${response.data.photo_id}, Taille: \${Math.round(response.data.size / 1024)}KB)\`)
+                        
+                        // Incrémenter compteur photos
+                        const currentCount = parseInt(document.getElementById('stat-photos').textContent) || 0
+                        document.getElementById('stat-photos').textContent = currentCount + 1
+                    } else {
+                        throw new Error(response.data.error || 'Upload failed')
+                    }
+                    
+                } catch (error) {
+                    console.error('Upload error:', error)
+                    alert('❌ Erreur upload: ' + (error.response?.data?.error || error.message))
+                } finally {
+                    btn.innerHTML = originalText
+                    btn.disabled = false
+                }
+                
+                // Reset modal
                 document.getElementById('modal-photo').classList.add('hidden')
                 document.getElementById('photo-description').value = ''
                 preview.classList.add('hidden')
@@ -548,13 +590,15 @@ export function getMobileFieldModePage() {
                 
                 const observation = {
                     audit_token: currentAudit,
-                    module: currentModule,
-                    type: document.getElementById('obs-type').value,
+                    module_type: currentModule,
+                    observation_type: document.getElementById('obs-type').value,
                     string_number: parseInt(document.getElementById('obs-string').value) || null,
                     module_number: parseInt(document.getElementById('obs-module').value) || null,
                     description: document.getElementById('obs-description').value,
-                    severity: document.getElementById('obs-severity').value,
-                    position: currentPosition,
+                    severity_level: document.getElementById('obs-type').value === 'defect' ? parseInt(document.getElementById('obs-severity').value) : null,
+                    latitude: currentPosition?.lat || null,
+                    longitude: currentPosition?.lng || null,
+                    gps_accuracy: currentPosition?.accuracy || null,
                     timestamp: new Date().toISOString()
                 }
                 
@@ -565,13 +609,60 @@ export function getMobileFieldModePage() {
                     document.getElementById('offline-count').textContent = offlineObservations.length
                     document.getElementById('offline-count').classList.remove('hidden')
                     alert('✅ Observation sauvegardée en local (mode hors ligne)')
+                    
+                    // Incrémenter compteur local
+                    const currentCount = parseInt(document.getElementById('stat-observations').textContent) || 0
+                    document.getElementById('stat-observations').textContent = currentCount + 1
                 } else {
-                    // Sinon envoyer au serveur
+                    // Sinon envoyer au serveur selon le module
                     try {
-                        // TODO: API call
-                        alert('✅ Observation enregistrée!')
+                        let apiEndpoint = ''
+                        let apiData = {}
+                        
+                        // Router vers la bonne API selon le module
+                        switch(currentModule) {
+                            case 'VISUAL':
+                                apiEndpoint = \`/api/visual/inspections/\${currentAudit}\`
+                                apiData = {
+                                    inspection_type: observation.observation_type,
+                                    component: 'Module',
+                                    severity: observation.severity_level || 1,
+                                    description: observation.description,
+                                    location: \`String \${observation.string_number || '?'}, Module \${observation.module_number || '?'}\`,
+                                    latitude: observation.latitude,
+                                    longitude: observation.longitude
+                                }
+                                break
+                            case 'ISOLATION':
+                                // TODO: API isolation
+                                apiEndpoint = \`/api/isolation/tests/\${currentAudit}\`
+                                apiData = observation
+                                break
+                            case 'EL':
+                            case 'IV':
+                            default:
+                                // Pour EL et IV, log simplement pour l'instant
+                                console.log('Observation:', observation)
+                                alert('✅ Observation enregistrée en local (API ' + currentModule + ' à implémenter)')
+                                break
+                        }
+                        
+                        if (apiEndpoint && currentModule === 'VISUAL') {
+                            await axios.post(apiEndpoint, apiData)
+                            alert('✅ Observation enregistrée sur le serveur!')
+                            
+                            // Incrémenter compteur
+                            const currentCount = parseInt(document.getElementById('stat-observations').textContent) || 0
+                            document.getElementById('stat-observations').textContent = currentCount + 1
+                            
+                            if (observation.observation_type === 'defect') {
+                                const defectsCount = parseInt(document.getElementById('stat-defects').textContent) || 0
+                                document.getElementById('stat-defects').textContent = defectsCount + 1
+                            }
+                        }
                     } catch (error) {
-                        alert('Erreur: ' + error.message)
+                        console.error('API error:', error)
+                        alert('❌ Erreur serveur: ' + (error.response?.data?.error || error.message))
                     }
                 }
                 
@@ -579,6 +670,7 @@ export function getMobileFieldModePage() {
                 document.getElementById('quick-observation-form').reset()
                 currentPosition = null
                 document.getElementById('gps-coords').textContent = 'Non défini'
+                document.getElementById('obs-defect-details').classList.add('hidden')
             })
             
             // QR Scanner (TODO)
