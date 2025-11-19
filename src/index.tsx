@@ -103,6 +103,12 @@ import consolidatedReportsRoutes from './modules/reports/consolidated-routes'
 app.route('/api/reports/consolidated', consolidatedReportsRoutes)
 
 // ============================================================================
+// MODULE EXPORTS - EXPORT CSV DES DONNÉES
+// ============================================================================
+import csvExportRoutes from './modules/exports/csv-routes'
+app.route('/api/exports/csv', csvExportRoutes)
+
+// ============================================================================
 // MODULE I-V - COURBES I-V (RÉFÉRENCE & SOMBRES)
 // ============================================================================
 import ivRoutes from './modules/iv/routes'

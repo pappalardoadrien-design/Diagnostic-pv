@@ -69,6 +69,24 @@ export function getCrmDashboardPage() {
             
             <!-- ONGLET DASHBOARD -->
             <div id="tab-dashboard" class="tab-content">
+                <!-- INDICATEUR DE MISE À JOUR TEMPS RÉEL -->
+                <div class="bg-gray-900 rounded-lg p-3 mb-6 border border-green-500/30">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </div>
+                            <span class="text-sm text-green-400 font-bold">
+                                <i class="fas fa-sync-alt mr-2"></i>STATISTIQUES TEMPS RÉEL
+                            </span>
+                        </div>
+                        <span id="last-update" class="text-xs text-gray-400">
+                            Chargement...
+                        </span>
+                    </div>
+                </div>
+
                 <!-- KPIs -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="stat-card bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg p-6 border-2 border-blue-400 shadow-lg">
@@ -206,21 +224,57 @@ export function getCrmDashboardPage() {
                 })
             })
             
-            // Charger les KPIs
+            // Animation de compteur (nombre qui monte progressivement)
+            function animateNumber(elementId, newValue) {
+                const element = document.getElementById(elementId)
+                const currentValue = parseInt(element.textContent) || 0
+                
+                if (currentValue === newValue) return
+                
+                const duration = 800 // ms
+                const steps = 20
+                const increment = (newValue - currentValue) / steps
+                const stepDuration = duration / steps
+                
+                let currentStep = 0
+                const interval = setInterval(() => {
+                    currentStep++
+                    const value = Math.round(currentValue + (increment * currentStep))
+                    element.textContent = value
+                    
+                    // Effet visuel de flash lors du changement
+                    element.classList.add('text-yellow-400')
+                    setTimeout(() => element.classList.remove('text-yellow-400'), 150)
+                    
+                    if (currentStep >= steps) {
+                        clearInterval(interval)
+                        element.textContent = newValue
+                    }
+                }, stepDuration)
+            }
+            
+            // Mettre à jour le timestamp de dernière mise à jour
+            function updateTimestamp() {
+                const now = new Date()
+                const timeStr = now.toLocaleTimeString('fr-FR')
+                document.getElementById('last-update').textContent = \`Dernière mise à jour: \${timeStr}\`
+            }
+            
+            // Charger les KPIs avec animation
             async function loadKPIs() {
                 try {
                     // Clients
                     const clientsRes = await axios.get('/api/crm/clients')
-                    document.getElementById('stat-clients').textContent = clientsRes.data.count || 0
+                    animateNumber('stat-clients', clientsRes.data.count || 0)
                     
                     // Sites
                     const sitesRes = await axios.get('/api/crm/projects')
-                    document.getElementById('stat-sites').textContent = sitesRes.data.count || 0
+                    animateNumber('stat-sites', sitesRes.data.count || 0)
                     
                     // Audits actifs
                     const auditsRes = await axios.get('/api/audits/list')
                     const auditsActifs = auditsRes.data.audits.filter(a => a.status === 'en_cours')
-                    document.getElementById('stat-audits-actifs').textContent = auditsActifs.length
+                    animateNumber('stat-audits-actifs', auditsActifs.length)
                     
                     // Interventions semaine
                     const interventionsRes = await axios.get('/api/planning/interventions')
@@ -230,10 +284,14 @@ export function getCrmDashboardPage() {
                         const date = new Date(i.intervention_date)
                         return date >= today && date <= nextWeek
                     })
-                    document.getElementById('stat-interventions').textContent = interventionsSemaine.length
+                    animateNumber('stat-interventions', interventionsSemaine.length)
+                    
+                    // Mettre à jour le timestamp
+                    updateTimestamp()
                     
                 } catch (error) {
                     console.error('Erreur chargement KPIs:', error)
+                    document.getElementById('last-update').textContent = 'Erreur de mise à jour'
                 }
             }
             
@@ -355,9 +413,20 @@ export function getCrmDashboardPage() {
             
             // Initialisation
             document.addEventListener('DOMContentLoaded', () => {
+                // Chargement initial
                 loadKPIs()
                 loadAudits()
                 loadInterventions()
+                
+                // AUTO-REFRESH TEMPS RÉEL : Toutes les 30 secondes
+                setInterval(() => {
+                    console.log('🔄 Auto-refresh des statistiques...')
+                    loadKPIs()
+                    loadAudits()
+                    loadInterventions()
+                }, 30000) // 30 secondes
+                
+                console.log('✅ Dashboard CRM initialisé avec auto-refresh 30s')
             })
         </script>
     </body>
