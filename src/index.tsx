@@ -15,12 +15,14 @@ import { isolationRoutes } from './modules/isolation/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
 import customReportRoutes from './modules/custom-report/routes.js'
 import picselliaRoutes from './modules/picsellia-integration/routes.js'
+import girasoleRoutes from './modules/girasole/routes'
 import { getRapportsPage } from './pages/rapports.js'
 import { getRapportsCustomPage } from './pages/rapports-custom.js'
 import { getIVCurvesPage } from './pages/iv-curves.js'
 import { getVisualPage } from './pages/visual.js'
 import { getIsolationPage } from './pages/isolation.js'
 import { getAuditPhotosPage } from './pages/audit-photos.js'
+import { getGirasoleDashboardPage } from './pages/girasole-dashboard.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -175,6 +177,14 @@ app.route('/api/report/unified', unifiedReportRoutes)
 // - POST /api/report/custom/generate  Générer rapport flexible
 // ============================================================================
 app.route('/api/report/custom', customReportRoutes)
+
+// === MODULE GIRASOLE ===
+app.route('/api/girasole', girasoleRoutes)
+
+// Page Dashboard GIRASOLE
+app.get('/girasole/dashboard', (c) => {
+  return c.html(getGirasoleDashboardPage());
+})
 
 // ============================================================================
 // MODULE PICSELLIA AI - INTÉGRATION IA ANALYSE PHOTOS EL (Phase 1)
