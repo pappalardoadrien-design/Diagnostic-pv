@@ -161,6 +161,10 @@ app.route('/api/diagnostiqueurs', diagnostiqueursRoutes)
 import missionsRoutes from './modules/missions/routes'
 app.route('/api/missions', missionsRoutes)
 
+// Module Labels - Certification DiagPV/AFPA (Diagnostiqueurs + Centrales)
+import labelsModule from './modules/labels'
+app.route('/api/labels', labelsModule)
+
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
 // ============================================================================
