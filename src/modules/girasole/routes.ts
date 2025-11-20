@@ -17,14 +17,562 @@
  */
 
 import { Hono } from 'hono'
-import { generateReportConformite } from './report-conformite.js'
-import { generateReportToiture } from './report-toiture.js'
 
 type Bindings = {
   DB: D1Database
 }
 
+// =============================================================================
+// REPORT DATA TYPES
+// =============================================================================
+interface ReportData {
+  project: {
+    id: number
+    name: string
+    id_referent: string
+    site_address: string
+    installation_power: number
+  }
+  inspection: {
+    token: string
+    checklist_type: string
+    created_at: string
+  }
+  items: Array<{
+    code: string
+    category: string
+    subcategory: string
+    description: string
+    normReference: string
+    criticalityLevel: string
+    checkMethod: string
+    conformity: string
+    observation: string
+  }>
+  stats: {
+    total: number
+    conformes: number
+    non_conformes: number
+    sans_objet: number
+    non_verifies: number
+    taux_conformite: number
+  }
+}
+
+// =============================================================================
+// INLINE REPORT GENERATOR - CONFORMITE
+// =============================================================================
+function generateReportConformiteInline(data: ReportData): string {
+  const {project, inspection, items, stats} = data
+  const date = new Date().toLocaleDateString('fr-FR', { 
+    year: 'numeric', month: 'long', day: 'numeric' 
+  })
+
+  // Group items by category
+  const categories = items.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = []
+    }
+    acc[item.category].push(item)
+    return acc
+  }, {} as Record<string, typeof items>)
+
+  const categoryNames: Record<string, string> = {
+    'PROTECTIONS': 'Protections Électriques',
+    'MISE_A_TERRE': 'Mise à la Terre',
+    'CABLAGE': 'Câblage et Cheminements',
+    'EQUIPEMENTS': 'Équipements',
+    'SIGNALISATION': 'Signalisation et Documentation'
+  }
+
+  const conformityLabels: Record<string, string> = {
+    'conforme': 'Conforme',
+    'non_conforme': 'Non Conforme',
+    'sans_objet': 'Sans Objet',
+    'non_verifie': 'Non Vérifié'
+  }
+
+  // Generate items HTML by category
+  let itemsHtml = ''
+  Object.keys(categoryNames).forEach(catKey => {
+    const catItems = categories[catKey] || []
+    if (catItems.length === 0) return
+
+    itemsHtml += `
+      <div class="category-section">
+        <div class="category-header">${categoryNames[catKey]}</div>
+        <table class="checklist-table">
+          <thead>
+            <tr>
+              <th style="width: 10%;">Code</th>
+              <th style="width: 45%;">Point de Contrôle</th>
+              <th style="width: 12%;">Niveau</th>
+              <th style="width: 18%;">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+    `
+
+    catItems.forEach(item => {
+      const statusClass = item.conformity || 'non_verifie'
+      const hasObservation = item.observation && item.observation.trim() !== ''
+
+      itemsHtml += `
+        <tr>
+          <td><div class="item-code">${item.code}</div></td>
+          <td>
+            <div class="item-description">${item.description}</div>
+            <div class="item-norm">${item.normReference}</div>
+            ${hasObservation ? `
+              <div class="observation-box">
+                <strong>⚠️ Observation :</strong>
+                ${item.observation}
+              </div>
+            ` : ''}
+          </td>
+          <td>
+            <span class="criticality-badge ${item.criticalityLevel}">
+              ${item.criticalityLevel === 'critical' ? 'Critique' : 
+                item.criticalityLevel === 'major' ? 'Majeur' : 
+                item.criticalityLevel === 'minor' ? 'Mineur' : 'Info'}
+            </span>
+          </td>
+          <td>
+            <span class="conformity-status ${statusClass}">
+              ${conformityLabels[statusClass] || 'Non Vérifié'}
+            </span>
+          </td>
+        </tr>
+      `
+    })
+
+    itemsHtml += `
+          </tbody>
+        </table>
+      </div>
+    `
+  })
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport Conformité GIRASOLE - ${project.name}</title>
+    <style>
+        @page { size: A4; margin: 15mm; }
+        @media print { 
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; line-height: 1.6; color: #1f2937; background: white; }
+        .container { max-width: 210mm; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 3px solid #16a34a; margin-bottom: 30px; }
+        .header-logo h1 { color: #16a34a; font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+        .header-logo p { color: #64748b; font-size: 12px; }
+        .header-contact { text-align: right; font-size: 11px; color: #64748b; }
+        .header-contact strong { color: #1f2937; display: block; margin-bottom: 2px; }
+        .report-title { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 30px; text-align: center; }
+        .report-title h2 { font-size: 24px; margin-bottom: 10px; }
+        .report-title .subtitle { font-size: 16px; opacity: 0.95; font-weight: 500; }
+        .info-box { background: #f8fafc; border-left: 4px solid #16a34a; padding: 20px; margin-bottom: 30px; border-radius: 4px; }
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .info-item label { display: block; font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+        .info-item span { display: block; color: #1f2937; font-size: 14px; font-weight: 500; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; border: 2px solid #e5e7eb; border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-card.conforme { border-color: #10b981; background: #f0fdf4; }
+        .stat-card.non-conforme { border-color: #ef4444; background: #fef2f2; }
+        .stat-card .stat-value { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 5px; }
+        .stat-card.conforme .stat-value { color: #16a34a; }
+        .stat-card.non-conforme .stat-value { color: #dc2626; }
+        .stat-card .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
+        .category-section { margin-bottom: 35px; }
+        .category-header { background: #1e293b; color: white; padding: 12px 20px; border-radius: 6px; margin-bottom: 15px; font-size: 16px; font-weight: 600; }
+        .checklist-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+        .checklist-table thead { background: #f1f5f9; }
+        .checklist-table th { text-align: left; padding: 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #cbd5e1; }
+        .checklist-table td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        .checklist-table tr:hover { background: #f8fafc; }
+        .item-code { font-weight: 700; color: #1e293b; font-size: 11px; }
+        .item-description { color: #334155; margin-bottom: 4px; font-size: 13px; }
+        .item-norm { color: #64748b; font-size: 10px; font-style: italic; }
+        .criticality-badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .criticality-badge.critical { background: #fee2e2; color: #991b1b; }
+        .criticality-badge.major { background: #fed7aa; color: #9a3412; }
+        .criticality-badge.minor { background: #fef3c7; color: #854d0e; }
+        .conformity-status { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 11px; white-space: nowrap; }
+        .conformity-status.conforme { background: #dcfce7; color: #166534; }
+        .conformity-status.non_conforme { background: #fee2e2; color: #991b1b; }
+        .conformity-status.sans_objet { background: #f1f5f9; color: #475569; }
+        .conformity-status.non_verifie { background: #fef3c7; color: #854d0e; }
+        .observation-box { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 8px; font-size: 11px; color: #78350f; border-radius: 3px; }
+        .observation-box strong { display: block; margin-bottom: 4px; color: #92400e; }
+        .footer { margin-top: 50px; padding-top: 30px; border-top: 2px solid #e5e7eb; }
+        .signature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-bottom: 30px; }
+        .signature-box { text-align: center; }
+        .signature-box .title { font-weight: 600; margin-bottom: 10px; color: #64748b; font-size: 12px; text-transform: uppercase; }
+        .signature-box .name { font-weight: 700; color: #1f2937; font-size: 14px; margin-top: 40px; }
+        .signature-box .function { color: #64748b; font-size: 12px; }
+        .disclaimer { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; font-size: 10px; color: #64748b; line-height: 1.5; }
+        .print-button { position: fixed; top: 20px; right: 20px; background: #16a34a; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; }
+        .print-button:hover { background: #15803d; }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">📄 Imprimer / PDF</button>
+    
+    <div class="container">
+        <div class="header">
+            <div class="header-logo">
+                <h1>🔋 DiagPV</h1>
+                <p>Expertise Photovoltaïque Indépendante depuis 2012</p>
+            </div>
+            <div class="header-contact">
+                <strong>Diagnostic Photovoltaïque</strong>
+                3 rue d'Apollo, 31240 L'Union<br>
+                Tél: 05.81.10.16.59<br>
+                contact@diagpv.fr<br>
+                RCS 792972309
+            </div>
+        </div>
+
+        <div class="report-title">
+            <h2>🔌 RAPPORT D'AUDIT DE CONFORMITÉ ÉLECTRIQUE</h2>
+            <div class="subtitle">Installation Photovoltaïque - Norme NF C 15-100</div>
+            <div class="ref">Réf: ${inspection.token} | ${date}</div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Centrale</label>
+                    <span>${project.name}</span>
+                </div>
+                <div class="info-item">
+                    <label>ID Référent</label>
+                    <span>${project.id_referent}</span>
+                </div>
+                <div class="info-item">
+                    <label>Adresse</label>
+                    <span>${project.site_address}</span>
+                </div>
+                <div class="info-item">
+                    <label>Puissance</label>
+                    <span>${project.installation_power} kWc</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card conforme">
+                <div class="stat-value">${stats.conformes}</div>
+                <div class="stat-label">Conformes</div>
+            </div>
+            <div class="stat-card non-conforme">
+                <div class="stat-value">${stats.non_conformes}</div>
+                <div class="stat-label">Non Conformes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.sans_objet}</div>
+                <div class="stat-label">Sans Objet</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #16a34a;">${stats.taux_conformite}%</div>
+                <div class="stat-label">Taux Conformité</div>
+            </div>
+        </div>
+
+        ${itemsHtml}
+
+        <div class="footer">
+            <div class="signature-grid">
+                <div class="signature-box">
+                    <div class="title">Auditeur DiagPV</div>
+                    <div style="height: 60px;"></div>
+                    <div class="name">Fabien CORRERA</div>
+                    <div class="function">Expert Photovoltaïque</div>
+                </div>
+                <div class="signature-box">
+                    <div class="title">Client</div>
+                    <div style="height: 60px;"></div>
+                    <div class="name">_____________________</div>
+                    <div class="function">Signature & Cachet</div>
+                </div>
+            </div>
+            
+            <div class="disclaimer">
+                <strong>Disclaimer :</strong> Ce rapport présente l'état de l'installation photovoltaïque au moment de l'audit. 
+                DiagPV SAS (RCS 792972309) est un organisme d'expertise indépendant. Les recommandations formulées 
+                n'engagent pas la responsabilité de DiagPV quant aux décisions prises par le client ou ses partenaires.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `
+}
+
+// =============================================================================
+// INLINE REPORT GENERATOR - TOITURE
+// =============================================================================
+function generateReportToitureInline(data: ReportData): string {
+  const {project, inspection, items, stats} = data
+  const date = new Date().toLocaleDateString('fr-FR', { 
+    year: 'numeric', month: 'long', day: 'numeric' 
+  })
+
+  // Group items by category
+  const categories = items.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = []
+    }
+    acc[item.category].push(item)
+    return acc
+  }, {} as Record<string, typeof items>)
+
+  const categoryNames: Record<string, string> = {
+    'ETANCHEITE': 'Étanchéité',
+    'FIXATIONS': 'Fixations et Ancrages',
+    'STRUCTURE': 'Structure et Charpente',
+    'EVACUATION': 'Évacuation Eaux Pluviales',
+    'SECURITE': 'Sécurité Accès Toiture'
+  }
+
+  const conformityLabels: Record<string, string> = {
+    'conforme': 'Conforme',
+    'non_conforme': 'Non Conforme',
+    'sans_objet': 'Sans Objet',
+    'non_verifie': 'Non Vérifié'
+  }
+
+  // Generate items HTML by category
+  let itemsHtml = ''
+  Object.keys(categoryNames).forEach(catKey => {
+    const catItems = categories[catKey] || []
+    if (catItems.length === 0) return
+
+    itemsHtml += `
+      <div class="category-section">
+        <div class="category-header">${categoryNames[catKey]}</div>
+        <table class="checklist-table">
+          <thead>
+            <tr>
+              <th style="width: 10%;">Code</th>
+              <th style="width: 45%;">Point de Contrôle</th>
+              <th style="width: 12%;">Niveau</th>
+              <th style="width: 18%;">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+    `
+
+    catItems.forEach(item => {
+      const statusClass = item.conformity || 'non_verifie'
+      const hasObservation = item.observation && item.observation.trim() !== ''
+
+      itemsHtml += `
+        <tr>
+          <td><div class="item-code">${item.code}</div></td>
+          <td>
+            <div class="item-description">${item.description}</div>
+            <div class="item-norm">${item.normReference}</div>
+            ${hasObservation ? `
+              <div class="observation-box">
+                <strong>⚠️ Observation :</strong>
+                ${item.observation}
+              </div>
+            ` : ''}
+          </td>
+          <td>
+            <span class="criticality-badge ${item.criticalityLevel}">
+              ${item.criticalityLevel === 'critical' ? 'Critique' : 
+                item.criticalityLevel === 'major' ? 'Majeur' : 
+                item.criticalityLevel === 'minor' ? 'Mineur' : 'Info'}
+            </span>
+          </td>
+          <td>
+            <span class="conformity-status ${statusClass}">
+              ${conformityLabels[statusClass] || 'Non Vérifié'}
+            </span>
+          </td>
+        </tr>
+      `
+    })
+
+    itemsHtml += `
+          </tbody>
+        </table>
+      </div>
+    `
+  })
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport Toiture GIRASOLE - ${project.name}</title>
+    <style>
+        @page { size: A4; margin: 15mm; }
+        @media print { 
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; line-height: 1.6; color: #1f2937; background: white; }
+        .container { max-width: 210mm; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 3px solid #16a34a; margin-bottom: 30px; }
+        .header-logo h1 { color: #16a34a; font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+        .header-logo p { color: #64748b; font-size: 12px; }
+        .header-contact { text-align: right; font-size: 11px; color: #64748b; }
+        .header-contact strong { color: #1f2937; display: block; margin-bottom: 2px; }
+        .report-title { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 30px; text-align: center; }
+        .report-title h2 { font-size: 24px; margin-bottom: 10px; }
+        .report-title .subtitle { font-size: 16px; opacity: 0.95; font-weight: 500; }
+        .info-box { background: #f8fafc; border-left: 4px solid #16a34a; padding: 20px; margin-bottom: 30px; border-radius: 4px; }
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .info-item label { display: block; font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+        .info-item span { display: block; color: #1f2937; font-size: 14px; font-weight: 500; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; border: 2px solid #e5e7eb; border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-card.conforme { border-color: #10b981; background: #f0fdf4; }
+        .stat-card.non-conforme { border-color: #ef4444; background: #fef2f2; }
+        .stat-card .stat-value { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 5px; }
+        .stat-card.conforme .stat-value { color: #16a34a; }
+        .stat-card.non-conforme .stat-value { color: #dc2626; }
+        .stat-card .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
+        .category-section { margin-bottom: 35px; }
+        .category-header { background: #1e293b; color: white; padding: 12px 20px; border-radius: 6px; margin-bottom: 15px; font-size: 16px; font-weight: 600; }
+        .checklist-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+        .checklist-table thead { background: #f1f5f9; }
+        .checklist-table th { text-align: left; padding: 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #cbd5e1; }
+        .checklist-table td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        .checklist-table tr:hover { background: #f8fafc; }
+        .item-code { font-weight: 700; color: #1e293b; font-size: 11px; }
+        .item-description { color: #334155; margin-bottom: 4px; font-size: 13px; }
+        .item-norm { color: #64748b; font-size: 10px; font-style: italic; }
+        .criticality-badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .criticality-badge.critical { background: #fee2e2; color: #991b1b; }
+        .criticality-badge.major { background: #fed7aa; color: #9a3412; }
+        .criticality-badge.minor { background: #fef3c7; color: #854d0e; }
+        .conformity-status { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 11px; white-space: nowrap; }
+        .conformity-status.conforme { background: #dcfce7; color: #166534; }
+        .conformity-status.non_conforme { background: #fee2e2; color: #991b1b; }
+        .conformity-status.sans_objet { background: #f1f5f9; color: #475569; }
+        .conformity-status.non_verifie { background: #fef3c7; color: #854d0e; }
+        .observation-box { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 8px; font-size: 11px; color: #78350f; border-radius: 3px; }
+        .observation-box strong { display: block; margin-bottom: 4px; color: #92400e; }
+        .footer { margin-top: 50px; padding-top: 30px; border-top: 2px solid #e5e7eb; }
+        .signature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-bottom: 30px; }
+        .signature-box { text-align: center; }
+        .signature-box .title { font-weight: 600; margin-bottom: 10px; color: #64748b; font-size: 12px; text-transform: uppercase; }
+        .signature-box .name { font-weight: 700; color: #1f2937; font-size: 14px; margin-top: 40px; }
+        .signature-box .function { color: #64748b; font-size: 12px; }
+        .disclaimer { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; font-size: 10px; color: #64748b; line-height: 1.5; }
+        .print-button { position: fixed; top: 20px; right: 20px; background: #16a34a; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; }
+        .print-button:hover { background: #15803d; }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">📄 Imprimer / PDF</button>
+    
+    <div class="container">
+        <div class="header">
+            <div class="header-logo">
+                <h1>🔋 DiagPV</h1>
+                <p>Expertise Photovoltaïque Indépendante depuis 2012</p>
+            </div>
+            <div class="header-contact">
+                <strong>Diagnostic Photovoltaïque</strong>
+                3 rue d'Apollo, 31240 L'Union<br>
+                Tél: 05.81.10.16.59<br>
+                contact@diagpv.fr<br>
+                RCS 792972309
+            </div>
+        </div>
+
+        <div class="report-title">
+            <h2>🏠 RAPPORT D'AUDIT DE CONFORMITÉ TOITURE</h2>
+            <div class="subtitle">Installation Photovoltaïque - Norme DTU 40.35</div>
+            <div class="ref">Réf: ${inspection.token} | ${date}</div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Centrale</label>
+                    <span>${project.name}</span>
+                </div>
+                <div class="info-item">
+                    <label>ID Référent</label>
+                    <span>${project.id_referent}</span>
+                </div>
+                <div class="info-item">
+                    <label>Adresse</label>
+                    <span>${project.site_address}</span>
+                </div>
+                <div class="info-item">
+                    <label>Puissance</label>
+                    <span>${project.installation_power} kWc</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card conforme">
+                <div class="stat-value">${stats.conformes}</div>
+                <div class="stat-label">Conformes</div>
+            </div>
+            <div class="stat-card non-conforme">
+                <div class="stat-value">${stats.non_conformes}</div>
+                <div class="stat-label">Non Conformes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${stats.sans_objet}</div>
+                <div class="stat-label">Sans Objet</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: #16a34a;">${stats.taux_conformite}%</div>
+                <div class="stat-label">Taux Conformité</div>
+            </div>
+        </div>
+
+        ${itemsHtml}
+
+        <div class="footer">
+            <div class="signature-grid">
+                <div class="signature-box">
+                    <div class="title">Auditeur DiagPV</div>
+                    <div style="height: 60px;"></div>
+                    <div class="name">Fabien CORRERA</div>
+                    <div class="function">Expert Photovoltaïque</div>
+                </div>
+                <div class="signature-box">
+                    <div class="title">Client</div>
+                    <div style="height: 60px;"></div>
+                    <div class="name">_____________________</div>
+                    <div class="function">Signature & Cachet</div>
+                </div>
+            </div>
+            
+            <div class="disclaimer">
+                <strong>Disclaimer :</strong> Ce rapport présente l'état de l'installation photovoltaïque au moment de l'audit. 
+                DiagPV SAS (RCS 792972309) est un organisme d'expertise indépendant. Les recommandations formulées 
+                n'engagent pas la responsabilité de DiagPV quant aux décisions prises par le client ou ses partenaires.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `
+}
+
 const girasoleRoutes = new Hono<{ Bindings: Bindings }>()
+
+console.log('🚀 GIRASOLE MODULE ROUTES LOADED - INLINE GENERATORS')
+console.log('🔥 /inspection/:token/report endpoint REGISTERED')
 
 // =============================================================================
 // 1. STATISTIQUES DASHBOARD
@@ -282,8 +830,10 @@ girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
 // 7. GÉNÉRER RAPPORT PDF
 // =============================================================================
 girasoleRoutes.get('/inspection/:token/report', async (c) => {
+  console.log('🔥🔥🔥 GIRASOLE REPORT ENDPOINT CALLED 🔥🔥🔥')
   const { DB } = c.env
   const token = c.req.param('token')
+  console.log('Token:', token)
 
   try {
     // Get inspection with items
@@ -346,9 +896,8 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
 
     // Generate report based on checklist type
     if (checklistType === 'CONFORMITE') {
-      console.log('🚀 GENERATING CONFORMITE REPORT WITH NEW GENERATOR')
-      console.log('Function generateReportConformite exists:', typeof generateReportConformite)
-      const html = generateReportConformite({
+      console.log('✅ GENERATING CONFORMITE REPORT - INLINE VERSION')
+      const html = generateReportConformiteInline({
         project: {
           id: project.id,
           name: project.name,
@@ -366,7 +915,8 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
       })
       return c.html(html)
     } else if (checklistType === 'TOITURE') {
-      const html = generateReportToiture({
+      console.log('✅ GENERATING TOITURE REPORT - INLINE VERSION')
+      const html = generateReportToitureInline({
         project: {
           id: project.id,
           name: project.name,
