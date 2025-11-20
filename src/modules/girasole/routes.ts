@@ -1292,4 +1292,271 @@ girasoleRoutes.get('/batch/download-all-reports', async (c) => {
   }
 })
 
+// =============================================================================
+// 11. RAPPORT SYNTHÈSE GÉNÉRAL CLIENT (52 CENTRALES)
+// =============================================================================
+girasoleRoutes.get('/synthesis-report/client/:clientId?', async (c) => {
+  const { DB } = c.env
+  const clientId = c.req.param('clientId') || '1' // Default: GIRASOLE Energies
+
+  try {
+    // Get all GIRASOLE projects stats
+    const { results: projects } = await DB.prepare(`
+      SELECT 
+        p.id,
+        p.name,
+        p.id_referent,
+        p.site_address,
+        p.installation_power,
+        p.audit_types,
+        COUNT(DISTINCT vi.audit_token) as audits_count,
+        SUM(CASE WHEN vi.conformite = 'conforme' THEN 1 ELSE 0 END) as conformes,
+        SUM(CASE WHEN vi.conformite = 'non_conforme' THEN 1 ELSE 0 END) as non_conformes,
+        SUM(CASE WHEN vi.conformite = 'sans_objet' THEN 1 ELSE 0 END) as sans_objet
+      FROM projects p
+      LEFT JOIN visual_inspections vi ON p.id = vi.project_id
+      WHERE p.is_girasole = 1
+      GROUP BY p.id
+      ORDER BY p.id_referent ASC
+    `).all()
+
+    // Calculate global stats
+    const totalProjects = projects?.length || 0
+    const solProjects = projects?.filter((p: any) => !JSON.parse(p.audit_types || '[]').includes('TOITURE')).length || 0
+    const doubleProjects = projects?.filter((p: any) => JSON.parse(p.audit_types || '[]').includes('TOITURE')).length || 0
+    
+    let totalConformes = 0
+    let totalNonConformes = 0
+    let totalItems = 0
+    let completedProjects = 0
+    
+    projects?.forEach((p: any) => {
+      totalConformes += p.conformes || 0
+      totalNonConformes += p.non_conformes || 0
+      totalItems += (p.conformes || 0) + (p.non_conformes || 0)
+      if ((p.audits_count || 0) > 0) completedProjects++
+    })
+
+    const globalConformityRate = totalItems > 0 ? ((totalConformes / totalItems) * 100).toFixed(1) : '0'
+    const completionRate = totalProjects > 0 ? ((completedProjects / totalProjects) * 100).toFixed(1) : '0'
+
+    // Get top anomalies by category
+    const { results: topAnomalies } = await DB.prepare(`
+      SELECT 
+        audit_category,
+        checklist_section,
+        COUNT(*) as count
+      FROM visual_inspections
+      WHERE conformite = 'non_conforme'
+        AND project_id IN (SELECT id FROM projects WHERE is_girasole = 1)
+      GROUP BY audit_category, checklist_section
+      ORDER BY count DESC
+      LIMIT 10
+    `).all()
+
+    // Generate HTML synthesis report
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIRASOLE - Rapport Synthèse Général</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div class="max-w-7xl mx-auto p-8">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h1 class="text-4xl font-bold text-green-600">🔋 DiagPV - GIRASOLE</h1>
+          <p class="text-gray-600 mt-2">Rapport de Synthèse Général - Mission 52 Centrales Photovoltaïques</p>
+        </div>
+        <button onclick="window.print()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+          📄 Imprimer
+        </button>
+      </div>
+      <div class="grid grid-cols-4 gap-4 mt-6">
+        <div class="text-center p-4 bg-blue-50 rounded-lg">
+          <div class="text-3xl font-bold text-blue-600">${totalProjects}</div>
+          <div class="text-sm text-gray-600">Centrales Total</div>
+        </div>
+        <div class="text-center p-4 bg-green-50 rounded-lg">
+          <div class="text-3xl font-bold text-green-600">${solProjects}</div>
+          <div class="text-sm text-gray-600">SOL (CONFORMITE)</div>
+        </div>
+        <div class="text-center p-4 bg-purple-50 rounded-lg">
+          <div class="text-3xl font-bold text-purple-600">${doubleProjects}</div>
+          <div class="text-sm text-gray-600">DOUBLE (CONF+TOIT)</div>
+        </div>
+        <div class="text-center p-4 bg-yellow-50 rounded-lg">
+          <div class="text-3xl font-bold text-yellow-600">${completionRate}%</div>
+          <div class="text-sm text-gray-600">Progression</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Stats -->
+    <div class="grid grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">📊 Statistiques Globales</h2>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center p-3 bg-green-50 rounded">
+            <span class="font-semibold text-green-800">Items Conformes</span>
+            <span class="text-2xl font-bold text-green-600">${totalConformes}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-red-50 rounded">
+            <span class="font-semibold text-red-800">Items Non Conformes</span>
+            <span class="text-2xl font-bold text-red-600">${totalNonConformes}</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-blue-50 rounded">
+            <span class="font-semibold text-blue-800">Taux Conformité Global</span>
+            <span class="text-2xl font-bold text-blue-600">${globalConformityRate}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">🎯 Mission GIRASOLE</h2>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between p-2 border-b">
+            <span class="text-gray-600">Budget Total</span>
+            <span class="font-bold">66.885 € HT</span>
+          </div>
+          <div class="flex justify-between p-2 border-b">
+            <span class="text-gray-600">Période</span>
+            <span class="font-bold">Janvier - Mars 2025</span>
+          </div>
+          <div class="flex justify-between p-2 border-b">
+            <span class="text-gray-600">Centrales complétées</span>
+            <span class="font-bold">${completedProjects} / ${totalProjects}</span>
+          </div>
+          <div class="flex justify-between p-2 border-b">
+            <span class="text-gray-600">Coût moyen/centrale</span>
+            <span class="font-bold">${(66885 / totalProjects).toFixed(0)} € HT</span>
+          </div>
+          <div class="flex justify-between p-2">
+            <span class="text-gray-600">Restant à facturer</span>
+            <span class="font-bold text-orange-600">${(66885 * (1 - completedProjects / totalProjects)).toFixed(0)} € HT</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Anomalies -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">⚠️ Top 10 Anomalies Détectées</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100 border-b">
+              <th class="p-3 text-left">#</th>
+              <th class="p-3 text-left">Catégorie</th>
+              <th class="p-3 text-left">Section</th>
+              <th class="p-3 text-center">Occurrences</th>
+              <th class="p-3 text-center">Criticité</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(topAnomalies || []).map((a: any, i: number) => `
+              <tr class="border-b hover:bg-gray-50">
+                <td class="p-3 font-bold text-gray-500">${i + 1}</td>
+                <td class="p-3">
+                  <span class="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800">
+                    ${a.audit_category || 'N/A'}
+                  </span>
+                </td>
+                <td class="p-3">${a.checklist_section || 'N/A'}</td>
+                <td class="p-3 text-center">
+                  <span class="text-lg font-bold text-red-600">${a.count}</span>
+                </td>
+                <td class="p-3 text-center">
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold ${a.count >= 5 ? 'bg-red-500 text-white' : a.count >= 3 ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-white'}">
+                    ${a.count >= 5 ? 'CRITIQUE' : a.count >= 3 ? 'MAJEURE' : 'MINEURE'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Projects List -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">🏢 Liste Centrales (${totalProjects})</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-100 border-b">
+              <th class="p-2 text-left">ID Ref</th>
+              <th class="p-2 text-left">Centrale</th>
+              <th class="p-2 text-center">Type Audit</th>
+              <th class="p-2 text-center">Puissance</th>
+              <th class="p-2 text-center">Conformes</th>
+              <th class="p-2 text-center">Non Conformes</th>
+              <th class="p-2 text-center">Taux</th>
+              <th class="p-2 text-center">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(projects || []).map((p: any) => {
+              const auditTypes = JSON.parse(p.audit_types || '[]')
+              const total = (p.conformes || 0) + (p.non_conformes || 0)
+              const rate = total > 0 ? ((p.conformes / total) * 100).toFixed(0) : '0'
+              const status = (p.audits_count || 0) > 0 ? 'Complété' : 'Pending'
+              
+              return `
+                <tr class="border-b hover:bg-gray-50">
+                  <td class="p-2 font-mono">${p.id_referent || 'N/A'}</td>
+                  <td class="p-2 font-semibold">${p.name}</td>
+                  <td class="p-2 text-center">
+                    <span class="px-2 py-1 rounded text-xs font-semibold ${auditTypes.includes('TOITURE') ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">
+                      ${auditTypes.join(' + ')}
+                    </span>
+                  </td>
+                  <td class="p-2 text-center">${p.installation_power || 0} kWc</td>
+                  <td class="p-2 text-center text-green-600 font-bold">${p.conformes || 0}</td>
+                  <td class="p-2 text-center text-red-600 font-bold">${p.non_conformes || 0}</td>
+                  <td class="p-2 text-center">
+                    <span class="font-bold ${rate >= 80 ? 'text-green-600' : rate >= 50 ? 'text-yellow-600' : 'text-red-600'}">${rate}%</span>
+                  </td>
+                  <td class="p-2 text-center">
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold ${status === 'Complété' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                      ${status}
+                    </span>
+                  </td>
+                </tr>
+              `
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 text-center text-sm text-gray-500">
+      <p><strong>DiagPV - Diagnostic Photovoltaïque</strong></p>
+      <p>3 rue d'Apollo, 31240 L'Union | 05.81.10.16.59 | contact@diagpv.fr | RCS 792972309</p>
+      <p class="mt-2">Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+    </div>
+  </div>
+
+  <style>
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      button { display: none !important; }
+    }
+  </style>
+</body>
+</html>`
+
+    return c.html(html)
+  } catch (error) {
+    console.error('Error generating synthesis report:', error)
+    return c.json({ error: 'Failed to generate synthesis report', details: error }, 500)
+  }
+})
+
 export default girasoleRoutes
