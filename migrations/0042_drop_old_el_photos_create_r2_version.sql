@@ -1,12 +1,22 @@
 -- ============================================================================
--- MIGRATION 0041: Table photos EL avec Cloudflare R2
+-- MIGRATION 0042: Drop old el_photos + Create new R2 version
 -- ============================================================================
--- Création table dédiée pour stockage multiple photos par module EL
--- Chaque module peut avoir plusieurs photos (défauts, vues générales, etc.)
+-- L'ancienne table el_photos utilisait photo_url (URLs externes)
+-- La nouvelle version utilise Cloudflare R2 pour stockage natif
 -- ============================================================================
 
--- Table des photos électroluminescence
-CREATE TABLE IF NOT EXISTS el_photos (
+-- Drop old table and its views/indexes
+DROP VIEW IF EXISTS v_el_photos_stats;
+DROP INDEX IF EXISTS idx_el_photos_r2_key;
+DROP INDEX IF EXISTS idx_el_photos_severity;
+DROP INDEX IF EXISTS idx_el_photos_defect;
+DROP INDEX IF EXISTS idx_el_photos_type;
+DROP INDEX IF EXISTS idx_el_photos_audit;
+DROP INDEX IF EXISTS idx_el_photos_module;
+DROP TABLE IF EXISTS el_photos;
+
+-- Create new table with R2 storage
+CREATE TABLE el_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   el_module_id INTEGER NOT NULL,
   audit_token TEXT NOT NULL,
@@ -35,7 +45,7 @@ CREATE TABLE IF NOT EXISTS el_photos (
   position_in_string INTEGER,
   
   -- Métadonnées système
-  uploaded_by INTEGER, -- user_id
+  uploaded_by INTEGER, -- auth_user_id
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   
   FOREIGN KEY (el_module_id) REFERENCES el_modules(id) ON DELETE CASCADE,
@@ -44,15 +54,15 @@ CREATE TABLE IF NOT EXISTS el_photos (
 );
 
 -- Index pour performance
-CREATE INDEX IF NOT EXISTS idx_el_photos_module ON el_photos(el_module_id);
-CREATE INDEX IF NOT EXISTS idx_el_photos_audit ON el_photos(audit_token);
-CREATE INDEX IF NOT EXISTS idx_el_photos_type ON el_photos(photo_type);
-CREATE INDEX IF NOT EXISTS idx_el_photos_defect ON el_photos(defect_category);
-CREATE INDEX IF NOT EXISTS idx_el_photos_severity ON el_photos(severity_level);
-CREATE INDEX IF NOT EXISTS idx_el_photos_r2_key ON el_photos(r2_key);
+CREATE INDEX idx_el_photos_module ON el_photos(el_module_id);
+CREATE INDEX idx_el_photos_audit ON el_photos(audit_token);
+CREATE INDEX idx_el_photos_type ON el_photos(photo_type);
+CREATE INDEX idx_el_photos_defect ON el_photos(defect_category);
+CREATE INDEX idx_el_photos_severity ON el_photos(severity_level);
+CREATE INDEX idx_el_photos_r2_key ON el_photos(r2_key);
 
 -- Vue statistiques photos par audit
-CREATE VIEW IF NOT EXISTS v_el_photos_stats AS
+CREATE VIEW v_el_photos_stats AS
 SELECT 
   audit_token,
   COUNT(*) as total_photos,
