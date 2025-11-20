@@ -157,6 +157,10 @@ app.route('/api/girasole', girasoleExportRoutes)
 import diagnostiqueursRoutes from './modules/diagnostiqueurs/routes'
 app.route('/api/diagnostiqueurs', diagnostiqueursRoutes)
 
+// Module Missions - Affectation automatique
+import missionsRoutes from './modules/missions/routes'
+app.route('/api/missions', missionsRoutes)
+
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
 // ============================================================================
