@@ -183,4 +183,32 @@ girasoleRoutes.get('/stats', async (c) => {
   }
 });
 
+// ============================================================================
+// GET /api/girasole/checklist/:type
+// Obtenir template checklist (CONFORMITE ou TOITURE)
+// ============================================================================
+girasoleRoutes.get('/checklist/:type', async (c) => {
+  try {
+    const type = c.req.param('type').toUpperCase() as 'CONFORMITE' | 'TOITURE';
+    
+    // Import dynamique des checklists
+    const { getChecklistByType } = await import('./checklists');
+    const items = getChecklistByType(type);
+    
+    return c.json({
+      success: true,
+      type,
+      items,
+      count: items.length
+    });
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/checklist/:type:', error);
+    return c.json({ 
+      error: 'Erreur récupération checklist',
+      details: error.message 
+    }, 500);
+  }
+});
+
 export default girasoleRoutes;

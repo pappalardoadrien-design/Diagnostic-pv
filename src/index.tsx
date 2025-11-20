@@ -23,6 +23,7 @@ import { getVisualPage } from './pages/visual.js'
 import { getIsolationPage } from './pages/isolation.js'
 import { getAuditPhotosPage } from './pages/audit-photos.js'
 import { getGirasoleDashboardPage } from './pages/girasole-dashboard.js'
+import { getGirasoleChecklistPage } from './pages/girasole-checklist.js'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -184,6 +185,17 @@ app.route('/api/girasole', girasoleRoutes)
 // Page Dashboard GIRASOLE
 app.get('/girasole/dashboard', (c) => {
   return c.html(getGirasoleDashboardPage());
+})
+
+// Pages Checklist GIRASOLE
+app.get('/girasole/checklist/conformite/:projectId', (c) => {
+  const projectId = c.req.param('projectId');
+  return c.html(getGirasoleChecklistPage(projectId, 'CONFORMITE'));
+})
+
+app.get('/girasole/checklist/toiture/:projectId', (c) => {
+  const projectId = c.req.param('projectId');
+  return c.html(getGirasoleChecklistPage(projectId, 'TOITURE'));
 })
 
 // ============================================================================

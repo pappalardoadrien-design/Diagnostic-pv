@@ -311,8 +311,7 @@ export function getGirasoleDashboardPage() {
 
         // Ouvrir checklist
         function openChecklist(projectId, checklistType) {
-            // TODO: Rediriger vers la page de checklist appropriée
-            alert(\`Ouverture checklist \${checklistType} pour centrale ID \${projectId}\nÀ implémenter: /girasole/checklist/\${checklistType.toLowerCase()}/\${projectId}\`);
+            window.location.href = \`/girasole/checklist/\${checklistType.toLowerCase()}/\${projectId}\`;
         }
 
         // Charger au démarrage
