@@ -291,20 +291,43 @@ girasoleRoutes.get('/export/annexe2', async (c) => {
   const { DB } = c.env
 
   try {
-    // Fetch all GIRASOLE projects with their inspection status
+    // Fetch all GIRASOLE projects
     const { results: projects } = await DB.prepare(`
       SELECT 
-        p.id, p.name, p.id_referent, p.site_address,
-        p.installation_power, p.audit_types,
-        COUNT(DISTINCT vi.inspection_token) as inspections_count,
-        SUM(CASE WHEN vi.conformite = 'conforme' THEN 1 ELSE 0 END) as conformes,
-        SUM(CASE WHEN vi.conformite = 'non_conforme' THEN 1 ELSE 0 END) as non_conformes
-      FROM projects p
-      LEFT JOIN visual_inspections vi ON vi.project_id = p.id
-      WHERE p.is_girasole = 1
-      GROUP BY p.id
-      ORDER BY p.id_referent ASC
+        id, name, id_referent, site_address,
+        installation_power, audit_types
+      FROM projects
+      WHERE is_girasole = 1
+      ORDER BY id_referent ASC
     `).all()
+
+    if (!projects || projects.length === 0) {
+      return c.json({ error: 'No GIRASOLE projects found' }, 404)
+    }
+
+    // For each project, get inspection stats
+    const projectsWithStats = await Promise.all(
+      projects.map(async (p) => {
+        const { results: inspections } = await DB.prepare(`
+          SELECT 
+            inspection_token,
+            conformite
+          FROM visual_inspections
+          WHERE project_id = ?
+        `).bind(p.id).all()
+
+        const tokens = new Set((inspections || []).map((i: any) => i.inspection_token).filter(Boolean))
+        const conformes = (inspections || []).filter((i: any) => i.conformite === 'conforme').length
+        const non_conformes = (inspections || []).filter((i: any) => i.conformite === 'non_conforme').length
+
+        return {
+          ...p,
+          inspections_count: tokens.size,
+          conformes,
+          non_conformes
+        }
+      })
+    )
 
     // Generate CSV
     const headers = [
@@ -323,7 +346,7 @@ girasoleRoutes.get('/export/annexe2', async (c) => {
       'URL Rapport'
     ]
 
-    const rows = projects?.map(p => {
+    const rows = projectsWithStats.map(p => {
       const auditTypes = JSON.parse(p.audit_types || '[]')
       const totalItems = p.conformes + p.non_conformes
       const tauxConformite = totalItems > 0 ? ((p.conformes / totalItems) * 100).toFixed(1) : '0'
