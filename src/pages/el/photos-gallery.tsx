@@ -124,7 +124,11 @@ elPhotosGalleryRoutes.get('/audit/:token/el/photos', async (c) => {
               </h1>
               <p class="text-gray-600 mt-1">📍 ${audit.project_name} - ${audit.site_location}</p>
             </div>
-            <div class="text-right">
+            <div class="text-right flex gap-3">
+              <a href="/api/el/reports/photos/${token}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold inline-flex items-center">
+                <i class="fas fa-file-pdf mr-2"></i>
+                Rapport PDF
+              </a>
               <a href="/audit/${token}/el/photos/upload" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold inline-flex items-center">
                 <i class="fas fa-upload mr-2"></i>
                 Upload Photos

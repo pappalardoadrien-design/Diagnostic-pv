@@ -9,6 +9,7 @@ import auditsRouter from './routes/audits'
 import modulesRouter from './routes/modules'
 import dashboardRouter from './routes/dashboard'
 import photosRouter from './routes/photos'
+import reportsRouter from './routes/reports'
 
 type Bindings = {
   DB: D1Database
@@ -29,5 +30,8 @@ elModule.route('/modules', modulesRouter)
 
 // Routes pour les photos (upload, liste, suppression)
 elModule.route('/photos', photosRouter)
+
+// Routes pour les rapports (génération PDF/HTML)
+elModule.route('/reports', reportsRouter)
 
 export default elModule
