@@ -17,9 +17,11 @@
  */
 
 import { Hono } from 'hono'
+import { cache, cacheInvalidator } from '../../middleware/cache'
 
 type Bindings = {
   DB: D1Database
+  KV: KVNamespace
 }
 
 const girasoleRoutes = new Hono<{ Bindings: Bindings }>()
@@ -27,7 +29,9 @@ const girasoleRoutes = new Hono<{ Bindings: Bindings }>()
 // =============================================================================
 // 1. STATISTIQUES DASHBOARD
 // =============================================================================
-girasoleRoutes.get('/stats', async (c) => {
+girasoleRoutes.get('/stats', 
+  cache({ ttl: 3600, namespace: 'girasole:stats:' }), 
+  async (c) => {
   const { DB } = c.env
 
   try {
@@ -53,7 +57,9 @@ girasoleRoutes.get('/stats', async (c) => {
 // =============================================================================
 // 2. LISTE DES CENTRALES (PAGINÉE)
 // =============================================================================
-girasoleRoutes.get('/projects', async (c) => {
+girasoleRoutes.get('/projects', 
+  cache({ ttl: 1800, namespace: 'girasole:projects:' }), 
+  async (c) => {
   const { DB } = c.env
   const page = parseInt(c.req.query('page') || '1')
   const limit = parseInt(c.req.query('limit') || '52')
@@ -106,7 +112,9 @@ girasoleRoutes.get('/projects', async (c) => {
 // =============================================================================
 // 3. DÉTAILS D'UNE CENTRALE
 // =============================================================================
-girasoleRoutes.get('/project/:id', async (c) => {
+girasoleRoutes.get('/project/:id', 
+  cache({ ttl: 1800, namespace: 'girasole:project:' }), 
+  async (c) => {
   const { DB } = c.env
   const projectId = parseInt(c.req.param('id'))
 
@@ -130,7 +138,9 @@ girasoleRoutes.get('/project/:id', async (c) => {
 // =============================================================================
 // 4. CRÉER INSPECTION + GÉNÉRER CHECKLIST ITEMS
 // =============================================================================
-girasoleRoutes.post('/inspection/create', async (c) => {
+girasoleRoutes.post('/inspection/create', 
+  cacheInvalidator('girasole:'), 
+  async (c) => {
   const { DB } = c.env
   const { project_id, checklist_type } = await c.req.json()
 
@@ -214,7 +224,9 @@ girasoleRoutes.post('/inspection/create', async (c) => {
 // =============================================================================
 // 5. RÉCUPÉRER INSPECTION
 // =============================================================================
-girasoleRoutes.get('/inspection/:token', async (c) => {
+girasoleRoutes.get('/inspection/:token', 
+  cache({ ttl: 900, namespace: 'girasole:inspection:' }), 
+  async (c) => {
   const { DB } = c.env
   const token = c.req.param('token')
 
@@ -252,7 +264,9 @@ girasoleRoutes.get('/inspection/:token', async (c) => {
 // =============================================================================
 // 6. METTRE À JOUR UN ITEM DE CHECKLIST
 // =============================================================================
-girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
+girasoleRoutes.put('/inspection/:token/item/:itemCode', 
+  cacheInvalidator('girasole:inspection:'), 
+  async (c) => {
   const { DB } = c.env
   const token = c.req.param('token')
   const itemCode = c.req.param('itemCode')
@@ -436,7 +450,9 @@ girasoleRoutes.get('/report-test/:token', async (c) => {
 // =============================================================================
 // 8. EXPORT ANNEXE 2 CSV
 // =============================================================================
-girasoleRoutes.get('/export/annexe2', async (c) => {
+girasoleRoutes.get('/export/annexe2', 
+  cache({ ttl: 3600, namespace: 'girasole:export:' }), 
+  async (c) => {
   const { DB } = c.env
 
   try {
@@ -533,7 +549,9 @@ girasoleRoutes.get('/export/annexe2', async (c) => {
 // =============================================================================
 // 8. EXPORT EXCEL ANNEXE 2 DÉTAILLÉ (47 COLONNES)
 // =============================================================================
-girasoleRoutes.get('/export/annexe2-excel/:audit_token?', async (c) => {
+girasoleRoutes.get('/export/annexe2-excel/:audit_token?', 
+  cache({ ttl: 3600, namespace: 'girasole:export-excel:' }), 
+  async (c) => {
   const { DB } = c.env
   const auditToken = c.req.param('audit_token') // Optionnel : exporter un seul audit ou tous
 
@@ -1061,7 +1079,9 @@ const CHECKLIST_TOITURE_ITEMS: ChecklistItem[] = [
 // =============================================================================
 // 9. GÉNÉRATION BATCH RAPPORTS PDF (52 CENTRALES)
 // =============================================================================
-girasoleRoutes.post('/batch/generate-reports', async (c) => {
+girasoleRoutes.post('/batch/generate-reports', 
+  cacheInvalidator('girasole:'), 
+  async (c) => {
   const { DB } = c.env
 
   try {
@@ -1295,7 +1315,9 @@ girasoleRoutes.get('/batch/download-all-reports', async (c) => {
 // =============================================================================
 // 11. RAPPORT SYNTHÈSE GÉNÉRAL CLIENT (52 CENTRALES)
 // =============================================================================
-girasoleRoutes.get('/synthesis-report/client/:clientId?', async (c) => {
+girasoleRoutes.get('/synthesis-report/client/:clientId?', 
+  cache({ ttl: 1800, namespace: 'girasole:synthesis:' }), 
+  async (c) => {
   const { DB } = c.env
   const clientId = c.req.param('clientId') || '1' // Default: GIRASOLE Energies
 
@@ -1562,7 +1584,9 @@ girasoleRoutes.get('/synthesis-report/client/:clientId?', async (c) => {
 // =============================================================================
 // 12. IMPORT PLANIFICATEUR CSV GIRASOLE (BATCH PROJECTS)
 // =============================================================================
-girasoleRoutes.post('/import/planning-csv', async (c) => {
+girasoleRoutes.post('/import/planning-csv', 
+  cacheInvalidator('girasole:'), 
+  async (c) => {
   const { DB } = c.env
 
   try {
@@ -1733,7 +1757,9 @@ girasoleRoutes.get('/import/template-csv', async (c) => {
 // =============================================================================
 // 14. DASHBOARD MARGES CLIENT (RENTABILITÉ MISSION)
 // =============================================================================
-girasoleRoutes.get('/dashboard/marges', async (c) => {
+girasoleRoutes.get('/dashboard/marges', 
+  cache({ ttl: 3600, namespace: 'girasole:marges:' }), 
+  async (c) => {
   const { DB } = c.env
 
   try {

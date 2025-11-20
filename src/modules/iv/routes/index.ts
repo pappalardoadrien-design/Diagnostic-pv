@@ -4,9 +4,11 @@
 // Gestion courbes I-V (référence et sombres)
 
 import { Hono } from 'hono';
+import { cache, cacheInvalidator } from '../../../middleware/cache';
 
 type Bindings = {
   DB: D1Database;
+  KV: KVNamespace;
 };
 
 const ivRoutes = new Hono<{ Bindings: Bindings }>();
@@ -14,7 +16,9 @@ const ivRoutes = new Hono<{ Bindings: Bindings }>();
 // ============================================================================
 // GET /api/iv/measurements/:token - Liste mesures I-V d'un audit
 // ============================================================================
-ivRoutes.get('/measurements/:token', async (c) => {
+ivRoutes.get('/measurements/:token', 
+  cache({ ttl: 1800, namespace: 'iv:measurements:' }), 
+  async (c) => {
   try {
     const { DB } = c.env;
     const token = c.req.param('token');
@@ -56,7 +60,9 @@ ivRoutes.get('/measurements/:token', async (c) => {
 // ============================================================================
 // POST /api/iv/measurements/:token - Importer mesures I-V depuis CSV
 // ============================================================================
-ivRoutes.post('/measurements/:token', async (c) => {
+ivRoutes.post('/measurements/:token', 
+  cacheInvalidator('iv:measurements:'), 
+  async (c) => {
   try {
     const { DB } = c.env;
     const token = c.req.param('token');
@@ -190,7 +196,9 @@ ivRoutes.get('/measurements/:token/module/:identifier', async (c) => {
 // ============================================================================
 // DELETE /api/iv/measurements/:token - Supprimer toutes les mesures d'un audit
 // ============================================================================
-ivRoutes.delete('/measurements/:token', async (c) => {
+ivRoutes.delete('/measurements/:token', 
+  cacheInvalidator('iv:measurements:'), 
+  async (c) => {
   try {
     const { DB } = c.env;
     const token = c.req.param('token');

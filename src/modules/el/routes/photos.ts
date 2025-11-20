@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
+import type { D1Database, R2Bucket, KVNamespace } from '@cloudflare/workers-types'
+import { cache, cacheInvalidator } from '../../../middleware/cache'
 
 type Bindings = {
   DB: D1Database
   R2: R2Bucket
+  KV: KVNamespace
 }
 
 const elPhotosRoutes = new Hono<{ Bindings: Bindings }>()
@@ -13,7 +15,9 @@ const elPhotosRoutes = new Hono<{ Bindings: Bindings }>()
 // ============================================================================
 // POST /api/el/photos/upload
 // Upload single photo to R2 and store metadata in D1
-elPhotosRoutes.post('/upload', async (c) => {
+elPhotosRoutes.post('/upload', 
+  cacheInvalidator('el:photos:'), 
+  async (c) => {
   try {
     const { DB, R2 } = c.env
     const formData = await c.req.formData()
@@ -109,7 +113,9 @@ elPhotosRoutes.post('/upload', async (c) => {
 // LIST PHOTOS BY AUDIT
 // ============================================================================
 // GET /api/el/photos/:audit_token
-elPhotosRoutes.get('/:audit_token', async (c) => {
+elPhotosRoutes.get('/:audit_token', 
+  cache({ ttl: 900, namespace: 'el:photos:' }), 
+  async (c) => {
   try {
     const { DB } = c.env
     const auditToken = c.req.param('audit_token')
@@ -141,7 +147,9 @@ elPhotosRoutes.get('/:audit_token', async (c) => {
 // LIST PHOTOS BY MODULE
 // ============================================================================
 // GET /api/el/photos/:audit_token/:module_identifier
-elPhotosRoutes.get('/:audit_token/:module_identifier', async (c) => {
+elPhotosRoutes.get('/:audit_token/:module_identifier', 
+  cache({ ttl: 900, namespace: 'el:photos:module:' }), 
+  async (c) => {
   try {
     const { DB } = c.env
     const auditToken = c.req.param('audit_token')
@@ -205,7 +213,9 @@ elPhotosRoutes.get('/detail/:photo_id', async (c) => {
 // DELETE PHOTO
 // ============================================================================
 // DELETE /api/el/photos/:photo_id
-elPhotosRoutes.delete('/:photo_id', async (c) => {
+elPhotosRoutes.delete('/:photo_id', 
+  cacheInvalidator('el:photos:'), 
+  async (c) => {
   try {
     const { DB, R2 } = c.env
     const photoId = c.req.param('photo_id')
@@ -242,7 +252,9 @@ elPhotosRoutes.delete('/:photo_id', async (c) => {
 // UPDATE PHOTO METADATA
 // ============================================================================
 // PATCH /api/el/photos/:photo_id
-elPhotosRoutes.patch('/:photo_id', async (c) => {
+elPhotosRoutes.patch('/:photo_id', 
+  cacheInvalidator('el:photos:'), 
+  async (c) => {
   try {
     const { DB } = c.env
     const photoId = c.req.param('photo_id')
@@ -307,7 +319,9 @@ elPhotosRoutes.patch('/:photo_id', async (c) => {
 // STATISTICS BY AUDIT
 // ============================================================================
 // GET /api/el/photos/stats/:audit_token
-elPhotosRoutes.get('/stats/:audit_token', async (c) => {
+elPhotosRoutes.get('/stats/:audit_token', 
+  cache({ ttl: 1800, namespace: 'el:photos:stats:' }), 
+  async (c) => {
   try {
     const { DB } = c.env
     const auditToken = c.req.param('audit_token')
@@ -344,7 +358,9 @@ elPhotosRoutes.get('/stats/:audit_token', async (c) => {
 // BATCH UPLOAD MULTIPLE PHOTOS
 // ============================================================================
 // POST /api/el/photos/batch-upload
-elPhotosRoutes.post('/batch-upload', async (c) => {
+elPhotosRoutes.post('/batch-upload', 
+  cacheInvalidator('el:photos:'), 
+  async (c) => {
   try {
     const { DB, R2 } = c.env
     const formData = await c.req.formData()
