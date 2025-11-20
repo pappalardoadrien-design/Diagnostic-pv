@@ -1730,4 +1730,242 @@ girasoleRoutes.get('/import/template-csv', async (c) => {
   })
 })
 
+// =============================================================================
+// 14. DASHBOARD MARGES CLIENT (RENTABILITÉ MISSION)
+// =============================================================================
+girasoleRoutes.get('/dashboard/marges', async (c) => {
+  const { DB } = c.env
+
+  try {
+    // Get project completion stats
+    const { results: stats } = await DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT p.id) as total_projects,
+        COUNT(DISTINCT CASE WHEN vi.audit_token IS NOT NULL THEN p.id END) as completed_projects,
+        SUM(p.installation_power) as total_power_kwc
+      FROM projects p
+      LEFT JOIN visual_inspections vi ON p.id = vi.project_id
+      WHERE p.is_girasole = 1
+    `).all()
+
+    const totalProjects = stats?.[0]?.total_projects || 52
+    const completedProjects = stats?.[0]?.completed_projects || 0
+    const totalPowerKwc = stats?.[0]?.total_power_kwc || 0
+
+    // Mission financials
+    const budgetTotal = 66885 // € HT
+    const costPerCentrale = budgetTotal / totalProjects
+    const revenueCompleted = completedProjects * costPerCentrale
+    const revenueRemaining = (totalProjects - completedProjects) * costPerCentrale
+    const completionRate = (completedProjects / totalProjects) * 100
+
+    // Estimated costs (assumptions)
+    const estimatedHoursPerCentrale = 4 // hours
+    const hourlyRate = 85 // €/hour
+    const travelCostPerCentrale = 150 // € (fuel, tolls)
+    const estimatedCostPerCentrale = (estimatedHoursPerCentrale * hourlyRate) + travelCostPerCentrale
+
+    const totalEstimatedCost = totalProjects * estimatedCostPerCentrale
+    const marginPerCentrale = costPerCentrale - estimatedCostPerCentrale
+    const totalMargin = budgetTotal - totalEstimatedCost
+    const marginRate = (totalMargin / budgetTotal) * 100
+
+    // Get projects with audit types breakdown
+    const { results: projects } = await DB.prepare(`
+      SELECT 
+        p.id,
+        p.name,
+        p.id_referent,
+        p.installation_power,
+        p.audit_types,
+        COUNT(DISTINCT vi.audit_token) as audits_completed
+      FROM projects p
+      LEFT JOIN visual_inspections vi ON p.id = vi.project_id
+      WHERE p.is_girasole = 1
+      GROUP BY p.id
+      ORDER BY p.id_referent ASC
+    `).all()
+
+    // Calculate per-project costs
+    const projectsWithCosts = projects?.map((p: any) => {
+      const auditTypes = JSON.parse(p.audit_types || '[]')
+      const isDouble = auditTypes.includes('TOITURE')
+      const estimatedTime = isDouble ? 6 : 4 // hours (DOUBLE takes longer)
+      const cost = (estimatedTime * hourlyRate) + travelCostPerCentrale
+      const revenue = costPerCentrale
+      const margin = revenue - cost
+      const status = (p.audits_completed || 0) > 0 ? 'completed' : 'pending'
+
+      return {
+        ...p,
+        isDouble,
+        estimatedTime,
+        cost: cost.toFixed(0),
+        revenue: revenue.toFixed(0),
+        margin: margin.toFixed(0),
+        marginRate: ((margin / revenue) * 100).toFixed(1),
+        status
+      }
+    })
+
+    // HTML Dashboard
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIRASOLE - Dashboard Marges</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div class="max-w-7xl mx-auto p-8">
+    <div class="mb-8">
+      <h1 class="text-4xl font-bold text-green-600">💰 DiagPV - Dashboard Marges GIRASOLE</h1>
+      <p class="text-gray-600 mt-2">Analyse Rentabilité Mission 52 Centrales Photovoltaïques</p>
+    </div>
+
+    <!-- Financial Overview -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-600 mb-2">Budget Total</div>
+        <div class="text-3xl font-bold text-blue-600">${budgetTotal.toLocaleString()} €</div>
+        <div class="text-xs text-gray-500 mt-1">HT</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-600 mb-2">Coût/Centrale</div>
+        <div class="text-3xl font-bold text-purple-600">${costPerCentrale.toFixed(0)} €</div>
+        <div class="text-xs text-gray-500 mt-1">Moyen</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-600 mb-2">Marge Totale</div>
+        <div class="text-3xl font-bold text-green-600">${totalMargin.toFixed(0)} €</div>
+        <div class="text-xs text-gray-500 mt-1">${marginRate.toFixed(1)}% marge</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-600 mb-2">Progression</div>
+        <div class="text-3xl font-bold text-orange-600">${completionRate.toFixed(1)}%</div>
+        <div class="text-xs text-gray-500 mt-1">${completedProjects}/${totalProjects} centrales</div>
+      </div>
+    </div>
+
+    <!-- Revenue Breakdown -->
+    <div class="grid grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4">💵 Facturation</h2>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center p-3 bg-green-50 rounded">
+            <span class="font-semibold">CA Complété</span>
+            <span class="text-2xl font-bold text-green-600">${revenueCompleted.toFixed(0)} €</span>
+          </div>
+          <div class="flex justify-between items-center p-3 bg-orange-50 rounded">
+            <span class="font-semibold">CA Restant</span>
+            <span class="text-2xl font-bold text-orange-600">${revenueRemaining.toFixed(0)} €</span>
+          </div>
+          <div class="text-sm text-gray-600 mt-4">
+            <div class="flex justify-between mb-2">
+              <span>Centrales SOL (39)</span>
+              <span>${(39 * costPerCentrale).toFixed(0)} €</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Centrales DOUBLE (13)</span>
+              <span>${(13 * costPerCentrale).toFixed(0)} €</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4">💸 Coûts Estimés</h2>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center p-3 bg-red-50 rounded">
+            <span class="font-semibold">Coût Total Estimé</span>
+            <span class="text-2xl font-bold text-red-600">${totalEstimatedCost.toFixed(0)} €</span>
+          </div>
+          <div class="text-sm space-y-2 mt-4">
+            <div class="flex justify-between p-2 border-b">
+              <span>Temps moyen/centrale</span>
+              <span class="font-semibold">${estimatedHoursPerCentrale}h</span>
+            </div>
+            <div class="flex justify-between p-2 border-b">
+              <span>Taux horaire</span>
+              <span class="font-semibold">${hourlyRate} €/h</span>
+            </div>
+            <div class="flex justify-between p-2 border-b">
+              <span>Frais déplacement</span>
+              <span class="font-semibold">${travelCostPerCentrale} €</span>
+            </div>
+            <div class="flex justify-between p-2 font-bold">
+              <span>Coût unitaire estimé</span>
+              <span class="text-red-600">${estimatedCostPerCentrale} €</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects Table -->
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-bold mb-4">📊 Détail par Centrale</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="p-2 text-left">ID Ref</th>
+              <th class="p-2 text-left">Centrale</th>
+              <th class="p-2 text-center">Type</th>
+              <th class="p-2 text-center">Puissance</th>
+              <th class="p-2 text-center">Temps Est.</th>
+              <th class="p-2 text-center">Revenu</th>
+              <th class="p-2 text-center">Coût Est.</th>
+              <th class="p-2 text-center">Marge</th>
+              <th class="p-2 text-center">Taux Marge</th>
+              <th class="p-2 text-center">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(projectsWithCosts || []).map((p: any) => `
+              <tr class="border-b hover:bg-gray-50">
+                <td class="p-2 font-mono text-xs">${p.id_referent || 'N/A'}</td>
+                <td class="p-2">${p.name}</td>
+                <td class="p-2 text-center">
+                  <span class="px-2 py-1 rounded text-xs font-semibold ${p.isDouble ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">
+                    ${p.isDouble ? 'DOUBLE' : 'SOL'}
+                  </span>
+                </td>
+                <td class="p-2 text-center">${p.installation_power || 0} kWc</td>
+                <td class="p-2 text-center">${p.estimatedTime}h</td>
+                <td class="p-2 text-center font-semibold text-green-600">${p.revenue} €</td>
+                <td class="p-2 text-center font-semibold text-red-600">${p.cost} €</td>
+                <td class="p-2 text-center font-bold ${parseFloat(p.margin) >= 0 ? 'text-green-600' : 'text-red-600'}">${p.margin} €</td>
+                <td class="p-2 text-center font-bold ${parseFloat(p.marginRate) >= 20 ? 'text-green-600' : parseFloat(p.marginRate) >= 10 ? 'text-yellow-600' : 'text-red-600'}">${p.marginRate}%</td>
+                <td class="p-2 text-center">
+                  <span class="px-2 py-1 rounded-full text-xs font-semibold ${p.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                    ${p.status === 'completed' ? '✅' : '⏳'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 text-center text-sm text-gray-500">
+      <p><strong>DiagPV - Diagnostic Photovoltaïque</strong></p>
+      <p>3 rue d'Apollo, 31240 L'Union | 05.81.10.16.59 | contact@diagpv.fr | RCS 792972309</p>
+      <p class="mt-2">Dashboard généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+    </div>
+  </div>
+</body>
+</html>`
+
+    return c.html(html)
+  } catch (error) {
+    console.error('Error generating margins dashboard:', error)
+    return c.json({ error: 'Failed to generate margins dashboard', details: error }, 500)
+  }
+})
+
 export default girasoleRoutes
