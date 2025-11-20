@@ -143,10 +143,12 @@ app.route('/api/isolation', isolationRoutes)
 app.route('/api/modules', unifiedModulesRoutes)
 
 // ============================================================================
-// GIRASOLE - IMPORT & BATCH OPERATIONS
+// GIRASOLE - MODULE PRINCIPAL (52 CENTRALES PV)
 // ============================================================================
+import girasoleRoutes from './modules/girasole/routes'
 import girasoleImportRoutes from './modules/girasole/import-routes'
 import girasoleExportRoutes from './modules/girasole/export-routes'
+app.route('/api/girasole', girasoleRoutes)
 app.route('/api/girasole', girasoleImportRoutes)
 app.route('/api/girasole', girasoleExportRoutes)
 
