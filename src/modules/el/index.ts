@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import auditsRouter from './routes/audits'
 import modulesRouter from './routes/modules'
 import dashboardRouter from './routes/dashboard'
+import photosRouter from './routes/photos'
 
 type Bindings = {
   DB: D1Database
@@ -25,5 +26,8 @@ elModule.route('/audit', auditsRouter)
 
 // Routes pour les modules (GET/PUT modules individuels)
 elModule.route('/modules', modulesRouter)
+
+// Routes pour les photos (upload, liste, suppression)
+elModule.route('/photos', photosRouter)
 
 export default elModule

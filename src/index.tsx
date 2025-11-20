@@ -442,6 +442,12 @@ app.route('/', ivPagesRoutes)
 app.route('/', ivImportRoutes)
 app.route('/', ivModuleDetailRoutes)
 
+// Module EL - Pages Photos
+import elPhotosGalleryRoutes from './pages/el/photos-gallery'
+import elPhotosUploadRoutes from './pages/el/photos-upload'
+app.route('/', elPhotosGalleryRoutes)
+app.route('/', elPhotosUploadRoutes)
+
 // Module Visuels - Contrôles Visuels
 app.get('/audit/:token/visual', (c) => {
   return c.html(getAuditVisualPage())

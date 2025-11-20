@@ -20,5 +20,13 @@
       "binding": "KV", 
       "id": "caf313a4703c4eb0911cd4f2bf8cc028"
     }
+  ],
+  
+  // Configuration R2 pour photos électroluminescence
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "diagpv-el-photos"
+    }
   ]
 }
