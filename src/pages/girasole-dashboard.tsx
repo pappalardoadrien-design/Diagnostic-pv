@@ -34,9 +34,15 @@ export function getGirasoleDashboardPage() {
                     </h1>
                     <p class="text-green-100 mt-1">52 Centrales PV - Audits Conformité NF C 15-100 & DTU 40.35</p>
                 </div>
-                <div class="text-right">
-                    <div class="text-2xl font-bold" id="mission-budget">66.885€ HT</div>
-                    <div class="text-green-100">Janvier - Mars 2025</div>
+                <div class="text-right flex items-center gap-4">
+                    <div>
+                        <div class="text-2xl font-bold" id="mission-budget">66.885€ HT</div>
+                        <div class="text-green-100">Janvier - Mars 2025</div>
+                    </div>
+                    <button onclick="exportAnnexe2()" class="bg-white text-green-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition flex items-center gap-2">
+                        <i class="fas fa-file-excel"></i>
+                        Export ANNEXE 2
+                    </button>
                 </div>
             </div>
         </div>
@@ -312,6 +318,11 @@ export function getGirasoleDashboardPage() {
         // Ouvrir checklist
         function openChecklist(projectId, checklistType) {
             window.location.href = \`/girasole/checklist/\${checklistType.toLowerCase()}/\${projectId}\`;
+        }
+
+        // Exporter ANNEXE 2
+        function exportAnnexe2() {
+            window.location.href = '/api/girasole/export/annexe2';
         }
 
         // Charger au démarrage

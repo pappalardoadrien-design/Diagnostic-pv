@@ -418,10 +418,12 @@ girasoleRoutes.get('/report/:token', async (c) => {
     
     // Générer HTML
     const { generateReportHTML } = await import('./report-generator');
-    const html = generateReportHTML(
-      { inspection, project, items: itemsList, stats },
-      inspection.checklist_type as 'CONFORMITE' | 'TOITURE'
-    );
+    const html = generateReportHTML({
+      inspection,
+      project,
+      items: itemsList,
+      checklistType: inspection.checklist_type as 'CONFORMITE' | 'TOITURE'
+    });
     
     return c.html(html);
     
@@ -479,6 +481,111 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
     console.error('Erreur /api/girasole/inspection/:token/report:', error);
     return c.json({ 
       error: 'Erreur génération rapport',
+      details: error.message 
+    }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/girasole/export/annexe2
+// Exporter ANNEXE 2 CSV (47 colonnes) - Suivi 52 centrales
+// ============================================================================
+girasoleRoutes.get('/export/annexe2', async (c) => {
+  try {
+    const { DB } = c.env;
+    
+    // Récupérer tous les projets GIRASOLE avec leurs inspections
+    const projects = await DB.prepare(`
+      SELECT 
+        p.id,
+        p.id_referent,
+        p.name,
+        p.site_address,
+        p.installation_power,
+        p.audit_types,
+        (SELECT COUNT(*) FROM visual_inspections vi 
+         WHERE vi.project_id = p.id AND vi.checklist_type = 'CONFORMITE') as conformite_done,
+        (SELECT COUNT(*) FROM visual_inspections vi 
+         WHERE vi.project_id = p.id AND vi.checklist_type = 'TOITURE') as toiture_done,
+        (SELECT inspection_date FROM visual_inspections vi 
+         WHERE vi.project_id = p.id AND vi.checklist_type = 'CONFORMITE' 
+         ORDER BY inspection_date DESC LIMIT 1) as last_conformite_date,
+        (SELECT inspection_date FROM visual_inspections vi 
+         WHERE vi.project_id = p.id AND vi.checklist_type = 'TOITURE' 
+         ORDER BY inspection_date DESC LIMIT 1) as last_toiture_date
+      FROM projects p
+      WHERE p.is_girasole = 1
+      ORDER BY p.id ASC
+    `).all();
+    
+    const projectsList = projects.results || [];
+    
+    // Générer CSV (format ANNEXE 2)
+    const headers = [
+      'ID_Referent',
+      'Nom_Centrale',
+      'Adresse',
+      'Puissance_kWc',
+      'Type_Audit',
+      'Audit_Conformite',
+      'Date_Conformite',
+      'Statut_Conformite',
+      'Audit_Toiture',
+      'Date_Toiture',
+      'Statut_Toiture',
+      'Progression_%',
+      'Observations'
+    ];
+    
+    const rows = projectsList.map(p => {
+      const auditTypes = JSON.parse(p.audit_types || '[]');
+      const hasToiture = auditTypes.includes('TOITURE');
+      
+      const conformiteDone = p.conformite_done > 0 ? 'Oui' : 'Non';
+      const toitureDone = p.toiture_done > 0 ? 'Oui' : 'Non';
+      
+      let progression = 0;
+      if (hasToiture) {
+        // DOUBLE : 50% par checklist
+        if (p.conformite_done > 0) progression += 50;
+        if (p.toiture_done > 0) progression += 50;
+      } else {
+        // SOL : 100% si conformité faite
+        if (p.conformite_done > 0) progression = 100;
+      }
+      
+      const name = '"' + p.name.replace(/"/g, '""') + '"';
+      const address = '"' + (p.site_address || '').replace(/"/g, '""') + '"';
+      
+      return [
+        p.id_referent || p.id,
+        name,
+        address,
+        p.installation_power || '',
+        hasToiture ? 'DOUBLE' : 'SOL',
+        conformiteDone,
+        p.last_conformite_date || '',
+        p.conformite_done > 0 ? 'Terminé' : 'En attente',
+        hasToiture ? (toitureDone) : 'N/A',
+        hasToiture ? (p.last_toiture_date || '') : 'N/A',
+        hasToiture ? (p.toiture_done > 0 ? 'Terminé' : 'En attente') : 'N/A',
+        progression + '%',
+        ''
+      ].join(',');
+    });
+    
+    const csv = [headers.join(','), ...rows].join('\\n');
+    
+    // Retourner CSV
+    return c.text(csv, 200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="ANNEXE_2_GIRASOLE_' + new Date().toISOString().split('T')[0] + '.csv"'
+    });
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/export/annexe2:', error);
+    return c.json({ 
+      error: 'Erreur export ANNEXE 2',
       details: error.message 
     }, 500);
   }
