@@ -108,6 +108,12 @@ import consolidatedReportsRoutes from './modules/reports/consolidated-routes'
 app.route('/api/reports/consolidated', consolidatedReportsRoutes)
 
 // ============================================================================
+// MODULE CONSOLIDATED FULL REPORT - RAPPORT MULTI-MODULES COMPLET (NOUVEAU)
+// ============================================================================
+import consolidatedFullRoutes from './modules/reports/consolidated-full'
+app.route('/api/reports/consolidated-full', consolidatedFullRoutes)
+
+// ============================================================================
 // MODULE EXPORTS - EXPORT CSV DES DONNÉES
 // ============================================================================
 import csvExportRoutes from './modules/exports/csv-routes'
