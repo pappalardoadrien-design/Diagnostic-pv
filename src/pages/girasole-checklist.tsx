@@ -50,9 +50,13 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
                         <div class="text-2xl font-bold" id="progress-percent">0%</div>
                         <div class="text-xs opacity-90" id="progress-text">0/0 items</div>
                     </div>
-                    <button onclick="saveChecklist()" class="bg-white text-green-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition flex items-center gap-2">
-                        <i class="fas fa-save"></i>
-                        Sauvegarder
+                    <button onclick="generateReport()" class="bg-white text-green-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition flex items-center gap-2">
+                        <i class="fas fa-file-pdf"></i>
+                        Rapport PDF
+                    </button>
+                    <button onclick="saveChecklist()" class="bg-white/80 text-white px-4 py-3 rounded-lg font-medium hover:bg-white/90 transition flex items-center gap-2">
+                        <i class="fas fa-check"></i>
+                        Auto-save ON
                     </button>
                 </div>
             </div>
@@ -371,6 +375,28 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
         // Sauvegarder (auto-save activé, ce bouton force juste la synchro)
         async function saveChecklist() {
             alert('✅ Sauvegarde automatique activée !\\nToutes vos modifications sont enregistrées en temps réel.');
+        }
+
+        // Générer rapport PDF
+        function generateReport() {
+            if (!inspectionToken) {
+                alert('❌ Aucune inspection en cours');
+                return;
+            }
+            
+            // Ouvrir rapport dans nouvelle fenêtre
+            const reportUrl = \`/api/girasole/inspection/\${inspectionToken}/report\`;
+            window.open(reportUrl, '_blank', 'width=1000,height=800');
+        }
+
+        // Générer rapport PDF
+        function generateReport() {
+            if (!inspectionToken) {
+                alert('⚠️ Inspection non initialisée');
+                return;
+            }
+            // Ouvrir rapport dans nouvel onglet
+            window.open(\`/api/girasole/report/\${inspectionToken}\`, '_blank');
         }
 
         // Retour

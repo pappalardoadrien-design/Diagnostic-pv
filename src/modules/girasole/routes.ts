@@ -372,4 +372,116 @@ girasoleRoutes.get('/inspection/:token', async (c) => {
   }
 });
 
+// ============================================================================
+// GET /api/girasole/report/:token
+// Générer rapport PDF HTML (CONFORMITE ou TOITURE)
+// ============================================================================
+girasoleRoutes.get('/report/:token', async (c) => {
+  try {
+    const token = c.req.param('token');
+    const { DB } = c.env;
+    
+    // Récupérer inspection
+    const inspection = await DB.prepare(`
+      SELECT * FROM visual_inspections WHERE inspection_token = ?
+    `).bind(token).first();
+    
+    if (!inspection) {
+      return c.json({ error: 'Inspection non trouvée' }, 404);
+    }
+    
+    // Récupérer projet
+    const project = await DB.prepare(`
+      SELECT p.*, c.name as client_name
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE p.id = ?
+    `).bind(inspection.project_id).first();
+    
+    // Récupérer items
+    const items = await DB.prepare(`
+      SELECT * FROM visual_inspection_items 
+      WHERE inspection_token = ? 
+      ORDER BY category, item_code ASC
+    `).bind(token).all();
+    
+    const itemsList = items.results || [];
+    
+    // Calculer stats
+    const stats = {
+      total: itemsList.length,
+      conforme: itemsList.filter((i: any) => i.conformity === 'conforme').length,
+      non_conforme: itemsList.filter((i: any) => i.conformity === 'non_conforme').length,
+      sans_objet: itemsList.filter((i: any) => i.conformity === 'sans_objet').length,
+      non_verifie: itemsList.filter((i: any) => i.conformity === 'non_verifie' || !i.conformity).length
+    };
+    
+    // Générer HTML
+    const { generateReportHTML } = await import('./report-generator');
+    const html = generateReportHTML(
+      { inspection, project, items: itemsList, stats },
+      inspection.checklist_type as 'CONFORMITE' | 'TOITURE'
+    );
+    
+    return c.html(html);
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/report/:token:', error);
+    return c.json({ 
+      error: 'Erreur génération rapport',
+      details: error.message 
+    }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/girasole/inspection/:token/report
+// Générer rapport PDF (HTML prêt pour impression)
+// ============================================================================
+girasoleRoutes.get('/inspection/:token/report', async (c) => {
+  try {
+    const token = c.req.param('token');
+    const { DB } = c.env;
+    
+    // Récupérer inspection
+    const inspection = await DB.prepare(`
+      SELECT * FROM visual_inspections WHERE inspection_token = ?
+    `).bind(token).first();
+    
+    if (!inspection) {
+      return c.json({ error: 'Inspection non trouvée' }, 404);
+    }
+    
+    // Récupérer projet
+    const project = await DB.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `).bind(inspection.project_id).first();
+    
+    // Récupérer items
+    const items = await DB.prepare(`
+      SELECT * FROM visual_inspection_items 
+      WHERE inspection_token = ? 
+      ORDER BY category, item_code ASC
+    `).bind(token).all();
+    
+    // Générer HTML
+    const { generateReportHTML } = await import('./report-generator');
+    const html = generateReportHTML({
+      inspection,
+      project,
+      items: items.results || [],
+      checklistType: inspection.checklist_type as 'CONFORMITE' | 'TOITURE'
+    });
+    
+    return c.html(html);
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/inspection/:token/report:', error);
+    return c.json({ 
+      error: 'Erreur génération rapport',
+      details: error.message 
+    }, 500);
+  }
+});
+
 export default girasoleRoutes;
