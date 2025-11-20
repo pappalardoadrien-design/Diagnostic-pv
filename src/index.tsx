@@ -434,6 +434,12 @@ app.get('/audit/:token/iv', (c) => {
   return c.html(getAuditIvPage())
 })
 
+// Module I-V - Pages UI
+import ivPagesRoutes from './pages/iv/measurements-list'
+import ivImportRoutes from './pages/iv/import-csv'
+app.route('/', ivPagesRoutes)
+app.route('/', ivImportRoutes)
+
 // Module Visuels - Contrôles Visuels
 app.get('/audit/:token/visual', (c) => {
   return c.html(getAuditVisualPage())
