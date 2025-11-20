@@ -346,6 +346,8 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
 
     // Generate report based on checklist type
     if (checklistType === 'CONFORMITE') {
+      console.log('🚀 GENERATING CONFORMITE REPORT WITH NEW GENERATOR')
+      console.log('Function generateReportConformite exists:', typeof generateReportConformite)
       const html = generateReportConformite({
         project: {
           id: project.id,
@@ -388,6 +390,20 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
     console.error('Error generating report:', error)
     return c.html(`<h1>Erreur génération rapport</h1><p>${error}</p>`, 500)
   }
+})
+
+// =============================================================================
+// 7B. GÉNÉRER RAPPORT PDF - TEST ROUTE
+// =============================================================================
+girasoleRoutes.get('/report-test/:token', async (c) => {
+  return c.html(`
+    <html>
+      <body>
+        <h1 style="color: red;">TEST ROUTE WORKS!</h1>
+        <p>Token: ${c.req.param('token')}</p>
+      </body>
+    </html>
+  `)
 })
 
 // =============================================================================
