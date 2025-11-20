@@ -20,10 +20,16 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://40a80360.diagnostic-hub.pages.dev
-- **Mobile Terrain**: https://40a80360.diagnostic-hub.pages.dev/mobile/field
+- **Production**: https://751939b9.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://751939b9.diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
-- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`
+- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
+
+### **🆕 GIRASOLE - Rapports PDF** (Mission 52 centrales)
+- **Rapport CONFORMITE**: `GET /api/girasole/inspection/{audit_token}/report`
+  - Exemple: https://751939b9.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-CONFORMITE-59-TEST/report
+- **Rapport TOITURE**: `GET /api/girasole/inspection/{audit_token}/report`
+  - Exemple: https://751939b9.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-TOITURE-60-TEST/report
 
 ---
 
@@ -234,12 +240,23 @@ GET    /audit/:token/visual/girasole/toiture        Checklist Toiture DTU 40.35 
 - Défauts détectés
 - Sévérité (low, medium, high, critical)
 
-**🆕 Checklists GIRASOLE (52 centrales)**:
+**🆕 Checklists GIRASOLE (52 centrales)** ✅:
 - **39 SOL**: Conformité NF C 15-100 + UTE C 15-712 (12 sections, 80+ items)
 - **13 TOITURE**: DTU 40.35 + ETN (7 sections, sécurité renforcée)
 - **Workflow**: Photo + Conformité + Commentaire par item
 - **Brouillons**: localStorage + offline-first
 - **Mission**: 66.885€ HT, janvier-mars 2025
+
+**✅ Rapports PDF GIRASOLE (PRODUCTION)**:
+- **Génération automatique**: HTML minimaliste intégré directement dans routes.ts
+- **Branding DiagPV officiel**: Logo vert/gris, coordonnées L'Union, RCS 792972309, signature Fabien CORRERA
+- **Statistiques conformité**: Calcul automatique taux conformité (✅/❌/S.O.)
+- **Catégories structurées**: 
+  - CONFORMITE: Protections, Mise à la Terre, Câblage, Équipements, Signalisation
+  - TOITURE: Étanchéité, Fixations, Structure, Évacuation EP, Sécurité
+- **Format imprimable**: Style CSS @page A4 optimisé impression
+- **URLs endpoints**: `/api/girasole/inspection/{audit_token}/report`
+- **Données test disponibles**: 2 projets (SOL + DOUBLE), 8 items inspection
 
 **Base de Données**:
 - Table `visual_inspections`: Inspections (type, observations, photos JSON, severity, **conformite, audit_category, checklist_section, item_order**)
