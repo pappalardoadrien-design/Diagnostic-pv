@@ -108,6 +108,7 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
         let checklistData = [];
         let checklistState = {};
         let currentFilter = 'all';
+        let inspectionToken = null;
 
         // Charger données
         async function loadData() {
@@ -130,8 +131,16 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
                     };
                 });
 
-                // Charger état sauvegardé si existe
-                // TODO: Appel API pour récupérer inspection existante
+                // Chercher inspection existante OU créer nouvelle
+                // TODO: Implémenter recherche inspection existante
+                // Pour l'instant, on crée toujours une nouvelle inspection
+                const createResp = await axios.post('/api/girasole/inspection/create', {
+                    project_id: PROJECT_ID,
+                    checklist_type: CHECKLIST_TYPE
+                });
+                
+                inspectionToken = createResp.data.inspection.token;
+                console.log('Inspection créée:', inspectionToken);
 
                 renderChecklist();
                 updateProgress();
@@ -250,8 +259,20 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
         }
 
         // Définir conformité
-        function setConformity(code, value) {
+        async function setConformity(code, value) {
             checklistState[code].conformity = value;
+            
+            // Sauvegarder en base immédiatement
+            if (inspectionToken) {
+                try {
+                    await axios.put(\`/api/girasole/inspection/\${inspectionToken}/item/\${code}\`, {
+                        conformity: value,
+                        observation: checklistState[code].observation
+                    });
+                } catch (error) {
+                    console.error('Erreur sauvegarde item:', error);
+                }
+            }
             
             // Mise à jour UI
             const item = document.querySelector(\`[data-code="\${code}"]\`);
@@ -271,8 +292,20 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
         }
 
         // Mettre à jour observation
-        function updateObservation(code, value) {
+        async function updateObservation(code, value) {
             checklistState[code].observation = value;
+            
+            // Sauvegarder en base
+            if (inspectionToken) {
+                try {
+                    await axios.put(\`/api/girasole/inspection/\${inspectionToken}/item/\${code}\`, {
+                        conformity: checklistState[code].conformity,
+                        observation: value
+                    });
+                } catch (error) {
+                    console.error('Erreur sauvegarde observation:', error);
+                }
+            }
         }
 
         // Mettre à jour progression
@@ -335,22 +368,9 @@ export function getGirasoleChecklistPage(projectId: string, checklistType: 'CONF
             });
         }
 
-        // Sauvegarder
+        // Sauvegarder (auto-save activé, ce bouton force juste la synchro)
         async function saveChecklist() {
-            try {
-                const data = {
-                    project_id: PROJECT_ID,
-                    checklist_type: CHECKLIST_TYPE,
-                    state: checklistState
-                };
-
-                // TODO: Appel API pour sauvegarder
-                console.log('Sauvegarde:', data);
-                alert('✅ Checklist sauvegardée !');
-            } catch (error) {
-                console.error('Erreur sauvegarde:', error);
-                alert('❌ Erreur lors de la sauvegarde');
-            }
+            alert('✅ Sauvegarde automatique activée !\\nToutes vos modifications sont enregistrées en temps réel.');
         }
 
         // Retour

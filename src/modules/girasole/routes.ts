@@ -211,4 +211,165 @@ girasoleRoutes.get('/checklist/:type', async (c) => {
   }
 });
 
+// ============================================================================
+// POST /api/girasole/inspection/create
+// Créer nouvelle inspection GIRASOLE (CONFORMITE ou TOITURE)
+// ============================================================================
+girasoleRoutes.post('/inspection/create', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { project_id, checklist_type } = body;
+    const { DB } = c.env;
+    
+    // Récupérer info projet
+    const project = await DB.prepare(`
+      SELECT p.*, c.name as client_name
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE p.id = ?
+    `).bind(project_id).first();
+    
+    if (!project) {
+      return c.json({ error: 'Projet non trouvé' }, 404);
+    }
+    
+    // Générer token unique
+    const token = `GIRASOLE-${checklist_type}-${project_id}-${Date.now()}`;
+    
+    // Créer inspection
+    const result = await DB.prepare(`
+      INSERT INTO visual_inspections (
+        inspection_token, project_id, project_name, client_name, 
+        location, inspection_date, inspector_name,
+        checklist_type, overall_status
+      ) VALUES (?, ?, ?, ?, ?, date('now'), ?, ?, 'pending')
+    `).bind(
+      token,
+      project_id,
+      project.name,
+      project.client_name || 'GIRASOLE Energies',
+      project.site_address || '',
+      'Technicien DiagPV',
+      checklist_type
+    ).run();
+    
+    const inspectionId = result.meta.last_row_id as number;
+    
+    // Créer items checklist
+    const { getChecklistByType } = await import('./checklists');
+    const items = getChecklistByType(checklist_type as 'CONFORMITE' | 'TOITURE');
+    
+    const itemInserts = items.map(item => 
+      DB.prepare(`
+        INSERT INTO visual_inspection_items (
+          inspection_id, inspection_token, category, subcategory,
+          item_code, item_description, severity, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'unchecked')
+      `).bind(
+        inspectionId,
+        token,
+        item.category,
+        item.subcategory,
+        item.code,
+        item.description,
+        item.criticalityLevel
+      )
+    );
+    
+    await DB.batch(itemInserts);
+    
+    return c.json({
+      success: true,
+      inspection: {
+        id: inspectionId,
+        token,
+        project_id,
+        checklist_type,
+        items_count: items.length
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/inspection/create:', error);
+    return c.json({ 
+      error: 'Erreur création inspection',
+      details: error.message 
+    }, 500);
+  }
+});
+
+// ============================================================================
+// PUT /api/girasole/inspection/:token/item/:itemCode
+// Mettre à jour un item de checklist
+// ============================================================================
+girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
+  try {
+    const token = c.req.param('token');
+    const itemCode = c.req.param('itemCode');
+    const body = await c.req.json();
+    const { DB } = c.env;
+    
+    const { conformity, observation } = body;
+    
+    await DB.prepare(`
+      UPDATE visual_inspection_items
+      SET 
+        conformity = ?,
+        observation = ?,
+        status = 'checked',
+        updated_at = CURRENT_TIMESTAMP
+      WHERE inspection_token = ? AND item_code = ?
+    `).bind(conformity, observation || null, token, itemCode).run();
+    
+    return c.json({ success: true });
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/inspection/:token/item/:itemCode:', error);
+    return c.json({ 
+      error: 'Erreur mise à jour item',
+      details: error.message 
+    }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/girasole/inspection/:token
+// Récupérer inspection complète avec items
+// ============================================================================
+girasoleRoutes.get('/inspection/:token', async (c) => {
+  try {
+    const token = c.req.param('token');
+    const { DB } = c.env;
+    
+    // Récupérer inspection
+    const inspection = await DB.prepare(`
+      SELECT * FROM visual_inspections WHERE inspection_token = ?
+    `).bind(token).first();
+    
+    if (!inspection) {
+      return c.json({ error: 'Inspection non trouvée' }, 404);
+    }
+    
+    // Récupérer items
+    const items = await DB.prepare(`
+      SELECT * FROM visual_inspection_items 
+      WHERE inspection_token = ? 
+      ORDER BY category, item_code ASC
+    `).bind(token).all();
+    
+    return c.json({
+      success: true,
+      inspection,
+      items: items.results || []
+    });
+    
+  } catch (error: any) {
+    console.error('Erreur /api/girasole/inspection/:token:', error);
+    return c.json({ 
+      error: 'Erreur récupération inspection',
+      details: error.message 
+    }, 500);
+  }
+});
+
 export default girasoleRoutes;
