@@ -531,6 +531,181 @@ girasoleRoutes.get('/export/annexe2', async (c) => {
 })
 
 // =============================================================================
+// 8. EXPORT EXCEL ANNEXE 2 DÉTAILLÉ (47 COLONNES)
+// =============================================================================
+girasoleRoutes.get('/export/annexe2-excel/:audit_token?', async (c) => {
+  const { DB } = c.env
+  const auditToken = c.req.param('audit_token') // Optionnel : exporter un seul audit ou tous
+
+  try {
+    // Fetch inspections with full details
+    let query = `
+      SELECT 
+        vi.id,
+        vi.project_id,
+        vi.audit_token,
+        vi.checklist_type,
+        vi.inspection_type,
+        vi.notes,
+        vi.item_order,
+        vi.audit_category,
+        vi.checklist_section,
+        vi.conformite,
+        vi.created_at,
+        p.name as project_name,
+        p.id_referent,
+        p.site_address,
+        p.installation_power,
+        p.audit_types,
+        a.client_name,
+        a.location,
+        a.status as audit_status
+      FROM visual_inspections vi
+      LEFT JOIN projects p ON vi.project_id = p.id
+      LEFT JOIN audits a ON vi.audit_token = a.audit_token
+      WHERE p.is_girasole = 1
+    `
+    
+    if (auditToken) {
+      query += ` AND vi.audit_token = ?`
+    }
+    
+    query += ` ORDER BY p.id_referent ASC, vi.checklist_type ASC, vi.item_order ASC`
+
+    const { results: inspections } = auditToken 
+      ? await DB.prepare(query).bind(auditToken).all()
+      : await DB.prepare(query).all()
+
+    if (!inspections || inspections.length === 0) {
+      return c.json({ error: 'No inspections found' }, 404)
+    }
+
+    // Parse notes JSON for each inspection
+    const parsedInspections = inspections.map((item: any) => {
+      let metadata = {}
+      try {
+        metadata = item.notes ? JSON.parse(item.notes) : {}
+      } catch (e) {
+        console.error('Failed to parse notes:', e)
+      }
+      return { ...item, metadata }
+    })
+
+    // Generate Excel XML (SpreadsheetML format)
+    const headers = [
+      'ID Référent', 'Nom Centrale', 'Adresse', 'Puissance kWc', 'Type Audit',
+      'Token Audit', 'Statut Audit', 'Date Inspection', 'Type Checklist',
+      'Code Item', 'Ordre', 'Catégorie', 'Section', 'Description', 
+      'Référence Normative', 'Méthode Contrôle', 'Niveau Criticité',
+      'Conformité', 'Observation', 'Photos URLs', 'Température', 'Humidité',
+      'Conditions Météo', 'Latitude', 'Longitude', 'Altitude', 'Précision GPS',
+      'Défauts Détectés', 'Sévérité', 'Action Corrective', 'Priorité',
+      'Coût Estimé', 'Délai Correction', 'Responsable', 'Statut Correction',
+      'Date Correction', 'Preuve Correction', 'Commentaire Auditeur',
+      'Validé Par', 'Date Validation', 'Version Rapport', 'URL Rapport',
+      'Client', 'Nom Auditeur', 'Contact Client', 'Email Client',
+      'Téléphone Client', 'Garantie', 'Date Mise Service'
+    ]
+
+    let rows = parsedInspections.map((item: any) => {
+      const meta = item.metadata || {}
+      const auditTypes = JSON.parse(item.audit_types || '[]')
+      
+      return [
+        item.id_referent || '',
+        item.project_name || '',
+        item.site_address || '',
+        item.installation_power || '',
+        auditTypes.join(' + '),
+        item.audit_token || '',
+        item.audit_status || 'pending',
+        item.created_at || '',
+        item.checklist_type || '',
+        meta.code || item.inspection_type || '',
+        item.item_order || 0,
+        item.audit_category || '',
+        item.checklist_section || '',
+        meta.description || '',
+        meta.normReference || '',
+        meta.checkMethod || '',
+        meta.criticalityLevel || 'minor',
+        item.conformite || 'non_verifie',
+        meta.observation || '',
+        meta.photos ? JSON.stringify(meta.photos) : '',
+        meta.temperature || '',
+        meta.humidity || '',
+        meta.weather || '',
+        meta.latitude || '',
+        meta.longitude || '',
+        meta.altitude || '',
+        meta.gps_accuracy || '',
+        meta.defects || '',
+        meta.severity || '',
+        meta.corrective_action || '',
+        meta.priority || '',
+        meta.estimated_cost || '',
+        meta.correction_deadline || '',
+        meta.responsible || '',
+        meta.correction_status || '',
+        meta.correction_date || '',
+        meta.correction_proof || '',
+        meta.auditor_comment || '',
+        meta.validated_by || '',
+        meta.validation_date || '',
+        meta.report_version || 'v1.0',
+        '', // URL rapport (à compléter)
+        item.client_name || '',
+        '', // Nom auditeur
+        '', // Contact client
+        '', // Email client
+        '', // Téléphone client
+        '', // Garantie
+        '' // Date mise service
+      ]
+    })
+
+    // Build Excel XML
+    const xmlRows = rows.map(row => {
+      const cells = row.map(cell => {
+        const escaped = String(cell).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        return `<Cell><Data ss:Type="String">${escaped}</Data></Cell>`
+      }).join('')
+      return `<Row>${cells}</Row>`
+    }).join('')
+
+    const headerCells = headers.map(h => 
+      `<Cell ss:StyleID="Header"><Data ss:Type="String">${h}</Data></Cell>`
+    ).join('')
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+  <Style ss:ID="Header">
+    <Font ss:Bold="1"/>
+    <Interior ss:Color="#16a34a" ss:Pattern="Solid"/>
+  </Style>
+</Styles>
+<Worksheet ss:Name="ANNEXE 2">
+  <Table>
+    <Row>${headerCells}</Row>
+    ${xmlRows}
+  </Table>
+</Worksheet>
+</Workbook>`
+
+    return c.body(xml, 200, {
+      'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
+      'Content-Disposition': `attachment; filename="ANNEXE_2_GIRASOLE_${auditToken || 'COMPLET'}_${new Date().toISOString().split('T')[0]}.xls"`
+    })
+  } catch (error) {
+    console.error('Error exporting ANNEXE 2 Excel:', error)
+    return c.json({ error: 'Failed to export ANNEXE 2 Excel', details: error }, 500)
+  }
+})
+
+// =============================================================================
 // CHECKLIST ITEMS DEFINITIONS
 // =============================================================================
 
