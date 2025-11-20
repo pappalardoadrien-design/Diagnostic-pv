@@ -668,6 +668,28 @@ Adrien PAPPALARDO - Business Developer
 
 ## 📝 Changelog
 
+### **v3.4.0 - 2025-11-20** 🔥🔥🔥 **RAPPORTS AUDITS PARFAITS**
+- ✅ **Rapport IV Complet** - `/api/iv/reports/report/:audit_token`
+  - Statistiques Voc, Isc, Pmax, FF (moyenne, min, max, écart-type)
+  - Comparaison référence vs sombres
+  - Analyse par string avec écarts de performance
+  - Alertes intelligentes (FF <70%, déviation >10%)
+  - Recommandations normées IEC 60891
+- ✅ **Rapport EL Complet** - `/api/el/reports/complete/:audit_token`
+  - Cartographie centrale par string (modules colorés par sévérité)
+  - Statistiques défauts par type et sévérité
+  - Top 10 photos critiques embedded (base64, 300KB max)
+  - Répartition visuelle défauts (microfissures, PID, bypass diodes)
+  - Recommandations par seuils (taux défauts >15%, critiques >0)
+- ✅ **Rapport Consolidé Multi-Modules** - `/api/reports/consolidated-full/:audit_token`
+  - **EL**: Cartographie + photos critiques + stats avancées
+  - **IV**: Stats performance + alertes FF + déviations par string
+  - **VISUAL**: Défauts sécurité + conformité NF C 15-100
+  - **ISOLATION**: Tests résistance + conformité seuils (>1 MΩ requis, ≥50 MΩ optimal)
+  - **Résumé exécutif intelligent**: Points critiques / Avertissements / Positifs
+  - **Recommandations hiérarchisées**: Urgentes (rouge) / Surveillance (orange) / Maintenance (bleu)
+  - Format imprimable A4 optimisé PDF (Ctrl+P)
+
 ### **v3.3.0 - 2025-11-20** 🎉🎉🎉 **MODULE GIRASOLE COMPLET - PRODUCTION**
 - ✅ **GIRASOLE - Module 100% Terminé et Déployé**
   - **Rapports PDF individuels** (CONFORMITE + TOITURE) avec filtrage `?type=`
