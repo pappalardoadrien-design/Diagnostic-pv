@@ -282,20 +282,20 @@ girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
 girasoleRoutes.get('/inspection/:token/report', async (c) => {
   const { DB } = c.env
   const token = c.req.param('token')
+  const checklistType = c.req.query('type') || 'CONFORMITE' // Default to CONFORMITE if not specified
 
   try {
-    // Get inspection with items
+    // Get inspection with items, filtering by checklist_type
     const { results: items } = await DB.prepare(`
       SELECT * FROM visual_inspections
-      WHERE audit_token = ?
+      WHERE audit_token = ? AND checklist_type = ?
       ORDER BY item_order ASC
-    `).bind(token).all()
+    `).bind(token, checklistType).all()
 
     if (!items || items.length === 0) {
       return c.html('<h1>Inspection non trouvée</h1>', 404)
     }
 
-    const checklistType = items[0].checklist_type
     const projectId = items[0].project_id
 
     // Get project details
@@ -376,24 +376,6 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
 
       const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport GIRASOLE - ${project.name}</title><style>@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#fff}.header{border-bottom:3px solid #16a34a;padding-bottom:15px;margin-bottom:25px}.header h1{color:#16a34a;font-size:24px;margin:0}.header p{font-size:11px;color:#666;margin:5px 0}.info{background:#f0fdf4;border-left:4px solid #16a34a;padding:15px;margin:20px 0}table{width:100%;border-collapse:collapse;margin:15px 0}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f1f5f9;font-weight:600}.conforme{color:#16a34a}.non_conforme{color:#dc2626}.sans_objet{color:#94a3b8}.non_verifie{color:#f59e0b}h3{background:#1e293b;color:#fff;padding:10px;margin:20px 0 10px;font-size:14px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.stat{background:#f8fafc;border:2px solid #e5e7eb;padding:15px;text-align:center;border-radius:6px}.stat .num{font-size:28px;font-weight:700;color:#16a34a}.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e5e7eb;font-size:10px;color:#64748b}button{background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;position:fixed;top:20px;right:20px}@media print{button{display:none}}</style></head><body><button onclick="window.print()">📄 Imprimer</button><div class="header"><h1>🔋 DiagPV</h1><p><strong>Diagnostic Photovoltaïque</strong> | 3 rue d'Apollo, 31240 L'Union | 05.81.10.16.59 | contact@diagpv.fr | RCS 792972309</p><h2 style="color:#16a34a;margin-top:15px">RAPPORT D'AUDIT DE CONFORMITÉ ÉLECTRIQUE</h2><p style="font-size:13px;color:#64748b">Installation Photovoltaïque - Norme NF C 15-100</p></div><div class="info"><strong>Centrale :</strong> ${project.name}<br><strong>ID Référent :</strong> ${project.id_referent}<br><strong>Adresse :</strong> ${project.site_address}<br><strong>Puissance :</strong> ${project.installation_power} kWc</div><div class="stats"><div class="stat"><div class="num" style="color:#16a34a">${stats.conformes}</div><div>Conformes</div></div><div class="stat"><div class="num" style="color:#dc2626">${stats.non_conformes}</div><div>Non Conformes</div></div><div class="stat"><div class="num" style="color:#94a3b8">${stats.sans_objet}</div><div>Sans Objet</div></div><div class="stat"><div class="num" style="color:#16a34a">${stats.taux_conformite}%</div><div>Taux Conformité</div></div></div>${itemsHtml}<div class="footer"><p><strong>Auditeur DiagPV :</strong> Fabien CORRERA, Expert Photovoltaïque</p><p style="margin-top:10px"><strong>Disclaimer :</strong> Ce rapport présente l'état de l'installation au moment de l'audit. DiagPV SAS (RCS 792972309) est un organisme d'expertise indépendant.</p></div></body></html>`
       
-      return c.html(html)
-    } else if (checklistType === 'TOITURE') {
-      const html = generateReportToiture({
-        project: {
-          id: project.id,
-          name: project.name,
-          id_referent: project.id_referent || '',
-          site_address: project.site_address || '',
-          installation_power: project.installation_power || 0
-        },
-        inspection: {
-          token,
-          checklist_type: checklistType,
-          created_at: items[0].created_at
-        },
-        items: parsedItems,
-        stats
-      })
       return c.html(html)
     } else if (checklistType === 'TOITURE') {
       console.log('✅ GENERATING TOITURE REPORT - MINIMALISTE VERSION')
