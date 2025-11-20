@@ -621,6 +621,17 @@ Adrien PAPPALARDO - Business Developer
 
 ## 📝 Changelog
 
+### **v3.2.0 - 2025-11-20** 🚀 **PRODUCTION READY**
+- ✅ **GIRASOLE - Rapports PDF CONFORMITE + TOITURE Fonctionnels**
+  - Fix génération rapports: template minimaliste inline (contourne limitations Vite)
+  - Build production: 1,011.66 kB bundle optimisé
+  - Déploiement Cloudflare Pages: https://751939b9.diagnostic-hub.pages.dev
+  - Migrations appliquées production (migration 0040)
+  - Données test GIRASOLE insérées (2 projets, 8 inspections)
+  - Tests validés production: CONFORMITE 75% + TOITURE 67% conformité
+  - URLs endpoints disponibles: `/api/girasole/inspection/{audit_token}/report`
+  - **Status**: 🟢 Prêt pour missions terrain janvier-mars 2025
+
 ### **v3.1.0 - 2025-11-19** 🌟
 - ✅ **Mission GIRASOLE (52 centrales PV)**
   - Extension Module Visuels pour audits qualité multi-sites
