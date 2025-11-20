@@ -35,6 +35,7 @@ import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
 import { getCrmProjectsDetailPage } from './pages/crm-projects-detail'
 import { getCrmProjectsEditPage } from './pages/crm-projects-edit'
 import { getSubcontractorsListPage } from './pages/subcontractors-list'
+import diagnostiqueursListPage from './pages/diagnostiqueurs-list'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -151,6 +152,10 @@ import girasoleExportRoutes from './modules/girasole/export-routes'
 app.route('/api/girasole', girasoleRoutes)
 app.route('/api/girasole', girasoleImportRoutes)
 app.route('/api/girasole', girasoleExportRoutes)
+
+// Module Diagnostiqueurs - Réseau labellisé
+import diagnostiqueursRoutes from './modules/diagnostiqueurs/routes'
+app.route('/api/diagnostiqueurs', diagnostiqueursRoutes)
 
 // ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
@@ -552,6 +557,9 @@ app.get('/crm/projects/edit', (c) => {
 app.get('/subcontractors', (c) => {
   return c.html(getSubcontractorsListPage())
 })
+
+// Diagnostiqueurs - Réseau labellisé
+app.route('/', diagnostiqueursListPage)
 
 // ============================================================================
 // MODE TERRAIN MOBILE - INTERFACE OPTIMISÉE SMARTPHONE
