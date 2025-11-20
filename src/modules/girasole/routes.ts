@@ -280,8 +280,98 @@ girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
 // 7. GÉNÉRER RAPPORT PDF
 // =============================================================================
 girasoleRoutes.get('/inspection/:token/report', async (c) => {
-  // Placeholder - will generate HTML report
-  return c.html('<h1>GIRASOLE Report - Coming Soon</h1>')
+  const { DB } = c.env
+  const token = c.req.param('token')
+
+  try {
+    // Get inspection with items
+    const { results: items } = await DB.prepare(`
+      SELECT * FROM visual_inspections
+      WHERE inspection_token = ?
+      ORDER BY item_order ASC
+    `).bind(token).all()
+
+    if (!items || items.length === 0) {
+      return c.html('<h1>Inspection non trouvée</h1>', 404)
+    }
+
+    const checklistType = items[0].checklist_type
+    const projectId = items[0].project_id
+
+    // Get project details
+    const project = await DB.prepare(`
+      SELECT * FROM projects WHERE id = ?
+    `).bind(projectId).first()
+
+    if (!project) {
+      return c.html('<h1>Projet non trouvé</h1>', 404)
+    }
+
+    // Parse items with metadata
+    const parsedItems = items.map((item: any) => {
+      let metadata = {}
+      try {
+        metadata = item.notes ? JSON.parse(item.notes) : {}
+      } catch (e) {
+        console.error('Failed to parse notes:', e)
+      }
+
+      return {
+        code: item.inspection_type,
+        category: item.audit_category || metadata.category || '',
+        subcategory: item.checklist_section || metadata.subcategory || '',
+        description: metadata.description || '',
+        normReference: metadata.normReference || '',
+        criticalityLevel: metadata.criticalityLevel || 'minor',
+        checkMethod: metadata.checkMethod || '',
+        conformity: item.conformite || 'non_verifie',
+        observation: metadata.observation || ''
+      }
+    })
+
+    // Calculate stats
+    const stats = {
+      total: items.length,
+      conformes: items.filter((i: any) => i.conformite === 'conforme').length,
+      non_conformes: items.filter((i: any) => i.conformite === 'non_conforme').length,
+      sans_objet: items.filter((i: any) => i.conformite === 'sans_objet').length,
+      non_verifies: items.filter((i: any) => !i.conformite || i.conformite === 'non_verifie').length,
+      taux_conformite: 0
+    }
+
+    const total = stats.conformes + stats.non_conformes
+    stats.taux_conformite = total > 0 ? Math.round((stats.conformes / total) * 100) : 0
+
+    // Generate report based on checklist type
+    if (checklistType === 'CONFORMITE') {
+      const { generateReportConformite } = await import('./report-conformite.js')
+      const html = generateReportConformite({
+        project: {
+          id: project.id,
+          name: project.name,
+          id_referent: project.id_referent || '',
+          site_address: project.site_address || '',
+          installation_power: project.installation_power || 0
+        },
+        inspection: {
+          token,
+          checklist_type: checklistType,
+          created_at: items[0].created_at
+        },
+        items: parsedItems,
+        stats
+      })
+      return c.html(html)
+    } else if (checklistType === 'TOITURE') {
+      // TODO: Implement TOITURE report generator
+      return c.html('<h1>Rapport TOITURE - En cours de développement</h1>')
+    } else {
+      return c.html('<h1>Type de checklist non supporté</h1>', 400)
+    }
+  } catch (error) {
+    console.error('Error generating report:', error)
+    return c.html(`<h1>Erreur génération rapport</h1><p>${error}</p>`, 500)
+  }
 })
 
 // =============================================================================
