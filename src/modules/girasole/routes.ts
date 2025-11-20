@@ -1058,4 +1058,238 @@ const CHECKLIST_TOITURE_ITEMS: ChecklistItem[] = [
   }
 ]
 
+// =============================================================================
+// 9. GÉNÉRATION BATCH RAPPORTS PDF (52 CENTRALES)
+// =============================================================================
+girasoleRoutes.post('/batch/generate-reports', async (c) => {
+  const { DB } = c.env
+
+  try {
+    // Get all GIRASOLE projects with inspections
+    const { results: projects } = await DB.prepare(`
+      SELECT DISTINCT
+        p.id,
+        p.name,
+        p.id_referent,
+        p.site_address,
+        p.installation_power,
+        p.audit_types,
+        vi.audit_token,
+        vi.checklist_type
+      FROM projects p
+      INNER JOIN visual_inspections vi ON p.id = vi.project_id
+      WHERE p.is_girasole = 1
+      ORDER BY p.id_referent ASC
+    `).all()
+
+    if (!projects || projects.length === 0) {
+      return c.json({ error: 'No GIRASOLE projects with inspections found' }, 404)
+    }
+
+    // Group by audit_token and checklist_type to generate unique reports
+    const reportsToGenerate: Array<{
+      audit_token: string
+      checklist_type: string
+      project_name: string
+      id_referent: string
+    }> = []
+
+    const seen = new Set<string>()
+    for (const p of projects) {
+      const key = `${p.audit_token}-${p.checklist_type}`
+      if (!seen.has(key) && p.audit_token && p.checklist_type) {
+        seen.add(key)
+        reportsToGenerate.push({
+          audit_token: p.audit_token,
+          checklist_type: p.checklist_type,
+          project_name: p.name,
+          id_referent: p.id_referent
+        })
+      }
+    }
+
+    console.log(`📊 Batch generation: ${reportsToGenerate.length} reports to generate`)
+
+    // Generate report URLs
+    const baseUrl = new URL(c.req.url).origin
+    const reportUrls = reportsToGenerate.map(r => ({
+      project: `${r.id_referent} - ${r.project_name}`,
+      checklist_type: r.checklist_type,
+      audit_token: r.audit_token,
+      report_url: `${baseUrl}/api/girasole/inspection/${r.audit_token}/report?type=${r.checklist_type}`,
+      filename: `GIRASOLE_${r.id_referent}_${r.checklist_type}_${r.audit_token.split('-').pop()}.pdf`
+    }))
+
+    // Return manifest JSON with all report URLs
+    return c.json({
+      success: true,
+      total_reports: reportUrls.length,
+      generated_at: new Date().toISOString(),
+      reports: reportUrls,
+      instructions: {
+        message: 'Use the report_url to download individual PDF reports',
+        batch_download: 'You can use a download manager to download all reports automatically',
+        example_curl: `curl -O "${reportUrls[0]?.report_url}" # Download first report`
+      }
+    })
+  } catch (error) {
+    console.error('Error generating batch reports:', error)
+    return c.json({ error: 'Failed to generate batch reports', details: error }, 500)
+  }
+})
+
+// =============================================================================
+// 10. GÉNÉRATION ZIP ARCHIVE RAPPORTS (OPTIMISÉ)
+// =============================================================================
+girasoleRoutes.get('/batch/download-all-reports', async (c) => {
+  const { DB } = c.env
+
+  try {
+    // Get unique audit tokens with checklist types
+    const { results: inspections } = await DB.prepare(`
+      SELECT DISTINCT
+        vi.audit_token,
+        vi.checklist_type,
+        p.name,
+        p.id_referent
+      FROM visual_inspections vi
+      INNER JOIN projects p ON vi.project_id = p.id
+      WHERE p.is_girasole = 1
+      ORDER BY p.id_referent ASC
+    `).all()
+
+    if (!inspections || inspections.length === 0) {
+      return c.json({ error: 'No inspections found' }, 404)
+    }
+
+    // Generate list of report URLs
+    const baseUrl = new URL(c.req.url).origin
+    const reportsList = inspections.map((insp: any) => {
+      const filename = `GIRASOLE_${insp.id_referent}_${insp.checklist_type}_${insp.audit_token.split('-').pop()}.html`
+      return {
+        filename,
+        url: `${baseUrl}/api/girasole/inspection/${insp.audit_token}/report?type=${insp.checklist_type}`,
+        project: insp.name,
+        type: insp.checklist_type
+      }
+    })
+
+    // Return HTML page with download links
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIRASOLE - Téléchargement Batch Rapports</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-green-600 mb-2">🔋 DiagPV - GIRASOLE</h1>
+      <p class="text-gray-600">Téléchargement Batch - ${reportsList.length} Rapports Disponibles</p>
+    </div>
+
+    <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4">
+      <p class="font-semibold text-blue-800">💡 Instructions:</p>
+      <ul class="list-disc list-inside text-blue-700 mt-2 space-y-1">
+        <li>Cliquez sur chaque lien pour télécharger individuellement</li>
+        <li>Ou utilisez "Télécharger Tout" pour sauvegarder tous les rapports</li>
+        <li>Les rapports sont au format HTML imprimable (Ctrl+P pour PDF)</li>
+      </ul>
+    </div>
+
+    <button onclick="downloadAll()" class="mb-6 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+      📥 Télécharger Tout (${reportsList.length} rapports)
+    </button>
+
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border p-3 text-left">ID Ref</th>
+            <th class="border p-3 text-left">Centrale</th>
+            <th class="border p-3 text-left">Type</th>
+            <th class="border p-3 text-left">Fichier</th>
+            <th class="border p-3 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${reportsList.map((r: any) => `
+            <tr class="hover:bg-gray-50">
+              <td class="border p-3">${r.filename.split('_')[1]}</td>
+              <td class="border p-3">${r.project}</td>
+              <td class="border p-3">
+                <span class="px-2 py-1 rounded text-xs font-semibold ${r.type === 'CONFORMITE' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">
+                  ${r.type}
+                </span>
+              </td>
+              <td class="border p-3 font-mono text-sm">${r.filename}</td>
+              <td class="border p-3 text-center">
+                <a href="${r.url}" target="_blank" class="text-green-600 hover:text-green-800 font-semibold">
+                  📄 Voir/Télécharger
+                </a>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-8 text-sm text-gray-500 border-t pt-4">
+      <p><strong>DiagPV - Diagnostic Photovoltaïque</strong></p>
+      <p>3 rue d'Apollo, 31240 L'Union | 05.81.10.16.59 | contact@diagpv.fr | RCS 792972309</p>
+    </div>
+  </div>
+
+  <script>
+    const reports = ${JSON.stringify(reportsList)};
+    
+    async function downloadAll() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '⏳ Téléchargement en cours...';
+      
+      for (let i = 0; i < reports.length; i++) {
+        const report = reports[i];
+        try {
+          const response = await fetch(report.url);
+          const html = await response.text();
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = report.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Update progress
+          btn.textContent = \`📥 \${i + 1}/\${reports.length} téléchargés...\`;
+          
+          // Small delay between downloads
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error('Error downloading ' + report.filename, error);
+        }
+      }
+      
+      btn.disabled = false;
+      btn.textContent = '✅ Téléchargement terminé !';
+      setTimeout(() => {
+        btn.textContent = '📥 Télécharger Tout (' + reports.length + ' rapports)';
+      }, 3000);
+    }
+  </script>
+</body>
+</html>`
+
+    return c.html(html)
+  } catch (error) {
+    console.error('Error generating download page:', error)
+    return c.json({ error: 'Failed to generate download page', details: error }, 500)
+  }
+})
+
 export default girasoleRoutes
