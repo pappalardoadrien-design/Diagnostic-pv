@@ -1559,4 +1559,175 @@ girasoleRoutes.get('/synthesis-report/client/:clientId?', async (c) => {
   }
 })
 
+// =============================================================================
+// 12. IMPORT PLANIFICATEUR CSV GIRASOLE (BATCH PROJECTS)
+// =============================================================================
+girasoleRoutes.post('/import/planning-csv', async (c) => {
+  const { DB } = c.env
+
+  try {
+    const body = await c.req.json()
+    const { csv_data, client_id } = body
+
+    if (!csv_data) {
+      return c.json({ error: 'csv_data is required' }, 400)
+    }
+
+    // Parse CSV (simple implementation)
+    const lines = csv_data.trim().split('\n')
+    if (lines.length < 2) {
+      return c.json({ error: 'CSV must contain header + at least 1 data row' }, 400)
+    }
+
+    const headers = lines[0].split(',').map((h: string) => h.trim())
+    const expectedHeaders = ['id_referent', 'nom_centrale', 'adresse', 'puissance_kwc', 'type_audit', 'date_planifiee', 'commentaires']
+    
+    // Validate headers
+    const hasRequiredHeaders = expectedHeaders.every(h => headers.includes(h))
+    if (!hasRequiredHeaders) {
+      return c.json({ 
+        error: 'Invalid CSV headers', 
+        expected: expectedHeaders, 
+        received: headers 
+      }, 400)
+    }
+
+    // Parse rows
+    const projects = []
+    const errors = []
+
+    // Simple CSV parser that handles quoted fields
+    const parseCSVLine = (line: string): string[] => {
+      const result = []
+      let current = ''
+      let inQuotes = false
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        
+        if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      result.push(current.trim())
+      return result
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+
+      const values = parseCSVLine(line)
+      
+      if (values.length !== headers.length) {
+        errors.push({ row: i + 1, error: 'Column count mismatch', line })
+        continue
+      }
+
+      const project: any = {}
+      headers.forEach((h, idx) => {
+        project[h] = values[idx]
+      })
+
+      // Validate required fields
+      if (!project.id_referent || !project.nom_centrale) {
+        errors.push({ row: i + 1, error: 'Missing id_referent or nom_centrale', project })
+        continue
+      }
+
+      // Parse audit types
+      let auditTypes = []
+      try {
+        if (project.type_audit.includes(',')) {
+          auditTypes = project.type_audit.split(',').map((t: string) => t.trim())
+        } else {
+          auditTypes = [project.type_audit.trim()]
+        }
+      } catch (e) {
+        auditTypes = ['CONFORMITE'] // Default
+      }
+
+      projects.push({
+        id_referent: project.id_referent,
+        name: project.nom_centrale,
+        site_address: project.adresse || '',
+        installation_power: parseFloat(project.puissance_kwc) || 0,
+        audit_types: JSON.stringify(auditTypes),
+        is_girasole: 1,
+        client_id: client_id || 1, // Default: GIRASOLE Energies
+        date_planifiee: project.date_planifiee || null,
+        commentaires: project.commentaires || ''
+      })
+    }
+
+    console.log(`📊 CSV Import: ${projects.length} projects parsed, ${errors.length} errors`)
+
+    // Insert projects into database
+    let insertedCount = 0
+    const insertErrors = []
+
+    for (const p of projects) {
+      try {
+        await DB.prepare(`
+          INSERT INTO projects (
+            client_id, name, id_referent, site_address,
+            installation_power, audit_types, is_girasole
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          p.client_id,
+          p.name,
+          p.id_referent,
+          p.site_address,
+          p.installation_power,
+          p.audit_types,
+          p.is_girasole
+        ).run()
+        
+        insertedCount++
+      } catch (error: any) {
+        insertErrors.push({ project: p.name, error: error.message })
+      }
+    }
+
+    return c.json({
+      success: true,
+      summary: {
+        total_rows: lines.length - 1,
+        parsed: projects.length,
+        inserted: insertedCount,
+        parse_errors: errors.length,
+        insert_errors: insertErrors.length
+      },
+      errors: {
+        parse: errors,
+        insert: insertErrors
+      },
+      message: `✅ ${insertedCount} projects imported successfully`
+    })
+  } catch (error) {
+    console.error('Error importing CSV:', error)
+    return c.json({ error: 'Failed to import CSV', details: error }, 500)
+  }
+})
+
+// =============================================================================
+// 13. TEMPLATE CSV PLANIFICATEUR (DOWNLOAD)
+// =============================================================================
+girasoleRoutes.get('/import/template-csv', async (c) => {
+  const template = `id_referent,nom_centrale,adresse,puissance_kwc,type_audit,date_planifiee,commentaires
+31971,Bouix,Bouix 11100,250,CONFORMITE,2025-01-15,Centrale SOL
+32010,EARL CADOT,CADOT 34000,300,"CONFORMITE,TOITURE",2025-01-20,Centrale DOUBLE avec toiture
+32015,Example Hangar,Route de Lyon 69000,180,CONFORMITE,2025-01-25,Centrale SOL standard`
+
+  return c.text(template, 200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="GIRASOLE_PLANNING_TEMPLATE.csv"'
+  })
+})
+
 export default girasoleRoutes
