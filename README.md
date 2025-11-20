@@ -20,20 +20,59 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://2eb95996.diagnostic-hub.pages.dev
-- **Mobile Terrain**: https://2eb95996.diagnostic-hub.pages.dev/mobile/field
+- **Production**: https://ea6a50be.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://ea6a50be.diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
 - **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
 
-### **🆕 GIRASOLE - Rapports PDF** (Mission 52 centrales) ✅ **PRODUCTION READY**
-- **Rapport CONFORMITE**: `GET /api/girasole/inspection/{audit_token}/report?type=CONFORMITE`
-  - Exemple: https://2eb95996.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-89219-20251120/report?type=CONFORMITE
-  - Stats: 80% conformité (4 conformes, 1 non conforme, 1 sans objet)
+### **🆕 GIRASOLE - Module Complet** (Mission 52 centrales - 66.885€ HT) ✅ **PRODUCTION OPÉRATIONNELLE**
+
+#### **📄 Rapports PDF Individuels**
+- **CONFORMITE**: `GET /api/girasole/inspection/{audit_token}/report?type=CONFORMITE`
+  - Exemple: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-89219-20251120/report?type=CONFORMITE
   - Normes: NF C 15-100, UTE C 15-712
-- **Rapport TOITURE**: `GET /api/girasole/inspection/{audit_token}/report?type=TOITURE`
-  - Exemple: https://2eb95996.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-89219-20251120/report?type=TOITURE
-  - Stats: 75% conformité (3 conformes, 1 non conforme)
+- **TOITURE**: `GET /api/girasole/inspection/{audit_token}/report?type=TOITURE`
+  - Exemple: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/inspection/GIRASOLE-89219-20251120/report?type=TOITURE
   - Normes: DTU 40.35
+
+#### **📦 Génération Batch Rapports**
+- **Manifeste JSON**: `POST /api/girasole/batch/generate-reports`
+  - Retourne liste URLs de tous les rapports
+- **Page Téléchargement**: `GET /api/girasole/batch/download-all-reports`
+  - Interface interactive pour télécharger tous les rapports (52+)
+  - URL: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/batch/download-all-reports
+
+#### **📊 Export Excel ANNEXE 2 (47 colonnes)**
+- **Export complet**: `GET /api/girasole/export/annexe2-excel`
+  - Format SpreadsheetML (Excel compatible)
+  - 47 colonnes détaillées : ID Référent, Nom, Adresse, Puissance, Type Audit, Token, Statut, Date, Checklist Type, Code Item, Catégorie, Description, Référence Normative, Conformité, Observation, Photos, GPS, Défauts, Actions correctives, etc.
+- **Export audit spécifique**: `GET /api/girasole/export/annexe2-excel/{audit_token}`
+  - URL: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/export/annexe2-excel/GIRASOLE-89219-20251120
+
+#### **📈 Rapport Synthèse Général Client**
+- **Vue d'ensemble 52 centrales**: `GET /api/girasole/synthesis-report/client`
+  - URL: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/synthesis-report/client
+  - Statistiques globales (taux conformité moyen, anomalies totales)
+  - Top 10 anomalies fréquentes
+  - Liste complète centrales avec statuts
+  - Progression mission (budget, centrales complétées)
+
+#### **💰 Dashboard Marges Client**
+- **Analyse rentabilité**: `GET /api/girasole/dashboard/marges`
+  - URL: https://ea6a50be.diagnostic-hub.pages.dev/api/girasole/dashboard/marges
+  - Budget total: 66.885€ HT
+  - Coût par centrale, marges unitaires
+  - Facturation complétée vs restante
+  - Coûts estimés détaillés (temps, frais déplacement)
+  - Rentabilité par centrale (SOL vs DOUBLE)
+
+#### **📥 Import CSV Planificateur**
+- **Template CSV**: `GET /api/girasole/import/template-csv`
+  - Téléchargement modèle CSV pour import masse
+- **Import projets**: `POST /api/girasole/import/planning-csv`
+  - Body: `{"csv_data": "...", "client_id": 1}`
+  - Import batch 52 centrales depuis fichier CSV
+  - Validation + parsing intelligent (gère champs entre guillemets)
 
 ---
 
@@ -579,12 +618,14 @@ git push origin main
 ## 🎯 Prochaines Améliorations (Roadmap)
 
 ### **Phase 3 - Fonctionnalités Avancées**
-- [ ] **GIRASOLE - Fonctionnalités Manquantes** (PRIORITÉ)
-  - [ ] Export Excel ANNEXE 2 (47 colonnes) - Route: `GET /api/visual/export-annexe2/:token`
-  - [ ] Génération rapports PDF individuels (52 rapports) - Route: `POST /api/visual/batch-reports`
-  - [ ] Rapport synthèse général client - Route: `GET /api/visual/synthesis-report/client/:clientId`
-  - [ ] Import planificateur CSV GIRASOLE - Route: `POST /api/planning/import-girasole-csv`
-  - [ ] Dashboard marges client - Page: `/planning/client/:id/marges`
+- [x] **GIRASOLE - Module Complet** ✅ **100% TERMINÉ**
+  - [x] Export Excel ANNEXE 2 (47 colonnes) - `GET /api/girasole/export/annexe2-excel/:token?`
+  - [x] Génération rapports PDF batch (52 rapports) - `POST /api/girasole/batch/generate-reports`
+  - [x] Page téléchargement interactif - `GET /api/girasole/batch/download-all-reports`
+  - [x] Rapport synthèse général client - `GET /api/girasole/synthesis-report/client/:clientId?`
+  - [x] Import planificateur CSV GIRASOLE - `POST /api/girasole/import/planning-csv`
+  - [x] Template CSV téléchargeable - `GET /api/girasole/import/template-csv`
+  - [x] Dashboard marges client - `GET /api/girasole/dashboard/marges`
   - [ ] Checklist BE (Bureau d'Études) - Page: `/audit/:token/visual/girasole/be` (si nécessaire)
 - [ ] Pages UI Module I-V (liste, import CSV, détail module)
 - [ ] Pages UI Module Visuels généraux (formulaire checklist, galerie photos)
@@ -627,18 +668,25 @@ Adrien PAPPALARDO - Business Developer
 
 ## 📝 Changelog
 
-### **v3.2.1 - 2025-11-20** 🎉 **PRODUCTION OPÉRATIONNELLE**
-- ✅ **GIRASOLE - Rapports PDF CONFORMITE + TOITURE 100% Fonctionnels**
+### **v3.3.0 - 2025-11-20** 🎉🎉🎉 **MODULE GIRASOLE COMPLET - PRODUCTION**
+- ✅ **GIRASOLE - Module 100% Terminé et Déployé**
+  - **Rapports PDF individuels** (CONFORMITE + TOITURE) avec filtrage `?type=`
+  - **Export Excel ANNEXE 2** (47 colonnes détaillées) - Format SpreadsheetML
+  - **Génération batch rapports** (manifeste JSON + page téléchargement interactive)
+  - **Rapport synthèse général** (vue d'ensemble 52 centrales + stats globales + top anomalies)
+  - **Import CSV planificateur** (import masse projets + template téléchargeable)
+  - **Dashboard marges client** (budget 66.885€ HT, rentabilité par centrale, coûts estimés)
+  - Build production: 1,044.39 kB bundle optimisé
+  - Déploiement Cloudflare Pages: https://ea6a50be.diagnostic-hub.pages.dev
+  - Base production: 52 projets GIRASOLE chargés
+  - **Status**: 🟢 Prêt pour mission complète janvier-mars 2025
+
+### **v3.2.1 - 2025-11-20** 🚀 **PRODUCTION OPÉRATIONNELLE**
+- ✅ **GIRASOLE - Rapports PDF CONFORMITE + TOITURE Fonctionnels**
   - Fix filtrage rapports: paramètre `?type=` pour sélection CONFORMITE vs TOITURE
   - Requête SQL corrigée: `WHERE audit_token = ? AND checklist_type = ?`
-  - Build production: 1,011.70 kB bundle optimisé
-  - Déploiement Cloudflare Pages: https://2eb95996.diagnostic-hub.pages.dev
-  - Base production: 52 projets GIRASOLE + 10 inspections test (EARL CADOT)
-  - Tests validés production:
-    - CONFORMITE: 80% (4✅/1❌/1 S.O.) - NF C 15-100
-    - TOITURE: 75% (3✅/1❌) - DTU 40.35
+  - Tests validés production: CONFORMITE 80% + TOITURE 75% conformité
   - URLs endpoints: `/api/girasole/inspection/{audit_token}/report?type={CONFORMITE|TOITURE}`
-  - **Status**: 🟢 Prêt pour 52 centrales terrain janvier-mars 2025 (66.885€ HT)
 
 ### **v3.1.0 - 2025-11-19** 🌟
 - ✅ **Mission GIRASOLE (52 centrales PV)**
