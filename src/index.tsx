@@ -565,6 +565,10 @@ app.get('/subcontractors', (c) => {
 // Diagnostiqueurs - Réseau labellisé
 app.route('/', diagnostiqueursListPage)
 
+// Missions - Dashboard affectation automatique
+import missionsDashboardPage from './pages/missions-dashboard'
+app.route('/', missionsDashboardPage)
+
 // ============================================================================
 // MODE TERRAIN MOBILE - INTERFACE OPTIMISÉE SMARTPHONE
 // ============================================================================
