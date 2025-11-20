@@ -17,6 +17,8 @@
  */
 
 import { Hono } from 'hono'
+import { generateReportConformite } from './report-conformite.js'
+import { generateReportToiture } from './report-toiture.js'
 
 type Bindings = {
   DB: D1Database
@@ -145,17 +147,17 @@ girasoleRoutes.post('/inspection/create', async (c) => {
   try {
     // Check if inspection already exists
     const existing = await DB.prepare(`
-      SELECT inspection_token, COUNT(*) as items_count
+      SELECT audit_token, COUNT(*) as items_count
       FROM visual_inspections
       WHERE project_id = ? AND checklist_type = ?
-      GROUP BY inspection_token
+      GROUP BY audit_token
       LIMIT 1
     `).bind(project_id, checklist_type).first()
 
     if (existing) {
       return c.json({
         inspection: {
-          token: existing.inspection_token,
+          token: existing.audit_token,
           exists: true,
           items_count: existing.items_count
         }
@@ -174,7 +176,7 @@ girasoleRoutes.post('/inspection/create', async (c) => {
     const insertPromises = items.map((item, index) => {
       return DB.prepare(`
         INSERT INTO visual_inspections (
-          project_id, checklist_type, inspection_token,
+          project_id, checklist_type, audit_token,
           inspection_type, notes, item_order, audit_category, checklist_section
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
@@ -221,7 +223,7 @@ girasoleRoutes.get('/inspection/:token', async (c) => {
   try {
     const { results } = await DB.prepare(`
       SELECT * FROM visual_inspections
-      WHERE inspection_token = ?
+      WHERE audit_token = ?
       ORDER BY item_order ASC
     `).bind(token).all()
 
@@ -266,7 +268,7 @@ girasoleRoutes.put('/inspection/:token/item/:itemCode', async (c) => {
     await DB.prepare(`
       UPDATE visual_inspections
       SET conformite = ?, notes = ?
-      WHERE inspection_token = ? AND inspection_type = ?
+      WHERE audit_token = ? AND inspection_type = ?
     `).bind(conformity, observation || '', token, itemCode).run()
 
     return c.json({ success: true })
@@ -287,7 +289,7 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
     // Get inspection with items
     const { results: items } = await DB.prepare(`
       SELECT * FROM visual_inspections
-      WHERE inspection_token = ?
+      WHERE audit_token = ?
       ORDER BY item_order ASC
     `).bind(token).all()
 
@@ -344,7 +346,6 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
 
     // Generate report based on checklist type
     if (checklistType === 'CONFORMITE') {
-      const { generateReportConformite } = await import('./report-conformite.js')
       const html = generateReportConformite({
         project: {
           id: project.id,
@@ -363,8 +364,23 @@ girasoleRoutes.get('/inspection/:token/report', async (c) => {
       })
       return c.html(html)
     } else if (checklistType === 'TOITURE') {
-      // TODO: Implement TOITURE report generator
-      return c.html('<h1>Rapport TOITURE - En cours de développement</h1>')
+      const html = generateReportToiture({
+        project: {
+          id: project.id,
+          name: project.name,
+          id_referent: project.id_referent || '',
+          site_address: project.site_address || '',
+          installation_power: project.installation_power || 0
+        },
+        inspection: {
+          token,
+          checklist_type: checklistType,
+          created_at: items[0].created_at
+        },
+        items: parsedItems,
+        stats
+      })
+      return c.html(html)
     } else {
       return c.html('<h1>Type de checklist non supporté</h1>', 400)
     }
@@ -400,13 +416,13 @@ girasoleRoutes.get('/export/annexe2', async (c) => {
       projects.map(async (p) => {
         const { results: inspections } = await DB.prepare(`
           SELECT 
-            inspection_token,
+            audit_token,
             conformite
           FROM visual_inspections
           WHERE project_id = ?
         `).bind(p.id).all()
 
-        const tokens = new Set((inspections || []).map((i: any) => i.inspection_token).filter(Boolean))
+        const tokens = new Set((inspections || []).map((i: any) => i.audit_token).filter(Boolean))
         const conformes = (inspections || []).filter((i: any) => i.conformite === 'conforme').length
         const non_conformes = (inspections || []).filter((i: any) => i.conformite === 'non_conforme').length
 
