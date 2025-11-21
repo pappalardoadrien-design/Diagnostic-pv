@@ -1,220 +1,47 @@
--- ============================================================================
--- DONNÉES DE TEST - Module Planning & CRM
--- ============================================================================
+-- Delete existing data first
+DELETE FROM iv_measurements WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f';
+DELETE FROM pvserv_measurements WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f';
+DELETE FROM isolation_tests WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f';
 
--- ============================================================================
--- 1. TECHNICIENS SOUS-TRAITANTS (auth_users)
--- ============================================================================
+-- Insert IV measurements (reference curves)
+INSERT INTO iv_measurements (
+  intervention_id, audit_token, module_identifier, string_number, module_number, measurement_type,
+  voc, isc, pmax, fill_factor, iv_curve_data
+) VALUES
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-1', 1, 1, 'reference', 
+   38.5, 9.2, 320.5, 0.90, '[{"voltage":0,"current":9.2},{"voltage":10,"current":9.1},{"voltage":20,"current":8.8},{"voltage":30,"current":7.5},{"voltage":35,"current":5.2},{"voltage":38,"current":1.5},{"voltage":38.5,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-2', 1, 2, 'reference', 
+   38.6, 9.3, 325.2, 0.91, '[{"voltage":0,"current":9.3},{"voltage":10,"current":9.2},{"voltage":20,"current":9.0},{"voltage":30,"current":7.8},{"voltage":35,"current":5.5},{"voltage":38,"current":1.8},{"voltage":38.6,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-3', 1, 3, 'reference', 
+   38.7, 9.35, 328.0, 0.91, '[{"voltage":0,"current":9.35},{"voltage":10,"current":9.3},{"voltage":20,"current":9.1},{"voltage":30,"current":8.0},{"voltage":35,"current":5.8},{"voltage":38,"current":2.0},{"voltage":38.7,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-4', 1, 4, 'reference', 
+   37.2, 8.9, 290.0, 0.85, '[{"voltage":0,"current":8.9},{"voltage":10,"current":8.8},{"voltage":20,"current":8.5},{"voltage":30,"current":6.5},{"voltage":35,"current":3.5},{"voltage":37,"current":0.5},{"voltage":37.2,"current":0}]');
 
--- Technicien 1: Jean Martin
-INSERT OR IGNORE INTO auth_users (email, password_hash, role, full_name, company, is_active, must_change_password)
-VALUES ('jean.martin@diagpv-tech.fr', '$2b$10$dummyhash1234567890123456789012', 'subcontractor', 'Jean Martin', 'DiagPV Tech', 1, 0);
+-- Insert PVserv measurements (dark curves + diodes)
+INSERT INTO pvserv_measurements (
+  intervention_id, audit_token, module_identifier, string_number, module_number,
+  ff, rds, uf, measurement_type, iv_curve_data
+) VALUES
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-1', 1, 1, 0.88, 4.2, 650, 'dark',
+   '[{"voltage":0,"current":0.5},{"voltage":10,"current":0.48},{"voltage":20,"current":0.45},{"voltage":30,"current":0.35},{"voltage":35,"current":0.15},{"voltage":38,"current":0.02},{"voltage":38.5,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-2', 1, 2, 0.90, 3.8, 680, 'dark',
+   '[{"voltage":0,"current":0.52},{"voltage":10,"current":0.50},{"voltage":20,"current":0.48},{"voltage":30,"current":0.38},{"voltage":35,"current":0.18},{"voltage":38,"current":0.03},{"voltage":38.6,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-3', 1, 3, 0.91, 3.5, 700, 'dark',
+   '[{"voltage":0,"current":0.55},{"voltage":10,"current":0.53},{"voltage":20,"current":0.50},{"voltage":30,"current":0.40},{"voltage":35,"current":0.20},{"voltage":38,"current":0.04},{"voltage":38.7,"current":0}]'),
+  (1, 'f7c663dc-02e2-48ef-8045-5cc35878036f', 'S1-4', 1, 4, 0.82, 6.8, 420, 'dark',
+   '[{"voltage":0,"current":0.45},{"voltage":10,"current":0.42},{"voltage":20,"current":0.38},{"voltage":30,"current":0.25},{"voltage":35,"current":0.08},{"voltage":37,"current":0.01},{"voltage":37.2,"current":0}]');
 
--- Technicien 2: Sophie Dubois
-INSERT OR IGNORE INTO auth_users (email, password_hash, role, full_name, company, is_active, must_change_password)
-VALUES ('sophie.dubois@diagpv-tech.fr', '$2b$10$dummyhash1234567890123456789012', 'subcontractor', 'Sophie Dubois', 'DiagPV Tech', 1, 0);
+-- Insert isolation tests
+INSERT INTO isolation_tests (
+  audit_token, string_number, module_number,
+  test_result, resistance_value
+) VALUES
+  ('f7c663dc-02e2-48ef-8045-5cc35878036f', 1, 1, 'pass', 850.5),
+  ('f7c663dc-02e2-48ef-8045-5cc35878036f', 1, 2, 'pass', 920.3),
+  ('f7c663dc-02e2-48ef-8045-5cc35878036f', 1, 3, 'pass', 890.7),
+  ('f7c663dc-02e2-48ef-8045-5cc35878036f', 1, 4, 'fail', 145.2);
 
--- Technicien 3: Marc Lefebvre
-INSERT OR IGNORE INTO auth_users (email, password_hash, role, full_name, company, is_active, must_change_password)
-VALUES ('marc.lefebvre@diagpv-tech.fr', '$2b$10$dummyhash1234567890123456789012', 'subcontractor', 'Marc Lefebvre', 'DiagPV Tech', 1, 0);
-
--- ============================================================================
--- 2. CLIENTS CRM
--- ============================================================================
-
--- Client 1: Mairie de Toulouse
-INSERT OR IGNORE INTO crm_clients (
-  company_name, client_type, siret, address, postal_code, city, country,
-  main_contact_name, main_contact_email, main_contact_phone, status
-) VALUES (
-  'Mairie de Toulouse', 'public', '21310555600013', 
-  '1 Place du Capitole', '31000', 'Toulouse', 'France',
-  'Pierre Durand', 'p.durand@toulouse.fr', '0561222222', 'active'
-);
-
--- Client 2: EDF Énergies Renouvelables
-INSERT OR IGNORE INTO crm_clients (
-  company_name, client_type, siret, address, postal_code, city, country,
-  main_contact_name, main_contact_email, main_contact_phone, status
-) VALUES (
-  'EDF Énergies Renouvelables', 'professional', '52850055900183',
-  '20 Avenue de la Paix', '92400', 'Courbevoie', 'France',
-  'Marie Laurent', 'm.laurent@edf-en.fr', '0149223344', 'active'
-);
-
--- Client 3: Ferme Solaire du Midi
-INSERT OR IGNORE INTO crm_clients (
-  company_name, client_type, siret, address, postal_code, city, country,
-  main_contact_name, main_contact_email, main_contact_phone, status
-) VALUES (
-  'Ferme Solaire du Midi', 'professional', '85234567800012',
-  'Route de Carcassonne', '11000', 'Carcassonne', 'France',
-  'Thomas Bernard', 't.bernard@fsmidi.fr', '0468445566', 'active'
-);
-
--- ============================================================================
--- 3. PROJETS (CENTRALES PV)
--- ============================================================================
-
--- Projet 1: Centrale Capitole (Mairie Toulouse)
-INSERT OR IGNORE INTO projects (
-  client_id, name, site_address, installation_power, total_modules, 
-  string_count, modules_per_string, commissioning_date, inverter_model
-) VALUES (
-  (SELECT id FROM crm_clients WHERE company_name = 'Mairie de Toulouse'),
-  'Centrale PV Capitole', '1 Place du Capitole, 31000 Toulouse',
-  250.0, 625, 25, 25, '2023-06-15', 'Fronius Symo 20.0-3'
-);
-
--- Projet 2: Parc Solaire Courbevoie (EDF)
-INSERT OR IGNORE INTO projects (
-  client_id, name, site_address, installation_power, total_modules,
-  string_count, modules_per_string, commissioning_date, inverter_model
-) VALUES (
-  (SELECT id FROM crm_clients WHERE company_name = 'EDF Énergies Renouvelables'),
-  'Parc Solaire Courbevoie', 'Zone Industrielle, 92400 Courbevoie',
-  1500.0, 3750, 125, 30, '2022-09-01', 'SMA Sunny Central 500'
-);
-
--- Projet 3: Installation Hôtel de Ville (Mairie Toulouse)
-INSERT OR IGNORE INTO projects (
-  client_id, name, site_address, installation_power, total_modules,
-  string_count, modules_per_string, commissioning_date, inverter_model
-) VALUES (
-  (SELECT id FROM crm_clients WHERE company_name = 'Mairie de Toulouse'),
-  'Installation Hôtel de Ville', 'Place du Capitole, 31000 Toulouse',
-  150.0, 375, 15, 25, '2024-01-10', 'SolarEdge SE15K'
-);
-
--- Projet 4: Ferme Agrivoltaïque Carcassonne
-INSERT OR IGNORE INTO projects (
-  client_id, name, site_address, installation_power, total_modules,
-  string_count, modules_per_string, commissioning_date, inverter_model
-) VALUES (
-  (SELECT id FROM crm_clients WHERE company_name = 'Ferme Solaire du Midi'),
-  'Ferme Agrivoltaïque Carcassonne', 'Route de Carcassonne, 11000',
-  2000.0, 5000, 200, 25, '2023-12-01', 'Huawei SUN2000-100KTL'
-);
-
--- Projet 5: Extension Parc EDF
-INSERT OR IGNORE INTO projects (
-  client_id, name, site_address, installation_power, total_modules,
-  string_count, modules_per_string, inverter_model
-) VALUES (
-  (SELECT id FROM crm_clients WHERE company_name = 'EDF Énergies Renouvelables'),
-  'Extension Parc Solaire', 'Zone Industrielle Nord, 92400 Courbevoie',
-  800.0, 2000, 80, 25, 'Sungrow SG110CX'
-);
-
--- ============================================================================
--- 4. INTERVENTIONS PLANIFIÉES
--- ============================================================================
-
--- Intervention 1: Audit EL Centrale Capitole - Jean Martin - PLANIFIÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date, 
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Centrale PV Capitole'),
-  (SELECT id FROM auth_users WHERE email = 'jean.martin@diagpv-tech.fr'),
-  'el_audit', '2025-11-20', 6.0, 'scheduled',
-  'Audit électroluminescence nocturne - 625 modules - Accès toiture validé'
-);
-
--- Intervention 2: Test I-V Parc Courbevoie - Sophie Dubois - PLANIFIÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Parc Solaire Courbevoie'),
-  (SELECT id FROM auth_users WHERE email = 'sophie.dubois@diagpv-tech.fr'),
-  'iv_test', '2025-11-21', 8.0, 'scheduled',
-  'Tests courbes I-V sur échantillon 150 modules - Équipement PVserv'
-);
-
--- Intervention 3: Thermographie Hôtel de Ville - Marc Lefebvre - EN COURS
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Installation Hôtel de Ville'),
-  (SELECT id FROM auth_users WHERE email = 'marc.lefebvre@diagpv-tech.fr'),
-  'thermography', '2025-11-17', 4.0, 'in_progress',
-  'Thermographie drone - Détection points chauds - Vol autorisé'
-);
-
--- Intervention 4: Inspection Visuelle Ferme Agrivoltaïque - NON ASSIGNÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Ferme Agrivoltaïque Carcassonne'),
-  NULL, 'visual_inspection', '2025-11-22', 5.0, 'scheduled',
-  'Inspection visuelle post-tempête - Vérification intégrité mécanique'
-);
-
--- Intervention 5: Commissioning Extension Parc - NON ASSIGNÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Extension Parc Solaire'),
-  NULL, 'commissioning', '2025-11-25', 10.0, 'scheduled',
-  'Commissioning complet - Tests réception - 2000 modules neufs'
-);
-
--- Intervention 6: Maintenance Centrale Capitole - Jean Martin - TERMINÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description, notes
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Centrale PV Capitole'),
-  (SELECT id FROM auth_users WHERE email = 'jean.martin@diagpv-tech.fr'),
-  'maintenance', '2025-11-10', 3.0, 'completed',
-  'Maintenance préventive trimestrielle',
-  'Nettoyage modules OK - Vérification onduleurs OK - RAS'
-);
-
--- Intervention 7: Audit EL Parc Courbevoie - Sophie Dubois - PLANIFIÉE (CONFLIT avec #2)
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Parc Solaire Courbevoie'),
-  (SELECT id FROM auth_users WHERE email = 'sophie.dubois@diagpv-tech.fr'),
-  'el_audit', '2025-11-21', 10.0, 'scheduled',
-  'CONFLIT VOLONTAIRE: Même technicien, même date que intervention #2'
-);
-
--- Intervention 8: Test Isolation Extension Parc - Marc Lefebvre - PLANIFIÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Extension Parc Solaire'),
-  (SELECT id FROM auth_users WHERE email = 'marc.lefebvre@diagpv-tech.fr'),
-  'isolation_test', '2025-11-23', 4.0, 'scheduled',
-  'Tests isolation électrique - Vérification conformité NF C 15-100'
-);
-
--- Intervention 9: Expertise Post-Sinistre Ferme - NON ASSIGNÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Ferme Agrivoltaïque Carcassonne'),
-  NULL, 'post_incident', '2025-11-28', 6.0, 'scheduled',
-  'Expertise judiciaire suite grêle du 15/11 - Rapport assuré requis'
-);
-
--- Intervention 10: Audit EL Hôtel de Ville - Jean Martin - ANNULÉE
-INSERT OR IGNORE INTO interventions (
-  project_id, technician_id, intervention_type, intervention_date,
-  duration_hours, status, description, notes
-) VALUES (
-  (SELECT id FROM projects WHERE name = 'Installation Hôtel de Ville'),
-  (SELECT id FROM auth_users WHERE email = 'jean.martin@diagpv-tech.fr'),
-  'el_audit', '2025-11-15', 4.0, 'cancelled',
-  'Audit EL reporté',
-  'Annulé: Conditions météo défavorables - Reprogrammé 2025-12-05'
-);
+SELECT 'Test data created successfully!' as message,
+       (SELECT COUNT(*) FROM iv_measurements WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f') as iv_count,
+       (SELECT COUNT(*) FROM pvserv_measurements WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f') as pvserv_count,
+       (SELECT COUNT(*) FROM isolation_tests WHERE audit_token = 'f7c663dc-02e2-48ef-8045-5cc35878036f') as iso_count;
