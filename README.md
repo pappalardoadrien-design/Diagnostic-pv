@@ -20,10 +20,26 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://ea6a50be.diagnostic-hub.pages.dev
-- **Mobile Terrain**: https://ea6a50be.diagnostic-hub.pages.dev/mobile/field
+- **Production**: https://cab52a97.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://cab52a97.diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
 - **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
+
+### **🆕 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
+
+#### **📊 Rapport I-V avec Visualisation Graphique**
+- **Rapport Enrichi**: `GET /api/iv/reports-enriched/full/:audit_token`
+  - **Corrélation multi-modules**: EL + IV + PVserv (courbes sombres + diodes) par `module_identifier`
+  - **Graphiques Chart.js**: Superposition courbes I-V par string (référence + sombres)
+  - **Détection diodes HS**: Uf < 500mV → color-coding rouge épais
+  - **Détection Rds élevée**: Rds > 5Ω → color-coding orange
+  - **Analyse statistique**: 
+    - Outliers (déviation >15%)
+    - Courbes non superposées (écart-type > 5% moyenne)
+    - Écart-type Pmax, déviation max
+  - **Cartographie multi-défauts**: Modules color-codés selon cumul défauts (EL+IV+PVserv)
+  - **Alertes intelligentes**: Diodes HS, Rds élevées, mismatch string
+  - **Exemple**: https://cab52a97.diagnostic-hub.pages.dev/api/iv/reports-enriched/full/f7c663dc-02e2-48ef-8045-5cc35878036f
 
 ### **🆕 GIRASOLE - Module Complet** (Mission 52 centrales - 66.885€ HT) ✅ **PRODUCTION OPÉRATIONNELLE**
 
