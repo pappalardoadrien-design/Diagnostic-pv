@@ -2,6 +2,74 @@ import { Hono } from 'hono'
 
 const calepinageGridRoutes = new Hono()
 
+// ============================================================================
+// CONFIGURATION CÂBLAGE PAR PROJET
+// ============================================================================
+// Définir ici la configuration du câblage pour chaque projet
+// Format: { audit_token: { wiring: [direction_string_1, direction_string_2, ...], arrows: [...] }}
+
+type WiringConfig = {
+  wiring: ('left-to-right' | 'right-to-left')[]  // Direction de chaque string
+  arrows: {
+    fromString: number    // Numéro de la string source
+    toString: number      // Numéro de la string destination
+    position: 'start' | 'end'  // Position de la flèche (début ou fin de la string)
+  }[]
+}
+
+const WIRING_CONFIGS: Record<string, WiringConfig> = {
+  'JALIBAT-2025-001': {
+    // Configuration JALIBAT : 10 strings en serpentin
+    wiring: [
+      'left-to-right',   // S1: 26 modules, gauche → droite
+      'right-to-left',   // S2: 24 modules, droite → gauche
+      'left-to-right',   // S3: 24 modules, gauche → droite
+      'right-to-left',   // S4: 24 modules, droite → gauche
+      'left-to-right',   // S5: 24 modules, gauche → droite
+      'right-to-left',   // S6: 24 modules, droite → gauche
+      'left-to-right',   // S7: 24 modules, gauche → droite
+      'right-to-left',   // S8: 24 modules, droite → gauche
+      'left-to-right',   // S9: 24 modules, gauche → droite
+      'right-to-left',   // S10: 24 modules, droite → gauche
+    ],
+    arrows: [
+      // Flèches de connexion entre strings (serpentin)
+      { fromString: 1, toString: 2, position: 'end' },    // S1 fin → S2 début
+      { fromString: 2, toString: 3, position: 'start' },  // S2 début → S3 début
+      { fromString: 3, toString: 4, position: 'end' },    // S3 fin → S4 fin
+      { fromString: 4, toString: 5, position: 'start' },  // S4 début → S5 début
+      { fromString: 5, toString: 6, position: 'end' },    // S5 fin → S6 fin
+      { fromString: 6, toString: 7, position: 'start' },  // S6 début → S7 début
+      { fromString: 7, toString: 8, position: 'end' },    // S7 fin → S8 fin
+      { fromString: 8, toString: 9, position: 'start' },  // S8 début → S9 début
+      { fromString: 9, toString: 10, position: 'end' },   // S9 fin → S10 fin
+    ]
+  }
+}
+
+// Fonction pour obtenir la config de câblage (par défaut = serpentin automatique)
+function getWiringConfig(auditToken: string, stringCount: number): WiringConfig {
+  // Si config custom existe, l'utiliser
+  if (WIRING_CONFIGS[auditToken]) {
+    return WIRING_CONFIGS[auditToken]
+  }
+  
+  // Sinon, générer config serpentin automatique
+  const wiring: ('left-to-right' | 'right-to-left')[] = []
+  const arrows: WiringConfig['arrows'] = []
+  
+  for (let i = 1; i <= stringCount; i++) {
+    wiring.push(i % 2 === 1 ? 'left-to-right' : 'right-to-left')
+    
+    if (i < stringCount) {
+      const position = i % 2 === 1 ? 'end' : 'start'
+      arrows.push({ fromString: i, toString: i + 1, position })
+    }
+  }
+  
+  return { wiring, arrows }
+}
+
 /**
  * GET /api/el/calepinage-grid/:audit_token
  * Plan de calepinage - Vue GRILLE conforme au plan de toiture
@@ -46,7 +114,10 @@ calepinageGridRoutes.get('/:audit_token', async (c) => {
       modulesByString[m.string_number].push(m)
     })
 
-    return c.html(generateGridCalepinageHTML(audit, modulesByString))
+    // Get wiring configuration for this project
+    const wiringConfig = getWiringConfig(audit_token, Object.keys(modulesByString).length)
+    
+    return c.html(generateGridCalepinageHTML(audit, modulesByString, audit_token, wiringConfig))
 
   } catch (error: any) {
     console.error('Error generating grid calepinage:', error)
@@ -105,7 +176,7 @@ function generateNoModulesHTML(audit: any): string {
   `
 }
 
-function generateGridCalepinageHTML(audit: any, modulesByString: Record<number, any[]>): string {
+function generateGridCalepinageHTML(audit: any, modulesByString: Record<number, any[]>, auditToken: string, wiringConfig: WiringConfig): string {
   const reportNumber = `CALEPINAGE-${audit.id?.toString().padStart(6, '0') || '000000'}`
   const currentDate = new Date().toLocaleDateString('fr-FR')
   const stringNumbers = Object.keys(modulesByString).map(Number).sort((a, b) => a - b)
@@ -469,7 +540,7 @@ function generateGridCalepinageHTML(audit: any, modulesByString: Record<number, 
 
     <!-- Grid Layout -->
     <div class="grid-container">
-      ${generateGridRows(modulesByString, stringNumbers)}
+      ${generateGridRows(modulesByString, stringNumbers, wiringConfig)}
     </div>
     
     <div class="orientation">⬇️ Sud</div>
@@ -535,20 +606,20 @@ function generateGridCalepinageHTML(audit: any, modulesByString: Record<number, 
   `
 }
 
-function generateGridRows(modulesByString: Record<number, any[]>, stringNumbers: number[]): string {
+function generateGridRows(modulesByString: Record<number, any[]>, stringNumbers: number[], wiringConfig: WiringConfig): string {
   let html = ''
+  const moduleWidth = 30 // 28px + 2px gap
+  const maxModules = Math.max(...stringNumbers.map(n => modulesByString[n].length))
   
   stringNumbers.forEach((stringNum, stringIndex) => {
     const modules = modulesByString[stringNum]
-    const isReversed = stringNum % 2 === 0  // Even strings go right-to-left
-    const isLastString = stringIndex === stringNumbers.length - 1
+    const direction = wiringConfig.wiring[stringIndex] || 'left-to-right'
+    const isReversed = direction === 'right-to-left'
     
-    // Reverse module order for even strings (serpentine wiring)
+    // Reverse module order for right-to-left strings
     const displayModules = isReversed ? [...modules].reverse() : modules
     
-    // Calculate indent for serpentine alignment
-    const moduleWidth = 30 // 28px + 2px gap
-    const maxModules = Math.max(...stringNumbers.map(n => modulesByString[n].length))
+    // Calculate indent for alignment
     const currentModules = modules.length
     const indent = isReversed ? 0 : (maxModules - currentModules) * moduleWidth
     
@@ -561,7 +632,7 @@ function generateGridRows(modulesByString: Record<number, any[]>, stringNumbers:
       
       <!-- Modules -->
       <div class="modules-wrapper">
-        ${displayModules.map((m, idx) => {
+        ${displayModules.map((m) => {
           const defectType = m.defect_type || 'none'
           const hasDefect = defectType !== 'none' && defectType !== 'pending'
           const cssClass = hasDefect ? defectType : 'ok'
@@ -569,7 +640,6 @@ function generateGridRows(modulesByString: Record<number, any[]>, stringNumbers:
           return `
           <div class="module-cell ${cssClass}" title="${m.module_identifier}${hasDefect ? ' - ' + defectType : ' - OK'}">
             <div class="module-number">${m.position_in_string}</div>
-            ${hasDefect ? '<div class="defect-marker">✕</div>' : ''}
           </div>
           `
         }).join('')}
@@ -580,26 +650,36 @@ function generateGridRows(modulesByString: Record<number, any[]>, stringNumbers:
     </div>
     `
     
-    // Add vertical arrow between strings (except after last string)
-    if (!isLastString) {
-      // Arrow position: left for odd strings ending on right, right for even strings ending on left
-      const arrowAlign = isReversed ? 'flex-start' : 'flex-end'
-      const arrowIndent = isReversed ? indent : indent + (maxModules * moduleWidth)
-      
-      html += `
-      <div class="string-spacer" style="padding-left: ${arrowIndent}px; justify-content: ${arrowAlign};">
-        <div class="vertical-arrow">
-          <svg viewBox="0 0 20 30">
-            <defs>
-              <marker id="arrowhead-down-${stringNum}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                <polygon points="0 0, 8 4, 0 8" fill="#dc2626" />
-              </marker>
-            </defs>
-            <line x1="10" y1="2" x2="10" y2="28" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowhead-down-${stringNum})" />
-          </svg>
+    // Add vertical arrows based on configuration
+    const arrowsForThisString = wiringConfig.arrows.filter(a => a.fromString === stringNum)
+    
+    if (arrowsForThisString.length > 0) {
+      arrowsForThisString.forEach(arrow => {
+        // Determine arrow position
+        const arrowAlign = arrow.position === 'end' ? 'flex-end' : 'flex-start'
+        let arrowIndent = indent
+        
+        if (arrow.position === 'end' && !isReversed) {
+          arrowIndent += (currentModules * moduleWidth) + 50  // +50 for connection icon
+        } else if (arrow.position === 'start' && isReversed) {
+          arrowIndent += (maxModules - currentModules) * moduleWidth + 50
+        }
+        
+        html += `
+        <div class="string-spacer" style="padding-left: ${arrowIndent}px; justify-content: ${arrowAlign};">
+          <div class="vertical-arrow">
+            <svg viewBox="0 0 20 30">
+              <defs>
+                <marker id="arrowhead-${stringNum}-${arrow.toString}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                  <polygon points="0 0, 8 4, 0 8" fill="#dc2626" />
+                </marker>
+              </defs>
+              <line x1="10" y1="2" x2="10" y2="28" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowhead-${stringNum}-${arrow.toString})" />
+            </svg>
+          </div>
         </div>
-      </div>
-      `
+        `
+      })
     }
   })
   
