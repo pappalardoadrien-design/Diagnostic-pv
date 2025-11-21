@@ -25,21 +25,28 @@
 - **API Base**: `/api/*`
 - **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
 
-### **🆕 v3.6.0 - PLAN DE CALEPINAGE** ✅ **DÉPLOYÉ**
+### **🆕 v3.6.0 - PLAN DE CALEPINAGE JALIBAT** ✅ **COMPLET**
 
-#### **🗺️ Plan de Calepinage - Câblage Électrique**
+#### **🗺️ Plan de Calepinage - Câblage Électrique Serpentin**
 - **Endpoint**: `GET /api/el/calepinage/:audit_token`
-- **Description**: Plan de calepinage conforme au câblage réel de la centrale
+- **Description**: Plan de calepinage conforme au câblage réel de la centrale avec données d'audit EL
 - **Fonctionnalités**:
-  - Représentation horizontale des strings (gauche → droite)
-  - Flèches indiquant le sens du câblage électrique ⚡
-  - Modules color-codés selon sévérité (blanc/jaune/rouge)
-  - Marqueurs croix bleues (✕) sur modules défectueux
-  - Support configurations variables (ex: JALIBAT 1x26 + 9x24 modules)
+  - **Câblage serpentin (zigzag)** : Strings pairs inversés (droite←gauche) + flèches de connexion verticales rouges
+  - **Couleurs réelles** selon état audit EL :
+    * 🟢 Vert : OK (modules sains)
+    * 🟡 Jaune : Inégalité
+    * 🟠 Orange : Microfissures
+    * 🔴 Rose : Impact Cellulaire - **À REMPLACER**
+    * 🔵 Bleu : String ouvert
+    * ⚫ Gris : Non raccordé
+    * 🟣 Violet : Vide
+  - **Marqueurs croix bleues (✕)** sur modules défectueux
+  - Support configurations variables (ex: JALIBAT 1x26 + 9x24 = 242 modules)
   - Format A3 paysage pour impression PDF (Ctrl+P)
   - Statistiques : strings, modules totaux, défauts détectés
-  - Légende complète (symboles câblage + défauts)
-- **Exemple**: https://38d89b0c.diagnostic-hub.pages.dev/api/el/calepinage/f7c663dc-02e2-48ef-8045-5cc35878036f
+  - Légende complète (7 états + câblage)
+- **Exemple JALIBAT**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev/api/el/calepinage/JALIBAT-2025-001
+- **Données réelles**: 22 modules OK, 9 microfissures, 211 impacts cellulaires à remplacer
 
 ### **📊 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
 
