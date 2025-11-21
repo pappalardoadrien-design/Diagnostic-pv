@@ -14,6 +14,7 @@ import completeReportRouter from './routes/report-complete'
 import calepinageRouter from './routes/calepinage'
 import calepinageGridRouter from './routes/calepinage-grid'
 import calepinageEditorRouter from './routes/calepinage-editor'
+import calepinagePhysicalRouter from './routes/calepinage-physical'
 
 type Bindings = {
   DB: D1Database
@@ -43,5 +44,6 @@ elModule.route('/reports', completeReportRouter)
 elModule.route('/calepinage', calepinageRouter)
 elModule.route('/calepinage-grid', calepinageGridRouter)  // Vue GRILLE (plan toiture)
 elModule.route('/calepinage-editor', calepinageEditorRouter)  // Éditeur interactif
+elModule.route('/calepinage-physical', calepinagePhysicalRouter)  // Vue PHYSIQUE (disposition réelle)
 
 export default elModule
