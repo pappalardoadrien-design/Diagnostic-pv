@@ -596,7 +596,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
         
         const header = document.createElement('div')
         header.className = 'string-header'
-        header.textContent = \`String \${stringNum} (\${stringGroups[stringNum].length} modules)\`
+        header.textContent = 'String ' + stringNum + ' (' + stringGroups[stringNum].length + ' modules)'
         group.appendChild(header)
         
         stringGroups[stringNum].forEach(m => {
@@ -636,8 +636,8 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
     function setMode(mode) {
       editorState.mode = mode
       document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'))
-      document.querySelector(\`[data-mode="\${mode}"]\`).classList.add('active')
-      document.getElementById('canvas').className = \`mode-\${mode}\`
+      document.querySelector('[data-mode="' + mode + '"]').classList.add('active')
+      document.getElementById('canvas').className = 'mode-' + mode
       document.getElementById('statusMode').textContent = {
         'select': 'Sélection',
         'move': 'Déplacement',
@@ -690,7 +690,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       
       renderCanvas()
       updateStats()
-      showMessage(\`Module \${identifier} ajouté\`)
+      showMessage('Module ' + identifier + ' ajouté')
     })
     
     // Render canvas
@@ -730,11 +730,11 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       editorState.arrows.forEach((arrow, idx) => {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
         svg.setAttribute('class', 'canvas-arrow')
-        svg.setAttribute('style', \`position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;\`)
+        svg.setAttribute('style', 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;')
         
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
         const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
-        marker.setAttribute('id', \`arrow-\${idx}\`)
+        marker.setAttribute('id', 'arrow-' + idx)
         marker.setAttribute('markerWidth', '12')
         marker.setAttribute('markerHeight', '12')
         marker.setAttribute('refX', '10')
@@ -754,7 +754,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
         line.setAttribute('y1', arrow.startY)
         line.setAttribute('x2', arrow.endX)
         line.setAttribute('y2', arrow.endY)
-        line.setAttribute('marker-end', \`url(#arrow-\${idx})\`)
+        line.setAttribute('marker-end', 'url(#arrow-' + idx + ')')
         svg.appendChild(line)
         
         if (arrow.label) {
@@ -831,17 +831,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
         // Ajouter un indicateur visuel temporaire
         const indicator = document.createElement('div')
         indicator.id = 'arrow-start-indicator'
-        indicator.style.cssText = \`
-          position: absolute;
-          left: \${x - 5}px;
-          top: \${y - 5}px;
-          width: 10px;
-          height: 10px;
-          background: #dc2626;
-          border-radius: 50%;
-          border: 2px solid white;
-          z-index: 1000;
-        \`
+        indicator.style.cssText = 'position: absolute; left: ' + (x - 5) + 'px; top: ' + (y - 5) + 'px; width: 10px; height: 10px; background: #dc2626; border-radius: 50%; border: 2px solid white; z-index: 1000;'
         canvas.appendChild(indicator)
       } else {
         // Deuxième clic: créer la flèche
@@ -854,7 +844,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
           endY: y,
           color: '#dc2626',
           width: 4,
-          label: \`S\${editorState.arrows.length + 1}\`
+          label: 'S' + (editorState.arrows.length + 1)
         }
         
         editorState.arrows.push(arrow)
@@ -866,7 +856,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
         editorState.arrowStartPos = null
         renderCanvas()
         updateStats()
-        showMessage(\`Flèche créée\`, 'success')
+        showMessage('Flèche créée', 'success')
       }
     }
     
@@ -888,13 +878,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       if (!zonePreview) {
         zonePreview = document.createElement('div')
         zonePreview.id = 'zone-preview'
-        zonePreview.style.cssText = \`
-          position: absolute;
-          border: 3px dashed #dc2626;
-          background: rgba(220, 38, 38, 0.1);
-          pointer-events: none;
-          z-index: 500;
-        \`
+        zonePreview.style.cssText = 'position: absolute; border: 3px dashed #dc2626; background: rgba(220, 38, 38, 0.1); pointer-events: none; z-index: 500;'
         canvas.appendChild(zonePreview)
       }
       
@@ -919,7 +903,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       if (width > 40 && height > 40) {  // Minimum size
         const zone = {
           id: 'zone-' + Date.now(),
-          name: \`Zone \${editorState.zones.length + 1}\`,
+          name: 'Zone ' + (editorState.zones.length + 1),
           x,
           y,
           width,
@@ -932,7 +916,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
         
         editorState.zones.push(zone)
         updateStats()
-        showMessage(\`Zone créée\`, 'success')
+        showMessage('Zone créée', 'success')
       } else {
         showMessage('Zone trop petite (minimum 40x40px)', 'warning')
       }
@@ -987,7 +971,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       const layout = {
         projectId: PROJECT_ID,
         moduleType: MODULE_TYPE,
-        layoutName: \`\${PROJECT_ID} - Configuration\`,
+        layoutName: PROJECT_ID + ' - Configuration',
         layout: {
           viewBox: { width: 2400, height: 1200, gridSize: 20 },
           modules: editorState.modules,
@@ -1028,7 +1012,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = \`calepinage-\${PROJECT_ID}.json\`
+      a.download = 'calepinage-' + PROJECT_ID + '.json'
       a.click()
       showMessage('📥 Exporté en JSON')
     })
