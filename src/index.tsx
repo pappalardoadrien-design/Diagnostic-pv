@@ -172,6 +172,13 @@ import labelsModule from './modules/labels'
 app.route('/api/labels', labelsModule)
 
 // ============================================================================
+// MODULE CALEPINAGE - ÉDITEUR VISUEL PLANS DE CÂBLAGE (UNIVERSEL)
+// Compatible avec tous les modules: EL, I-V, Diodes, Thermique, Isolation, Visuel
+// ============================================================================
+import calepinageModule from './modules/calepinage'
+app.route('/api/calepinage', calepinageModule)
+
+// ============================================================================
 // ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
 // ============================================================================
 // Les routes suivantes ont été migrées vers src/modules/el/ (Point 4.1)

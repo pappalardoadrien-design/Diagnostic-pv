@@ -807,28 +807,28 @@ ${criticalPhotos.filter((p: any) => p.base64Image).length > 0 ? `
     </ul>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
       <div style="text-align: center;">
-        <a href="/api/el/calepinage-physical/${auditToken}" 
+        <a href="/api/calepinage/editor/${auditToken}?module_type=el" 
            target="_blank" 
-           style="display: inline-block; background: #dc2626; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 10pt; box-shadow: 0 2px 8px rgba(220,38,38,0.3);">
-          🗺️ Plan Physique Réel
+           style="display: inline-block; background: #10b981; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 10pt; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">
+          ✏️ Éditeur de Plan
         </a>
         <div style="margin-top: 8px; font-size: 8pt; color: #6b7280;">
-          Disposition réelle sur toiture
+          Créer / Modifier le plan de calepinage
         </div>
       </div>
       <div style="text-align: center;">
-        <a href="/api/el/calepinage-grid/${auditToken}" 
+        <a href="/api/calepinage/viewer/${auditToken}?module_type=el" 
            target="_blank" 
-           style="display: inline-block; background: #1e40af; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 10pt; box-shadow: 0 2px 8px rgba(30,64,175,0.3);">
-          📄 Plan Grille Simplifié
+           style="display: inline-block; background: #dc2626; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 10pt; box-shadow: 0 2px 8px rgba(220,38,38,0.3);">
+          🗺️ Voir le Plan (SVG)
         </a>
         <div style="margin-top: 8px; font-size: 8pt; color: #6b7280;">
-          Vue grille organisée par string
+          Afficher le plan configuré
         </div>
       </div>
     </div>
     <div style="margin-top: 15px; text-align: center; font-size: 8pt; color: #6b7280;">
-      💡 Astuce : Une fois ouvert, utilisez Ctrl+P pour exporter en PDF A3 paysage
+      💡 Nouveau : Créez votre plan visuellement avec drag-and-drop, puis exportez en SVG/PDF
     </div>
   </div>
 </div>
