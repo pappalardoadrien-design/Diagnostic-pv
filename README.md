@@ -25,28 +25,39 @@
 - **API Base**: `/api/*`
 - **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
 
-### **🆕 v3.6.0 - PLAN DE CALEPINAGE JALIBAT** ✅ **COMPLET**
+### **🆕 v4.0.0 - ÉDITEUR VISUEL DE CALEPINAGE UNIVERSEL** ✅ **NOUVEAU**
 
-#### **🗺️ Plan de Calepinage - Câblage Électrique Serpentin**
-- **Endpoint**: `GET /api/el/calepinage/:audit_token`
-- **Description**: Plan de calepinage conforme au câblage réel de la centrale avec données d'audit EL
-- **Fonctionnalités**:
-  - **Câblage serpentin (zigzag)** : Strings pairs inversés (droite←gauche) + flèches de connexion verticales rouges
-  - **Couleurs réelles** selon état audit EL :
-    * 🟢 Vert : OK (modules sains)
-    * 🟡 Jaune : Inégalité
-    * 🟠 Orange : Microfissures
-    * 🔴 Rose : Impact Cellulaire - **À REMPLACER**
-    * 🔵 Bleu : String ouvert
-    * ⚫ Gris : Non raccordé
-    * 🟣 Violet : Vide
-  - **Marqueurs croix bleues (✕)** sur modules défectueux
-  - Support configurations variables (ex: JALIBAT 1x26 + 9x24 = 242 modules)
-  - Format A3 paysage pour impression PDF (Ctrl+P)
-  - Statistiques : strings, modules totaux, défauts détectés
-  - Légende complète (7 états + câblage)
-- **Exemple JALIBAT**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev/api/el/calepinage/JALIBAT-2025-001
-- **Données réelles**: 22 modules OK, 9 microfissures, 211 impacts cellulaires à remplacer
+#### **🗺️ Système de Calepinage Interactif - Drag & Drop**
+- **Module**: `/api/calepinage`
+- **Description**: Éditeur visuel complet pour créer et gérer plans de câblage PV
+- **Fonctionnalités principales**:
+  - **✏️ Éditeur drag-and-drop** : Positionnement libre des modules sur canvas
+  - **🎨 Outils de dessin** :
+    * ➡️ Flèches de câblage (2 clics : start → end)
+    * 🔲 Zones rectangulaires (click-drag)
+    * ✋ Déplacement modules (drag avec snap-to-grid 20px)
+    * 👆 Sélection/suppression (click + Delete key)
+  - **💾 Persistance D1** : Sauvegarde automatique configuration
+  - **🖼️ Viewer SVG dynamique** : 
+    * Couleurs temps réel selon états EL
+    * Export PDF vectoriel (Ctrl+P)
+    * Légende automatique
+  - **🔄 Universel** : Compatible tous modules (el, iv, diodes, thermique, isolation, visuel)
+  - **📤 Export/Import** : Backup JSON des configurations
+
+**Routes API** :
+- `GET /api/calepinage/editor/:projectId?module_type=el` - Éditeur visuel
+- `GET /api/calepinage/viewer/:projectId?module_type=el` - Viewer SVG
+- `GET /api/calepinage/layouts` - Liste layouts
+- `POST /api/calepinage/layouts` - Créer/MAJ layout
+- `DELETE /api/calepinage/layouts/:projectId` - Supprimer
+
+**Intégration** :
+- Liens directs depuis rapports EL (section Plan de Calepinage)
+- Documentation complète : `CALEPINAGE-GUIDE-UTILISATEUR.md`
+- Architecture technique : `CALEPINAGE-SYSTEM.md`
+
+**Exemple démo** : https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev/api/calepinage/editor/JALIBAT-2025-001?module_type=el
 
 ### **📊 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
 
