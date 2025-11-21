@@ -284,15 +284,40 @@ function generateCalepinageHTML(audit: any, modulesByString: Record<number, any[
       flex-shrink: 0;
     }
     
-    .module-box.has-defect {
-      background: #fff3cd;
-      border-color: #f59e0b;
+    /* Module colors according to defect type */
+    .module-box.ok {
+      background: #d4f4dd;  /* Light green - OK */
+      border-color: #4ade80;
     }
     
-    .module-box.severity-3,
-    .module-box.severity-4 {
-      background: #fee2e2;
-      border-color: #dc2626;
+    .module-box.inegalite {
+      background: #fef3c7;  /* Yellow/Beige - Inégalité */
+      border-color: #fbbf24;
+    }
+    
+    .module-box.microfissures {
+      background: #fed7aa;  /* Orange - Microfissures */
+      border-color: #fb923c;
+    }
+    
+    .module-box.impact_cellulaire {
+      background: #fecaca;  /* Pink/Rose - Impact Cellulaire */
+      border-color: #f87171;
+    }
+    
+    .module-box.string_ouvert {
+      background: #bfdbfe;  /* Light blue - String ouvert */
+      border-color: #60a5fa;
+    }
+    
+    .module-box.non_raccorde {
+      background: #e5e7eb;  /* Gray - Non raccordé */
+      border-color: #9ca3af;
+    }
+    
+    .module-box.vide {
+      background: #e9d5ff;  /* Purple - Vide */
+      border-color: #c084fc;
     }
     
     .module-number {
@@ -321,6 +346,33 @@ function generateCalepinageHTML(audit: any, modulesByString: Record<number, any[
     }
     
     .end-arrow svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* CONNECTION ARROWS BETWEEN STRINGS */
+    .string-connection {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      height: 30px;
+      margin-left: 68px;
+    }
+    
+    .string-connection.left {
+      justify-content: flex-start;
+    }
+    
+    .string-connection.right {
+      justify-content: flex-end;
+    }
+    
+    .connection-arrow {
+      width: 40px;
+      height: 30px;
+    }
+    
+    .connection-arrow svg {
       width: 100%;
       height: 100%;
     }
@@ -453,31 +505,49 @@ function generateCalepinageHTML(audit: any, modulesByString: Record<number, any[
     <!-- Legend -->
     <div class="legend">
       <div class="legend-item">
-        <div class="legend-box"></div>
-        <span class="legend-label">Module OK</span>
+        <div class="legend-box" style="background: #d4f4dd; border-color: #4ade80;"></div>
+        <span class="legend-label">✅ OK</span>
       </div>
       <div class="legend-item">
-        <div class="legend-box defect">
-          <span style="color: #3b82f6; font-size: 14pt; font-weight: bold;">✕</span>
-        </div>
-        <span class="legend-label">Défaut mineur/modéré</span>
+        <div class="legend-box" style="background: #fef3c7; border-color: #fbbf24;"></div>
+        <span class="legend-label">⚠️ Inégalité</span>
       </div>
       <div class="legend-item">
-        <div class="legend-box critical">
-          <span style="color: #3b82f6; font-size: 14pt; font-weight: bold;">✕</span>
-        </div>
-        <span class="legend-label">Défaut sévère/critique</span>
+        <div class="legend-box" style="background: #fed7aa; border-color: #fb923c;"></div>
+        <span class="legend-label">🔶 Microfissures</span>
       </div>
       <div class="legend-item">
-        <svg width="30" height="20" style="vertical-align: middle;">
+        <div class="legend-box" style="background: #fecaca; border-color: #f87171;"></div>
+        <span class="legend-label">🚨 Impact Cellulaire - À REMPLACER</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box" style="background: #bfdbfe; border-color: #60a5fa;"></div>
+        <span class="legend-label">🔌 String ouvert</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box" style="background: #e5e7eb; border-color: #9ca3af;"></div>
+        <span class="legend-label">⚫ Non raccordé</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box" style="background: #e9d5ff; border-color: #c084fc;"></div>
+        <span class="legend-label">⬜ Vide</span>
+      </div>
+      <div class="legend-item">
+        <svg width="60" height="40" style="vertical-align: middle;">
           <defs>
-            <marker id="arrowhead-legend" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+            <marker id="arrowhead-legend-r" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
               <polygon points="0 0, 10 3, 0 6" fill="#1e40af" />
             </marker>
+            <marker id="arrowhead-legend-l" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto">
+              <polygon points="10 0, 0 3, 10 6" fill="#1e40af" />
+            </marker>
           </defs>
-          <line x1="0" y1="10" x2="25" y2="10" stroke="#1e40af" stroke-width="2" marker-end="url(#arrowhead-legend)" />
+          <!-- String impair: gauche → droite -->
+          <line x1="5" y1="12" x2="55" y2="12" stroke="#1e40af" stroke-width="2" marker-end="url(#arrowhead-legend-r)" />
+          <!-- String pair: droite → gauche -->
+          <line x1="55" y1="28" x2="5" y2="28" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowhead-legend-l)" />
         </svg>
-        <span class="legend-label">Sens du câblage électrique</span>
+        <span class="legend-label">🔄 Câblage serpentin (zigzag)</span>
       </div>
     </div>
 
@@ -503,9 +573,18 @@ function generateCalepinageHTML(audit: any, modulesByString: Record<number, any[
 function generateStringRows(modulesByString: Record<number, any[]>): string {
   const stringNumbers = Object.keys(modulesByString).map(Number).sort((a, b) => a - b)
   
-  return stringNumbers.map(stringNum => {
+  return stringNumbers.map((stringNum, index) => {
     const modules = modulesByString[stringNum]
     const moduleCount = modules.length
+    
+    // Câblage en SERPENTIN (zigzag): strings impairs → gauche-droite, strings pairs → droite-gauche
+    const isReversed = stringNum % 2 === 0
+    
+    // Si reversed, inverser l'ordre des modules pour affichage droite-gauche
+    const displayModules = isReversed ? [...modules].reverse() : modules
+    
+    // Est-ce la dernière string ?
+    const isLastString = index === stringNumbers.length - 1
     
     return `
     <div class="string-row">
@@ -515,31 +594,31 @@ function generateStringRows(modulesByString: Record<number, any[]>): string {
       <div class="start-arrow">
         <svg viewBox="0 0 25 25">
           <defs>
-            <marker id="arrowhead-start-${stringNum}" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto">
-              <polygon points="10 0, 0 3, 10 6" fill="#1e40af" />
+            <marker id="arrowhead-start-${stringNum}" markerWidth="10" markerHeight="10" refX="${isReversed ? '9' : '0'}" refY="3" orient="auto">
+              <polygon points="${isReversed ? '0 0, 10 3, 0 6' : '10 0, 0 3, 10 6'}" fill="#1e40af" />
             </marker>
           </defs>
           <circle cx="12.5" cy="12.5" r="8" fill="none" stroke="#1e40af" stroke-width="2"/>
-          <line x1="8" y1="12.5" x2="17" y2="12.5" stroke="#1e40af" stroke-width="2" marker-start="url(#arrowhead-start-${stringNum})" />
+          <line x1="${isReversed ? '17' : '8'}" y1="12.5" x2="${isReversed ? '8' : '17'}" y2="12.5" stroke="#1e40af" stroke-width="2" marker-${isReversed ? 'end' : 'start'}="url(#arrowhead-start-${stringNum})" />
         </svg>
       </div>
       
       <!-- Modules -->
-      <div class="modules-container">
-        ${modules.map(m => {
-          const hasDefect = m.defect_type && m.defect_type !== 'none' && m.defect_type !== 'pending'
-          const severityLevel = m.severity_level || 0
+      <div class="modules-container" style="${isReversed ? 'flex-direction: row-reverse;' : ''}">
+        ${displayModules.map(m => {
+          const defectType = m.defect_type || 'none'
+          const hasDefect = defectType !== 'none' && defectType !== 'pending'
           
+          // Determine CSS class based on defect type
           let className = 'module-box'
           if (hasDefect) {
-            className += ' has-defect'
-            if (severityLevel >= 3) {
-              className += ` severity-${severityLevel}`
-            }
+            className += ` ${defectType}`
+          } else {
+            className += ' ok'  // Green for OK modules
           }
           
           return `
-            <div class="${className}" title="${m.module_identifier}${hasDefect ? ' - ' + m.defect_type : ''}">
+            <div class="${className}" title="${m.module_identifier}${hasDefect ? ' - ' + defectType : ' - OK'}">
               <div class="module-number">${m.position_in_string}</div>
               ${hasDefect ? '<div class="defect-marker">✕</div>' : ''}
             </div>
@@ -551,15 +630,31 @@ function generateStringRows(modulesByString: Record<number, any[]>): string {
       <div class="end-arrow">
         <svg viewBox="0 0 25 25">
           <defs>
-            <marker id="arrowhead-end-${stringNum}" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-              <polygon points="0 0, 10 3, 0 6" fill="#1e40af" />
+            <marker id="arrowhead-end-${stringNum}" markerWidth="10" markerHeight="10" refX="${isReversed ? '0' : '9'}" refY="3" orient="auto">
+              <polygon points="${isReversed ? '10 0, 0 3, 10 6' : '0 0, 10 3, 0 6'}" fill="#1e40af" />
             </marker>
           </defs>
           <circle cx="12.5" cy="12.5" r="8" fill="none" stroke="#1e40af" stroke-width="2"/>
-          <line x1="5" y1="12.5" x2="20" y2="12.5" stroke="#1e40af" stroke-width="2" marker-end="url(#arrowhead-end-${stringNum})" />
+          <line x1="${isReversed ? '8' : '5'}" y1="12.5" x2="${isReversed ? '17' : '20'}" y2="12.5" stroke="#1e40af" stroke-width="2" marker-${isReversed ? 'start' : 'end'}="url(#arrowhead-end-${stringNum})" />
         </svg>
       </div>
     </div>
+    
+    ${!isLastString ? `
+    <!-- Connection arrow to next string (serpentine) -->
+    <div class="string-connection ${isReversed ? 'left' : 'right'}">
+      <div class="connection-arrow">
+        <svg viewBox="0 0 40 30">
+          <defs>
+            <marker id="arrowhead-connect-${stringNum}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+              <polygon points="0 0, 8 4, 0 8" fill="#dc2626" />
+            </marker>
+          </defs>
+          <line x1="20" y1="2" x2="20" y2="28" stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead-connect-${stringNum})" />
+        </svg>
+      </div>
+    </div>
+    ` : ''}
     `
   }).join('')
 }
