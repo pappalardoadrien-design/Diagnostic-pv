@@ -20,12 +20,28 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://cab52a97.diagnostic-hub.pages.dev
-- **Mobile Terrain**: https://cab52a97.diagnostic-hub.pages.dev/mobile/field
+- **Production**: https://38d89b0c.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://38d89b0c.diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
 - **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
 
-### **🆕 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
+### **🆕 v3.6.0 - PLAN DE CALEPINAGE** ✅ **DÉPLOYÉ**
+
+#### **🗺️ Plan de Calepinage - Câblage Électrique**
+- **Endpoint**: `GET /api/el/calepinage/:audit_token`
+- **Description**: Plan de calepinage conforme au câblage réel de la centrale
+- **Fonctionnalités**:
+  - Représentation horizontale des strings (gauche → droite)
+  - Flèches indiquant le sens du câblage électrique ⚡
+  - Modules color-codés selon sévérité (blanc/jaune/rouge)
+  - Marqueurs croix bleues (✕) sur modules défectueux
+  - Support configurations variables (ex: JALIBAT 1x26 + 9x24 modules)
+  - Format A3 paysage pour impression PDF (Ctrl+P)
+  - Statistiques : strings, modules totaux, défauts détectés
+  - Légende complète (symboles câblage + défauts)
+- **Exemple**: https://38d89b0c.diagnostic-hub.pages.dev/api/el/calepinage/f7c663dc-02e2-48ef-8045-5cc35878036f
+
+### **📊 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
 
 #### **📊 Rapport I-V avec Visualisation Graphique**
 - **Rapport Enrichi**: `GET /api/iv/reports-enriched/full/:audit_token`
@@ -39,7 +55,7 @@
     - Écart-type Pmax, déviation max
   - **Cartographie multi-défauts**: Modules color-codés selon cumul défauts (EL+IV+PVserv)
   - **Alertes intelligentes**: Diodes HS, Rds élevées, mismatch string
-  - **Exemple**: https://cab52a97.diagnostic-hub.pages.dev/api/iv/reports-enriched/full/f7c663dc-02e2-48ef-8045-5cc35878036f
+  - **Exemple**: https://38d89b0c.diagnostic-hub.pages.dev/api/iv/reports-enriched/full/f7c663dc-02e2-48ef-8045-5cc35878036f
 
 ### **🆕 GIRASOLE - Module Complet** (Mission 52 centrales - 66.885€ HT) ✅ **PRODUCTION OPÉRATIONNELLE**
 
