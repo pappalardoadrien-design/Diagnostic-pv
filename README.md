@@ -20,10 +20,11 @@
 
 ## 🚀 URLs Déployées
 
-- **Production**: https://38d89b0c.diagnostic-hub.pages.dev
-- **Mobile Terrain**: https://38d89b0c.diagnostic-hub.pages.dev/mobile/field
+- **Production**: https://diagnostic-hub.pages.dev
+- **Deploy Latest**: https://642cf4d1.diagnostic-hub.pages.dev
+- **Mobile Terrain**: https://diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
-- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`
+- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`, `/api/calepinage`
 
 ### **🆕 v4.0.0 - ÉDITEUR VISUEL DE CALEPINAGE UNIVERSEL** ✅ **NOUVEAU**
 
@@ -57,7 +58,7 @@
 - Documentation complète : `CALEPINAGE-GUIDE-UTILISATEUR.md`
 - Architecture technique : `CALEPINAGE-SYSTEM.md`
 
-**Exemple démo** : https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev/api/calepinage/editor/JALIBAT-2025-001?module_type=el
+**Exemple production** : https://diagnostic-hub.pages.dev/api/calepinage/editor/JALIBAT-2025-001?module_type=el
 
 ### **📊 v3.5.0 - RAPPORT IV ENRICHI** ✅ **DÉPLOYÉ**
 
