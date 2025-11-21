@@ -790,6 +790,33 @@ ${criticalPhotos.filter((p: any) => p.base64Image).length > 0 ? `
 </div>
 ` : ''}
 
+<!-- PLAN DE CALEPINAGE -->
+<div class="section">
+  <div class="section-title">🗺️ Plan de Calepinage - Câblage Électrique</div>
+  <div style="background: #f9fafb; padding: 20px; border-radius: 8px; border-left: 4px solid #1e40af;">
+    <p style="margin-bottom: 15px; color: #374151; font-size: 10pt; line-height: 1.6;">
+      Le plan de calepinage présente la disposition physique des modules sur la toiture avec :
+    </p>
+    <ul style="margin-left: 20px; margin-bottom: 15px; color: #4b5563; font-size: 9pt; line-height: 1.8;">
+      <li>✅ <strong>Couleurs réelles</strong> selon état EL de chaque module</li>
+      <li>🔄 <strong>Câblage serpentin</strong> avec icônes de connexion (⊙)</li>
+      <li>➡️ <strong>Flèches directionnelles</strong> indiquant le sens du câble</li>
+      <li>📍 <strong>Numérotation précise</strong> de chaque module</li>
+      <li>🖨️ <strong>Export PDF A3</strong> optimisé pour impression</li>
+    </ul>
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="/api/el/calepinage-grid/${auditToken}" 
+         target="_blank" 
+         style="display: inline-block; background: #1e40af; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 10pt; box-shadow: 0 2px 8px rgba(30,64,175,0.3);">
+        📄 Ouvrir le Plan de Calepinage
+      </a>
+    </div>
+    <div style="margin-top: 15px; text-align: center; font-size: 8pt; color: #6b7280;">
+      💡 Astuce : Une fois ouvert, utilisez Ctrl+P pour exporter en PDF A3 paysage
+    </div>
+  </div>
+</div>
+
 <!-- RECOMMENDATIONS -->
 <div class="section">
   <div class="section-title">💡 Recommandations & Actions Correctives</div>

@@ -12,6 +12,7 @@ import photosRouter from './routes/photos'
 import reportsRouter from './routes/reports'
 import completeReportRouter from './routes/report-complete'
 import calepinageRouter from './routes/calepinage'
+import calepinageGridRouter from './routes/calepinage-grid'
 
 type Bindings = {
   DB: D1Database
@@ -39,5 +40,6 @@ elModule.route('/reports', completeReportRouter)
 
 // Route pour le plan de calepinage (câblage électrique)
 elModule.route('/calepinage', calepinageRouter)
+elModule.route('/calepinage-grid', calepinageGridRouter)  // Vue GRILLE (plan toiture)
 
 export default elModule
