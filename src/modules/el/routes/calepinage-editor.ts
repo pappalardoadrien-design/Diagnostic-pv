@@ -195,7 +195,7 @@ function generateEditorHTML(audit: any, modulesByString: Record<number, any[]>, 
     .grid-row {
       display: flex;
       gap: 2px;
-      margin-bottom: 15px;
+      margin-bottom: 50px;
       position: relative;
     }
     
@@ -238,9 +238,23 @@ function generateEditorHTML(audit: any, modulesByString: Record<number, any[]>, 
     }
     
     .module-cell:hover {
-      transform: scale(1.1);
+      transform: scale(1.15);
       z-index: 10;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    body.arrow-mode .module-cell:hover {
+      border-color: #dc2626 !important;
+      border-width: 3px;
+      cursor: crosshair;
+    }
+    
+    body.direction-mode .row-label:hover,
+    body.direction-mode .direction-toggle:hover {
+      color: #1e40af;
+      cursor: pointer;
+      text-shadow: 0 0 8px rgba(30, 64, 175, 0.5);
+      transform: scale(1.2);
     }
     
     .module-cell.ok { background: #d4f4dd; border-color: #4ade80; }
@@ -253,12 +267,25 @@ function generateEditorHTML(audit: any, modulesByString: Record<number, any[]>, 
     .module-cell.arrow-start::after {
       content: '↓';
       position: absolute;
-      bottom: -25px;
+      bottom: -30px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 20pt;
+      font-size: 32pt;
       color: #dc2626;
       font-weight: bold;
+      text-shadow: 0 0 4px rgba(220, 38, 38, 0.5);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.7; transform: translateX(-50%) scale(1.1); }
+    }
+    
+    .module-cell.arrow-start {
+      background: #fef3c7 !important;
+      border: 3px solid #dc2626 !important;
+      box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
     }
     
     .arrow-spacer {
@@ -392,6 +419,9 @@ function generateEditorHTML(audit: any, modulesByString: Record<number, any[]>, 
       mode = newMode
       document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'))
       event.target.classList.add('active')
+      
+      // Update body class for CSS targeting
+      document.body.className = newMode + '-mode'
     }
     
     function toggleDirection(stringIndex) {
@@ -489,6 +519,7 @@ function generateEditorHTML(audit: any, modulesByString: Record<number, any[]>, 
     }
     
     // Initialize
+    document.body.className = 'direction-mode'
     updateDirectionIcons()
   </script>
 </body>
