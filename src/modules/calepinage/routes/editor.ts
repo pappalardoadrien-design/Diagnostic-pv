@@ -826,7 +826,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
       if (!editorState.arrowStartPos) {
         // Premier clic: définir le point de départ
         editorState.arrowStartPos = { x, y }
-        showMessage('Cliquez sur le point d\'arrivée de la flèche', 'info')
+        showMessage("Cliquez sur le point d'arrivée de la flèche", 'info')
         
         // Ajouter un indicateur visuel temporaire
         const indicator = document.createElement('div')
