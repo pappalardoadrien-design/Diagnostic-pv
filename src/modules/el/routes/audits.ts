@@ -66,15 +66,27 @@ auditsRouter.post('/create', async (c) => {
     modulesPerString = oldModulesPerString || 0
   }
   
-  // Création structure audit en base D1
-  await env.DB.prepare(`
-    INSERT INTO el_audits (
-      audit_token, project_name, client_name, location, 
-      string_count, modules_per_string, total_modules,
-      configuration_json, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+  // ÉTAPE 1 : Créer dans la table `audits` unifiée (CRM compatible)
+  const auditEntry = await env.DB.prepare(`
+    INSERT INTO audits (
+      audit_token, project_name, client_name, location,
+      modules_enabled, configuration_json, status,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'en_cours', datetime('now'), datetime('now'))
   `).bind(
     auditToken, projectName, clientName, location,
+    JSON.stringify(['EL']), configJson
+  ).run()
+  
+  // ÉTAPE 2 : Créer dans la table `el_audits` (données spécifiques EL)
+  await env.DB.prepare(`
+    INSERT INTO el_audits (
+      audit_token, audit_id, project_name, client_name, location, 
+      string_count, modules_per_string, total_modules,
+      configuration_json, status, created_at, updated_at
+    ) VALUES (?, (SELECT id FROM audits WHERE audit_token = ?), ?, ?, ?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+  `).bind(
+    auditToken, auditToken, projectName, clientName, location,
     stringCount, modulesPerString, totalModules, configJson
   ).run()
   
@@ -157,15 +169,27 @@ auditsRouter.post('/create-from-json', async (c) => {
   const config = jsonConfig.diagpv_import_format
   const auditToken = crypto.randomUUID()
   
-  // Création audit avec données JSON
+  // ÉTAPE 1 : Créer dans la table `audits` unifiée (CRM compatible)
   await env.DB.prepare(`
-    INSERT INTO el_audits (
-      audit_token, project_name, client_name, location, 
-      string_count, modules_per_string, total_modules,
-      configuration_json, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+    INSERT INTO audits (
+      audit_token, project_name, client_name, location,
+      modules_enabled, configuration_json, status,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'en_cours', datetime('now'), datetime('now'))
   `).bind(
     auditToken, config.project_name, config.client_name, config.location,
+    JSON.stringify(['EL']), JSON.stringify(jsonConfig)
+  ).run()
+  
+  // ÉTAPE 2 : Création audit avec données JSON dans el_audits
+  await env.DB.prepare(`
+    INSERT INTO el_audits (
+      audit_token, audit_id, project_name, client_name, location, 
+      string_count, modules_per_string, total_modules,
+      configuration_json, status, created_at, updated_at
+    ) VALUES (?, (SELECT id FROM audits WHERE audit_token = ?), ?, ?, ?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+  `).bind(
+    auditToken, auditToken, config.project_name, config.client_name, config.location,
     config.string_count, config.modules_per_string, config.total_modules,
     JSON.stringify(jsonConfig)
   ).run()

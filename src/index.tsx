@@ -67,6 +67,10 @@ app.route('/api/auth/admin/assignments', assignmentsRoutes)
 // ============================================================================
 app.route('/api/crm', crmRoutes)
 
+// Page CRM Unifiée (vue hiérarchique complète)
+import crmUnifiedViewPage from './pages/crm-unified-view'
+app.route('/api/crm-unified', crmUnifiedViewPage)
+
 // ============================================================================
 // MODULE PLANNING - PLANNING & ATTRIBUTION SOUS-TRAITANTS (Priorité #1)
 // ============================================================================
