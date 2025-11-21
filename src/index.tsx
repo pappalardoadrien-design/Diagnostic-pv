@@ -172,6 +172,12 @@ import labelsModule from './modules/labels'
 app.route('/api/labels', labelsModule)
 
 // ============================================================================
+// MODULE DASHBOARD - VUE D'ENSEMBLE TOUS AUDITS
+// ============================================================================
+import dashboardModule from './modules/dashboard'
+app.route('/api/dashboard', dashboardModule)
+
+// ============================================================================
 // MODULE CALEPINAGE - ÉDITEUR VISUEL PLANS DE CÂBLAGE (UNIVERSEL)
 // Compatible avec tous les modules: EL, I-V, Diodes, Thermique, Isolation, Visuel
 // ============================================================================
@@ -2798,6 +2804,13 @@ app.get('/dashboard', (c) => {
     </body>
     </html>
   `)
+})
+
+// ============================================================================
+// ROOT ROUTE - Redirection vers dashboard centralisé
+// ============================================================================
+app.get('/', (c) => {
+  return c.redirect('/api/dashboard/audits')
 })
 
 export default app
