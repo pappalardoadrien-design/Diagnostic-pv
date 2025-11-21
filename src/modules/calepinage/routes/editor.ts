@@ -36,8 +36,8 @@ editorRouter.get('/:projectId', async (c) => {
     
     // Charger layout existant si disponible
     const existingLayout = await DB.prepare(`
-      SELECT * FROM calepinage_layouts WHERE project_id = ? LIMIT 1
-    `).bind(projectId).first()
+      SELECT * FROM calepinage_layouts WHERE project_id = ? AND module_type = ? LIMIT 1
+    `).bind(projectId, moduleType).first()
     
     let savedLayout = null
     if (existingLayout) {
@@ -47,6 +47,9 @@ editorRouter.get('/:projectId', async (c) => {
         arrows: JSON.parse(existingLayout.arrows_json as string || '[]'),
         zones: JSON.parse(existingLayout.zones_json as string || '[]')
       }
+    } else if (modules.length > 0) {
+      // Créer layout automatique depuis modules EL
+      savedLayout = generateAutoLayout(modules)
     }
     
     return c.html(renderEditor(projectId, moduleType, modules, savedLayout))
@@ -55,6 +58,111 @@ editorRouter.get('/:projectId', async (c) => {
     return c.html(`<h1>Erreur: ${error.message}</h1>`, 500)
   }
 })
+
+function generateAutoLayout(modules: any[]) {
+  const positionedModules: any[] = []
+  const arrows: any[] = []
+  const zones: any[] = []
+  
+  // Grouper par string
+  const stringGroups: {[key: number]: any[]} = {}
+  modules.forEach(m => {
+    if (!stringGroups[m.stringNumber]) {
+      stringGroups[m.stringNumber] = []
+    }
+    stringGroups[m.stringNumber].push(m)
+  })
+  
+  // Configuration layout
+  const moduleWidth = 80
+  const moduleHeight = 120
+  const spacingX = 20
+  const spacingY = 30
+  const startX = 100
+  const startY = 100
+  
+  // Directions câblage serpentin
+  const wiringDirections: {[key: number]: string} = {
+    1: 'left_to_right',
+    2: 'right_to_left',
+    3: 'left_to_right',
+    4: 'right_to_left',
+    5: 'left_to_right',
+    6: 'right_to_left',
+    7: 'left_to_right',
+    8: 'right_to_left',
+    9: 'left_to_right',
+    10: 'right_to_left'
+  }
+  
+  // Positionner modules par string
+  Object.keys(stringGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(stringNumStr => {
+    const stringNum = parseInt(stringNumStr)
+    const stringModules = stringGroups[stringNum].sort((a, b) => a.position - b.position)
+    const moduleCount = stringModules.length
+    const direction = wiringDirections[stringNum] || 'left_to_right'
+    
+    const y = startY + (stringNum - 1) * (moduleHeight + spacingY)
+    
+    // Positionner modules
+    stringModules.forEach((m, idx) => {
+      const x = startX + idx * (moduleWidth + spacingX)
+      positionedModules.push({
+        identifier: m.identifier,
+        x,
+        y,
+        width: moduleWidth,
+        height: moduleHeight,
+        rotation: 0
+      })
+    })
+    
+    // Créer flèche directionnelle (15px au-dessus du string)
+    const arrowY = y - 15
+    let arrowStartX, arrowEndX
+    
+    if (direction === 'left_to_right') {
+      arrowStartX = startX + Math.floor(moduleWidth / 2)
+      arrowEndX = startX + (moduleCount - 1) * (moduleWidth + spacingX) + Math.floor(moduleWidth / 2)
+    } else {
+      arrowStartX = startX + (moduleCount - 1) * (moduleWidth + spacingX) + Math.floor(moduleWidth / 2)
+      arrowEndX = startX + Math.floor(moduleWidth / 2)
+    }
+    
+    arrows.push({
+      id: `arrow-s${stringNum}`,
+      stringNumber: stringNum,
+      startX: arrowStartX,
+      startY: arrowY,
+      endX: arrowEndX,
+      endY: arrowY,
+      color: '#dc2626',
+      width: 4,
+      label: `S${stringNum}`
+    })
+    
+    // Créer zone rectangulaire
+    zones.push({
+      id: `zone-s${stringNum}`,
+      name: `Zone S${stringNum}`,
+      x: startX - 20,
+      y: y - 30,
+      width: moduleCount * (moduleWidth + spacingX) + 20,
+      height: moduleHeight + 60,
+      borderColor: '#dc2626',
+      borderWidth: 2,
+      borderStyle: 'solid',
+      backgroundColor: 'rgba(220, 38, 38, 0.05)'
+    })
+  })
+  
+  return {
+    viewBox: { width: 3000, height: 1600, gridSize: 20 },
+    modules: positionedModules,
+    arrows,
+    zones
+  }
+}
 
 function renderEditor(projectId: string, moduleType: string, modules: any[], savedLayout: any) {
   const modulesJson = JSON.stringify(modules)
