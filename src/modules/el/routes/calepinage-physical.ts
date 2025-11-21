@@ -35,18 +35,8 @@ const JALIBAT_LAYOUT: PhysicalLayout = {
   // Positions physiques des modules selon le schéma
   modules: generateJalibatModulePositions(),
   
-  // Câbles entre strings (flèches rouges)
-  cables: [
-    { from: 'S1-26', to: 'S2-1', arrowType: 'end', color: '#dc2626' },
-    { from: 'S2-24', to: 'S3-24', arrowType: 'end', color: '#dc2626' },
-    { from: 'S3-1', to: 'S4-1', arrowType: 'end', color: '#dc2626' },
-    { from: 'S4-24', to: 'S5-1', arrowType: 'end', color: '#dc2626' },
-    { from: 'S5-24', to: 'S6-24', arrowType: 'end', color: '#dc2626' },
-    { from: 'S6-1', to: 'S7-1', arrowType: 'end', color: '#dc2626' },
-    { from: 'S7-24', to: 'S8-24', arrowType: 'end', color: '#dc2626' },
-    { from: 'S8-1', to: 'S9-1', arrowType: 'end', color: '#dc2626' },
-    { from: 'S9-24', to: 'S10-24', arrowType: 'end', color: '#dc2626' }
-  ],
+  // Pas de câbles inter-strings (les flèches sont à l'intérieur des strings)
+  cables: [],
   
   // Zones de câblage (rectangles rouges)
   zones: [
@@ -254,6 +244,16 @@ function renderPhysicalPlan(layout: LayoutWithModuleStates, audit: any, auditTok
     `
   }).join('') || ''
   
+  // Grouper les modules par string pour afficher flèches
+  const modulesByString = new Map<number, typeof modules>()
+  modules.forEach(m => {
+    const stringNum = parseInt(m.identifier.split('-')[0].substring(1))
+    if (!modulesByString.has(stringNum)) {
+      modulesByString.set(stringNum, [])
+    }
+    modulesByString.get(stringNum)!.push(m)
+  })
+  
   // Générer les modules
   const modulesSvg = modules.map(m => {
     const state = stateMap.get(m.identifier)
@@ -302,44 +302,61 @@ function renderPhysicalPlan(layout: LayoutWithModuleStates, audit: any, auditTok
     `
   }).join('')
   
-  // Générer les câbles avec flèches
-  const cablesSvg = cables.map((cable, idx) => {
-    const fromModule = modules.find(m => m.identifier === cable.from)
-    const toModule = modules.find(m => m.identifier === cable.to)
+  // Générer les flèches de câblage À L'INTÉRIEUR de chaque string
+  const wiringArrows = layout.wiring.map((wire, idx) => {
+    const stringModules = modulesByString.get(wire.stringNumber) || []
+    if (stringModules.length === 0) return ''
     
-    if (!fromModule || !toModule) return ''
+    // Trier les modules par position
+    stringModules.sort((a, b) => {
+      const posA = parseInt(a.identifier.split('-')[1])
+      const posB = parseInt(b.identifier.split('-')[1])
+      return posA - posB
+    })
     
-    const fromX = fromModule.x + (fromModule.width || 60) / 2
-    const fromY = fromModule.y + (fromModule.height || 35) / 2
-    const toX = toModule.x + (toModule.width || 60) / 2
-    const toY = toModule.y + (toModule.height || 35) / 2
+    const firstModule = stringModules[0]
+    const lastModule = stringModules[stringModules.length - 1]
     
-    const markerId = `arrow-${idx}`
+    const width = firstModule.width || 60
+    const height = firstModule.height || 35
+    
+    // Calculer position de la flèche (au-dessus de la string)
+    const startX = wire.direction === 'left-to-right' ? firstModule.x : lastModule.x + width
+    const endX = wire.direction === 'left-to-right' ? lastModule.x + width : firstModule.x
+    const y = firstModule.y - 15  // 15px au-dessus des modules
+    
+    const arrowId = `arrow-string-${wire.stringNumber}`
     
     return `
       <defs>
         <marker
-          id="${markerId}"
-          markerWidth="10"
-          markerHeight="10"
-          refX="9"
-          refY="3"
+          id="${arrowId}"
+          markerWidth="12"
+          markerHeight="12"
+          refX="10"
+          refY="6"
           orient="auto"
-          markerUnits="strokeWidth"
         >
-          <path d="M0,0 L0,6 L9,3 z" fill="${cable.color || '#dc2626'}" />
+          <path d="M2,2 L2,10 L10,6 z" fill="#dc2626" />
         </marker>
       </defs>
       <line
-        x1="${fromX}"
-        y1="${fromY}"
-        x2="${toX}"
-        y2="${toY}"
-        stroke="${cable.color || '#dc2626'}"
-        stroke-width="3"
-        marker-end="url(#${markerId})"
-        opacity="0.8"
+        x1="${startX}"
+        y1="${y}"
+        x2="${endX}"
+        y2="${y}"
+        stroke="#dc2626"
+        stroke-width="4"
+        marker-end="url(#${arrowId})"
       />
+      <text
+        x="${(startX + endX) / 2}"
+        y="${y - 8}"
+        text-anchor="middle"
+        font-size="11"
+        font-weight="bold"
+        fill="#dc2626"
+      >S${wire.stringNumber}</text>
     `
   }).join('')
   
@@ -496,8 +513,8 @@ function renderPhysicalPlan(layout: LayoutWithModuleStates, audit: any, auditTok
       <!-- Modules avec états EL -->
       ${modulesSvg}
       
-      <!-- Câbles avec flèches -->
-      ${cablesSvg}
+      <!-- Flèches de câblage (à l'intérieur des strings) -->
+      ${wiringArrows}
     </svg>
   </div>
   
@@ -521,10 +538,10 @@ function renderPhysicalPlan(layout: LayoutWithModuleStates, audit: any, auditTok
         <span>Autre défaut</span>
       </div>
       <div class="legend-item">
-        <div style="width: 40px; height: 3px; background: #dc2626; position: relative;">
-          <div style="position: absolute; right: -5px; top: -3px; width: 0; height: 0; border-left: 8px solid #dc2626; border-top: 5px solid transparent; border-bottom: 5px solid transparent;"></div>
+        <div style="width: 50px; height: 4px; background: #dc2626; position: relative;">
+          <div style="position: absolute; right: -5px; top: -4px; width: 0; height: 0; border-left: 10px solid #dc2626; border-top: 6px solid transparent; border-bottom: 6px solid transparent;"></div>
         </div>
-        <span>Câblage entre strings</span>
+        <span>Sens de câblage (par string)</span>
       </div>
       <div class="legend-item">
         <div style="width: 30px; height: 20px; border: 3px dashed #dc2626; border-radius: 4px;"></div>
