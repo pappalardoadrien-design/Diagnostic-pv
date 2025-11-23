@@ -138,9 +138,12 @@ modulesRouter.post('/module', async (c) => {
   }
   
   try {
-    // Récupérer l'audit_id depuis le token
+    // Récupérer l'audit_id depuis le token (from el_audits)
     const audit = await env.DB.prepare(`
-      SELECT id FROM el_audits WHERE audit_token = ?
+      SELECT el.id as id
+      FROM audits a
+      LEFT JOIN el_audits el ON a.audit_token = el.audit_token
+      WHERE a.audit_token = ?
     `).bind(token).first<{ id: number }>()
     
     if (!audit) {

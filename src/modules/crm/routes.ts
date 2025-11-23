@@ -42,7 +42,7 @@ crmRoutes.get('/clients', async (c) => {
         MAX(a.created_at) as last_audit_date,
         COUNT(DISTINCT ct.id) as contacts_count
       FROM crm_clients c
-      LEFT JOIN el_audits a ON a.client_id = c.id
+      LEFT JOIN audits a ON a.client_id = c.id
       LEFT JOIN crm_contacts ct ON ct.client_id = c.id
     `;
 
@@ -155,7 +155,7 @@ crmRoutes.get('/clients/:id', async (c) => {
       SELECT 
         COUNT(*) as total_audits,
         MAX(created_at) as last_audit_date
-      FROM el_audits 
+      FROM audits 
       WHERE client_id = ?
     `).bind(clientId).first();
 
@@ -241,7 +241,7 @@ crmRoutes.delete('/clients/:id', async (c) => {
     const clientId = c.req.param('id');
 
     // Vérifier si audits liés
-    const audits = await DB.prepare('SELECT COUNT(*) as count FROM el_audits WHERE client_id = ?')
+    const audits = await DB.prepare('SELECT COUNT(*) as count FROM audits WHERE client_id = ?')
       .bind(clientId)
       .first() as any;
 
@@ -300,17 +300,19 @@ crmRoutes.get('/clients/:id/audits', async (c) => {
 
     const audits = await DB.prepare(`
       SELECT 
-        id as audit_id,
-        audit_token,
-        project_name,
-        location,
-        total_modules,
-        status,
-        created_at,
-        updated_at
-      FROM el_audits 
-      WHERE client_id = ?
-      ORDER BY created_at DESC
+        a.id as audit_id,
+        a.audit_token,
+        a.project_name,
+        a.location,
+        a.modules_enabled,
+        a.status,
+        a.created_at,
+        a.updated_at,
+        e.total_modules
+      FROM audits a
+      LEFT JOIN el_audits e ON a.id = e.audit_id
+      WHERE a.client_id = ?
+      ORDER BY a.created_at DESC
     `).bind(clientId).all();
 
     return c.json({

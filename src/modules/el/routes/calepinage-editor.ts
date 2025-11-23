@@ -11,9 +11,16 @@ calepinageEditorRoutes.get('/:audit_token', async (c) => {
   const { DB } = c.env as { DB: D1Database }
 
   try {
-    // Get audit info
+    // Get audit info (unified from audits + el_audits)
     const audit = await DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
+      SELECT 
+        a.*,
+        el.*,
+        a.id as audit_id,
+        el.id as el_audit_id
+      FROM audits a
+      LEFT JOIN el_audits el ON a.audit_token = el.audit_token
+      WHERE a.audit_token = ?
     `).bind(audit_token).first()
 
     if (!audit) {
@@ -31,7 +38,7 @@ calepinageEditorRoutes.get('/:audit_token', async (c) => {
       FROM el_modules
       WHERE el_audit_id = ?
       ORDER BY string_number ASC, position_in_string ASC
-    `).bind(audit.id).all()
+    `).bind(audit.el_audit_id).all()
 
     if (!modules.results || modules.results.length === 0) {
       return c.html('<h1>Aucun module trouvé</h1>')

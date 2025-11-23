@@ -295,7 +295,9 @@ auditsRouter.post('/create-from-intervention', async (c) => {
     
     // 2. Vérifier qu'un audit EL n'existe pas déjà pour cette intervention
     const existingAudit = await env.DB.prepare(`
-      SELECT audit_token FROM el_audits WHERE intervention_id = ?
+      SELECT a.audit_token 
+      FROM audits a
+      WHERE a.intervention_id = ? AND JSON_EXTRACT(a.modules_enabled, '$[0]') = 'EL'
     `).bind(intervention_id).first()
     
     if (existingAudit) {
@@ -356,7 +358,10 @@ auditsRouter.post('/create-from-intervention', async (c) => {
     
     // 5. Récupérer l'audit créé avec ID
     const auditResult = await env.DB.prepare(`
-      SELECT id FROM el_audits WHERE audit_token = ?
+      SELECT e.id 
+      FROM el_audits e
+      JOIN audits a ON a.audit_token = e.audit_token
+      WHERE e.audit_token = ?
     `).bind(auditToken).first()
     
     const auditId = auditResult ? (auditResult as any).id : null
@@ -435,9 +440,12 @@ auditsRouter.get('/:token', async (c) => {
   const { env } = c
   const token = c.req.param('token')
   
-  const audit = await env.DB.prepare(
-    'SELECT * FROM el_audits WHERE audit_token = ?'
-  ).bind(token).first<ELAudit>()
+  const audit = await env.DB.prepare(`
+    SELECT e.*, a.modules_enabled, a.status as audit_status
+    FROM el_audits e
+    JOIN audits a ON a.audit_token = e.audit_token
+    WHERE e.audit_token = ?
+  `).bind(token).first<ELAudit>()
   
   if (!audit) {
     return c.json({ error: 'Audit non trouvé' }, 404)
@@ -489,9 +497,12 @@ auditsRouter.put('/:token', async (c) => {
   const { project_name, client_name, location } = await c.req.json()
   
   // Vérification que l'audit existe
-  const existingAudit = await env.DB.prepare(
-    'SELECT * FROM el_audits WHERE audit_token = ?'
-  ).bind(token).first()
+  const existingAudit = await env.DB.prepare(`
+    SELECT e.*, a.id as audit_id
+    FROM el_audits e
+    JOIN audits a ON a.audit_token = e.audit_token
+    WHERE e.audit_token = ?
+  `).bind(token).first()
   
   if (!existingAudit) {
     return c.json({ error: 'Audit non trouvé' }, 404)
@@ -501,6 +512,13 @@ auditsRouter.put('/:token', async (c) => {
   if (!project_name || !client_name || !location) {
     return c.json({ error: 'Nom projet, client et localisation requis' }, 400)
   }
+  
+  // Mettre à jour dans les DEUX tables
+  await env.DB.prepare(`
+    UPDATE audits 
+    SET project_name = ?, client_name = ?, location = ?, updated_at = datetime('now')
+    WHERE audit_token = ?
+  `).bind(project_name, client_name, location, token).run()
   
   await env.DB.prepare(`
     UPDATE el_audits 
@@ -533,9 +551,12 @@ auditsRouter.put('/:token/configuration', async (c) => {
   
   try {
     // Vérification que l'audit existe
-    const existingAudit = await env.DB.prepare(
-      'SELECT * FROM el_audits WHERE audit_token = ?'
-    ).bind(token).first()
+    const existingAudit = await env.DB.prepare(`
+      SELECT e.*, a.id as audit_id
+      FROM el_audits e
+      JOIN audits a ON a.audit_token = e.audit_token
+      WHERE e.audit_token = ?
+    `).bind(token).first()
     
     if (!existingAudit) {
       return c.json({ error: 'Audit non trouvé' }, 404)
@@ -684,9 +705,12 @@ auditsRouter.delete('/:token', async (c) => {
   
   try {
     // Vérification que l'audit existe
-    const existingAudit = await env.DB.prepare(
-      'SELECT audit_token, project_name FROM el_audits WHERE audit_token = ?'
-    ).bind(token).first()
+    const existingAudit = await env.DB.prepare(`
+      SELECT e.audit_token, e.project_name, a.id as audit_id
+      FROM el_audits e
+      JOIN audits a ON a.audit_token = e.audit_token
+      WHERE e.audit_token = ?
+    `).bind(token).first()
     
     if (!existingAudit) {
       return c.json({ error: 'Audit non trouvé' }, 404)
@@ -735,7 +759,10 @@ auditsRouter.get('/:token/report', async (c) => {
   try {
     // Récupération audit
     const auditResult = await env.DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
+      SELECT e.*, a.modules_enabled, a.status as audit_status
+      FROM el_audits e
+      JOIN audits a ON a.audit_token = e.audit_token
+      WHERE e.audit_token = ?
     `).bind(token).first()
     
     if (!auditResult) {

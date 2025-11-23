@@ -35,7 +35,9 @@ multiModulePdfRoutes.get('/:audit_token', async (c) => {
     // Module EL
     if (modulesEnabled.includes('EL')) {
       const elAudit = await DB.prepare(`
-        SELECT * FROM el_audits WHERE audit_token = ?
+        SELECT el.* FROM audits a
+        LEFT JOIN el_audits el ON a.audit_token = el.audit_token
+        WHERE a.audit_token = ?
       `).bind(auditToken).first();
 
       const elModules = await DB.prepare(`

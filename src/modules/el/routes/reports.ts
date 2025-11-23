@@ -45,9 +45,16 @@ elReportsRoutes.get('/photos/:audit_token', async (c) => {
     const { DB, R2 } = c.env
     const auditToken = c.req.param('audit_token')
     
-    // Get audit info
+    // Get audit info (unified from audits + el_audits)
     const { results: audits } = await DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
+      SELECT 
+        a.*,
+        el.*,
+        a.id as audit_id,
+        el.id as el_audit_id
+      FROM audits a
+      LEFT JOIN el_audits el ON a.audit_token = el.audit_token
+      WHERE a.audit_token = ?
     `).bind(auditToken).all()
     
     if (!audits || audits.length === 0) {
