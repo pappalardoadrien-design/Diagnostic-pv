@@ -489,6 +489,120 @@ app.post('/api/pv/zones/from-audit/:auditToken', async (c: Context<{ Bindings: B
   }
 })
 
+// ========================================================================
+// CRÉER AUTOMATIQUEMENT CENTRALE PV DEPUIS AUDIT EL
+// ========================================================================
+app.post('/api/pv/create-from-el-audit/:auditToken', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const auditToken = c.req.param('auditToken')
+    
+    // 1. Récupérer les infos de l'audit EL
+    const audit = await c.env.DB.prepare(`
+      SELECT 
+        a.project_name, a.client_name, a.location,
+        e.total_modules, e.string_count
+      FROM audits a
+      JOIN el_audits e ON e.audit_token = a.audit_token
+      WHERE a.audit_token = ?
+    `).bind(auditToken).first()
+    
+    if (!audit) {
+      return c.json({ success: false, error: 'Audit EL non trouvé' }, 404)
+    }
+    
+    // 2. Vérifier si une centrale PV existe déjà pour cet audit
+    const existingZone: any = await c.env.DB.prepare(`
+      SELECT z.*, p.id as plant_id, p.plant_name
+      FROM pv_zones z
+      JOIN pv_plants p ON p.id = z.plant_id
+      WHERE z.audit_token = ?
+    `).bind(auditToken).first()
+    
+    if (existingZone) {
+      // Centrale déjà créée, retourner les infos
+      return c.json({ 
+        success: true, 
+        message: 'Centrale PV déjà existante',
+        plant_id: existingZone.plant_id,
+        zone_id: existingZone.id,
+        redirect_url: `/pv/plant/${existingZone.plant_id}/zone/${existingZone.id}/designer`
+      })
+    }
+    
+    // 3. Créer la centrale PV
+    const plantResult = await c.env.DB.prepare(`
+      INSERT INTO pv_plants (
+        plant_name, plant_type, address, 
+        module_count, total_power_kwp
+      ) VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      (audit as any).project_name,
+      'rooftop',
+      (audit as any).location,
+      (audit as any).total_modules || 0,
+      ((audit as any).total_modules || 0) * 0.45 // 450Wp par module par défaut
+    ).run()
+    
+    const plantId = plantResult.meta.last_row_id
+    
+    // 4. Créer la zone PV liée à l'audit EL
+    const zoneResult = await c.env.DB.prepare(`
+      INSERT INTO pv_zones (
+        plant_id, zone_name, zone_type,
+        audit_token, azimuth, tilt
+      ) VALUES (?, ?, ?, ?, 180, 30)
+    `).bind(
+      plantId,
+      `Zone principale - ${(audit as any).project_name}`,
+      'roof',
+      auditToken
+    ).run()
+    
+    const zoneId = zoneResult.meta.last_row_id
+    
+    // 5. Synchroniser les modules EL → PV
+    await c.env.DB.prepare(`
+      INSERT INTO pv_modules (
+        zone_id, module_identifier, string_number, position_in_string,
+        pos_x_meters, pos_y_meters, rotation,
+        width_meters, height_meters, power_wp,
+        module_status, status_comment
+      )
+      SELECT 
+        ? as zone_id,
+        m.module_identifier,
+        m.string_number,
+        m.position_in_string,
+        (m.position_in_string - 1) * 1.8 as pos_x_meters,
+        (m.string_number - 1) * 1.1 as pos_y_meters,
+        0 as rotation,
+        1.7 as width_meters,
+        1.0 as height_meters,
+        450 as power_wp,
+        CASE 
+          WHEN m.defect_type IN ('microcracks', 'pid') THEN 'warning'
+          WHEN m.defect_type IN ('dead_cell', 'hotspot', 'dead', 'string_open') THEN 'critical'
+          WHEN m.defect_type = 'pending' THEN 'pending'
+          ELSE 'ok'
+        END as module_status,
+        'Synchronisé depuis audit EL: ' || COALESCE(m.defect_type, 'ok')
+      FROM el_modules m
+      WHERE m.audit_token = ?
+    `).bind(zoneId, auditToken).run()
+    
+    return c.json({ 
+      success: true, 
+      message: 'Centrale PV créée avec succès',
+      plant_id: plantId,
+      zone_id: zoneId,
+      redirect_url: `/pv/plant/${plantId}/zone/${zoneId}/designer`
+    })
+    
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 // Synchroniser modules EL → PV (copie états des modules EL vers PV)
 app.post('/api/pv/zones/:zoneId/sync-from-el', async (c: Context<{ Bindings: Bindings }>) => {
   try {

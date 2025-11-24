@@ -1750,6 +1750,7 @@ app.get('/audit/:token', async (c) => {
         
         <script src="/static/diagpv-audit.js"></script>
         <script src="/static/diagpv-measures.js"></script>
+        <script src="/static/el-pv-carto.js"></script>
     </body>
     </html>
   `)
