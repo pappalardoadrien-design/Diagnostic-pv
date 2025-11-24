@@ -23,7 +23,10 @@ app.get('/pv/plant/:id', async (c: Context) => {
 
 // Éditeur cartographique d'une zone
 app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c: Context) => {
-  return c.redirect('/static/pv/editor.html')
+  // Redirection vers HTML statique avec query params
+  const plantId = c.req.param('plantId')
+  const zoneId = c.req.param('zoneId')
+  return c.redirect(`/static/pv/editor.html?plantId=${plantId}&zoneId=${zoneId}`)
 })
 
 export default app

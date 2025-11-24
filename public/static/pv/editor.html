@@ -44,7 +44,7 @@
         <div class="bg-gray-900 border-b-2 border-purple-400 p-4">
             <div class="container mx-auto flex justify-between items-center">
                 <div class="flex gap-3">
-                    <a href="/pv/plant/4" class="text-purple-400 hover:text-purple-300 font-bold">
+                    <a id="backLink" href="#" class="text-purple-400 hover:text-purple-300 font-bold">
                         <i class="fas fa-arrow-left mr-2"></i>RETOUR ZONE
                     </a>
                     <h1 id="zoneTitle" class="text-xl font-black">Zone...</h1>
@@ -204,9 +204,10 @@
         </div>
 
         <script>
-        // VARIABLES GLOBALES
-        const plantId = '4'
-        const zoneId = '4'
+        // VARIABLES GLOBALES - Lecture depuis URL
+        const urlParams = new URLSearchParams(window.location.search)
+        const plantId = urlParams.get('plantId') || '4'
+        const zoneId = urlParams.get('zoneId') || '4'
         const canvas = document.getElementById('canvas')
         const ctx = canvas.getContext('2d')
         
@@ -248,6 +249,9 @@
         // INIT
         // ========================================================================
         async function init() {
+            // Mettre à jour le lien retour avec le bon plantId
+            document.getElementById('backLink').href = `/pv/plant/${plantId}`
+            
             await loadZone()
             await loadModules()
             render()
