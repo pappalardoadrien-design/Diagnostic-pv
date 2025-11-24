@@ -287,6 +287,29 @@
                 const data = await response.json()
                 modules = data.modules || []
                 
+                // Si aucun module PV n'existe, tenter sync automatique depuis EL
+                if (modules.length === 0 && zoneData && zoneData.audit_token) {
+                    console.log('Aucun module PV trouvé, tentative sync automatique depuis EL...')
+                    try {
+                        const syncResponse = await fetch(`/api/pv/zones/${zoneId}/sync-from-el`, {
+                            method: 'POST'
+                        })
+                        const syncData = await syncResponse.json()
+                        
+                        if (syncData.success) {
+                            console.log(`✅ ${syncData.synced_count} modules synchronisés depuis EL`)
+                            // Recharger les modules
+                            const response2 = await fetch(`/api/pv/plants/${plantId}/zones/${zoneId}/modules`)
+                            const data2 = await response2.json()
+                            modules = data2.modules || []
+                        } else {
+                            console.warn('Sync EL échouée:', syncData.error)
+                        }
+                    } catch (syncError) {
+                        console.warn('Erreur sync auto EL:', syncError)
+                    }
+                }
+                
                 if (modules.length > 0) {
                     nextModuleNum = Math.max(...modules.map(m => {
                         const match = m.module_identifier.match(/\d+/)
