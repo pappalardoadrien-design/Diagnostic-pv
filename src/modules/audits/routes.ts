@@ -15,6 +15,65 @@ type Bindings = {
 const auditsRouter = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
+// GET /api/audits?project_id=X
+// Lister audits (filtrable par projet/client/intervention)
+// ============================================================================
+auditsRouter.get('/', async (c) => {
+  const { env } = c
+  const projectId = c.req.query('project_id')
+  const clientId = c.req.query('client_id')
+  const interventionId = c.req.query('intervention_id')
+  
+  try {
+    let query = `
+      SELECT 
+        a.*,
+        COUNT(DISTINCT em.id) as el_modules_count,
+        p.name as project_name_full,
+        cl.company_name as client_name_full
+      FROM audits a
+      LEFT JOIN el_modules em ON em.audit_token = a.audit_token
+      LEFT JOIN projects p ON p.id = a.project_id
+      LEFT JOIN crm_clients cl ON cl.id = a.client_id
+    `
+    
+    const conditions = []
+    const params = []
+    
+    if (projectId) {
+      conditions.push('a.project_id = ?')
+      params.push(parseInt(projectId))
+    }
+    if (clientId) {
+      conditions.push('a.client_id = ?')
+      params.push(parseInt(clientId))
+    }
+    if (interventionId) {
+      conditions.push('a.intervention_id = ?')
+      params.push(parseInt(interventionId))
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    
+    query += ' GROUP BY a.id ORDER BY a.created_at DESC'
+    
+    const statement = env.DB.prepare(query).bind(...params)
+    const { results } = await statement.all()
+    
+    return c.json({
+      success: true,
+      audits: results,
+      count: results.length
+    })
+  } catch (error: any) {
+    console.error('Erreur liste audits:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// ============================================================================
 // POST /api/audits
 // Créer un audit simple (pour dashboard GIRASOLE)
 // ============================================================================
