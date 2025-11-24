@@ -88,6 +88,12 @@ app.route('/api/el', elModule)
 app.route('/', pvModule)
 
 // ============================================================================
+// MODULE DESIGNER SATELLITE - CARTOGRAPHIE SATELLITE GOOGLE MAPS
+// ============================================================================
+import designerModule from './modules/designer'
+app.route('/', designerModule)
+
+// ============================================================================
 // MODULE AUDITS - GESTION AUDITS MULTI-MODULES (MASTER)
 // ============================================================================
 import auditsRoutes from './modules/audits/routes'

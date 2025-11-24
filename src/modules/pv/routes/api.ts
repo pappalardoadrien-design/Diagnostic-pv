@@ -574,4 +574,92 @@ app.post('/api/pv/zones/:zoneId/sync-from-el', async (c: Context<{ Bindings: Bin
   }
 })
 
+// ========================================================================
+// API DESIGNER SATELLITE - SAUVEGARDE LAYOUT CARTOGRAPHIE
+// ========================================================================
+
+/**
+ * POST /api/pv/zones/:zoneId/save-designer-layout
+ * 
+ * Sauvegarde le layout Designer Satellite (positions GPS des modules)
+ */
+app.post('/api/pv/zones/:zoneId/save-designer-layout', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const zoneId = c.req.param('zoneId')
+    const body = await c.req.json()
+    const { modules, map_center, zoom } = body
+    
+    if (!modules || modules.length === 0) {
+      return c.json({ success: false, error: 'Aucun module à sauvegarder' }, 400)
+    }
+    
+    // Sauvegarder dans designer_layouts
+    const layoutData = {
+      zone_id: parseInt(zoneId),
+      modules_count: modules.length,
+      modules_data: JSON.stringify(modules),
+      module_specs: JSON.stringify({ width: 1.7, height: 1.0, power: 450 }),
+      map_center: JSON.stringify(map_center),
+      zoom_level: zoom || 18,
+      created_at: new Date().toISOString()
+    }
+    
+    const result = await c.env.DB.prepare(`
+      INSERT INTO designer_layouts (
+        zone_id, modules_count, modules_data, module_specs, map_center, zoom_level, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      layoutData.zone_id,
+      layoutData.modules_count,
+      layoutData.modules_data,
+      layoutData.module_specs,
+      layoutData.map_center,
+      layoutData.zoom_level,
+      layoutData.created_at
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: `Layout Designer sauvegardé avec ${modules.length} modules`,
+      layout_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/pv/zones/:zoneId/designer-layout
+ * 
+ * Récupérer le dernier layout Designer Satellite pour une zone
+ */
+app.get('/api/pv/zones/:zoneId/designer-layout', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const zoneId = c.req.param('zoneId')
+    
+    const layout = await c.env.DB.prepare(`
+      SELECT * FROM designer_layouts
+      WHERE zone_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(zoneId).first()
+    
+    if (!layout) {
+      return c.json({ success: false, message: 'Aucun layout trouvé' }, 404)
+    }
+    
+    return c.json({
+      success: true,
+      layout: {
+        ...layout,
+        modules_data: JSON.parse(layout.modules_data as string),
+        module_specs: JSON.parse(layout.module_specs as string),
+        map_center: JSON.parse(layout.map_center as string)
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
