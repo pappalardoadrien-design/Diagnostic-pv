@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { PVservParser } from './pvserv-parser.js'
 import elModule from './modules/el'
+import pvModule from './modules/pv'
 import authRoutes from './modules/auth/routes'
 import adminAuthRoutes from './modules/auth/admin-routes'
 import assignmentsRoutes from './modules/auth/assignments-routes'
@@ -80,6 +81,11 @@ app.route('/api/planning', planningRoutes)
 // MODULE EL - ARCHITECTURE MODULAIRE (Point 4.1 + 4.3)
 // ============================================================================
 app.route('/api/el', elModule)
+
+// ============================================================================
+// MODULE PV CARTOGRAPHY - CARTOGRAPHIE CENTRALES PHOTOVOLTAÏQUES
+// ============================================================================
+app.route('/', pvModule)
 
 // ============================================================================
 // MODULE AUDITS - GESTION AUDITS MULTI-MODULES (MASTER)
