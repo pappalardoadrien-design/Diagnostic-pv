@@ -86,9 +86,14 @@ app.get('/api/pv/plants/:id', async (c: Context<{ Bindings: Bindings }>) => {
       SELECT 
         z.*,
         COUNT(m.id) as module_count,
-        SUM(m.power_wp) as total_power_wp
+        SUM(m.power_wp) as total_power_wp,
+        a.project_name as audit_project_name,
+        a.client_name as audit_client_name,
+        a.audit_type,
+        a.status as audit_status
       FROM pv_zones z
       LEFT JOIN pv_modules m ON m.zone_id = z.id
+      LEFT JOIN audits a ON a.audit_token = z.audit_token
       WHERE z.plant_id = ?
       GROUP BY z.id
       ORDER BY z.zone_order ASC
@@ -135,12 +140,13 @@ app.post('/api/pv/plants/:plantId/zones', async (c: Context<{ Bindings: Bindings
   try {
     const plantId = c.req.param('plantId')
     const body = await c.req.json()
-    const { zone_name, zone_type, azimuth, tilt, width_meters, height_meters } = body
+    const { zone_name, zone_type, azimuth, tilt, width_meters, height_meters, audit_token, sync_status } = body
     
     const result = await c.env.DB.prepare(`
       INSERT INTO pv_zones (
-        plant_id, zone_name, zone_type, azimuth, tilt, width_meters, height_meters
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        plant_id, zone_name, zone_type, azimuth, tilt, width_meters, height_meters, 
+        audit_token, sync_status, sync_direction
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       plantId,
       zone_name,
@@ -148,7 +154,10 @@ app.post('/api/pv/plants/:plantId/zones', async (c: Context<{ Bindings: Bindings
       azimuth || 180,
       tilt || 30,
       width_meters || 50,
-      height_meters || 30
+      height_meters || 30,
+      audit_token || null,
+      sync_status || 'manual',
+      'bidirectional'
     ).run()
     
     return c.json({ 
@@ -169,7 +178,16 @@ app.get('/api/pv/plants/:plantId/zones/:zoneId', async (c: Context<{ Bindings: B
     const zoneId = c.req.param('zoneId')
     
     const zone = await c.env.DB.prepare(`
-      SELECT * FROM pv_zones WHERE id = ?
+      SELECT 
+        z.*,
+        a.project_name as audit_project_name,
+        a.client_name as audit_client_name,
+        a.location as audit_location,
+        a.audit_type,
+        a.status as audit_status
+      FROM pv_zones z
+      LEFT JOIN audits a ON a.audit_token = z.audit_token
+      WHERE z.id = ?
     `).bind(zoneId).first()
     
     if (!zone) {
@@ -205,6 +223,68 @@ app.put('/api/pv/plants/:plantId/zones/:zoneId/background', async (c: Context<{ 
     ).run()
     
     return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// Lier une zone PV à un audit
+app.put('/api/pv/plants/:plantId/zones/:zoneId/link-audit', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const zoneId = c.req.param('zoneId')
+    const body = await c.req.json()
+    const { audit_token, sync_status, sync_direction } = body
+    
+    if (!audit_token) {
+      return c.json({ success: false, error: 'audit_token requis' }, 400)
+    }
+    
+    // Vérifier que l'audit existe
+    const audit = await c.env.DB.prepare(`
+      SELECT id, project_name, client_name FROM audits WHERE audit_token = ?
+    `).bind(audit_token).first()
+    
+    if (!audit) {
+      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
+    }
+    
+    // Mettre à jour zone
+    await c.env.DB.prepare(`
+      UPDATE pv_zones 
+      SET audit_token = ?,
+          audit_id = ?,
+          sync_status = ?,
+          sync_direction = ?,
+          last_sync_at = datetime('now')
+      WHERE id = ?
+    `).bind(
+      audit_token,
+      (audit as any).id,
+      sync_status || 'synced',
+      sync_direction || 'bidirectional',
+      zoneId
+    ).run()
+    
+    // Mettre à jour audit (lien inverse)
+    const zone = await c.env.DB.prepare(`
+      SELECT plant_id FROM pv_zones WHERE id = ?
+    `).bind(zoneId).first()
+    
+    await c.env.DB.prepare(`
+      UPDATE audits
+      SET pv_zone_id = ?,
+          pv_plant_id = ?
+      WHERE audit_token = ?
+    `).bind(zoneId, (zone as any)?.plant_id, audit_token).run()
+    
+    return c.json({ 
+      success: true,
+      message: `Zone liée à l'audit "${(audit as any).project_name}"`,
+      audit_info: {
+        project_name: (audit as any).project_name,
+        client_name: (audit as any).client_name
+      }
+    })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
@@ -303,6 +383,108 @@ app.delete('/api/pv/plants/:plantId/zones/:zoneId/modules', async (c: Context<{ 
     `).bind(zoneId).run()
     
     return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ========================================================================
+// ROUTE SPÉCIALE: Créer zone PV depuis audit EL
+// ========================================================================
+
+// Créer automatiquement zone PV depuis audit EL
+app.post('/api/pv/zones/from-audit/:auditToken', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const auditToken = c.req.param('auditToken')
+    
+    // Récupérer audit EL avec infos complètes
+    const audit = await c.env.DB.prepare(`
+      SELECT 
+        a.*,
+        ea.total_modules,
+        ea.string_count,
+        c.name as client_name,
+        p.name as project_name,
+        p.id as project_id,
+        p.site_address
+      FROM audits a
+      LEFT JOIN el_audits ea ON ea.audit_token = a.audit_token
+      LEFT JOIN projects p ON p.id = a.project_id
+      LEFT JOIN crm_clients c ON c.id = a.client_id
+      WHERE a.audit_token = ?
+    `).bind(auditToken).first()
+    
+    if (!audit) {
+      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
+    }
+    
+    const auditData = audit as any
+    
+    // Créer ou récupérer centrale PV pour ce projet
+    let plant = await c.env.DB.prepare(`
+      SELECT id FROM pv_plants WHERE plant_name = ?
+    `).bind(auditData.project_name || 'Centrale sans nom').first()
+    
+    let plantId
+    if (!plant) {
+      // Créer nouvelle centrale
+      const plantResult = await c.env.DB.prepare(`
+        INSERT INTO pv_plants (
+          plant_name, plant_type, address, city, module_count, notes
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        auditData.project_name || 'Centrale sans nom',
+        'rooftop',
+        auditData.site_address || auditData.location,
+        null,
+        auditData.total_modules || 0,
+        `Centrale créée automatiquement depuis audit EL ${auditToken}`
+      ).run()
+      plantId = plantResult.meta.last_row_id
+    } else {
+      plantId = (plant as any).id
+    }
+    
+    // Créer zone liée à l'audit
+    const zoneResult = await c.env.DB.prepare(`
+      INSERT INTO pv_zones (
+        plant_id, zone_name, zone_type, module_count,
+        audit_token, audit_id, sync_status, sync_direction,
+        string_count, modules_per_string
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      plantId,
+      auditData.project_name || 'Zone principale',
+      'roof',
+      auditData.total_modules || 0,
+      auditToken,
+      auditData.id,
+      'auto',
+      'audit_to_pv',
+      auditData.string_count || 0,
+      auditData.total_modules && auditData.string_count 
+        ? Math.ceil(auditData.total_modules / auditData.string_count)
+        : 0
+    ).run()
+    
+    const zoneId = zoneResult.meta.last_row_id
+    
+    // Mettre à jour audit (lien inverse)
+    await c.env.DB.prepare(`
+      UPDATE audits
+      SET pv_zone_id = ?,
+          pv_plant_id = ?
+      WHERE audit_token = ?
+    `).bind(zoneId, plantId, auditToken).run()
+    
+    return c.json({
+      success: true,
+      message: 'Zone PV créée et liée à l\'audit',
+      plant_id: plantId,
+      zone_id: zoneId,
+      editor_url: `/pv/plant/${plantId}/zone/${zoneId}/editor`,
+      audit_token: auditToken
+    })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
