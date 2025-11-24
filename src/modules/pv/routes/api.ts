@@ -89,8 +89,8 @@ app.get('/api/pv/plants/:id', async (c: Context<{ Bindings: Bindings }>) => {
         SUM(m.power_wp) as total_power_wp,
         a.project_name as audit_project_name,
         a.client_name as audit_client_name,
-        a.audit_type,
-        a.status as audit_status
+        a.status as audit_status,
+        a.modules_enabled as audit_modules_enabled
       FROM pv_zones z
       LEFT JOIN pv_modules m ON m.zone_id = z.id
       LEFT JOIN audits a ON a.audit_token = z.audit_token
@@ -183,8 +183,8 @@ app.get('/api/pv/plants/:plantId/zones/:zoneId', async (c: Context<{ Bindings: B
         a.project_name as audit_project_name,
         a.client_name as audit_client_name,
         a.location as audit_location,
-        a.audit_type,
-        a.status as audit_status
+        a.status as audit_status,
+        a.modules_enabled as audit_modules_enabled
       FROM pv_zones z
       LEFT JOIN audits a ON a.audit_token = z.audit_token
       WHERE z.id = ?
@@ -403,7 +403,7 @@ app.post('/api/pv/zones/from-audit/:auditToken', async (c: Context<{ Bindings: B
         a.*,
         ea.total_modules,
         ea.string_count,
-        c.name as client_name,
+        c.company_name as client_name,
         p.name as project_name,
         p.id as project_id,
         p.site_address
@@ -448,15 +448,14 @@ app.post('/api/pv/zones/from-audit/:auditToken', async (c: Context<{ Bindings: B
     // Créer zone liée à l'audit
     const zoneResult = await c.env.DB.prepare(`
       INSERT INTO pv_zones (
-        plant_id, zone_name, zone_type, module_count,
+        plant_id, zone_name, zone_type,
         audit_token, audit_id, sync_status, sync_direction,
         string_count, modules_per_string
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       plantId,
       auditData.project_name || 'Zone principale',
       'roof',
-      auditData.total_modules || 0,
       auditToken,
       auditData.id,
       'auto',
@@ -484,6 +483,91 @@ app.post('/api/pv/zones/from-audit/:auditToken', async (c: Context<{ Bindings: B
       zone_id: zoneId,
       editor_url: `/pv/plant/${plantId}/zone/${zoneId}/editor`,
       audit_token: auditToken
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// Synchroniser modules EL → PV (copie états des modules EL vers PV)
+app.post('/api/pv/zones/:zoneId/sync-from-el', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const zoneId = c.req.param('zoneId')
+    
+    // Récupérer zone avec audit_token
+    const zone = await c.env.DB.prepare(`
+      SELECT * FROM pv_zones WHERE id = ?
+    `).bind(zoneId).first() as any
+    
+    if (!zone || !zone.audit_token) {
+      return c.json({ success: false, error: 'Zone PV non liée à un audit' }, 400)
+    }
+    
+    // Récupérer modules EL
+    const { results: elModules } = await c.env.DB.prepare(`
+      SELECT 
+        id,
+        module_identifier,
+        string_number,
+        module_position,
+        defect_type,
+        defect_severity,
+        notes
+      FROM el_modules
+      WHERE audit_token = ?
+      ORDER BY string_number, module_position
+    `).bind(zone.audit_token).all()
+    
+    if (!elModules || elModules.length === 0) {
+      return c.json({ success: false, error: 'Aucun module EL trouvé pour cet audit' }, 404)
+    }
+    
+    // Supprimer modules PV existants
+    await c.env.DB.prepare(`
+      DELETE FROM pv_modules WHERE zone_id = ?
+    `).bind(zoneId).run()
+    
+    // Créer modules PV avec états EL
+    let syncedCount = 0
+    for (const el of elModules) {
+      const elMod = el as any
+      
+      // Mapper defect_type EL → module_status PV
+      let pvStatus = 'ok'
+      if (elMod.defect_type === 'microcracks' || elMod.defect_type === 'pid') {
+        pvStatus = 'warning'
+      } else if (elMod.defect_type === 'dead_cell' || elMod.defect_type === 'hotspot') {
+        pvStatus = 'critical'
+      } else if (elMod.defect_type === 'pending') {
+        pvStatus = 'pending'
+      }
+      
+      await c.env.DB.prepare(`
+        INSERT INTO pv_modules (
+          zone_id, module_identifier, string_number, position_in_string,
+          pos_x_meters, pos_y_meters, width_meters, height_meters,
+          rotation, power_wp, module_status, status_comment
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        zoneId,
+        elMod.module_identifier,
+        elMod.string_number || 1,
+        elMod.module_position || 1,
+        0, 0, // Position par défaut (à placer manuellement)
+        1.7, 1.0, // Dimensions standard modules
+        0, // Rotation par défaut
+        450, // Power par défaut
+        pvStatus,
+        elMod.notes || `Synchronisé depuis EL: ${elMod.defect_type}`
+      ).run()
+      
+      syncedCount++
+    }
+    
+    return c.json({
+      success: true,
+      message: `${syncedCount} modules synchronisés depuis EL vers PV`,
+      synced_count: syncedCount
     })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
