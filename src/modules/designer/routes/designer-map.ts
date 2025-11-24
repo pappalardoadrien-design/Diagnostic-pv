@@ -173,6 +173,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
                 <!-- Actions principales -->
                 <div class="space-y-2">
                     <button 
+                        onclick="syncFromEL()"
+                        class="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold">
+                        <i class="fas fa-sync mr-2"></i>Synchroniser depuis Audit EL
+                    </button>
+                    
+                    <button 
                         onclick="placeModulesOnMap()"
                         class="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold">
                         <i class="fas fa-plus-circle mr-2"></i>Placer Modules sur Carte
@@ -250,6 +256,8 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
         let selectedMarkers = new Set();
         let pvModules = [];
         let zoneData = null;
+        let drawnItems;
+        let roofPolygons = [];
         
         // Initialisation carte Leaflet
         function initMap() {
@@ -263,7 +271,82 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
                 attribution: '© Google Maps'
             }).addTo(map);
             
-            updateStatus('Carte satellite chargée');
+            // ✨ NOUVEAU: Initialisation Leaflet.draw pour dessiner polygones toiture
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            const drawControl = new L.Control.Draw({
+                position: 'topleft',
+                draw: {
+                    polygon: {
+                        allowIntersection: false,
+                        shapeOptions: {
+                            color: '#FFD700',
+                            fillColor: '#FFD700',
+                            fillOpacity: 0.3,
+                            weight: 3
+                        }
+                    },
+                    rectangle: {
+                        shapeOptions: {
+                            color: '#FFD700',
+                            fillColor: '#FFD700',
+                            fillOpacity: 0.3,
+                            weight: 3
+                        }
+                    },
+                    polyline: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false
+                },
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true
+                }
+            });
+            map.addControl(drawControl);
+            
+            // ✨ Événement: Polygone toiture dessiné
+            map.on(L.Draw.Event.CREATED, function (e) {
+                const layer = e.layer;
+                drawnItems.addLayer(layer);
+                roofPolygons.push(layer);
+                
+                // Calculer surface avec Turf.js
+                const area = turf.area(layer.toGeoJSON());
+                const areaSqm = area.toFixed(2);
+                
+                // Afficher popup avec surface
+                layer.bindPopup(\`
+                    <b>Toiture dessinée</b><br>
+                    Surface: \${areaSqm} m²<br>
+                    <button onclick="placeModulesInPolygon(\${roofPolygons.length - 1})" 
+                            class="mt-2 px-3 py-1 bg-green-600 text-white rounded text-sm">
+                        Placer modules ici
+                    </button>
+                \`).openPopup();
+                
+                updateStatus(\`Toiture dessinée: \${areaSqm} m²\`);
+            });
+            
+            // ✨ Événement: Polygone modifié
+            map.on(L.Draw.Event.EDITED, function (e) {
+                updateStatus('Toitures modifiées');
+            });
+            
+            // ✨ Événement: Polygone supprimé
+            map.on(L.Draw.Event.DELETED, function (e) {
+                e.layers.eachLayer(function(layer) {
+                    const index = roofPolygons.indexOf(layer);
+                    if (index > -1) {
+                        roofPolygons.splice(index, 1);
+                    }
+                });
+                updateStatus('Toitures supprimées');
+            });
+            
+            updateStatus('Carte satellite chargée - Dessinez une toiture avec les outils à gauche');
         }
         
         // Recherche d'adresse avec Nominatim
@@ -302,6 +385,38 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
                 console.error('Erreur recherche:', error);
                 alert('Erreur lors de la recherche d\\'adresse');
                 updateStatus('Erreur recherche');
+            }
+        }
+        
+        // ✨ NOUVEAU: Synchroniser modules depuis audit EL (connexion dynamique)
+        async function syncFromEL() {
+            if (!confirm('Synchroniser les modules et leurs statuts depuis l\\'audit EL ?\\nCela va écraser les modules actuels.')) {
+                return;
+            }
+            
+            try {
+                updateStatus('Synchronisation depuis audit EL...');
+                
+                const response = await fetch(\`/api/pv/zones/\${zoneId}/sync-from-el\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(\`✅ \${data.synced_count} modules synchronisés depuis l'audit EL\\nLes statuts ont été mis à jour !\`);
+                    // Recharger les modules avec les nouveaux statuts
+                    await loadModules();
+                    updateStatus(\`Synchronisation réussie: \${data.synced_count} modules\`);
+                } else {
+                    alert(\`❌ Erreur: \${data.error}\`);
+                    updateStatus('Échec synchronisation');
+                }
+            } catch (error) {
+                console.error('Erreur sync EL:', error);
+                alert('Erreur lors de la synchronisation avec l\\'audit EL');
+                updateStatus('Erreur synchronisation');
             }
         }
         
@@ -394,14 +509,86 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
             updateStatus(\`\${pvModules.length} modules placés sur la carte\`);
         }
         
+        // ✨ NOUVEAU: Placer modules DANS un polygone toiture dessiné
+        function placeModulesInPolygon(polygonIndex) {
+            if (pvModules.length === 0) {
+                alert('Aucun module à placer. Chargez d\\'abord les modules depuis l\\'API.');
+                return;
+            }
+            
+            if (!roofPolygons[polygonIndex]) {
+                alert('Polygone toiture non trouvé');
+                return;
+            }
+            
+            // Supprimer markers existants
+            moduleMarkers.forEach(marker => map.removeLayer(marker));
+            moduleMarkers = [];
+            selectedMarkers.clear();
+            
+            const polygon = roofPolygons[polygonIndex];
+            const bounds = polygon.getBounds();
+            
+            // Calculer dimensions du polygone en mètres (approximatif)
+            const latDiff = bounds.getNorth() - bounds.getSouth();
+            const lonDiff = bounds.getEast() - bounds.getWest();
+            const heightMeters = latDiff * 111320; // 1° lat ≈ 111.32 km
+            const widthMeters = lonDiff * 111320 * Math.cos(bounds.getCenter().lat * Math.PI / 180);
+            
+            // Dimensions module
+            const moduleWidth = 1.7;
+            const moduleHeight = 1.0;
+            const spacing = 0.3;
+            
+            // Calculer nombre de lignes/colonnes optimales
+            const cols = Math.floor(widthMeters / (moduleWidth + spacing));
+            const rows = Math.ceil(pvModules.length / cols);
+            
+            // Centre du polygone
+            const center = bounds.getCenter();
+            
+            let placedCount = 0;
+            pvModules.forEach((module, index) => {
+                if (placedCount >= pvModules.length) return;
+                
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+                
+                // Position relative en mètres depuis le centre
+                const offsetX = (col - cols / 2) * (moduleWidth + spacing);
+                const offsetY = (row - rows / 2) * (moduleHeight + spacing);
+                
+                // Conversion mètres → degrés
+                const latOffset = offsetY / 111320;
+                const lonOffset = offsetX / (111320 * Math.cos(center.lat * Math.PI / 180));
+                
+                const lat = center.lat + latOffset;
+                const lon = center.lng + lonOffset;
+                
+                // Vérifier si le point est DANS le polygone
+                const point = turf.point([lon, lat]);
+                const poly = turf.polygon([polygon.getLatLngs()[0].map(ll => [ll.lng, ll.lat])]);
+                
+                if (turf.booleanPointInPolygon(point, poly)) {
+                    createModuleMarker(module, lat, lon);
+                    placedCount++;
+                }
+            });
+            
+            updateStatus(\`\${placedCount} modules placés dans la toiture\`);
+        }
+        
         // Créer un marker de module
         function createModuleMarker(module, lat, lon) {
+            // ✨ Utiliser la couleur selon le statut du module (connexion dynamique avec audit EL)
+            const statusColor = getStatusColor(module.module_status);
+            
             const marker = L.rectangle(
                 [[lat - 0.000005, lon - 0.000008], [lat + 0.000005, lon + 0.000008]],
                 {
-                    color: '#22C55E',
-                    fillColor: '#22C55E',
-                    fillOpacity: 0.4,
+                    color: statusColor,
+                    fillColor: statusColor,
+                    fillOpacity: 0.5,
                     weight: 2,
                     className: 'module-marker',
                     moduleData: module,
@@ -444,17 +631,25 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
         
         function selectMarker(marker) {
             selectedMarkers.add(marker);
+            // Sauvegarder la couleur d'origine
+            if (!marker.options.originalColor) {
+                marker.options.originalColor = marker.options.color;
+            }
             marker.setStyle({ color: '#3B82F6', fillColor: '#3B82F6' });
         }
         
         function deselectMarker(marker) {
             selectedMarkers.delete(marker);
-            marker.setStyle({ color: '#22C55E', fillColor: '#22C55E' });
+            // ✨ Restaurer la couleur d'origine selon le statut
+            const originalColor = marker.options.originalColor || getStatusColor(marker.options.moduleData?.module_status);
+            marker.setStyle({ color: originalColor, fillColor: originalColor });
         }
         
         function clearSelection() {
             selectedMarkers.forEach(marker => {
-                marker.setStyle({ color: '#22C55E', fillColor: '#22C55E' });
+                // ✨ Restaurer la couleur d'origine selon le statut
+                const originalColor = marker.options.originalColor || getStatusColor(marker.options.moduleData?.module_status);
+                marker.setStyle({ color: originalColor, fillColor: originalColor });
             });
             selectedMarkers.clear();
         }
