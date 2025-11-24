@@ -304,6 +304,7 @@ class DiagPVAudit {
         // Boutons header
         document.getElementById('measureBtn').addEventListener('click', () => this.showMeasuresModal())
         document.getElementById('reportBtn').addEventListener('click', () => this.generateReport())
+        document.getElementById('pvCartoBtn').addEventListener('click', () => this.createPVCartography())
         document.getElementById('shareBtn').addEventListener('click', () => this.shareAudit())
         document.getElementById('editAuditBtn').addEventListener('click', () => this.showEditAuditModal())
         document.getElementById('configBtn').addEventListener('click', () => this.showConfigModal())
@@ -1485,6 +1486,93 @@ class DiagPVAudit {
             // Fermeture modal en cas d'erreur critique
             this.exitMultiSelectMode()
             this.closeBulkModal()
+        }
+    }
+
+    // ========================================================================
+    // CRÉATION CARTOGRAPHIE PV AUTOMATIQUE
+    // ========================================================================
+    async createPVCartography() {
+        logAudit('🗺️ Création cartographie PV pour audit:', this.auditToken)
+        
+        try {
+            // Afficher loader
+            const btn = document.getElementById('pvCartoBtn')
+            const originalHTML = btn.innerHTML
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>CRÉATION...'
+            btn.disabled = true
+            
+            // Vérifier si zone PV existe déjà
+            const checkResponse = await fetch(`/api/audits?audit_token=${this.auditToken}`)
+            const checkData = await checkResponse.json()
+            
+            if (checkData.audits && checkData.audits.length > 0) {
+                const audit = checkData.audits[0]
+                
+                // Si zone PV existe déjà, rediriger directement
+                if (audit.pv_zone_id && audit.pv_plant_id) {
+                    logAudit('✅ Zone PV existe déjà:', audit.pv_zone_id)
+                    this.showAlert('Zone PV existe déjà ! Redirection...', 'success')
+                    
+                    setTimeout(() => {
+                        window.location.href = `/pv/plant/${audit.pv_plant_id}/zone/${audit.pv_zone_id}/editor`
+                    }, 1000)
+                    return
+                }
+            }
+            
+            // Créer zone PV depuis audit EL
+            const response = await fetch(`/api/pv/zones/from-audit/${this.auditToken}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Erreur création zone PV')
+            }
+            
+            const data = await response.json()
+            logAudit('✅ Zone PV créée:', data)
+            
+            this.showAlert(`Zone PV créée ! ${data.synced_count || 0} modules prêts à placer`, 'success')
+            
+            // Synchroniser modules EL → PV
+            if (data.zone_id) {
+                logAudit('🔄 Synchronisation modules EL → PV...')
+                
+                const syncResponse = await fetch(`/api/pv/zones/${data.zone_id}/sync-from-el`, {
+                    method: 'POST'
+                })
+                
+                if (syncResponse.ok) {
+                    const syncData = await syncResponse.json()
+                    logAudit('✅ Modules synchronisés:', syncData.synced_count)
+                    
+                    this.showAlert(`${syncData.synced_count} modules synchronisés ! Redirection vers éditeur PV...`, 'success')
+                    
+                    // Rediriger vers éditeur PV après 2 secondes
+                    setTimeout(() => {
+                        window.location.href = data.editor_url
+                    }, 2000)
+                } else {
+                    logAudit('⚠️ Sync modules échouée, mais zone créée')
+                    
+                    // Rediriger quand même vers l'éditeur
+                    setTimeout(() => {
+                        window.location.href = data.editor_url
+                    }, 1500)
+                }
+            }
+            
+        } catch (err) {
+            errorAudit('❌ Erreur création PV Carto:', err)
+            this.showAlert('Erreur: ' + err.message, 'error')
+            
+            // Restaurer bouton
+            const btn = document.getElementById('pvCartoBtn')
+            btn.innerHTML = '<i class="fas fa-map-marked-alt mr-1"></i>PV CARTO'
+            btn.disabled = false
         }
     }
 

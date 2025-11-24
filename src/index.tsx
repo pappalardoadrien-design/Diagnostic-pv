@@ -1462,6 +1462,9 @@ app.get('/audit/:token', async (c) => {
                     <button id="reportBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-file-pdf mr-1"></i>RAPPORT
                     </button>
+                    <button id="pvCartoBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold border-2 border-purple-400" title="Créer cartographie PV et synchroniser modules">
+                        <i class="fas fa-map-marked-alt mr-1"></i>PV CARTO
+                    </button>
                     <button id="shareBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold">
                         <i class="fas fa-share mr-1"></i>PARTAGE
                     </button>
