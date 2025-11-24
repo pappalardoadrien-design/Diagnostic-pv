@@ -26,20 +26,34 @@ dashboardRouter.get('/audits', async (c) => {
   try {
     let query = `
       SELECT 
-        v.*,
-        ea.location,
+        a.audit_token,
+        a.project_name,
+        a.client_name,
+        a.location,
+        a.status,
+        a.created_at,
+        a.intervention_id,
         ea.string_count,
-        ea.intervention_id
-      FROM v_el_audit_statistics v
-      LEFT JOIN el_audits ea ON v.audit_id = ea.id
+        ea.total_modules,
+        COUNT(em.id) as modules_completed,
+        SUM(CASE WHEN em.defect_type = 'ok' THEN 1 ELSE 0 END) as modules_ok,
+        SUM(CASE WHEN em.defect_type = 'microcracks' THEN 1 ELSE 0 END) as modules_microcrack,
+        SUM(CASE WHEN em.defect_type = 'dead_cell' THEN 1 ELSE 0 END) as modules_dead,
+        SUM(CASE WHEN em.defect_type = 'inequality' OR em.defect_type = 'pid' THEN 1 ELSE 0 END) as modules_inequality,
+        SUM(CASE WHEN em.severity_level = 'critical' THEN 1 ELSE 0 END) as modules_critical,
+        ROUND((COUNT(CASE WHEN em.defect_type != 'pending' THEN 1 END) * 100.0 / NULLIF(ea.total_modules, 0)), 1) as completion_rate
+      FROM audits a
+      LEFT JOIN el_audits ea ON ea.audit_token = a.audit_token
+      LEFT JOIN el_modules em ON em.audit_token = a.audit_token
     `
     
     // Filtre par intervention_id si fourni
     if (interventionId) {
-      query += ` WHERE ea.intervention_id = ?`
+      query += ` WHERE a.intervention_id = ?`
     }
     
-    query += ` ORDER BY v.created_at DESC`
+    query += ` GROUP BY a.audit_token, a.id
+               ORDER BY a.created_at DESC`
     
     const statement = interventionId 
       ? env.DB.prepare(query).bind(parseInt(interventionId))

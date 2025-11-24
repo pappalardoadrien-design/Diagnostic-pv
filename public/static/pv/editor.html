@@ -239,7 +239,12 @@
                 const data = await response.json()
                 zoneData = data.zone
                 
-                document.getElementById('zoneTitle').textContent = zoneData.zone_name
+                // Afficher nom projet + client depuis audit
+                const projectName = zoneData.audit_project_name || zoneData.zone_name
+                const clientName = zoneData.audit_client_name || ''
+                const titleText = clientName ? `${projectName} (${clientName})` : projectName
+                document.getElementById('zoneTitle').textContent = titleText
+                document.title = `PV Cartography - ${titleText}`
                 
                 if (zoneData.background_image_url) {
                     backgroundImage = new Image()

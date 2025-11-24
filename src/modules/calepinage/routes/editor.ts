@@ -14,6 +14,21 @@ editorRouter.get('/:projectId', async (c) => {
   const { projectId } = c.req.param()
   const moduleType = c.req.query('module_type') || 'el'
   
+  // Récupérer infos audit depuis table unifiée
+  const auditInfo = await DB.prepare(`
+    SELECT 
+      a.project_name,
+      a.client_name,
+      a.location,
+      a.audit_token
+    FROM audits a
+    WHERE a.audit_token = ?
+  `).bind(projectId).first() as any
+  
+  const projectName = auditInfo?.project_name || projectId
+  const clientName = auditInfo?.client_name || 'Client inconnu'
+  const location = auditInfo?.location || ''
+  
   // Récupérer les modules depuis le module source (EL par exemple)
   let modules: any[] = []
   
@@ -52,7 +67,7 @@ editorRouter.get('/:projectId', async (c) => {
       savedLayout = generateAutoLayout(modules)
     }
     
-    return c.html(renderEditor(projectId, moduleType, modules, savedLayout))
+    return c.html(renderEditor(projectId, moduleType, modules, savedLayout, projectName, clientName, location))
   } catch (error: any) {
     console.error('Erreur chargement éditeur:', error)
     return c.html(`<h1>Erreur: ${error.message}</h1>`, 500)
@@ -164,7 +179,15 @@ function generateAutoLayout(modules: any[]) {
   }
 }
 
-function renderEditor(projectId: string, moduleType: string, modules: any[], savedLayout: any) {
+function renderEditor(
+  projectId: string, 
+  moduleType: string, 
+  modules: any[], 
+  savedLayout: any,
+  projectName: string = projectId,
+  clientName: string = 'Client inconnu',
+  location: string = ''
+) {
   const modulesJson = JSON.stringify(modules)
   const savedLayoutJson = savedLayout ? JSON.stringify(savedLayout) : 'null'
   
@@ -174,7 +197,7 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Éditeur de Calepinage - ${projectId}</title>
+  <title>Calepinage - ${projectName} (${clientName})</title>
   <style>
     * {
       margin: 0;
@@ -486,7 +509,9 @@ function renderEditor(projectId: string, moduleType: string, modules: any[], sav
     <div class="sidebar">
       <div class="sidebar-header">
         <h1>🗺️ Éditeur de Calepinage</h1>
-        <p>${projectId}</p>
+        <p style="font-size: 16px; font-weight: bold; color: #2563eb; margin-top: 8px;">${projectName}</p>
+        <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">Client: ${clientName}</p>
+        ${location ? `<p style="font-size: 12px; color: #9ca3af; margin-top: 2px;">📍 ${location}</p>` : ''}
       </div>
       
       <div class="tool-section">
