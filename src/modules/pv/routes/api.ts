@@ -509,13 +509,13 @@ app.post('/api/pv/zones/:zoneId/sync-from-el', async (c: Context<{ Bindings: Bin
         id,
         module_identifier,
         string_number,
-        module_position,
+        position_in_string,
         defect_type,
-        defect_severity,
-        notes
+        severity_level,
+        comment as notes
       FROM el_modules
       WHERE audit_token = ?
-      ORDER BY string_number, module_position
+      ORDER BY string_number, position_in_string
     `).bind(zone.audit_token).all()
     
     if (!elModules || elModules.length === 0) {
@@ -552,7 +552,7 @@ app.post('/api/pv/zones/:zoneId/sync-from-el', async (c: Context<{ Bindings: Bin
         zoneId,
         elMod.module_identifier,
         elMod.string_number || 1,
-        elMod.module_position || 1,
+        elMod.position_in_string || 1,
         0, 0, // Position par défaut (à placer manuellement)
         1.7, 1.0, // Dimensions standard modules
         0, // Rotation par défaut
