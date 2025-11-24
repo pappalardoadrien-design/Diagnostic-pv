@@ -32,9 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = await response.json()
         
         if (data.success && data.plant_id && data.zone_id) {
-          // Ouvrir l'ÉDITEUR CANVAS (module V2 PRO avec rotation gestuelle)
-          const canvasEditorUrl = `/pv/plant/${data.plant_id}/zone/${data.zone_id}/editor`
-          window.open(canvasEditorUrl, '_blank')
+          // Ouvrir le DESIGNER SATELLITE (Leaflet avec dessin polygones toiture)
+          const designerUrl = `/pv/plant/${data.plant_id}/zone/${data.zone_id}/designer`
+          window.open(designerUrl, '_blank')
           
           // Feedback utilisateur
           pvCartoBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Ouvert !'
