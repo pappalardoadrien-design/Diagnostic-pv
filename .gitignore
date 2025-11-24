@@ -33,3 +33,4 @@ lerna-debug.log*
 .DS_Store
 restore-complete.sql
 test-data-full.sql
+core.*
