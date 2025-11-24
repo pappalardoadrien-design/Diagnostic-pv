@@ -21,12 +21,61 @@
 ## 🚀 URLs Déployées
 
 - **Production**: https://diagnostic-hub.pages.dev
-- **Deploy Latest**: https://642cf4d1.diagnostic-hub.pages.dev
+- **Deploy Latest**: https://c75824b1.diagnostic-hub.pages.dev
 - **Mobile Terrain**: https://diagnostic-hub.pages.dev/mobile/field
 - **API Base**: `/api/*`
-- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`, `/api/calepinage`
+- **Modules**: `/api/el`, `/api/iv`, `/api/visual`, `/api/isolation`, `/api/modules`, `/api/photos`, `/api/girasole`, `/api/calepinage`, `/api/pv`
 
-### **🆕 v4.0.0 - ÉDITEUR VISUEL DE CALEPINAGE UNIVERSEL** ✅ **NOUVEAU**
+### **🆕 v4.1.0 - CARTOGRAPHIE PV AVEC ROTATION GESTUELLE** ✅ **NOUVEAU 2025-11-24**
+
+#### **🗺️ Éditeur Cartographique PV - Rotation Libre + Drag Global**
+- **Module**: `/api/pv`
+- **Description**: Éditeur visuel pour modéliser et cartographier les centrales PV sur carte satellite
+- **Fonctionnalités principales**:
+  - **🎯 Sélection multiple** : 
+    * Bouton "TOUT SÉLECTIONNER" ou raccourci `Ctrl+A`
+    * Border violet (4px) sur modules sélectionnés
+    * Centre de rotation globale visible (cercle violet + croix)
+  - **🔄 Rotation gestuelle libre (0-360°)** :
+    * `Ctrl+Clic+Glissé` sur module = rotation libre individuelle
+    * `Ctrl+Clic+Glissé` sur sélection = rotation globale autour du centre
+    * Angle affiché en temps réel
+  - **🚀 Drag & Drop global** :
+    * `Clic+Glissé` sur sélection = déplacer toute la centrale
+    * Curseur adaptatif (move/grab)
+  - **🖼️ Intégration satellite** :
+    * Upload image Google Maps/Satellite en fond
+    * Transparence 60% pour alignement visuel
+    * Placement/rotation pour correspondance parfaite
+  - **💾 Sauvegarde D1** : Positions et rotations finales de tous les modules
+  - **🔗 Synchronisation EL automatique** : 
+    * Bouton "PV CARTO" dans audit EL
+    * Création automatique plant + zone + sync 242+ modules
+    * Mapping défauts EL → états PV (ok/warning/critical)
+
+**Routes API** :
+- `GET /api/pv/plants` - Liste centrales PV
+- `GET /api/pv/plants/:id` - Détails centrale + zones
+- `GET /api/pv/plants/:plantId/zones/:zoneId` - Détails zone
+- `GET /api/pv/plants/:plantId/zones/:zoneId/editor` - Éditeur cartographique
+- `POST /api/pv/zones/from-audit/:token` - Créer zone depuis audit EL
+- `POST /api/pv/zones/:zoneId/sync-from-el` - Synchroniser modules EL → PV
+
+**Workflow complet** :
+1. Audit EL → Clic "PV CARTO" → Création automatique plant/zone/modules
+2. Upload image satellite
+3. `Ctrl+A` → Sélectionner tous les modules
+4. `Clic+Glissé` → Déplacer la centrale sur la carte
+5. `Ctrl+Glissé` → Rotation libre jusqu'à alignement parfait
+6. Enregistrer → Positions/rotations sauvegardées
+
+**Documentation complète** : `GUIDE_ROTATION_GESTUELLE_PV.md` (10 KB)
+
+**Exemple production** : https://c75824b1.diagnostic-hub.pages.dev/pv/plant/5/zone/15/editor (JALIBAT 242 modules)
+
+---
+
+### **🆕 v4.0.0 - ÉDITEUR VISUEL DE CALEPINAGE UNIVERSEL** ✅ **DÉPLOYÉ**
 
 #### **🗺️ Système de Calepinage Interactif - Drag & Drop**
 - **Module**: `/api/calepinage`
