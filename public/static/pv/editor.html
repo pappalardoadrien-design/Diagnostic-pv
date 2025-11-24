@@ -50,6 +50,9 @@
                     <h1 id="zoneTitle" class="text-xl font-black">Zone...</h1>
                 </div>
                 <div class="flex gap-3">
+                    <button id="designerBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold" onclick="openDesigner()">
+                        <i class="fas fa-map-marked-alt mr-2"></i>DESIGNER SATELLITE
+                    </button>
                     <button id="saveBtn" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-black">
                         <i class="fas fa-save mr-2"></i>ENREGISTRER
                     </button>
@@ -855,6 +858,13 @@
             document.getElementById('statsDead').textContent = modules.filter(m => m.module_status === 'dead').length
             document.getElementById('statsStringOpen').textContent = modules.filter(m => m.module_status === 'string_open').length
             document.getElementById('statsPending').textContent = modules.filter(m => m.module_status === 'pending').length
+        }
+        
+        // ========================================================================
+        // DESIGNER SATELLITE
+        // ========================================================================
+        function openDesigner() {
+            window.location.href = `/pv/plant/${plantId}/zone/${zoneId}/designer`
         }
         
         // INIT
