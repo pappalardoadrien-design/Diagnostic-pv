@@ -21,8 +21,8 @@ document.addEventListener('DOMContentLoaded', function() {
       pvCartoBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Création...'
       
       try {
-        // Appel API pour créer/récupérer la centrale PV
-        const response = await fetch(`/api/pv/create-from-el-audit/${auditToken}`, {
+        // Appel API pour créer/récupérer la centrale PV depuis shared_configurations
+        const response = await fetch(`/api/pv/create-from-shared-config/${auditToken}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -33,8 +33,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (data.success && data.plant_id && data.zone_id) {
           // Ouvrir l'ÉDITEUR CANVAS (module V2 PRO avec rotation gestuelle)
+          // Config automatiquement récupérée depuis shared_configurations
           const canvasEditorUrl = `/pv/plant/${data.plant_id}/zone/${data.zone_id}/editor`
           window.open(canvasEditorUrl, '_blank')
+          
+          // Log config utilisée (DEBUG)
+          if (data.config_used) {
+            console.log('✅ Configuration PV utilisée:', data.config_used)
+          }
           
           // Feedback utilisateur
           pvCartoBtn.innerHTML = '<i class="fas fa-check mr-1"></i>Ouvert !'

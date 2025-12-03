@@ -362,6 +362,33 @@ auditsRouter.post('/create-multi-modules', async (c) => {
         url: `/audit/${auditToken}`,
         modules_count: totalModules
       }
+      
+      // ========================================================================
+      // AUTO-CREATE SHARED_CONFIGURATIONS (Hook automatique)
+      // ========================================================================
+      try {
+        await env.DB.prepare(`
+          INSERT INTO shared_configurations (
+            audit_id, audit_token,
+            string_count, modules_per_string, total_modules,
+            advanced_config, is_advanced_mode,
+            validation_status, created_by
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', 'system_auto_create')
+        `).bind(
+          auditId,
+          auditToken,
+          stringCount || null,
+          modulesPerString || null,
+          totalModules,
+          configJson,
+          configJson ? 1 : 0
+        ).run()
+        
+        console.log(`✅ shared_configurations créée automatiquement pour audit ${auditToken}`)
+      } catch (sharedConfigError) {
+        console.warn('⚠️ Impossible de créer shared_configurations:', sharedConfigError)
+        // Non-bloquant, on continue
+      }
     }
     
     // ========================================================================

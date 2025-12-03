@@ -496,18 +496,20 @@ app.post('/api/pv/create-from-el-audit/:auditToken', async (c: Context<{ Binding
   try {
     const auditToken = c.req.param('auditToken')
     
-    // 1. Récupérer les infos de l'audit EL
+    // 1. Récupérer les infos de l'audit + configuration partagée
     const audit = await c.env.DB.prepare(`
       SELECT 
         a.project_name, a.client_name, a.location,
-        e.total_modules, e.string_count
+        sc.total_modules, sc.string_count, sc.modules_per_string,
+        sc.advanced_config, sc.is_advanced_mode,
+        sc.module_model, sc.module_power_wp
       FROM audits a
-      JOIN el_audits e ON e.audit_token = a.audit_token
+      LEFT JOIN shared_configurations sc ON sc.audit_token = a.audit_token
       WHERE a.audit_token = ?
     `).bind(auditToken).first()
     
     if (!audit) {
-      return c.json({ success: false, error: 'Audit EL non trouvé' }, 404)
+      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
     }
     
     // 2. Vérifier si une centrale PV existe déjà pour cet audit
@@ -599,6 +601,156 @@ app.post('/api/pv/create-from-el-audit/:auditToken', async (c: Context<{ Binding
     })
     
   } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ========================================================================
+// CRÉER ZONE PV DEPUIS SHARED_CONFIGURATIONS (Nouveau !)
+// ========================================================================
+app.post('/api/pv/create-from-shared-config/:auditToken', async (c: Context<{ Bindings: Bindings }>) => {
+  try {
+    const auditToken = c.req.param('auditToken')
+    
+    // 1. Récupérer audit + configuration partagée
+    const auditData = await c.env.DB.prepare(`
+      SELECT 
+        a.id as audit_id,
+        a.project_name, 
+        a.client_name, 
+        a.location,
+        sc.id as config_id,
+        sc.total_modules,
+        sc.string_count,
+        sc.modules_per_string,
+        sc.advanced_config,
+        sc.is_advanced_mode,
+        sc.module_model,
+        sc.module_power_wp,
+        sc.total_power_kwc
+      FROM audits a
+      LEFT JOIN shared_configurations sc ON sc.audit_token = a.audit_token
+      WHERE a.audit_token = ?
+    `).bind(auditToken).first()
+    
+    if (!auditData) {
+      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
+    }
+    
+    const audit = auditData as any
+    
+    // 2. Vérifier si zone PV existe déjà
+    const existingZone = await c.env.DB.prepare(`
+      SELECT z.*, p.id as plant_id
+      FROM pv_zones z
+      JOIN pv_plants p ON p.id = z.plant_id
+      WHERE z.audit_token = ?
+    `).bind(auditToken).first()
+    
+    if (existingZone) {
+      const zone = existingZone as any
+      return c.json({ 
+        success: true, 
+        message: 'Zone PV déjà existante',
+        plant_id: zone.plant_id,
+        zone_id: zone.id,
+        editor_url: `/pv/plant/${zone.plant_id}/zone/${zone.id}/editor`
+      })
+    }
+    
+    // 3. Créer centrale PV
+    const plantResult = await c.env.DB.prepare(`
+      INSERT INTO pv_plants (
+        plant_name, plant_type, address, 
+        module_count, total_power_kwp, notes
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      audit.project_name || 'Centrale sans nom',
+      'rooftop',
+      audit.location,
+      audit.total_modules || 0,
+      audit.total_power_kwc || 0,
+      `Créée depuis audit ${auditToken} avec shared_configurations`
+    ).run()
+    
+    const plantId = plantResult.meta.last_row_id
+    
+    // 4. Créer zone PV liée à l'audit + shared_config
+    const zoneResult = await c.env.DB.prepare(`
+      INSERT INTO pv_zones (
+        plant_id, zone_name, zone_type,
+        audit_token, audit_id, 
+        sync_status, sync_direction,
+        string_count, modules_per_string
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      plantId,
+      `Zone principale - ${audit.project_name}`,
+      'roof',
+      auditToken,
+      audit.audit_id,
+      'synced',
+      'bidirectional',
+      audit.string_count || 0,
+      audit.modules_per_string || 0
+    ).run()
+    
+    const zoneId = zoneResult.meta.last_row_id
+    
+    // 5. Mettre à jour audit (lien inverse)
+    await c.env.DB.prepare(`
+      UPDATE audits
+      SET pv_zone_id = ?,
+          pv_plant_id = ?
+      WHERE audit_token = ?
+    `).bind(zoneId, plantId, auditToken).run()
+    
+    // 6. Synchroniser modules EL → PV avec statuts
+    await c.env.DB.prepare(`
+      INSERT INTO pv_modules (
+        zone_id, module_identifier, string_number, position_in_string,
+        pos_x_meters, pos_y_meters, rotation,
+        width_meters, height_meters, power_wp,
+        module_status, status_comment
+      )
+      SELECT 
+        ? as zone_id,
+        m.module_identifier,
+        m.string_number,
+        m.position_in_string,
+        (m.position_in_string - 1) * 1.8 as pos_x_meters,
+        (m.string_number - 1) * 1.1 as pos_y_meters,
+        0 as rotation,
+        1.7 as width_meters,
+        1.0 as height_meters,
+        ? as power_wp,
+        CASE 
+          WHEN m.defect_type IN ('microcracks', 'pid') THEN 'warning'
+          WHEN m.defect_type IN ('dead_cell', 'hotspot', 'dead', 'string_open') THEN 'critical'
+          WHEN m.defect_type = 'pending' THEN 'pending'
+          ELSE 'ok'
+        END as module_status,
+        'Synchronisé depuis audit EL: ' || COALESCE(m.defect_type, 'ok')
+      FROM el_modules m
+      WHERE m.audit_token = ?
+    `).bind(zoneId, audit.module_power_wp || 450, auditToken).run()
+    
+    return c.json({ 
+      success: true, 
+      message: 'Zone PV créée depuis shared_configurations',
+      plant_id: plantId,
+      zone_id: zoneId,
+      editor_url: `/pv/plant/${plantId}/zone/${zoneId}/editor`,
+      config_used: {
+        total_modules: audit.total_modules,
+        string_count: audit.string_count,
+        modules_per_string: audit.modules_per_string,
+        is_advanced: audit.is_advanced_mode
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('❌ Erreur /api/pv/create-from-shared-config:', error)
     return c.json({ success: false, error: error.message }, 500)
   }
 })

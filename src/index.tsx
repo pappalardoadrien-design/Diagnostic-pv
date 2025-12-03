@@ -100,6 +100,12 @@ import auditsRoutes from './modules/audits/routes'
 app.route('/api/audits', auditsRoutes)
 
 // ============================================================================
+// MODULE SHARED-CONFIG - CONFIGURATION PARTAGÉE MULTI-MODULES (Nouveau !)
+// ============================================================================
+import sharedConfigRoutes from './modules/shared-config/routes'
+app.route('/api/shared-config', sharedConfigRoutes)
+
+// ============================================================================
 // MODULE MISSION ORDERS - ORDRES DE MISSION PDF
 // ============================================================================
 import missionOrdersRoutes from './modules/mission-orders/routes'
