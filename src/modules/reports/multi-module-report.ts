@@ -146,8 +146,12 @@ function generateReportHTML(data: any) {
     <head>
         <meta charset="UTF-8">
         <title>Rapport Multi-Modules - ${audit.project_name || 'Audit'}</title>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
             @page { size: A4; margin: 2cm; }
+            @media print {
+                .no-print { display: none !important; }
+            }
             body { 
                 font-family: 'Segoe UI', Arial, sans-serif; 
                 font-size: 11pt; 
@@ -259,6 +263,18 @@ function generateReportHTML(data: any) {
         </style>
     </head>
     <body>
+        <!-- BOUTONS ACTIONS (no-print) -->
+        <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+            <button onclick="window.print()" 
+                    style="background: #FF6B35; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-right: 10px;">
+                <i class="fas fa-print"></i> IMPRIMER PDF
+            </button>
+            <button onclick="window.close()" 
+                    style="background: #333; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <i class="fas fa-times"></i> FERMER
+            </button>
+        </div>
+
         <!-- EN-TÊTE -->
         <div class="header">
             <h1>RAPPORT D'AUDIT PHOTOVOLTAÏQUE</h1>

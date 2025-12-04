@@ -24,6 +24,7 @@ import { getAuditIvPage } from './pages/audit-iv'
 import { getAuditIvGraphsPage } from './pages/audit-iv-graphs'
 import { getAuditVisualPage } from './pages/audit-visual'
 import { getAuditIsolationPage } from './pages/audit-isolation'
+import { getPhotosUploadPage } from './pages/photos-upload'
 import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
 import { getGirasoleToitureChecklistPage } from './pages/audit-visual-girasole-toiture'
 import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
@@ -177,6 +178,12 @@ app.route('/api/photos', photosRoutes)
 // ============================================================================
 import reportsRoutes from './modules/reports/multi-module-report'
 app.route('/api/reports', reportsRoutes)
+
+// ============================================================================
+// MODULE ANALYTICS - DASHBOARD MÉTRIQUES TEMPS RÉEL
+// ============================================================================
+import analyticsRoutes from './modules/analytics/routes'
+app.route('/api/analytics', analyticsRoutes)
 
 // ============================================================================
 // MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)
@@ -504,6 +511,11 @@ app.get('/audit/:token/iv', (c) => {
 // Module I-V - Graphiques Courbes
 app.get('/audit/:token/iv/graphs', (c) => {
   return c.html(getAuditIvGraphsPage())
+})
+
+// Module Photos - Upload Interface
+app.get('/audit/:token/photos/upload', (c) => {
+  return c.html(getPhotosUploadPage())
 })
 
 // Module I-V - Pages UI
