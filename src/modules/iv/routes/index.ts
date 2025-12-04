@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { cache, cacheInvalidator } from '../../../middleware/cache';
 import ivReportsRoutes from './reports';
 import ivEnrichedReportsRoutes from './reports-enriched';
+import ivGraphExportsRoutes from './graph-exports';
 
 type Bindings = {
   DB: D1Database;
@@ -514,5 +515,6 @@ ivRoutes.get('/report/:token', async (c) => {
 // Mount reports routes
 ivRoutes.route('/reports', ivReportsRoutes);
 ivRoutes.route('/reports-enriched', ivEnrichedReportsRoutes);
+ivRoutes.route('/graph-exports', ivGraphExportsRoutes);
 
 export default ivRoutes;

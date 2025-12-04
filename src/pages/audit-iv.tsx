@@ -33,6 +33,10 @@ export function getAuditIvPage() {
             <!-- Actions -->
             <div class="max-w-6xl mx-auto mb-6">
                 <div class="flex gap-4 justify-end mb-4">
+                    <button onclick="window.location.href='/audit/'+auditToken+'/iv/graphs'" class="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-black">
+                        <i class="fas fa-chart-area mr-2"></i>
+                        VOIR GRAPHIQUES I-V
+                    </button>
                     <button onclick="generateMultiModuleReport()" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-black">
                         <i class="fas fa-file-pdf mr-2"></i>
                         RAPPORT PDF MULTI-MODULES

@@ -21,6 +21,7 @@ import { getPlanningCalendarPage } from './pages/planning-calendar'
 import { getCrmDashboardPage } from './pages/crm-dashboard'
 import { getAuditsCreatePage } from './pages/audits-create'
 import { getAuditIvPage } from './pages/audit-iv'
+import { getAuditIvGraphsPage } from './pages/audit-iv-graphs'
 import { getAuditVisualPage } from './pages/audit-visual'
 import { getAuditIsolationPage } from './pages/audit-isolation'
 import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
@@ -486,6 +487,11 @@ app.get('/audits/create', (c) => {
 // Module I-V - Courbes I-V
 app.get('/audit/:token/iv', (c) => {
   return c.html(getAuditIvPage())
+})
+
+// Module I-V - Graphiques Courbes
+app.get('/audit/:token/iv/graphs', (c) => {
+  return c.html(getAuditIvGraphsPage())
 })
 
 // Module I-V - Pages UI
