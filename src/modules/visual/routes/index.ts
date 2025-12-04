@@ -1,7 +1,8 @@
 // ============================================================================
-// MODULE VISUAL - API ROUTES
+// MODULE VISUAL - API ROUTES (Production Schema Compatible)
 // ============================================================================
 // Routes API pour inspections visuelles PV
+// Schéma production: 28 colonnes incluant Girasole, GPS, checklists
 // Intégration avec shared_configurations
 // ============================================================================
 
@@ -33,8 +34,9 @@ app.get('/inspections/:auditToken', async (c) => {
     const stats = await DB.prepare(`
       SELECT 
         COUNT(*) as total,
-        SUM(defects_found) as total_defects,
-        SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical_count
+        SUM(CASE WHEN defect_found = 1 THEN 1 ELSE 0 END) as defects_found,
+        SUM(CASE WHEN severity_level >= 3 THEN 1 ELSE 0 END) as critical_count,
+        SUM(CASE WHEN corrective_action_required = 1 THEN 1 ELSE 0 END) as actions_required
       FROM visual_inspections
       WHERE audit_token = ?
     `).bind(auditToken).first()
@@ -42,7 +44,7 @@ app.get('/inspections/:auditToken', async (c) => {
     return c.json({
       success: true,
       inspections: inspections.results || [],
-      stats: stats || { total: 0, total_defects: 0, critical_count: 0 }
+      stats: stats || { total: 0, defects_found: 0, critical_count: 0, actions_required: 0 }
     })
 
   } catch (error: any) {
@@ -53,7 +55,7 @@ app.get('/inspections/:auditToken', async (c) => {
 
 // ============================================================================
 // ROUTE 2: POST /api/visual/inspections/:auditToken
-// Ajouter une nouvelle inspection visuelle
+// Ajouter une nouvelle inspection visuelle (schéma production)
 // ============================================================================
 app.post('/inspections/:auditToken', async (c) => {
   const { DB } = c.env
@@ -63,41 +65,84 @@ app.post('/inspections/:auditToken', async (c) => {
     const body = await c.req.json()
     const {
       inspection_type = 'general',
-      inspection_date,
-      observations,
-      photos,
-      defects_found = 0,
-      severity = 'low'
+      string_number = null,
+      module_number = null,
+      location_description = '',
+      defect_found = 0,
+      defect_type = null,
+      severity_level = 0,
+      photo_url = null,
+      gps_latitude = null,
+      gps_longitude = null,
+      corrective_action_required = 0,
+      corrective_action_description = null,
+      notes = '',
+      inspection_date = null,
+      conformite = null,
+      audit_category = 'general',
+      checklist_section = null,
+      item_order = 0,
+      checklist_type = 'IEC_62446'
     } = body
 
-    // Vérifier que l'audit existe
+    // Vérifier que l'audit existe et récupérer audit_id
     const audit = await DB.prepare(`
-      SELECT id FROM audits WHERE audit_token = ?
+      SELECT id, intervention_id FROM audits WHERE audit_token = ?
     `).bind(auditToken).first()
 
     if (!audit) {
       return c.json({ success: false, error: 'Audit introuvable' }, 404)
     }
 
-    // Insérer l'inspection
+    // Insérer l'inspection (schéma production complet)
     const result = await DB.prepare(`
       INSERT INTO visual_inspections (
+        intervention_id,
         audit_token,
+        audit_id,
         inspection_type,
+        string_number,
+        module_number,
+        location_description,
+        defect_found,
+        defect_type,
+        severity_level,
+        photo_url,
+        gps_latitude,
+        gps_longitude,
+        corrective_action_required,
+        corrective_action_description,
+        notes,
         inspection_date,
-        observations,
-        photos,
-        defects_found,
-        severity
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        conformite,
+        audit_category,
+        checklist_section,
+        item_order,
+        checklist_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
+      audit.intervention_id,
       auditToken,
+      audit.id,
       inspection_type,
+      string_number,
+      module_number,
+      location_description,
+      defect_found,
+      defect_type,
+      severity_level,
+      photo_url,
+      gps_latitude,
+      gps_longitude,
+      corrective_action_required,
+      corrective_action_description,
+      notes,
       inspection_date || new Date().toISOString().split('T')[0],
-      observations,
-      JSON.stringify(photos || []),
-      defects_found,
-      severity
+      conformite,
+      audit_category,
+      checklist_section,
+      item_order,
+      checklist_type
     ).run()
 
     return c.json({
@@ -123,37 +168,38 @@ app.put('/inspections/:auditToken/:id', async (c) => {
 
   try {
     const body = await c.req.json()
-    const {
-      inspection_type,
-      inspection_date,
-      observations,
-      photos,
-      defects_found,
-      severity
-    } = body
 
-    // Mettre à jour l'inspection
+    // Construction dynamique UPDATE avec COALESCE
+    const updates: string[] = []
+    const bindings: any[] = []
+
+    // Champs updatables
+    const fields = [
+      'inspection_type', 'string_number', 'module_number', 'location_description',
+      'defect_found', 'defect_type', 'severity_level', 'photo_url',
+      'gps_latitude', 'gps_longitude', 'corrective_action_required',
+      'corrective_action_description', 'notes', 'inspection_date',
+      'conformite', 'audit_category', 'checklist_section', 'item_order'
+    ]
+
+    fields.forEach(field => {
+      if (body[field] !== undefined) {
+        updates.push(`${field} = ?`)
+        bindings.push(body[field])
+      }
+    })
+
+    if (updates.length === 0) {
+      return c.json({ success: false, error: 'Aucun champ à mettre à jour' }, 400)
+    }
+
+    bindings.push(inspectionId, auditToken)
+
     await DB.prepare(`
       UPDATE visual_inspections
-      SET
-        inspection_type = COALESCE(?, inspection_type),
-        inspection_date = COALESCE(?, inspection_date),
-        observations = COALESCE(?, observations),
-        photos = COALESCE(?, photos),
-        defects_found = COALESCE(?, defects_found),
-        severity = COALESCE(?, severity),
-        updated_at = CURRENT_TIMESTAMP
+      SET ${updates.join(', ')}
       WHERE id = ? AND audit_token = ?
-    `).bind(
-      inspection_type,
-      inspection_date,
-      observations,
-      photos ? JSON.stringify(photos) : null,
-      defects_found,
-      severity,
-      inspectionId,
-      auditToken
-    ).run()
+    `).bind(...bindings).run()
 
     return c.json({
       success: true,
@@ -214,33 +260,53 @@ app.post('/initialize/:auditToken', async (c) => {
       }, 404)
     }
 
-    // Lire audit pour obtenir intervention_id si nécessaire
+    // Lire audit pour obtenir intervention_id et audit_id
     const audit = await DB.prepare(`
       SELECT id, intervention_id FROM audits
       WHERE audit_token = ?
     `).bind(auditToken).first()
 
-    // Créer checklist visuelle par défaut (schéma production)
+    // Créer checklist visuelle NF C 15-100 / IEC 62446-1
     const checklists = [
       {
         type: 'structural',
-        location: 'Structure & Fixations',
-        notes: 'Vérifier fixations modules, rails, vis, état structures'
+        section: 'Structure & Fixations',
+        category: 'mechanical',
+        location: 'Ensemble installation',
+        notes: 'Contrôle fixations modules, état rails, vis de serrage, structures porteuses',
+        order: 1
       },
       {
         type: 'electrical',
-        location: 'Câblage & Connexions',
-        notes: 'Vérifier MC4, boîtes jonction, chemins câbles, onduleurs'
+        section: 'Câblage & Connexions',
+        category: 'electrical',
+        location: 'Boîtes jonction, MC4, chemins câbles',
+        notes: 'Vérifier étanchéité MC4, serrage connexions, état câbles DC/AC, boîtes jonction',
+        order: 2
       },
       {
         type: 'mechanical',
-        location: 'Modules PV',
-        notes: 'Vérifier verre, cadre, joint, délamination, corrosion'
+        section: 'État Modules PV',
+        category: 'mechanical',
+        location: 'Modules photovoltaïques',
+        notes: 'Contrôle verre (fissures, impacts), cadre (déformation, corrosion), joint (décollement)',
+        order: 3
       },
       {
-        type: 'general',
-        location: 'Environnement',
-        notes: 'Vérifier propreté, ombrage, végétation, accès'
+        type: 'safety',
+        section: 'Sécurité & Signalisation',
+        category: 'electrical',
+        location: 'Onduleurs, protections, signalétique',
+        notes: 'Vérifier DC disconnect, signalisation réglementaire, accès pompiers, AGCP',
+        order: 4
+      },
+      {
+        type: 'environment',
+        section: 'Environnement',
+        category: 'general',
+        location: 'Site installation',
+        notes: 'Propreté modules, ombrage, végétation, accès maintenance, état toiture',
+        order: 5
       }
     ]
 
@@ -248,19 +314,28 @@ app.post('/initialize/:auditToken', async (c) => {
     for (const checklist of checklists) {
       const result = await DB.prepare(`
         INSERT INTO visual_inspections (
+          intervention_id,
           audit_token,
           audit_id,
           inspection_type,
           location_description,
           defect_found,
-          notes
-        ) VALUES (?, ?, ?, ?, 0, ?)
+          notes,
+          audit_category,
+          checklist_section,
+          item_order,
+          checklist_type
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 'IEC_62446')
       `).bind(
+        audit?.intervention_id || null,
         auditToken,
         audit?.id || null,
         checklist.type,
         checklist.location,
-        checklist.notes
+        checklist.notes,
+        checklist.category,
+        checklist.section,
+        checklist.order
       ).run()
 
       if (result.success) created++
@@ -268,7 +343,7 @@ app.post('/initialize/:auditToken', async (c) => {
 
     return c.json({
       success: true,
-      message: 'Checklist visuelle initialisée',
+      message: 'Checklist visuelle initialisée (NF C 15-100 / IEC 62446-1)',
       checklists_created: created,
       config_used: {
         string_count: config.string_count,
@@ -304,41 +379,121 @@ app.get('/report/:auditToken', async (c) => {
       return c.json({ success: false, error: 'Configuration introuvable' }, 404)
     }
 
-    // Récupérer inspections
+    // Récupérer inspections groupées par catégorie
     const inspections = await DB.prepare(`
-      SELECT * FROM visual_inspections
+      SELECT 
+        audit_category,
+        checklist_section,
+        inspection_type,
+        location_description,
+        defect_found,
+        defect_type,
+        severity_level,
+        notes,
+        conformite,
+        corrective_action_required,
+        corrective_action_description,
+        inspection_date
+      FROM visual_inspections
       WHERE audit_token = ?
-      ORDER BY inspection_type, created_at
+      ORDER BY item_order, checklist_section
     `).bind(auditToken).all()
 
-    // Générer rapport HTML simple
+    // Stats globales
+    const stats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(defect_found) as defects,
+        SUM(CASE WHEN severity_level >= 3 THEN 1 ELSE 0 END) as critical,
+        SUM(corrective_action_required) as actions
+      FROM visual_inspections
+      WHERE audit_token = ?
+    `).bind(auditToken).first()
+
+    // Générer rapport HTML professionnel
     const html = `
       <!DOCTYPE html>
-      <html>
+      <html lang="fr">
       <head>
-        <title>Rapport Inspections Visuelles</title>
+        <title>Rapport Inspection Visuelle - DiagPV</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          h1 { color: #0EA5E9; }
-          .inspection { border: 1px solid #ccc; padding: 15px; margin: 10px 0; }
-          .severity-critical { background: #fee; }
-          .severity-high { background: #ffd; }
+          body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+          h1 { color: #14B8A6; border-bottom: 3px solid #14B8A6; padding-bottom: 10px; }
+          h2 { color: #0EA5E9; margin-top: 30px; }
+          .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+          .stats { display: flex; gap: 20px; margin: 20px 0; }
+          .stat-box { flex: 1; padding: 15px; border-radius: 8px; text-align: center; }
+          .stat-ok { background: #d1fae5; border: 2px solid #10b981; }
+          .stat-warning { background: #fef3c7; border: 2px solid #f59e0b; }
+          .stat-critical { background: #fee2e2; border: 2px solid #ef4444; }
+          .inspection { border: 1px solid #e5e7eb; padding: 15px; margin: 15px 0; border-radius: 8px; }
+          .inspection.defect { background: #fef2f2; border-color: #fca5a5; }
+          .section-title { font-weight: bold; color: #0EA5E9; margin-top: 20px; }
+          .defect-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+          .severity-1 { background: #dbeafe; color: #1e40af; }
+          .severity-2 { background: #fef3c7; color: #92400e; }
+          .severity-3 { background: #fed7aa; color: #9a3412; }
+          .severity-4 { background: #fecaca; color: #991b1b; }
+          footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #e5e7eb; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
-        <h1>Rapport Inspections Visuelles</h1>
-        <p><strong>Audit Token:</strong> ${auditToken}</p>
-        <p><strong>Modules:</strong> ${config.total_modules} (${config.string_count} strings)</p>
-        <hr>
+        <div class="header">
+          <h1>📋 Rapport Inspection Visuelle - Contrôle Conformité</h1>
+          <p><strong>Audit Token:</strong> ${auditToken}</p>
+          <p><strong>Installation:</strong> ${config.total_modules} modules (${config.string_count} strings × ${config.modules_per_string} modules/string)</p>
+          <p><strong>Date rapport:</strong> ${new Date().toLocaleDateString('fr-FR')}</p>
+          <p><strong>Normes:</strong> NF C 15-100, IEC 62446-1, UTE C 15-712-1</p>
+        </div>
+
+        <div class="stats">
+          <div class="stat-box stat-ok">
+            <h3>${stats?.total || 0}</h3>
+            <p>Points contrôlés</p>
+          </div>
+          <div class="stat-box stat-warning">
+            <h3>${stats?.defects || 0}</h3>
+            <p>Défauts trouvés</p>
+          </div>
+          <div class="stat-box stat-critical">
+            <h3>${stats?.critical || 0}</h3>
+            <p>Critiques</p>
+          </div>
+          <div class="stat-box stat-warning">
+            <h3>${stats?.actions || 0}</h3>
+            <p>Actions requises</p>
+          </div>
+        </div>
+
+        <h2>Détail Contrôles par Section</h2>
         ${(inspections.results || []).map((insp: any) => `
-          <div class="inspection severity-${insp.severity}">
-            <h3>${insp.inspection_type.toUpperCase()}</h3>
-            <p><strong>Date:</strong> ${insp.inspection_date}</p>
-            <p><strong>Observations:</strong> ${insp.observations || 'Aucune'}</p>
-            <p><strong>Défauts:</strong> ${insp.defects_found}</p>
-            <p><strong>Sévérité:</strong> ${insp.severity}</p>
+          <div class="inspection ${insp.defect_found ? 'defect' : ''}">
+            <div class="section-title">${insp.checklist_section || insp.inspection_type.toUpperCase()}</div>
+            <p><strong>Zone:</strong> ${insp.location_description}</p>
+            <p><strong>Notes:</strong> ${insp.notes || 'Aucune observation'}</p>
+            
+            ${insp.defect_found ? `
+              <p><strong>⚠️ Défaut détecté:</strong> ${insp.defect_type || 'Non spécifié'}</p>
+              <p><strong>Sévérité:</strong> 
+                <span class="defect-badge severity-${insp.severity_level || 1}">
+                  Niveau ${insp.severity_level || 1}/4
+                </span>
+              </p>
+            ` : '<p style="color: green;">✅ Conforme</p>'}
+            
+            ${insp.corrective_action_required ? `
+              <p><strong>🔧 Action corrective requise:</strong> ${insp.corrective_action_description || 'À définir'}</p>
+            ` : ''}
+            
+            <p style="font-size: 12px; color: #6b7280;"><strong>Date:</strong> ${insp.inspection_date}</p>
           </div>
         `).join('')}
+
+        <footer>
+          <p><strong>Diagnostic Photovoltaïque</strong> - Expertise indépendante depuis 2012</p>
+          <p>3 rue d'Apollo, 31240 L'Union | 05.81.10.16.59 | contact@diagpv.fr | RCS 792972309</p>
+          <p>Ce rapport a été généré automatiquement par DiagPV Hub. Toute reproduction interdite sans autorisation.</p>
+        </footer>
       </body>
       </html>
     `
