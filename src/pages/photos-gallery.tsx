@@ -95,6 +95,11 @@ export function getPhotosGalleryPage() {
                         </div>
                     </div>
                     <div class="flex gap-3">
+                        <a href="/rapport/print/'+auditToken+'" target="_blank"
+                           class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-black">
+                            <i class="fas fa-file-pdf mr-2"></i>
+                            TÉLÉCHARGER PDF
+                        </a>
                         <button onclick="window.location.href='/audit/'+auditToken+'/photos/upload'" 
                                 class="bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded-lg font-black">
                             <i class="fas fa-upload mr-2"></i>

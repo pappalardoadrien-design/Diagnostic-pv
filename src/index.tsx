@@ -499,6 +499,13 @@ import { getRapportPrintPage } from './pages/rapport-print'
 app.get('/rapport/print/:audit_token', getRapportPrintPage)
 
 // ============================================================================
+// PAGE FIN D'AUDIT - INTERFACE COMPLÉTION (PHASE 10.3)
+// Checklist modules, statuts, génération rapport final
+// ============================================================================
+import { getAuditCompletePage } from './pages/audit-complete'
+app.get('/audit/:audit_token/complete', getAuditCompletePage)
+
+// ============================================================================
 // PAGE CRM DASHBOARD - PAGE CENTRALE APPLICATION
 // Hub central avec KPIs, audits en cours, planning, actions rapides
 // ============================================================================
