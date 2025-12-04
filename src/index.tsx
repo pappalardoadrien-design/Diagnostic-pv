@@ -140,6 +140,12 @@ import consolidatedFullRoutes from './modules/reports/consolidated-full'
 app.route('/api/reports/consolidated-full', consolidatedFullRoutes)
 
 // ============================================================================
+// MODULE THERMOGRAPHIE - THERMOGRAPHIE IR (MISSION 1)
+// ============================================================================
+import thermiqueRoutes from './modules/thermique/routes'
+app.route('/api/thermique', thermiqueRoutes)
+
+// ============================================================================
 // MODULE EXPORTS - EXPORT CSV DES DONNÉES
 // ============================================================================
 import csvExportRoutes from './modules/exports/csv-routes'
@@ -504,6 +510,13 @@ app.get('/rapport/print/:audit_token', getRapportPrintPage)
 // ============================================================================
 import { getAuditCompletePage } from './pages/audit-complete'
 app.get('/audit/:audit_token/complete', getAuditCompletePage)
+
+// ============================================================================
+// PAGE AUDIT THERMOGRAPHIE - ANALYSE THERMIQUE IR (MISSION 1)
+// Thermographie infrarouge - Défauts thermiques - DIN EN 62446-3
+// ============================================================================
+import { getAuditThermiquePage } from './pages/audit-thermique'
+app.get('/audit/thermique/:audit_token', getAuditThermiquePage)
 
 // ============================================================================
 // PAGE CRM DASHBOARD - PAGE CENTRALE APPLICATION
