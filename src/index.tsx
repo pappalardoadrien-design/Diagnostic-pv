@@ -140,12 +140,6 @@ import consolidatedFullRoutes from './modules/reports/consolidated-full'
 app.route('/api/reports/consolidated-full', consolidatedFullRoutes)
 
 // ============================================================================
-// MODULE PDF GENERATOR - GÉNÉRATION PDF PROFESSIONNELS (PHASE 10)
-// ============================================================================
-import pdfRoutes from './modules/pdf-generator/routes'
-app.route('/api/pdf', pdfRoutes)
-
-// ============================================================================
 // MODULE EXPORTS - EXPORT CSV DES DONNÉES
 // ============================================================================
 import csvExportRoutes from './modules/exports/csv-routes'
@@ -496,6 +490,13 @@ app.get('/planning/interventions/:id', (c) => {
 app.get('/planning/calendar', (c) => {
   return c.html(getPlanningCalendarPage())
 })
+
+// ============================================================================
+// PAGE RAPPORT PDF - IMPRESSION OPTIMISÉE (PHASE 10)
+// Rapport multi-modules avec CSS @media print pour window.print()
+// ============================================================================
+import { getRapportPrintPage } from './pages/rapport-print'
+app.get('/rapport/print/:audit_token', getRapportPrintPage)
 
 // ============================================================================
 // PAGE CRM DASHBOARD - PAGE CENTRALE APPLICATION
