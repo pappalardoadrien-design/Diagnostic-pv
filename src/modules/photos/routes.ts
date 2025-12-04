@@ -1,279 +1,347 @@
+// ============================================================================
+// MODULE PHOTOS - UPLOAD & STOCKAGE R2
+// ============================================================================
+// Upload photos EL, thermographie, visuelles vers Cloudflare R2
+// Génération URLs publiques pour intégration rapports
+// ============================================================================
+
 import { Hono } from 'hono'
 
 type Bindings = {
   DB: D1Database
+  R2: R2Bucket
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const photos = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
-// UPLOAD PHOTO - Base64 avec compression
+// POST /api/photos/upload - Upload photo vers R2
+// Body multipart/form-data:
+//   - file: Photo (JPEG/PNG)
+//   - audit_token: Token audit
+//   - photo_type: 'el' | 'thermal' | 'visual' | 'iv'
+//   - module_id?: ID module (optionnel)
+//   - string_number?: Numéro string (optionnel)
+//   - module_number?: Numéro module (optionnel)
 // ============================================================================
-app.post('/upload', async (c) => {
+photos.post('/upload', async (c) => {
   try {
-    const { DB } = c.env
-    const body = await c.req.json()
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const auditToken = formData.get('audit_token') as string
+    const photoType = formData.get('photo_type') as string
+    const moduleId = formData.get('module_id') as string | null
+    const stringNumber = formData.get('string_number') as string | null
+    const moduleNumber = formData.get('module_number') as string | null
+
+    if (!file) {
+      return c.json({ success: false, error: 'Fichier requis' }, 400)
+    }
+
+    if (!auditToken) {
+      return c.json({ success: false, error: 'audit_token requis' }, 400)
+    }
+
+    if (!['el', 'thermal', 'visual', 'iv'].includes(photoType)) {
+      return c.json({ success: false, error: 'photo_type invalide' }, 400)
+    }
+
+    // Vérifier type MIME
+    if (!file.type.startsWith('image/')) {
+      return c.json({ success: false, error: 'Le fichier doit être une image' }, 400)
+    }
+
+    // Générer nom unique
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substring(2, 15)
+    const extension = file.name.split('.').pop() || 'jpg'
     
-    const {
-      audit_token,
-      module_type, // EL, IV, VISUAL, ISOLATION
-      photo_data, // base64 string
-      description,
-      string_number,
-      module_number,
-      latitude,
-      longitude,
-      accuracy
-    } = body
-
-    if (!audit_token || !photo_data) {
-      return c.json({ error: 'Missing required fields' }, 400)
+    let fileName = `${auditToken}/${photoType}/${timestamp}-${randomId}.${extension}`
+    
+    // Si module spécifique, ajouter dans chemin
+    if (stringNumber && moduleNumber) {
+      fileName = `${auditToken}/${photoType}/S${stringNumber}-${moduleNumber}/${timestamp}-${randomId}.${extension}`
     }
 
-    // Valider que c'est bien du base64
-    if (!photo_data.startsWith('data:image/')) {
-      return c.json({ error: 'Invalid image format' }, 400)
-    }
+    // Upload vers R2
+    const buffer = await file.arrayBuffer()
+    await c.env.R2.put(fileName, buffer, {
+      httpMetadata: {
+        contentType: file.type
+      },
+      customMetadata: {
+        audit_token: auditToken,
+        photo_type: photoType,
+        module_id: moduleId || '',
+        string_number: stringNumber || '',
+        module_number: moduleNumber || '',
+        uploaded_at: new Date().toISOString()
+      }
+    })
 
-    // Extraire les métadonnées de l'image
-    const matches = photo_data.match(/^data:image\/(\w+);base64,(.+)$/)
-    if (!matches) {
-      return c.json({ error: 'Invalid base64 format' }, 400)
-    }
+    // Générer URL publique (nécessite configuration Custom Domain ou R2.dev)
+    const publicUrl = `/api/photos/view/${fileName}`
 
-    const imageFormat = matches[1] // jpeg, png, etc
-    const base64Data = matches[2]
-    const imageSize = Math.round((base64Data.length * 3) / 4) // Taille approximative en bytes
-
-    // Insérer dans la base de données
-    const result = await DB.prepare(`
+    // Enregistrer métadonnées dans D1 (adapter au schéma existant)
+    await c.env.DB.prepare(`
       INSERT INTO photos (
-        audit_token,
-        module_type,
-        photo_data,
-        photo_format,
-        photo_size,
-        description,
-        string_number,
-        module_number,
-        latitude,
-        longitude,
-        gps_accuracy,
-        captured_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        audit_token, module_type, photo_data, photo_format, photo_size,
+        string_number, module_number, r2_key, public_url, mime_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      audit_token,
-      module_type || 'GENERAL',
-      photo_data, // Stockage base64 dans D1 (limité à ~1MB par row)
-      imageFormat,
-      imageSize,
-      description || null,
-      string_number || null,
-      module_number || null,
-      latitude || null,
-      longitude || null,
-      accuracy || null
+      auditToken,
+      photoType.toUpperCase(), // module_type: 'EL', 'THERMAL', 'VISUAL', 'IV'
+      '', // photo_data vide (utilise R2 au lieu de Base64)
+      file.type,
+      file.size,
+      stringNumber ? parseInt(stringNumber) : null,
+      moduleNumber ? parseInt(moduleNumber) : null,
+      fileName,
+      publicUrl,
+      file.type
     ).run()
 
     return c.json({
       success: true,
-      photo_id: result.meta.last_row_id,
-      size: imageSize,
-      format: imageFormat,
-      message: 'Photo uploaded successfully'
+      message: 'Photo uploadée avec succès',
+      data: {
+        r2_key: fileName,
+        public_url: publicUrl,
+        file_size: file.size,
+        mime_type: file.type
+      }
     })
 
   } catch (error: any) {
-    console.error('Upload error:', error)
-    return c.json({ error: error.message }, 500)
+    console.error('Erreur upload photo:', error)
+    return c.json({
+      success: false,
+      error: 'Erreur upload photo',
+      details: error.message
+    }, 500)
   }
 })
 
 // ============================================================================
-// GET PHOTOS - Liste photos par audit
+// GET /api/photos/view/:key - Récupérer photo depuis R2
+// Sert l'image directement depuis R2 avec headers appropriés
 // ============================================================================
-app.get('/:auditToken', async (c) => {
+photos.get('/view/*', async (c) => {
   try {
-    const { DB } = c.env
-    const { auditToken } = c.req.param()
+    // Extraire key depuis URL
+    const key = c.req.param('*')
 
-    const result = await DB.prepare(`
+    if (!key) {
+      return c.json({ error: 'Clé R2 requise' }, 400)
+    }
+
+    // Récupérer depuis R2
+    const object = await c.env.R2.get(key)
+
+    if (!object) {
+      return c.json({ error: 'Photo non trouvée' }, 404)
+    }
+
+    // Retourner image avec headers
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000',
+        'ETag': object.httpEtag
+      }
+    })
+
+  } catch (error: any) {
+    console.error('Erreur récupération photo:', error)
+    return c.json({
+      success: false,
+      error: 'Erreur récupération photo',
+      details: error.message
+    }, 500)
+  }
+})
+
+// ============================================================================
+// GET /api/photos/list/:audit_token - Lister photos d'un audit
+// Query params:
+//   - photo_type?: Filtrer par type ('el', 'thermal', 'visual', 'iv')
+//   - string_number?: Filtrer par string
+//   - module_number?: Filtrer par module
+// ============================================================================
+photos.get('/list/:audit_token', async (c) => {
+  try {
+    const auditToken = c.req.param('audit_token')
+    const photoType = c.req.query('photo_type')
+    const stringNumber = c.req.query('string_number')
+    const moduleNumber = c.req.query('module_number')
+
+    let query = `
       SELECT 
-        id,
-        module_type,
-        photo_format,
-        photo_size,
-        description,
-        string_number,
-        module_number,
-        latitude,
-        longitude,
-        gps_accuracy,
-        captured_at,
-        created_at
+        id, audit_token, module_type as photo_type, string_number, module_number,
+        r2_key, public_url, photo_size as file_size, mime_type, created_at as uploaded_at
       FROM photos
       WHERE audit_token = ?
-      ORDER BY created_at DESC
-    `).bind(auditToken).all()
+    `
+    const params: any[] = [auditToken]
+
+    if (photoType) {
+      query += ` AND module_type = ?`
+      params.push(photoType.toUpperCase())
+    }
+
+    if (stringNumber) {
+      query += ` AND string_number = ?`
+      params.push(parseInt(stringNumber))
+    }
+
+    if (moduleNumber) {
+      query += ` AND module_number = ?`
+      params.push(parseInt(moduleNumber))
+    }
+
+    query += ` ORDER BY uploaded_at DESC`
+
+    const result = await c.env.DB.prepare(query).bind(...params).all()
 
     return c.json({
-      photos: result.results || [],
+      success: true,
+      data: result.results,
       count: result.results?.length || 0
     })
 
   } catch (error: any) {
-    console.error('Get photos error:', error)
-    return c.json({ error: error.message }, 500)
+    console.error('Erreur liste photos:', error)
+    return c.json({
+      success: false,
+      error: 'Erreur liste photos',
+      details: error.message
+    }, 500)
   }
 })
 
 // ============================================================================
-// GET PHOTO - Récupérer une photo spécifique (avec data)
+// DELETE /api/photos/:id - Supprimer photo
+// Supprime de R2 ET de D1
 // ============================================================================
-app.get('/:auditToken/:photoId', async (c) => {
+photos.delete('/:id', async (c) => {
   try {
-    const { DB } = c.env
-    const { auditToken, photoId } = c.req.param()
+    const photoId = parseInt(c.req.param('id'))
 
-    const photo = await DB.prepare(`
-      SELECT *
-      FROM photos
-      WHERE audit_token = ? AND id = ?
-    `).bind(auditToken, photoId).first()
+    // Récupérer info photo
+    const photo = await c.env.DB.prepare(`
+      SELECT r2_key FROM photos WHERE id = ?
+    `).bind(photoId).first()
 
     if (!photo) {
-      return c.json({ error: 'Photo not found' }, 404)
+      return c.json({ success: false, error: 'Photo non trouvée' }, 404)
     }
 
-    return c.json({ photo })
+    // Supprimer de R2
+    await c.env.R2.delete(photo.r2_key as string)
 
-  } catch (error: any) {
-    console.error('Get photo error:', error)
-    return c.json({ error: error.message }, 500)
-  }
-})
-
-// ============================================================================
-// DELETE PHOTO
-// ============================================================================
-app.delete('/:auditToken/:photoId', async (c) => {
-  try {
-    const { DB } = c.env
-    const { auditToken, photoId } = c.req.param()
-
-    await DB.prepare(`
-      DELETE FROM photos
-      WHERE audit_token = ? AND id = ?
-    `).bind(auditToken, photoId).run()
-
-    return c.json({ success: true, message: 'Photo deleted' })
-
-  } catch (error: any) {
-    console.error('Delete photo error:', error)
-    return c.json({ error: error.message }, 500)
-  }
-})
-
-// ============================================================================
-// GET PHOTOS BY MODULE - Filtrer par type de module
-// ============================================================================
-app.get('/:auditToken/module/:moduleType', async (c) => {
-  try {
-    const { DB } = c.env
-    const { auditToken, moduleType } = c.req.param()
-
-    const result = await DB.prepare(`
-      SELECT 
-        id,
-        module_type,
-        photo_format,
-        photo_size,
-        description,
-        string_number,
-        module_number,
-        latitude,
-        longitude,
-        gps_accuracy,
-        captured_at,
-        created_at
-      FROM photos
-      WHERE audit_token = ? AND module_type = ?
-      ORDER BY created_at DESC
-    `).bind(auditToken, moduleType.toUpperCase()).all()
-
-    return c.json({
-      photos: result.results || [],
-      count: result.results?.length || 0,
-      module_type: moduleType.toUpperCase()
-    })
-
-  } catch (error: any) {
-    console.error('Get photos by module error:', error)
-    return c.json({ error: error.message }, 500)
-  }
-})
-
-// ============================================================================
-// POST /api/photos/observations
-// Créer une observation terrain (texte seul, sans photo)
-// ============================================================================
-app.post('/observations', async (c) => {
-  const { env } = c
-  
-  try {
-    const body = await c.req.json()
-    const { 
-      audit_token, 
-      module_type, 
-      observation_text,
-      string_number,
-      module_number,
-      latitude,
-      longitude,
-      accuracy
-    } = body
-
-    if (!audit_token || !observation_text) {
-      return c.json({ error: 'audit_token and observation_text required' }, 400)
-    }
-
-    // Créer une entrée "photo" avec une image placeholder pour les observations texte
-    const placeholderImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzMzMzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+T0JTPC90ZXh0Pjwvc3ZnPg=='
-
-    const result = await env.DB.prepare(`
-      INSERT INTO photos (
-        audit_token, module_type, 
-        photo_data, photo_format, photo_size,
-        description, 
-        string_number, module_number,
-        latitude, longitude, gps_accuracy,
-        captured_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(
-      audit_token,
-      module_type || 'GENERAL',
-      placeholderImage,
-      'svg',
-      placeholderImage.length,
-      observation_text,
-      string_number || null,
-      module_number || null,
-      latitude || null,
-      longitude || null,
-      accuracy || null
-    ).run()
+    // Supprimer de D1
+    await c.env.DB.prepare(`
+      DELETE FROM photos WHERE id = ?
+    `).bind(photoId).run()
 
     return c.json({
       success: true,
-      observation_id: result.meta.last_row_id,
-      message: 'Observation saved successfully'
+      message: 'Photo supprimée avec succès'
     })
 
   } catch (error: any) {
-    console.error('Create observation error:', error)
-    return c.json({ error: error.message }, 500)
+    console.error('Erreur suppression photo:', error)
+    return c.json({
+      success: false,
+      error: 'Erreur suppression photo',
+      details: error.message
+    }, 500)
   }
 })
 
-export default app
+// ============================================================================
+// POST /api/photos/bulk-upload - Upload multiple photos
+// Body multipart/form-data:
+//   - files[]: Array de fichiers
+//   - audit_token: Token audit
+//   - photo_type: Type photos
+// ============================================================================
+photos.post('/bulk-upload', async (c) => {
+  try {
+    const formData = await c.req.formData()
+    const auditToken = formData.get('audit_token') as string
+    const photoType = formData.get('photo_type') as string
+
+    if (!auditToken || !photoType) {
+      return c.json({ success: false, error: 'audit_token et photo_type requis' }, 400)
+    }
+
+    const files = formData.getAll('files[]') as File[]
+
+    if (files.length === 0) {
+      return c.json({ success: false, error: 'Aucun fichier fourni' }, 400)
+    }
+
+    const results = []
+    const errors = []
+
+    for (const file of files) {
+      try {
+        if (!file.type.startsWith('image/')) {
+          errors.push({ file: file.name, error: 'Type fichier invalide' })
+          continue
+        }
+
+        const timestamp = Date.now()
+        const randomId = Math.random().toString(36).substring(2, 15)
+        const extension = file.name.split('.').pop() || 'jpg'
+        const fileName = `${auditToken}/${photoType}/${timestamp}-${randomId}.${extension}`
+
+        const buffer = await file.arrayBuffer()
+        await c.env.R2.put(fileName, buffer, {
+          httpMetadata: { contentType: file.type },
+          customMetadata: {
+            audit_token: auditToken,
+            photo_type: photoType,
+            uploaded_at: new Date().toISOString()
+          }
+        })
+
+        const publicUrl = `/api/photos/view/${fileName}`
+
+        await c.env.DB.prepare(`
+          INSERT INTO photos (
+            audit_token, module_type, photo_data, photo_format, photo_size,
+            r2_key, public_url, mime_type
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(auditToken, photoType.toUpperCase(), '', file.type, file.size, fileName, publicUrl, file.type).run()
+
+        results.push({
+          file: file.name,
+          r2_key: fileName,
+          public_url: publicUrl,
+          success: true
+        })
+
+      } catch (error: any) {
+        errors.push({ file: file.name, error: error.message })
+      }
+    }
+
+    return c.json({
+      success: errors.length === 0,
+      message: `${results.length} photos uploadées, ${errors.length} erreurs`,
+      data: { results, errors }
+    })
+
+  } catch (error: any) {
+    console.error('Erreur bulk upload:', error)
+    return c.json({
+      success: false,
+      error: 'Erreur bulk upload',
+      details: error.message
+    }, 500)
+  }
+})
+
+export default photos

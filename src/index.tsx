@@ -167,6 +167,18 @@ import isolationRoutes from './modules/isolation/routes/index'
 app.route('/api/isolation', isolationRoutes)
 
 // ============================================================================
+// MODULE PHOTOS - UPLOAD & STOCKAGE R2
+// ============================================================================
+import photosRoutes from './modules/photos/routes'
+app.route('/api/photos', photosRoutes)
+
+// ============================================================================
+// MODULE REPORTS - RAPPORTS MULTI-MODULES
+// ============================================================================
+import reportsRoutes from './modules/reports/multi-module-report'
+app.route('/api/reports', reportsRoutes)
+
+// ============================================================================
 // MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)
 // Vue unifiée de tous les diagnostics d'un module physique
 // ============================================================================
