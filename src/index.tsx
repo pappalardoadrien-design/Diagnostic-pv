@@ -154,15 +154,15 @@ import ivRoutes from './modules/iv/routes'
 app.route('/api/iv', ivRoutes)
 
 // ============================================================================
-// MODULE VISUAL - INSPECTIONS VISUELLES
+// MODULE VISUAL - INSPECTIONS VISUELLES (avec shared_configurations)
 // ============================================================================
-import visualRoutes from './modules/visual/routes'
+import visualRoutes from './modules/visual/routes/index'
 app.route('/api/visual', visualRoutes)
 
 // ============================================================================
-// MODULE ISOLATION - TESTS D'ISOLEMENT
+// MODULE ISOLATION - TESTS D'ISOLEMENT (avec shared_configurations)
 // ============================================================================
-import isolationRoutes from './modules/isolation/routes'
+import isolationRoutes from './modules/isolation/routes/index'
 app.route('/api/isolation', isolationRoutes)
 
 // ============================================================================
