@@ -28,5 +28,10 @@
       "binding": "R2",
       "bucket_name": "diagpv-el-photos"
     }
-  ]
+  ],
+  
+  // Configuration Browser Rendering API pour génération PDF
+  "browser": {
+    "binding": "BROWSER"
+  }
 }

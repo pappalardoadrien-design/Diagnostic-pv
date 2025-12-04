@@ -140,6 +140,12 @@ import consolidatedFullRoutes from './modules/reports/consolidated-full'
 app.route('/api/reports/consolidated-full', consolidatedFullRoutes)
 
 // ============================================================================
+// MODULE PDF GENERATOR - GÉNÉRATION PDF PROFESSIONNELS (PHASE 10)
+// ============================================================================
+import pdfRoutes from './modules/pdf-generator/routes'
+app.route('/api/pdf', pdfRoutes)
+
+// ============================================================================
 // MODULE EXPORTS - EXPORT CSV DES DONNÉES
 // ============================================================================
 import csvExportRoutes from './modules/exports/csv-routes'
