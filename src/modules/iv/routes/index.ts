@@ -16,6 +16,146 @@ type Bindings = {
 const ivRoutes = new Hono<{ Bindings: Bindings }>();
 
 // ============================================================================
+// POST /api/iv/initialize/:token - Initialiser mesures I-V depuis shared_config
+// ============================================================================
+ivRoutes.post('/initialize/:token', async (c) => {
+  try {
+    const { DB } = c.env;
+    const token = c.req.param('token');
+
+    // Récupérer configuration partagée + audit info
+    const config = await DB.prepare(`
+      SELECT 
+        a.intervention_id,
+        a.id as audit_id,
+        sc.total_modules,
+        sc.string_count,
+        sc.modules_per_string,
+        sc.advanced_config,
+        sc.is_advanced_mode
+      FROM shared_configurations sc
+      LEFT JOIN audits a ON a.audit_token = sc.audit_token
+      WHERE sc.audit_token = ?
+    `).bind(token).first();
+
+    if (!config) {
+      return c.json({ 
+        success: false, 
+        error: 'Configuration partagée introuvable. Créez d\'abord un audit EL.' 
+      }, 404);
+    }
+
+    const configData = config as any;
+
+    // Vérifier si mesures existent déjà
+    const existingMeasurements = await DB.prepare(`
+      SELECT COUNT(*) as count FROM iv_measurements WHERE audit_token = ?
+    `).bind(token).first();
+
+    if ((existingMeasurements as any)?.count > 0) {
+      return c.json({
+        success: false,
+        error: 'Des mesures existent déjà pour cet audit. Utilisez DELETE pour réinitialiser.',
+        existing_count: (existingMeasurements as any).count
+      }, 400);
+    }
+
+    // Générer liste modules depuis config
+    let modules: Array<{string: number, module: number}> = [];
+
+    if (configData.is_advanced_mode && configData.advanced_config) {
+      // Parse advanced_config JSON
+      const advConfig = JSON.parse(configData.advanced_config);
+      
+      // Mode avancé avec strings array
+      if (advConfig.strings && Array.isArray(advConfig.strings)) {
+        advConfig.strings.forEach((str: any) => {
+          const moduleCount = str.modules || str.moduleCount;
+          const stringId = str.id || str.mpptNumber;
+          for (let m = 1; m <= moduleCount; m++) {
+            modules.push({ string: stringId, module: m });
+          }
+        });
+      } 
+      // Mode simple stocké dans advanced_config
+      else if (advConfig.mode === 'simple' && advConfig.stringCount && advConfig.modulesPerString) {
+        for (let s = 1; s <= advConfig.stringCount; s++) {
+          for (let m = 1; m <= advConfig.modulesPerString; m++) {
+            modules.push({ string: s, module: m });
+          }
+        }
+      }
+    } else {
+      // Mode simple: utiliser colonnes directes
+      for (let s = 1; s <= configData.string_count; s++) {
+        for (let m = 1; m <= configData.modules_per_string; m++) {
+          modules.push({ string: s, module: m });
+        }
+      }
+    }
+
+    // Créer mesures vides pour chaque module (type: reference ET dark)
+    let createdCount = 0;
+    for (const mod of modules) {
+      const moduleIdentifier = `S${mod.string}-${mod.module}`;
+      
+      // Mesure référence
+      await DB.prepare(`
+        INSERT INTO iv_measurements (
+          intervention_id, audit_id, audit_token, module_identifier,
+          string_number, module_number, measurement_type,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'reference', datetime('now'))
+      `).bind(
+        configData.intervention_id || null,
+        configData.audit_id,
+        token,
+        moduleIdentifier,
+        mod.string,
+        mod.module
+      ).run();
+      
+      // Mesure sombre
+      await DB.prepare(`
+        INSERT INTO iv_measurements (
+          intervention_id, audit_id, audit_token, module_identifier,
+          string_number, module_number, measurement_type,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'dark', datetime('now'))
+      `).bind(
+        configData.intervention_id || null,
+        configData.audit_id,
+        token,
+        moduleIdentifier,
+        mod.string,
+        mod.module
+      ).run();
+      
+      createdCount += 2;
+    }
+
+    return c.json({
+      success: true,
+      message: `Mesures I-V initialisées depuis shared_configurations`,
+      total_modules: modules.length,
+      measurements_created: createdCount,
+      config_used: {
+        string_count: configData.string_count,
+        modules_per_string: configData.modules_per_string,
+        is_advanced: configData.is_advanced_mode
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Erreur POST /initialize/:token:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erreur initialisation mesures: ' + error.message 
+    }, 500);
+  }
+});
+
+// ============================================================================
 // GET /api/iv/measurements/:token - Liste mesures I-V d'un audit
 // ============================================================================
 ivRoutes.get('/measurements/:token', 
@@ -240,9 +380,20 @@ ivRoutes.get('/report/:token', async (c) => {
     const { DB } = c.env;
     const token = c.req.param('token');
 
-    // Récupérer audit info
+    // Récupérer audit info depuis audits + shared_configurations (NOUVELLE ARCHITECTURE)
     const audit = await DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
+      SELECT 
+        a.project_name,
+        a.client_name,
+        a.location,
+        sc.total_modules,
+        sc.string_count,
+        sc.modules_per_string,
+        sc.advanced_config,
+        sc.is_advanced_mode
+      FROM audits a
+      LEFT JOIN shared_configurations sc ON sc.audit_token = a.audit_token
+      WHERE a.audit_token = ?
     `).bind(token).first();
 
     if (!audit) {
