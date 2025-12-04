@@ -10,72 +10,120 @@ import { Hono } from 'hono'
 type Bindings = {
   DB: D1Database
   R2: R2Bucket
+  KV: KVNamespace
 }
 
 const report = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
-// GET /api/reports/multi-module/:audit_token - Rapport consolidé HTML
+// CACHE KV HELPERS - TTL 60 secondes (rapports plus longs)
+// ============================================================================
+const CACHE_TTL = 60 // secondes
+const CACHE_VERSION = 'v1'
+
+async function getCachedReport(
+  kv: KVNamespace,
+  cacheKey: string,
+  generateFn: () => Promise<string>
+): Promise<{ html: string; cached: boolean; timestamp: string }> {
+  // 1. Vérifier cache
+  const cached = await kv.get(cacheKey, { type: 'json' })
+  
+  if (cached && cached.html && cached.timestamp) {
+    const cacheAge = Date.now() - new Date(cached.timestamp).getTime()
+    if (cacheAge < CACHE_TTL * 1000) {
+      console.log(`✅ Cache KV HIT (Report): ${cacheKey} (age: ${(cacheAge / 1000).toFixed(1)}s)`)
+      return {
+        html: cached.html as string,
+        cached: true,
+        timestamp: cached.timestamp
+      }
+    }
+  }
+  
+  // 2. Cache MISS → Générer rapport
+  console.log(`❌ Cache KV MISS (Report): ${cacheKey} → Generate HTML`)
+  const html = await generateFn()
+  const timestamp = new Date().toISOString()
+  
+  // 3. Stocker en cache
+  await kv.put(cacheKey, JSON.stringify({ html, timestamp }), {
+    expirationTtl: CACHE_TTL
+  })
+  
+  return { html, cached: false, timestamp }
+}
+
+// ============================================================================
+// GET /api/reports/multi-module/:audit_token - Rapport consolidé HTML (AVEC CACHE KV)
 // ============================================================================
 report.get('/multi-module/:audit_token', async (c) => {
   try {
     const auditToken = c.req.param('audit_token')
+    const cacheKey = `report:multi:${auditToken}:${CACHE_VERSION}`
 
-    // 1. Récupérer audit EL
-    const audit = await c.env.DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
-    `).bind(auditToken).first()
+    const result = await getCachedReport(c.env.KV, cacheKey, async () => {
+      // 1. Récupérer audit EL
+      const audit = await c.env.DB.prepare(`
+        SELECT * FROM el_audits WHERE audit_token = ?
+      `).bind(auditToken).first()
 
-    if (!audit) {
-      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
-    }
+      if (!audit) {
+        throw new Error('Audit non trouvé')
+      }
 
-    // 2. Récupérer configuration partagée
-    const config = await c.env.DB.prepare(`
-      SELECT * FROM shared_configurations WHERE audit_token = ?
-    `).bind(auditToken).first()
+      // 2. Récupérer configuration partagée
+      const config = await c.env.DB.prepare(`
+        SELECT * FROM shared_configurations WHERE audit_token = ?
+      `).bind(auditToken).first()
 
-    // 3. Récupérer modules EL
-    const elModules = await c.env.DB.prepare(`
-      SELECT * FROM el_modules WHERE audit_token = ? ORDER BY string_number, module_number
-    `).bind(auditToken).all()
+      // 3. Récupérer modules EL
+      const elModules = await c.env.DB.prepare(`
+        SELECT * FROM el_modules WHERE audit_token = ? ORDER BY string_number, module_number
+      `).bind(auditToken).all()
 
-    // 4. Récupérer zones PV
-    const pvZones = await c.env.DB.prepare(`
-      SELECT * FROM pv_zones WHERE audit_token = ? ORDER BY zone_number
-    `).bind(auditToken).all()
+      // 4. Récupérer zones PV
+      const pvZones = await c.env.DB.prepare(`
+        SELECT * FROM pv_zones WHERE audit_token = ? ORDER BY zone_number
+      `).bind(auditToken).all()
 
-    // 5. Récupérer mesures I-V
-    const ivMeasurements = await c.env.DB.prepare(`
-      SELECT * FROM iv_measurements WHERE audit_token = ? ORDER BY string_number, module_number
-    `).bind(auditToken).all()
+      // 5. Récupérer mesures I-V
+      const ivMeasurements = await c.env.DB.prepare(`
+        SELECT * FROM iv_measurements WHERE audit_token = ? ORDER BY string_number, module_number
+      `).bind(auditToken).all()
 
-    // 6. Récupérer inspections visuelles
-    const visualInspections = await c.env.DB.prepare(`
-      SELECT * FROM visual_inspections WHERE audit_token = ? ORDER BY id
-    `).bind(auditToken).all()
+      // 6. Récupérer inspections visuelles
+      const visualInspections = await c.env.DB.prepare(`
+        SELECT * FROM visual_inspections WHERE audit_token = ? ORDER BY id
+      `).bind(auditToken).all()
 
-    // 7. Récupérer tests isolement
-    const isolationTests = await c.env.DB.prepare(`
-      SELECT * FROM isolation_tests WHERE audit_el_token = ? ORDER BY test_date
-    `).bind(auditToken).all()
+      // 7. Récupérer tests isolement
+      const isolationTests = await c.env.DB.prepare(`
+        SELECT * FROM isolation_tests WHERE audit_el_token = ? ORDER BY test_date
+      `).bind(auditToken).all()
 
-    // 8. Calculer statistiques
-    const stats = await calculateStats(c.env.DB, auditToken)
+      // 8. Calculer statistiques
+      const stats = await calculateStats(c.env.DB, auditToken)
 
-    // 9. Générer HTML rapport
-    const html = generateReportHTML({
-      audit,
-      config,
-      elModules: elModules.results,
-      pvZones: pvZones.results,
-      ivMeasurements: ivMeasurements.results,
-      visualInspections: visualInspections.results,
-      isolationTests: isolationTests.results,
-      stats
+      // 9. Générer HTML rapport
+      return generateReportHTML({
+        audit,
+        config,
+        elModules: elModules.results,
+        pvZones: pvZones.results,
+        ivMeasurements: ivMeasurements.results,
+        visualInspections: visualInspections.results,
+        isolationTests: isolationTests.results,
+        stats
+      })
     })
 
-    return c.html(html)
+    // Ajouter header cache info
+    c.header('X-Cache-Hit', result.cached ? 'true' : 'false')
+    c.header('X-Cache-Generated-At', result.timestamp)
+    c.header('X-Cache-TTL', CACHE_TTL.toString())
+
+    return c.html(result.html)
 
   } catch (error: any) {
     console.error('Erreur génération rapport:', error)
@@ -264,16 +312,121 @@ function generateReportHTML(data: any) {
     </head>
     <body>
         <!-- BOUTONS ACTIONS (no-print) -->
-        <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+        <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 10px; flex-wrap: wrap; max-width: 600px; justify-content: flex-end;">
             <button onclick="window.print()" 
-                    style="background: #FF6B35; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-right: 10px;">
+                    style="background: #FF6B35; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 <i class="fas fa-print"></i> IMPRIMER PDF
+            </button>
+            <button onclick="exportCSV()" 
+                    style="background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <i class="fas fa-file-csv"></i> EXPORT CSV
+            </button>
+            <button onclick="exportJSON()" 
+                    style="background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <i class="fas fa-file-code"></i> EXPORT JSON
+            </button>
+            <button onclick="exportSummary()" 
+                    style="background: #6c757d; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <i class="fas fa-chart-bar"></i> RÉSUMÉ
             </button>
             <button onclick="window.close()" 
                     style="background: #333; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 <i class="fas fa-times"></i> FERMER
             </button>
         </div>
+        
+        <script>
+            const auditToken = '${audit.audit_token}';
+            
+            async function exportCSV() {
+                try {
+                    const response = await fetch('/api/exports/csv/' + auditToken);
+                    if (!response.ok) throw new Error('Erreur export CSV');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'diagnostic-pv-' + auditToken.substring(0, 8) + '.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    alert('✅ Export CSV téléchargé avec succès !');
+                } catch (error) {
+                    console.error('Erreur export CSV:', error);
+                    alert('❌ Erreur lors du téléchargement CSV');
+                }
+            }
+            
+            async function exportJSON() {
+                try {
+                    const response = await fetch('/api/exports/json/' + auditToken);
+                    if (!response.ok) throw new Error('Erreur export JSON');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'diagnostic-pv-' + auditToken.substring(0, 8) + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    alert('✅ Export JSON téléchargé avec succès !');
+                } catch (error) {
+                    console.error('Erreur export JSON:', error);
+                    alert('❌ Erreur lors du téléchargement JSON');
+                }
+            }
+            
+            async function exportSummary() {
+                try {
+                    const response = await fetch('/api/exports/summary/' + auditToken);
+                    if (!response.ok) throw new Error('Erreur export résumé');
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Afficher résumé dans nouvelle fenêtre
+                        const summary = data.data;
+                        const win = window.open('', '_blank', 'width=800,height=600');
+                        win.document.write(\`
+                            <html>
+                            <head>
+                                <title>Résumé Audit</title>
+                                <style>
+                                    body { font-family: Arial; padding: 20px; }
+                                    h1 { color: #FF6B35; }
+                                    .stat { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+                                </style>
+                            </head>
+                            <body>
+                                <h1>📊 RÉSUMÉ AUDIT</h1>
+                                <h2>\${summary.audit.project_name}</h2>
+                                <h3>Statistiques</h3>
+                                <div class="stat"><strong>Modules totaux:</strong> \${summary.statistics.modules_total}</div>
+                                <div class="stat"><strong>Modules défectueux:</strong> \${summary.statistics.modules_defective}</div>
+                                <div class="stat"><strong>Mesures I-V:</strong> \${summary.statistics.iv_measurements}</div>
+                                <div class="stat"><strong>Pmax moyen:</strong> \${summary.statistics.iv_pmax_avg}</div>
+                                <div class="stat"><strong>Inspections visuelles:</strong> \${summary.statistics.visual_inspections}</div>
+                                <div class="stat"><strong>Tests isolement:</strong> \${summary.statistics.isolation_tests}</div>
+                                <h3>Conformité</h3>
+                                <div class="stat"><strong>Taux conformité EL:</strong> \${summary.conformity_rate.el}</div>
+                            </body>
+                            </html>
+                        \`);
+                    } else {
+                        alert('❌ Erreur: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Erreur export résumé:', error);
+                    alert('❌ Erreur lors du chargement du résumé');
+                }
+            }
+        </script>
 
         <!-- EN-TÊTE -->
         <div class="header">

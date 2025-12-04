@@ -182,10 +182,16 @@ import reportsRoutes from './modules/reports/multi-module-report'
 app.route('/api/reports', reportsRoutes)
 
 // ============================================================================
-// MODULE ANALYTICS - DASHBOARD MÉTRIQUES TEMPS RÉEL
+// MODULE ANALYTICS - DASHBOARD MÉTRIQUES TEMPS RÉEL (AVEC CACHE KV)
 // ============================================================================
 import analyticsRoutes from './modules/analytics/routes'
 app.route('/api/analytics', analyticsRoutes)
+
+// ============================================================================
+// MODULE EXPORTS - EXPORTS CSV/JSON/SUMMARY
+// ============================================================================
+import exportsRoutes from './modules/exports/routes'
+app.route('/api/exports', exportsRoutes)
 
 // ============================================================================
 // MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)

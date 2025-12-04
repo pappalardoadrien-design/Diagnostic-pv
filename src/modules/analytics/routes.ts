@@ -9,17 +9,66 @@ import { Hono } from 'hono'
 
 type Bindings = {
   DB: D1Database
+  KV: KVNamespace
 }
 
 const analytics = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================================
-// GET /api/analytics/global - KPIs globaux plateforme
+// CACHE KV HELPERS - TTL 60 secondes (minimum Cloudflare KV)
+// ============================================================================
+const CACHE_TTL = 60 // secondes (minimum KV)
+const CACHE_VERSION = 'v1'
+
+async function getCachedOrFetch<T>(
+  kv: KVNamespace,
+  cacheKey: string,
+  fetchFn: () => Promise<T>
+): Promise<{ data: T; cached: boolean; timestamp: string }> {
+  // 1. Vérifier cache
+  const cached = await kv.get(cacheKey, { type: 'json' })
+  
+  if (cached && cached.data && cached.timestamp) {
+    const cacheAge = Date.now() - new Date(cached.timestamp).getTime()
+    if (cacheAge < CACHE_TTL * 1000) {
+      console.log(`✅ Cache KV HIT: ${cacheKey} (age: ${(cacheAge / 1000).toFixed(1)}s)`)
+      return {
+        data: cached.data as T,
+        cached: true,
+        timestamp: cached.timestamp
+      }
+    }
+  }
+  
+  // 2. Cache MISS ou expiré → Fetch données
+  console.log(`❌ Cache KV MISS: ${cacheKey} → Query D1`)
+  const data = await fetchFn()
+  const timestamp = new Date().toISOString()
+  
+  // 3. Stocker en cache
+  await kv.put(cacheKey, JSON.stringify({ data, timestamp }), {
+    expirationTtl: CACHE_TTL
+  })
+  
+  return { data, cached: false, timestamp }
+}
+
+async function invalidateCache(kv: KVNamespace, pattern: string) {
+  // Invalidation simple : on pourrait lister les clés avec prefix
+  // Pour l'instant, on laisse expirer naturellement (30s)
+  console.log(`🗑️ Cache invalidation demandée: ${pattern}`)
+}
+
+// ============================================================================
+// GET /api/analytics/global - KPIs globaux plateforme (AVEC CACHE KV)
 // ============================================================================
 analytics.get('/global', async (c) => {
   try {
-    // 1. Stats audits EL
-    const auditsStats = await c.env.DB.prepare(`
+    const cacheKey = `analytics:global:${CACHE_VERSION}`
+    
+    const result = await getCachedOrFetch(c.env.KV, cacheKey, async () => {
+      // 1. Stats audits EL
+      const auditsStats = await c.env.DB.prepare(`
       SELECT 
         COUNT(*) as total_audits,
         COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_audits,
@@ -40,9 +89,9 @@ analytics.get('/global', async (c) => {
     const ivStats = await c.env.DB.prepare(`
       SELECT 
         COUNT(*) as total_measurements,
-        AVG(pmax_measured) as avg_pmax,
-        AVG(ABS(deviation_percent)) as avg_deviation,
-        COUNT(CASE WHEN ABS(deviation_percent) > 10 THEN 1 END) as high_deviation_count
+        AVG(pmax) as avg_pmax,
+        AVG(ABS(deviation_from_datasheet)) as avg_deviation,
+        COUNT(CASE WHEN ABS(deviation_from_datasheet) > 10 THEN 1 END) as high_deviation_count
       FROM iv_measurements 
       WHERE measurement_type = 'reference'
     `).first()
@@ -103,8 +152,8 @@ analytics.get('/global', async (c) => {
       SELECT 
         string_number,
         COUNT(*) as modules_count,
-        AVG(pmax_measured) as avg_pmax,
-        AVG(ABS(deviation_percent)) as avg_deviation
+        AVG(pmax) as avg_pmax,
+        AVG(ABS(deviation_from_datasheet)) as avg_deviation
       FROM iv_measurements
       WHERE measurement_type = 'reference'
       GROUP BY string_number
@@ -125,9 +174,7 @@ analytics.get('/global', async (c) => {
         : '0'
     }
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         audits: auditsStats,
         modules: modulesStats,
         iv: ivStats,
@@ -138,8 +185,17 @@ analytics.get('/global', async (c) => {
         audits_trend: auditsTrend.results,
         string_performance: stringPerformance.results,
         conformity_rate: conformityRate
-      },
-      generated_at: new Date().toISOString()
+      }
+    })
+
+    return c.json({
+      success: true,
+      data: result.data,
+      cache: {
+        hit: result.cached,
+        generated_at: result.timestamp,
+        ttl: CACHE_TTL
+      }
     })
 
   } catch (error: any) {
@@ -153,22 +209,24 @@ analytics.get('/global', async (c) => {
 })
 
 // ============================================================================
-// GET /api/analytics/audit/:token - Analytics audit spécifique
+// GET /api/analytics/audit/:token - Analytics audit spécifique (AVEC CACHE KV)
 // ============================================================================
 analytics.get('/audit/:token', async (c) => {
   try {
     const auditToken = c.req.param('token')
+    const cacheKey = `analytics:audit:${auditToken}:${CACHE_VERSION}`
 
-    // 1. Info audit
-    const audit = await c.env.DB.prepare(`
-      SELECT * FROM el_audits WHERE audit_token = ?
-    `).bind(auditToken).first()
+    const result = await getCachedOrFetch(c.env.KV, cacheKey, async () => {
+      // 1. Info audit
+      const audit = await c.env.DB.prepare(`
+        SELECT * FROM el_audits WHERE audit_token = ?
+      `).bind(auditToken).first()
 
-    if (!audit) {
-      return c.json({ success: false, error: 'Audit non trouvé' }, 404)
-    }
+      if (!audit) {
+        throw new Error('Audit non trouvé')
+      }
 
-    // 2. Stats modules EL
+      // 2. Stats modules EL
     const elStats = await c.env.DB.prepare(`
       SELECT 
         COUNT(*) as total,
@@ -184,11 +242,11 @@ analytics.get('/audit/:token', async (c) => {
     const ivStats = await c.env.DB.prepare(`
       SELECT 
         COUNT(*) as total,
-        AVG(pmax_measured) as avg_pmax,
-        MIN(pmax_measured) as min_pmax,
-        MAX(pmax_measured) as max_pmax,
-        AVG(ABS(deviation_percent)) as avg_deviation,
-        COUNT(CASE WHEN ABS(deviation_percent) > 10 THEN 1 END) as high_deviation
+        AVG(pmax) as avg_pmax,
+        MIN(pmax) as min_pmax,
+        MAX(pmax) as max_pmax,
+        AVG(ABS(deviation_from_datasheet)) as avg_deviation,
+        COUNT(CASE WHEN ABS(deviation_from_datasheet) > 10 THEN 1 END) as high_deviation
       FROM iv_measurements
       WHERE audit_token = ? AND measurement_type = 'reference'
     `).bind(auditToken).first()
@@ -234,17 +292,15 @@ analytics.get('/audit/:token', async (c) => {
       SELECT 
         string_number,
         COUNT(*) as modules_count,
-        AVG(pmax_measured) as avg_pmax,
-        AVG(ABS(deviation_percent)) as avg_deviation
+        AVG(pmax) as avg_pmax,
+        AVG(ABS(deviation_from_datasheet)) as avg_deviation
       FROM iv_measurements
       WHERE audit_token = ? AND measurement_type = 'reference'
       GROUP BY string_number
       ORDER BY string_number
     `).bind(auditToken).all()
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         audit: audit,
         el: elStats.results,
         iv: ivStats,
@@ -252,8 +308,17 @@ analytics.get('/audit/:token', async (c) => {
         isolation: isolationStats,
         defects_by_string: defectsByString.results,
         iv_by_string: ivByString.results
-      },
-      generated_at: new Date().toISOString()
+      }
+    })
+
+    return c.json({
+      success: true,
+      data: result.data,
+      cache: {
+        hit: result.cached,
+        generated_at: result.timestamp,
+        ttl: CACHE_TTL
+      }
     })
 
   } catch (error: any) {
@@ -267,30 +332,40 @@ analytics.get('/audit/:token', async (c) => {
 })
 
 // ============================================================================
-// GET /api/analytics/realtime - Métriques temps réel (cache 30s)
+// GET /api/analytics/realtime - Métriques temps réel (AVEC CACHE KV 30s)
 // ============================================================================
 analytics.get('/realtime', async (c) => {
   try {
-    // Compteurs temps réel
-    const realtimeData = await c.env.DB.batch([
-      c.env.DB.prepare('SELECT COUNT(*) as count FROM el_audits WHERE created_at >= datetime("now", "-1 hour")'),
-      c.env.DB.prepare('SELECT COUNT(*) as count FROM el_modules WHERE created_at >= datetime("now", "-1 hour")'),
-      c.env.DB.prepare('SELECT COUNT(*) as count FROM iv_measurements WHERE created_at >= datetime("now", "-1 hour")'),
-      c.env.DB.prepare('SELECT COUNT(*) as count FROM visual_inspections WHERE created_at >= datetime("now", "-1 hour")'),
-      c.env.DB.prepare('SELECT COUNT(*) as count FROM photos WHERE created_at >= datetime("now", "-1 hour")')
-    ])
+    const cacheKey = `analytics:realtime:${CACHE_VERSION}`
+    
+    const result = await getCachedOrFetch(c.env.KV, cacheKey, async () => {
+      // Compteurs temps réel
+      const realtimeData = await c.env.DB.batch([
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM el_audits WHERE created_at >= datetime("now", "-1 hour")'),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM el_modules WHERE created_at >= datetime("now", "-1 hour")'),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM iv_measurements WHERE created_at >= datetime("now", "-1 hour")'),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM visual_inspections WHERE created_at >= datetime("now", "-1 hour")'),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM photos WHERE created_at >= datetime("now", "-1 hour")')
+      ])
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         last_hour: {
           audits: realtimeData[0].results[0]?.count || 0,
           modules: realtimeData[1].results[0]?.count || 0,
           iv_measurements: realtimeData[2].results[0]?.count || 0,
           visual_inspections: realtimeData[3].results[0]?.count || 0,
           photos: realtimeData[4].results[0]?.count || 0
-        },
-        timestamp: new Date().toISOString()
+        }
+      }
+    })
+
+    return c.json({
+      success: true,
+      data: result.data,
+      cache: {
+        hit: result.cached,
+        generated_at: result.timestamp,
+        ttl: CACHE_TTL
       }
     })
 
