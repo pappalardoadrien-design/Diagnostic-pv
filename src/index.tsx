@@ -25,6 +25,8 @@ import { getAuditIvGraphsPage } from './pages/audit-iv-graphs'
 import { getAuditVisualPage } from './pages/audit-visual'
 import { getAuditIsolationPage } from './pages/audit-isolation'
 import { getPhotosUploadPage } from './pages/photos-upload'
+import { getAnalyticsDashboardPage } from './pages/analytics-dashboard'
+import { getPhotosGalleryPage } from './pages/photos-gallery'
 import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
 import { getGirasoleToitureChecklistPage } from './pages/audit-visual-girasole-toiture'
 import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
@@ -516,6 +518,16 @@ app.get('/audit/:token/iv/graphs', (c) => {
 // Module Photos - Upload Interface
 app.get('/audit/:token/photos/upload', (c) => {
   return c.html(getPhotosUploadPage())
+})
+
+// Dashboard Analytics
+app.get('/analytics/dashboard', (c) => {
+  return c.html(getAnalyticsDashboardPage())
+})
+
+// Galerie Photos
+app.get('/audit/:token/photos', (c) => {
+  return c.html(getPhotosGalleryPage())
 })
 
 // Module I-V - Pages UI
