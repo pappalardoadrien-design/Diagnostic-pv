@@ -21,8 +21,12 @@ import { getPlanningCalendarPage } from './pages/planning-calendar'
 import { getCrmDashboardPage } from './pages/crm-dashboard'
 import { getAuditsCreatePage } from './pages/audits-create'
 import { getAuditIvPage } from './pages/audit-iv'
+import { getAuditIvGraphsPage } from './pages/audit-iv-graphs'
 import { getAuditVisualPage } from './pages/audit-visual'
 import { getAuditIsolationPage } from './pages/audit-isolation'
+import { getPhotosUploadPage } from './pages/photos-upload'
+import { getAnalyticsDashboardPage } from './pages/analytics-dashboard'
+import { getPhotosGalleryPage } from './pages/photos-gallery'
 import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
 import { getGirasoleToitureChecklistPage } from './pages/audit-visual-girasole-toiture'
 import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
@@ -136,6 +140,12 @@ import consolidatedFullRoutes from './modules/reports/consolidated-full'
 app.route('/api/reports/consolidated-full', consolidatedFullRoutes)
 
 // ============================================================================
+// MODULE THERMOGRAPHIE - THERMOGRAPHIE IR (MISSION 1)
+// ============================================================================
+import thermiqueRoutes from './modules/thermique/routes'
+app.route('/api/thermique', thermiqueRoutes)
+
+// ============================================================================
 // MODULE EXPORTS - EXPORT CSV DES DONNÉES
 // ============================================================================
 import csvExportRoutes from './modules/exports/csv-routes'
@@ -164,6 +174,30 @@ app.route('/api/visual', visualRoutes)
 // ============================================================================
 import isolationRoutes from './modules/isolation/routes/index'
 app.route('/api/isolation', isolationRoutes)
+
+// ============================================================================
+// MODULE PHOTOS - UPLOAD & STOCKAGE R2
+// ============================================================================
+import photosRoutes from './modules/photos/routes'
+app.route('/api/photos', photosRoutes)
+
+// ============================================================================
+// MODULE REPORTS - RAPPORTS MULTI-MODULES
+// ============================================================================
+import reportsRoutes from './modules/reports/multi-module-report'
+app.route('/api/reports', reportsRoutes)
+
+// ============================================================================
+// MODULE ANALYTICS - DASHBOARD MÉTRIQUES TEMPS RÉEL (AVEC CACHE KV)
+// ============================================================================
+import analyticsRoutes from './modules/analytics/routes'
+app.route('/api/analytics', analyticsRoutes)
+
+// ============================================================================
+// MODULE EXPORTS - EXPORTS CSV/JSON/SUMMARY
+// ============================================================================
+import exportsRoutes from './modules/exports/routes'
+app.route('/api/exports', exportsRoutes)
 
 // ============================================================================
 // MODULE UNIFIED MODULES - DONNÉES COMPLÈTES MODULES (EL + I-V + PVserv)
@@ -464,6 +498,27 @@ app.get('/planning/calendar', (c) => {
 })
 
 // ============================================================================
+// PAGE RAPPORT PDF - IMPRESSION OPTIMISÉE (PHASE 10)
+// Rapport multi-modules avec CSS @media print pour window.print()
+// ============================================================================
+import { getRapportPrintPage } from './pages/rapport-print'
+app.get('/rapport/print/:audit_token', getRapportPrintPage)
+
+// ============================================================================
+// PAGE FIN D'AUDIT - INTERFACE COMPLÉTION (PHASE 10.3)
+// Checklist modules, statuts, génération rapport final
+// ============================================================================
+import { getAuditCompletePage } from './pages/audit-complete'
+app.get('/audit/:audit_token/complete', getAuditCompletePage)
+
+// ============================================================================
+// PAGE AUDIT THERMOGRAPHIE - ANALYSE THERMIQUE IR (MISSION 1)
+// Thermographie infrarouge - Défauts thermiques - DIN EN 62446-3
+// ============================================================================
+import { getAuditThermiquePage } from './pages/audit-thermique'
+app.get('/audit/thermique/:audit_token', getAuditThermiquePage)
+
+// ============================================================================
 // PAGE CRM DASHBOARD - PAGE CENTRALE APPLICATION
 // Hub central avec KPIs, audits en cours, planning, actions rapides
 // ============================================================================
@@ -486,6 +541,26 @@ app.get('/audits/create', (c) => {
 // Module I-V - Courbes I-V
 app.get('/audit/:token/iv', (c) => {
   return c.html(getAuditIvPage())
+})
+
+// Module I-V - Graphiques Courbes
+app.get('/audit/:token/iv/graphs', (c) => {
+  return c.html(getAuditIvGraphsPage())
+})
+
+// Module Photos - Upload Interface
+app.get('/audit/:token/photos/upload', (c) => {
+  return c.html(getPhotosUploadPage())
+})
+
+// Dashboard Analytics
+app.get('/analytics/dashboard', (c) => {
+  return c.html(getAnalyticsDashboardPage())
+})
+
+// Galerie Photos
+app.get('/audit/:token/photos', (c) => {
+  return c.html(getPhotosGalleryPage())
 })
 
 // Module I-V - Pages UI

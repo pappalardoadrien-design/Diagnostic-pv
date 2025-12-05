@@ -26,9 +26,7 @@
     "git:status": "git status",
     "git:log": "git log --oneline",
     "backup": "./scripts/backup.sh",
-    "backup:now": "./scripts/backup.sh && echo 'Backup manuel terminé'",
-    "prebuild": "npm run backup",
-    "predeploy": "npm run backup"
+    "backup:now": "./scripts/backup.sh && echo 'Backup manuel terminé'"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

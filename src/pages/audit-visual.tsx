@@ -177,9 +177,28 @@ export function getAuditVisualPage() {
                             <textarea id="notes" rows="3" class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2"></textarea>
                         </div>
                         
-                        <div>
-                            <label class="block font-bold mb-2">Photo (URL) :</label>
-                            <input type="url" id="photo-url" placeholder="https://..." class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                        <div class="bg-gray-800 p-4 rounded border border-gray-600">
+                            <label class="block font-bold mb-3">📸 PHOTO TERRAIN :</label>
+                            
+                            <!-- Bouton Capture Photo Mobile -->
+                            <input type="file" id="photo-input" accept="image/*" capture="environment" class="hidden">
+                            <button type="button" onclick="document.getElementById('photo-input').click()" 
+                                    class="w-full bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg font-bold mb-3">
+                                <i class="fas fa-camera mr-2"></i>
+                                PRENDRE UNE PHOTO
+                            </button>
+                            
+                            <!-- Preview Photo -->
+                            <div id="photo-preview" class="hidden">
+                                <img id="preview-img" class="w-full rounded border-2 border-teal-400 mb-2" alt="Preview">
+                                <p class="text-sm text-gray-400 text-center" id="photo-info"></p>
+                            </div>
+                            
+                            <!-- Option URL alternative -->
+                            <div class="mt-3">
+                                <label class="block text-sm font-bold mb-2 text-gray-400">Ou coller URL photo :</label>
+                                <input type="url" id="photo-url" placeholder="https://..." class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2">
+                            </div>
                         </div>
                         
                         <div class="flex gap-4 mt-6">
@@ -294,8 +313,58 @@ export function getAuditVisualPage() {
                 document.getElementById('action-details').classList.toggle('hidden', !e.target.checked)
             })
             
+            // Upload photo terrain
+            let photoBase64 = null
+            
+            document.getElementById('photo-input').addEventListener('change', async (e) => {
+                const file = e.target.files[0]
+                if (!file) return
+                
+                // Vérifier taille (max 4MB recommandé pour D1)
+                if (file.size > 4 * 1024 * 1024) {
+                    alert('Photo trop volumineuse (max 4MB). Compressez-la.')
+                    return
+                }
+                
+                // Lire fichier comme base64
+                const reader = new FileReader()
+                reader.onload = (event) => {
+                    photoBase64 = event.target.result
+                    
+                    // Afficher preview
+                    document.getElementById('preview-img').src = photoBase64
+                    document.getElementById('photo-preview').classList.remove('hidden')
+                    document.getElementById('photo-info').textContent = \`\${(file.size / 1024).toFixed(0)} KB - \${file.name}\`
+                }
+                reader.readAsDataURL(file)
+            })
+            
             document.getElementById('inspectionForm').addEventListener('submit', async (e) => {
                 e.preventDefault()
+                
+                let photoUrl = document.getElementById('photo-url').value || null
+                
+                // Si photo base64 capturée, uploader d'abord
+                if (photoBase64) {
+                    try {
+                        const photoResponse = await axios.post(\`/api/photos/upload\`, {
+                            audit_token: auditToken,
+                            module_type: 'VISUAL',
+                            photo_data: photoBase64,
+                            description: document.getElementById('notes').value,
+                            string_number: parseInt(document.getElementById('string-number').value) || null,
+                            module_number: parseInt(document.getElementById('module-number').value) || null
+                        })
+                        
+                        if (photoResponse.data.success) {
+                            // Générer URL de la photo uploadée
+                            photoUrl = \`/api/photos/\${auditToken}/\${photoResponse.data.photo_id}\`
+                        }
+                    } catch (error) {
+                        console.error('Erreur upload photo:', error)
+                        alert('Avertissement: Photo non uploadée, mais observation sera sauvegardée.')
+                    }
+                }
                 
                 const data = {
                     inspection_type: document.getElementById('inspection-type').value,
@@ -306,7 +375,7 @@ export function getAuditVisualPage() {
                     defect_type: document.getElementById('defect-type').value || null,
                     severity_level: parseInt(document.getElementById('severity').value) || null,
                     notes: document.getElementById('notes').value,
-                    photo_url: document.getElementById('photo-url').value || null,
+                    photo_url: photoUrl,
                     corrective_action_required: document.getElementById('action-required').checked,
                     corrective_action_description: document.getElementById('action-desc').value || null
                 }
@@ -316,6 +385,8 @@ export function getAuditVisualPage() {
                     document.getElementById('modalInspection').classList.add('hidden')
                     document.getElementById('inspectionForm').reset()
                     document.getElementById('defect-details').classList.add('hidden')
+                    document.getElementById('photo-preview').classList.add('hidden')
+                    photoBase64 = null
                     loadInspections()
                 } catch (error) {
                     alert('Erreur: ' + (error.response?.data?.error || error.message))
