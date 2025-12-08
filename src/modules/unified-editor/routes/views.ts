@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
-// @ts-ignore
-import editorHtml from '../views/unified-editor.html?raw'
+import { unifiedEditorHtml } from '../views/unified-editor-html'
 
 const views = new Hono<{ Bindings: { DB: D1Database } }>()
 
@@ -9,7 +8,7 @@ views.get('/:zoneId', async (c) => {
   const zoneId = c.req.param('zoneId')
   
   // Remplacement dynamique de l'ID de zone dans le HTML
-  const html = editorHtml.replace(/{{ZONE_ID}}/g, zoneId)
+  const html = unifiedEditorHtml.replace(/{{ZONE_ID}}/g, zoneId)
   
   return c.html(html)
 })

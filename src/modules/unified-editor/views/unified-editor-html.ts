@@ -1,0 +1,509 @@
+export const unifiedEditorHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Studio - DiagPV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { height: 100%; overflow: hidden; }
+        .canvas-grid {
+            background-image: 
+                linear-gradient(#e5e7eb 1px, transparent 1px),
+                linear-gradient(90deg, #e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .inspector-panel {
+            transition: transform 0.3s ease-in-out;
+        }
+        .inspector-panel.closed {
+            transform: translateX(100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col h-full text-slate-800">
+
+    <!-- 1. TOP BAR (Command Center) -->
+    <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 z-20 shadow-sm">
+        <div class="flex items-center space-x-4">
+            <button onclick="history.back()" class="text-gray-500 hover:text-gray-800">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div>
+                <h1 class="text-lg font-bold text-gray-800">Digital Twin Studio</h1>
+                <div class="flex items-center text-xs text-gray-500 space-x-2">
+                    <span id="plantName">Centrale Inconnue</span>
+                    <i class="fas fa-chevron-right text-[10px]"></i>
+                    <select id="missionSelector" onchange="updateMissionContext()" class="bg-transparent border-none font-bold text-purple-700 focus:ring-0 cursor-pointer">
+                        <option value="all">Mission Complète (EL + IV + Visuel)</option>
+                        <option value="el">Audit Électroluminescence</option>
+                        <option value="visual">Audit Visuel / Drone</option>
+                        <option value="iv">Audit Courbes I-V</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Switcher -->
+        <div class="flex bg-gray-100 p-1 rounded-lg">
+            <button onclick="switchView('map')" id="btnViewMap" class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white shadow-sm text-purple-700">
+                <i class="fas fa-satellite mr-2"></i>Satellite
+            </button>
+            <button onclick="switchView('schematic')" id="btnViewSchematic" class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-gray-600 hover:text-gray-900">
+                <i class="fas fa-project-diagram mr-2"></i>Schématique
+            </button>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <div id="syncStatus" class="text-xs text-gray-400 hidden">
+                <i class="fas fa-check mr-1"></i>Sauvegardé
+            </div>
+            <button onclick="syncFull()" class="bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>Sync Multi-Modules
+            </button>
+            <button onclick="saveChanges()" class="bg-purple-600 text-white hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">
+                <i class="fas fa-save mr-2"></i>Sauvegarder
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- LEFT: Module List (Collapsible) -->
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col z-10">
+            <div class="p-4 border-b border-gray-100">
+                <input type="text" placeholder="Rechercher module..." class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-500">
+            </div>
+            <div class="flex-1 overflow-y-auto p-2 space-y-1" id="moduleList">
+                <!-- Modules injected here -->
+            </div>
+            <div class="p-3 border-t border-gray-100 bg-gray-50 text-xs text-center text-gray-400">
+                <span id="totalModules">0</span> modules • <span id="totalStrings">0</span> strings
+            </div>
+        </div>
+
+        <!-- CENTER: Canvas / Map -->
+        <div class="flex-1 relative bg-gray-50">
+            
+            <!-- Map View -->
+            <div id="mapContainer" class="absolute inset-0 z-0"></div>
+
+            <!-- Schematic View (Hidden by default) -->
+            <div id="schematicContainer" class="absolute inset-0 z-0 hidden canvas-grid overflow-hidden">
+                <canvas id="schematicCanvas"></canvas>
+            </div>
+
+            <!-- Loading Overlay -->
+            <div id="loadingOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p class="text-gray-500 font-medium">Chargement du Jumeau Numérique...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: INSPECTOR (The "Lateral Inspector") -->
+        <div id="inspectorPanel" class="w-80 bg-white border-l border-gray-200 shadow-xl z-20 flex flex-col inspector-panel closed absolute right-0 top-0 bottom-0 h-full">
+            <!-- Header -->
+            <div class="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-gray-50">
+                <div>
+                    <h2 class="font-bold text-lg text-gray-800" id="inspModuleId">--</h2>
+                    <p class="text-xs text-gray-500" id="inspStringId">Sélectionnez un module</p>
+                </div>
+                <button onclick="closeInspector()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200">
+                <button onclick="switchTab('el')" class="flex-1 py-3 text-sm font-medium text-purple-600 border-b-2 border-purple-600 active-tab">EL</button>
+                <button onclick="switchTab('visual')" class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Visuel</button>
+                <button onclick="switchTab('iv')" class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">I-V</button>
+                <button onclick="switchTab('info')" class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Infos</button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                <!-- TAB: EL Audit -->
+                <div id="tab-el" class="space-y-4">
+                    <div class="aspect-square bg-gray-900 rounded-lg overflow-hidden relative group">
+                        <img id="inspELImage" src="" class="w-full h-full object-contain hidden">
+                        <div id="inspELPlaceholder" class="w-full h-full flex items-center justify-center text-gray-500 flex-col">
+                            <i class="fas fa-camera-retro text-3xl mb-2"></i>
+                            <span class="text-xs">Pas d'image EL</span>
+                        </div>
+                        <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                            EL
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Statut Électroluminescence</label>
+                        <select id="inspELStatus" onchange="updateModuleStatus('el')" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="ok">🟢 OK (Intact)</option>
+                            <option value="microcracks">🟠 Microfissures</option>
+                            <option value="pid">🟠 PID (Dégradation)</option>
+                            <option value="dead_cell">🔴 Cellule Morte</option>
+                            <option value="hotspot">🔴 Hotspot</option>
+                            <option value="bypass_diode">🔴 Diode Bypass</option>
+                            <option value="string_open">⚫ String Ouvert</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TAB: Visual -->
+                <div id="tab-visual" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">État Visuel</label>
+                        <select id="inspVisualStatus" onchange="updateModuleStatus('visual')" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-md">
+                            <option value="ok">🟢 RAS</option>
+                            <option value="dirty">🟠 Sale / Soiling</option>
+                            <option value="vegetation">🟠 Ombrage Végétation</option>
+                            <option value="breakage">🔴 Casse / Impact</option>
+                            <option value="delamination">🔴 Délamination</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TAB: IV -->
+                 <div id="tab-iv" class="space-y-4 hidden">
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 class="font-bold text-blue-800 text-sm mb-1"><i class="fas fa-bolt mr-2"></i>Audit I-V</h3>
+                        <p class="text-xs text-blue-700">Mesures électriques.</p>
+                    </div>
+                     <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">État I-V</label>
+                        <select id="inspIVStatus" onchange="updateModuleStatus('iv')" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-md">
+                            <option value="ok">🟢 Normal</option>
+                            <option value="measured">🔵 Mesuré</option>
+                            <option value="low_power">🟠 Sous-performance</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TAB: Infos -->
+                <div id="tab-info" class="space-y-4 hidden">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs text-gray-400">Latitude</label>
+                            <div class="font-mono text-sm" id="inspLat">-</div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Longitude</label>
+                            <div class="font-mono text-sm" id="inspLon">-</div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">String</label>
+                            <input type="number" id="inspStringInput" class="w-full border rounded px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Position</label>
+                            <input type="number" id="inspPosInput" class="w-full border rounded px-2 py-1 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Footer -->
+            <div class="p-4 border-t border-gray-200 bg-gray-50">
+                <button onclick="saveInspector()" class="w-full bg-purple-600 text-white py-2 rounded-md font-semibold hover:bg-purple-700 transition">
+                    Appliquer les modifications
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- GLOBAL STATE ---
+        const ZONE_ID = window.location.pathname.split('/').pop();
+        let MODULES = []; // The Single Source of Truth
+        let VIEW_MODE = 'map'; // 'map' or 'schematic'
+        let SELECTED_MODULE_ID = null;
+        let map = null;
+        let mapMarkers = {}; // id -> L.rectangle
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initMap();
+            await loadTopology();
+        });
+
+        // --- API CALLS ---
+        async function loadTopology() {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            try {
+                const res = await fetch(\`/api/unified/topology/\${ZONE_ID}\`);
+                const data = await res.json();
+                if(data.success) {
+                    MODULES = data.modules;
+                    renderModuleList();
+                    renderMapModules();
+                    // renderSchematicModules(); // TODO
+                    updateStats();
+                } else {
+                    alert('Erreur chargement: ' + data.error);
+                }
+            } catch(e) {
+                console.error(e);
+                alert('Erreur réseau');
+            } finally {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }
+        }
+
+        async function syncFull() {
+            if(!confirm("Lancer la synchronisation multi-modules (EL + Visual + IV) ?")) return;
+            
+            try {
+                const res = await fetch(\`/api/unified/topology/\${ZONE_ID}/sync-full\`, { method: 'POST' });
+                const data = await res.json();
+                if(data.success) {
+                    alert(\`\${data.total_synced_topology} modules synchronisés !\\nLogs:\\n\${data.logs.join('\\n')}\`);
+                    loadTopology(); // Reload data
+                } else {
+                    alert('Erreur sync: ' + data.error);
+                }
+            } catch(e) {
+                alert('Erreur réseau pendant la sync');
+            }
+        }
+
+        // --- MAP ENGINE (Leaflet) ---
+        async function initMap() {
+            map = L.map('mapContainer').setView([43.6, 1.4], 18); // Default Toulouse
+            
+            // Google Satellite Layer
+            L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+                maxZoom: 21,
+                subdomains:['mt0','mt1','mt2','mt3']
+            }).addTo(map);
+
+            // Center map on modules if they exist
+            // (Will be done in renderMapModules)
+        }
+
+        function renderMapModules() {
+            // Clear existing
+            Object.values(mapMarkers).forEach(m => map.removeLayer(m));
+            mapMarkers = {};
+            
+            if(MODULES.length === 0) return;
+
+            const bounds = L.latLngBounds([]);
+
+            MODULES.forEach(m => {
+                if(!m.geo_lat || !m.geo_lon) return; // Skip if no GPS
+
+                const color = getStatusColor(m);
+                const boundsArr = [
+                    [m.geo_lat, m.geo_lon], 
+                    [m.geo_lat + 0.00001, m.geo_lon + 0.000015] // Simple rect approx for demo
+                ];
+
+                const rect = L.rectangle(boundsArr, {
+                    color: color,
+                    weight: 1,
+                    fillOpacity: 0.6
+                }).addTo(map);
+                
+                rect.on('click', () => openInspector(m.id));
+                mapMarkers[m.id] = rect;
+                bounds.extend(boundsArr);
+            });
+
+            if(bounds.isValid()) map.fitBounds(bounds);
+        }
+
+        // --- UI LOGIC ---
+        function getStatusColor(m) {
+            // CORRELATION ENGINE (Simple Version)
+            // Priority: Red (Critical) > Orange (Warning) > Green (OK) > Gray (Unknown)
+            
+            const defects = [];
+            if(m.status_el && m.status_el !== 'ok') defects.push({ type: 'el', val: m.status_el });
+            if(m.status_visual && m.status_visual !== 'ok') defects.push({ type: 'vis', val: m.status_visual });
+            if(m.status_iv && m.status_iv !== 'ok') defects.push({ type: 'iv', val: m.status_iv });
+
+            // 1. Critical
+            if(defects.some(d => ['dead_cell', 'hotspot', 'bypass_diode', 'breakage', 'delamination', 'string_open'].includes(d.val))) {
+                return '#ef4444'; // Red
+            }
+            // 2. Warning
+            if(defects.some(d => ['microcracks', 'pid', 'dirty', 'vegetation', 'low_power'].includes(d.val))) {
+                return '#f97316'; // Orange
+            }
+            // 3. Info / Measured
+            if(defects.some(d => ['measured'].includes(d.val))) {
+                return '#3b82f6'; // Blue
+            }
+            // 4. OK
+            if(m.status_el === 'ok' || m.status_visual === 'ok' || m.status_iv === 'ok') {
+                return '#22c55e'; // Green
+            }
+
+            return '#94a3b8'; // Gray
+        }
+
+        function updateMissionContext() {
+            const mission = document.getElementById('missionSelector').value;
+            // Filter Tabs
+            const tabs = {
+                'el': document.querySelector('button[onclick="switchTab(\\'el\\')"]'),
+                'visual': document.querySelector('button[onclick="switchTab(\\'visual\\')"]'),
+                'iv': document.querySelector('button[onclick="switchTab(\\'iv\\')"]'),
+            };
+            
+            // Reset all
+            Object.values(tabs).forEach(t => t.style.display = 'block');
+
+            if(mission === 'el') {
+                tabs['visual'].style.display = 'none';
+                tabs['iv'].style.display = 'none';
+                switchTab('el');
+            } else if (mission === 'visual') {
+                tabs['el'].style.display = 'none';
+                tabs['iv'].style.display = 'none';
+                switchTab('visual');
+            } else if (mission === 'iv') {
+                tabs['el'].style.display = 'none';
+                tabs['visual'].style.display = 'none';
+                switchTab('iv');
+            }
+            
+            // Re-render map to reflect context if we want mission-specific coloring (optional)
+            // For now, we keep correlation view as default
+        }
+
+        function renderModuleList() {
+            const list = document.getElementById('moduleList');
+            list.innerHTML = '';
+            
+            MODULES.sort((a,b) => {
+                if(a.string_number !== b.string_number) return a.string_number - b.string_number;
+                return a.position_in_string - b.position_in_string;
+            });
+
+            MODULES.forEach(m => {
+                const el = document.createElement('div');
+                el.className = 'flex items-center p-2 hover:bg-purple-50 cursor-pointer rounded text-xs';
+                el.onclick = () => openInspector(m.id);
+                el.innerHTML = \`
+                    <div class="w-3 h-3 rounded-full mr-2" style="background-color: \${getStatusColor(m)}"></div>
+                    <span class="font-mono font-bold w-16">\${m.module_identifier}</span>
+                    <span class="text-gray-400">S\${m.string_number}:P\${m.position_in_string}</span>
+                \`;
+                list.appendChild(el);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('totalModules').innerText = MODULES.length;
+            const strings = new Set(MODULES.map(m => m.string_number));
+            document.getElementById('totalStrings').innerText = strings.size;
+        }
+
+        // --- INSPECTOR LOGIC ---
+        function openInspector(moduleId) {
+            const m = MODULES.find(mod => mod.id === moduleId);
+            if(!m) return;
+            SELECTED_MODULE_ID = moduleId;
+
+            document.getElementById('inspectorPanel').classList.remove('closed');
+            
+            // Populate Data
+            document.getElementById('inspModuleId').innerText = m.module_identifier;
+            document.getElementById('inspStringId').innerText = \`String \${m.string_number} • Pos \${m.position_in_string}\`;
+            
+            // EL Tab
+            document.getElementById('inspELStatus').value = m.status_el || 'ok';
+            if(m.el_image_url) {
+                document.getElementById('inspELImage').src = m.el_image_url;
+                document.getElementById('inspELImage').classList.remove('hidden');
+                document.getElementById('inspELPlaceholder').classList.add('hidden');
+            } else {
+                document.getElementById('inspELImage').classList.add('hidden');
+                document.getElementById('inspELPlaceholder').classList.remove('hidden');
+            }
+
+            // Info Tab
+            document.getElementById('inspLat').innerText = m.geo_lat?.toFixed(6) || '-';
+            document.getElementById('inspLon').innerText = m.geo_lon?.toFixed(6) || '-';
+            document.getElementById('inspStringInput').value = m.string_number;
+            document.getElementById('inspPosInput').value = m.position_in_string;
+
+            // Visual Tab
+            document.getElementById('inspVisualStatus').value = m.status_visual || 'ok';
+            
+            // IV Tab
+            document.getElementById('inspIVStatus').value = m.status_iv || 'ok';
+
+            // Highlight in List
+            // TODO
+        }
+
+        function closeInspector() {
+            document.getElementById('inspectorPanel').classList.add('closed');
+            SELECTED_MODULE_ID = null;
+        }
+
+        function switchTab(tab) {
+            // Hide all contents
+            ['el', 'visual', 'iv', 'info'].forEach(t => {
+                document.getElementById(\`tab-\${t}\`).classList.add('hidden');
+            });
+            // Show selected
+            document.getElementById(\`tab-\${tab}\`).classList.remove('hidden');
+            
+            // Update buttons style (simple version)
+            // In real app, toggle classes
+        }
+
+        function updateModuleStatus(type) {
+            if(!SELECTED_MODULE_ID) return;
+            const m = MODULES.find(mod => mod.id === SELECTED_MODULE_ID);
+            
+            if(type === 'el') m.status_el = document.getElementById('inspELStatus').value;
+            if(type === 'visual') m.status_visual = document.getElementById('inspVisualStatus').value;
+            if(type === 'iv') m.status_iv = document.getElementById('inspIVStatus').value;
+            
+            // Re-render map marker color immediately
+            if(mapMarkers[m.id]) {
+                mapMarkers[m.id].setStyle({ color: getStatusColor(m) });
+            }
+            renderModuleList();
+        }
+
+        async function saveInspector() {
+            // Here we would call API to save specific module changes
+            // For now, we rely on the global Save button
+            alert('Modifications appliquées localement. Cliquez sur "Sauvegarder" en haut pour persister.');
+        }
+
+        // --- VIEW SWITCHING ---
+        function switchView(mode) {
+            VIEW_MODE = mode;
+            if(mode === 'map') {
+                document.getElementById('mapContainer').classList.remove('hidden');
+                document.getElementById('schematicContainer').classList.add('hidden');
+                document.getElementById('btnViewMap').classList.add('bg-white', 'shadow-sm', 'text-purple-700');
+                document.getElementById('btnViewSchematic').classList.remove('bg-white', 'shadow-sm', 'text-purple-700');
+            } else {
+                document.getElementById('mapContainer').classList.add('hidden');
+                document.getElementById('schematicContainer').classList.remove('hidden');
+                document.getElementById('btnViewSchematic').classList.add('bg-white', 'shadow-sm', 'text-purple-700');
+                document.getElementById('btnViewMap').classList.remove('bg-white', 'shadow-sm', 'text-purple-700');
+            }
+        }
+    </script>
+</body>
+</html>`;
