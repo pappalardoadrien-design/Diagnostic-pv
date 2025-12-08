@@ -1,0 +1,46 @@
+name: Build & Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+      
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name diagnostic-hub
+      
+      - name: Deploy success notification
+        if: success()
+        run: |
+          echo "✅ Déploiement réussi sur https://diagnostic-hub.pages.dev"
+      
+      - name: Deploy failure notification
+        if: failure()
+        run: |
+          echo "❌ Échec du déploiement - Vérifier les logs GitHub Actions"
