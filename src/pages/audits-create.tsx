@@ -1,9 +1,10 @@
 // ============================================================================
-// PAGE CRÉATION AUDIT MULTI-MODULES
+// PAGE CRÉATION AUDIT MULTI-MODULES - VERSION CORRIGÉE
 // ============================================================================
-// Formulaire de création avec 2 options :
+// Formulaire de création avec 3 options :
 // - Option A : Depuis intervention existante (hérite config PV)
-// - Option B : Saisie manuelle complète
+// - Option B : Saisie manuelle simple (strings uniformes)
+// - Option C : Configuration avancée (strings inégaux)
 // Sélection des modules à activer : EL, I-V, Visuels, Isolation
 // ============================================================================
 
@@ -98,27 +99,27 @@ export function getAuditsCreatePage() {
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Nom du projet :</label>
-                                    <input type="text" id="project_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="text" id="project_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Centrale PV Toulouse">
                                 </div>
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Client :</label>
-                                    <input type="text" id="client_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="text" id="client_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Engie">
                                 </div>
                             </div>
                             
                             <div>
                                 <label class="block text-lg font-bold mb-2">Localisation :</label>
-                                <input type="text" id="location" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                <input type="text" id="location" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 31000 Toulouse">
                             </div>
                             
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Nombre de strings :</label>
-                                    <input type="number" id="stringCount" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="number" id="stringCount" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 10">
                                 </div>
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Modules par string :</label>
-                                    <input type="number" id="modulesPerString" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="number" id="modulesPerString" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 20">
                                 </div>
                             </div>
                         </div>
@@ -135,17 +136,17 @@ export function getAuditsCreatePage() {
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Nom du projet :</label>
-                                    <input type="text" id="project_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="text" id="project_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Centrale PV Toulouse">
                                 </div>
                                 <div>
                                     <label class="block text-lg font-bold mb-2">Client :</label>
-                                    <input type="text" id="client_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                    <input type="text" id="client_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Engie">
                                 </div>
                             </div>
                             
                             <div>
                                 <label class="block text-lg font-bold mb-2">Localisation :</label>
-                                <input type="text" id="location_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none">
+                                <input type="text" id="location_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 31000 Toulouse">
                             </div>
                             
                             <div class="border-2 border-yellow-400 rounded-lg p-4 bg-black">
@@ -261,52 +262,144 @@ export function getAuditsCreatePage() {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
             let currentMode = 'intervention'
+            let stringConfigCounter = 0
             
-            // Gestion des boutons de mode
-            document.getElementById('btn-mode-intervention').addEventListener('click', () => {
-                currentMode = 'intervention'
-                document.getElementById('btn-mode-intervention').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                document.getElementById('btn-mode-intervention').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                document.getElementById('btn-mode-manual').classList.remove('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                document.getElementById('btn-mode-manual').classList.add('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+            // ========================================================================
+            // GESTION DES BOUTONS DE MODE
+            // ========================================================================
+            function switchMode(mode) {
+                currentMode = mode
                 
-                document.getElementById('form-intervention').classList.remove('hidden')
-                document.getElementById('form-manual').classList.add('hidden')
-            })
-            
-            document.getElementById('btn-mode-manual').addEventListener('click', () => {
-                currentMode = 'manual'
-                document.getElementById('btn-mode-manual').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                document.getElementById('btn-mode-manual').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                document.getElementById('btn-mode-intervention').classList.remove('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                document.getElementById('btn-mode-intervention').classList.add('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+                // Reset tous les boutons
+                const buttons = ['btn-mode-intervention', 'btn-mode-manual', 'btn-mode-advanced']
+                buttons.forEach(btnId => {
+                    const btn = document.getElementById(btnId)
+                    btn.classList.remove('active', 'border-purple-400', 'border-yellow-400', 'from-purple-900', 'to-purple-700', 'from-yellow-900', 'to-yellow-700')
+                    btn.classList.add('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+                })
                 
-                document.getElementById('form-manual').classList.remove('hidden')
+                // Reset tous les formulaires
                 document.getElementById('form-intervention').classList.add('hidden')
-            })
+                document.getElementById('form-manual').classList.add('hidden')
+                document.getElementById('form-advanced').classList.add('hidden')
+                
+                // Activer le mode sélectionné
+                if (mode === 'intervention') {
+                    document.getElementById('btn-mode-intervention').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+                    document.getElementById('btn-mode-intervention').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
+                    document.getElementById('form-intervention').classList.remove('hidden')
+                } else if (mode === 'manual') {
+                    document.getElementById('btn-mode-manual').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+                    document.getElementById('btn-mode-manual').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
+                    document.getElementById('form-manual').classList.remove('hidden')
+                } else if (mode === 'advanced') {
+                    document.getElementById('btn-mode-advanced').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
+                    document.getElementById('btn-mode-advanced').classList.add('active', 'border-yellow-400', 'from-yellow-900', 'to-yellow-700')
+                    document.getElementById('form-advanced').classList.remove('hidden')
+                }
+            }
             
-            // Charger les interventions
+            document.getElementById('btn-mode-intervention').addEventListener('click', () => switchMode('intervention'))
+            document.getElementById('btn-mode-manual').addEventListener('click', () => switchMode('manual'))
+            document.getElementById('btn-mode-advanced').addEventListener('click', () => switchMode('advanced'))
+            
+            // ========================================================================
+            // MODE AVANCÉ : GESTION STRINGS INÉGAUX
+            // ========================================================================
+            function updateTotalModules() {
+                let total = 0
+                document.querySelectorAll('.string-module-count').forEach(input => {
+                    total += parseInt(input.value) || 0
+                })
+                document.getElementById('totalModulesCount').textContent = total
+            }
+            
+            function addStringConfig() {
+                stringConfigCounter++
+                const container = document.getElementById('stringsContainer')
+                
+                const stringItem = document.createElement('div')
+                stringItem.className = 'string-config-item flex items-center gap-3 bg-gray-900 p-3 rounded-lg border border-gray-700'
+                stringItem.innerHTML = \`
+                    <div class="flex-shrink-0 w-24">
+                        <span class="block text-center bg-yellow-900 text-yellow-400 px-3 py-2 rounded font-black">STRING \${stringConfigCounter}</span>
+                    </div>
+                    <div class="flex-grow">
+                        <input type="number" 
+                               min="0" 
+                               placeholder="Nombre de modules" 
+                               class="string-module-count w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-white focus:border-yellow-400 focus:outline-none"
+                               value="20">
+                    </div>
+                    <button type="button" class="remove-string-btn flex-shrink-0 bg-red-600 hover:bg-red-700 px-3 py-2 rounded font-bold">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                \`
+                
+                container.appendChild(stringItem)
+                
+                // Event listener pour suppression
+                stringItem.querySelector('.remove-string-btn').addEventListener('click', () => {
+                    stringItem.remove()
+                    updateTotalModules()
+                })
+                
+                // Event listener pour mise à jour total
+                stringItem.querySelector('.string-module-count').addEventListener('input', updateTotalModules)
+                
+                updateTotalModules()
+            }
+            
+            document.getElementById('addStringBtn').addEventListener('click', addStringConfig)
+            
+            // Ajouter 2 strings par défaut
+            addStringConfig()
+            addStringConfig()
+            
+            // ========================================================================
+            // CHARGER LES INTERVENTIONS
+            // ========================================================================
             async function loadInterventions() {
                 try {
                     const response = await axios.get('/api/planning/interventions')
                     const select = document.getElementById('intervention_id')
                     
-                    select.innerHTML = '<option value="">-- Sélectionner une intervention --</option>'
-                    
-                    response.data.interventions.forEach(intervention => {
-                        const date = new Date(intervention.intervention_date).toLocaleDateString('fr-FR')
-                        const option = document.createElement('option')
-                        option.value = intervention.id
-                        option.textContent = \`\${intervention.intervention_type} - \${intervention.project_name || 'N/A'} - \${date}\`
-                        select.appendChild(option)
-                    })
+                    if (response.data.interventions && response.data.interventions.length > 0) {
+                        select.innerHTML = '<option value="">-- Sélectionner une intervention --</option>'
+                        
+                        response.data.interventions.forEach(intervention => {
+                            const date = new Date(intervention.intervention_date).toLocaleDateString('fr-FR')
+                            const option = document.createElement('option')
+                            option.value = intervention.id
+                            option.textContent = \`\${intervention.intervention_type} - \${intervention.project_name || 'N/A'} - \${date}\`
+                            select.appendChild(option)
+                        })
+                    } else {
+                        // Aucune intervention → Activer mode MANUEL automatiquement
+                        select.innerHTML = '<option value="">⚠️ Aucune intervention disponible</option>'
+                        select.disabled = true
+                        
+                        // Afficher message + passer en mode manuel
+                        setTimeout(() => {
+                            alert('ℹ️ Aucune intervention existante.\\n\\nPassage automatique en mode SAISIE SIMPLE.\\n\\nVous pouvez aussi utiliser le mode CONFIG AVANCÉE pour des strings inégaux.')
+                            switchMode('manual')
+                        }, 500)
+                    }
                 } catch (error) {
                     console.error('Erreur chargement interventions:', error)
                     document.getElementById('intervention_id').innerHTML = '<option value="">Erreur de chargement</option>'
+                    
+                    // Fallback mode manuel si erreur
+                    setTimeout(() => {
+                        alert('⚠️ Impossible de charger les interventions.\\n\\nVeuillez utiliser le mode SAISIE SIMPLE ou AVANCÉE.')
+                        switchMode('manual')
+                    }, 500)
                 }
             }
             
-            // Soumission formulaire
+            // ========================================================================
+            // SOUMISSION FORMULAIRE
+            // ========================================================================
             document.getElementById('createAuditForm').addEventListener('submit', async (e) => {
                 e.preventDefault()
                 
@@ -315,7 +408,7 @@ export function getAuditsCreatePage() {
                     .map(input => input.value)
                 
                 if (modules.length === 0) {
-                    alert('Veuillez sélectionner au moins un module')
+                    alert('⚠️ Veuillez sélectionner au moins un module')
                     return
                 }
                 
@@ -326,19 +419,29 @@ export function getAuditsCreatePage() {
                 try {
                     let payload = { modules }
                     
+                    // MODE INTERVENTION
                     if (currentMode === 'intervention') {
                         const interventionId = document.getElementById('intervention_id').value
                         if (!interventionId) {
-                            alert('Veuillez sélectionner une intervention')
+                            alert('⚠️ Veuillez sélectionner une intervention')
                             btn.disabled = false
                             btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
                             return
                         }
                         payload.intervention_id = parseInt(interventionId)
-                    } else {
+                    } 
+                    // MODE MANUEL (strings uniformes)
+                    else if (currentMode === 'manual') {
                         payload.project_name = document.getElementById('project_name').value
                         payload.client_name = document.getElementById('client_name').value
                         payload.location = document.getElementById('location').value
+                        
+                        if (!payload.project_name || !payload.client_name) {
+                            alert('⚠️ Veuillez remplir le nom du projet et du client')
+                            btn.disabled = false
+                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
+                            return
+                        }
                         
                         const stringCount = parseInt(document.getElementById('stringCount').value)
                         const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
@@ -350,23 +453,71 @@ export function getAuditsCreatePage() {
                                 modulesPerString
                             }
                         }
+                    } 
+                    // MODE AVANCÉ (strings inégaux)
+                    else if (currentMode === 'advanced') {
+                        payload.project_name = document.getElementById('project_name_adv').value
+                        payload.client_name = document.getElementById('client_name_adv').value
+                        payload.location = document.getElementById('location_adv').value
+                        
+                        if (!payload.project_name || !payload.client_name) {
+                            alert('⚠️ Veuillez remplir le nom du projet et du client')
+                            btn.disabled = false
+                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
+                            return
+                        }
+                        
+                        // Récupérer configuration strings inégaux
+                        const stringsConfig = []
+                        document.querySelectorAll('.string-config-item').forEach((item, index) => {
+                            const moduleCount = parseInt(item.querySelector('.string-module-count').value) || 0
+                            if (moduleCount > 0) {
+                                stringsConfig.push({
+                                    id: index + 1,
+                                    mpptNumber: index + 1,
+                                    moduleCount: moduleCount,
+                                    physicalRow: index + 1,
+                                    physicalCol: 0
+                                })
+                            }
+                        })
+                        
+                        if (stringsConfig.length === 0) {
+                            alert('⚠️ Veuillez ajouter au moins une string avec des modules')
+                            btn.disabled = false
+                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
+                            return
+                        }
+                        
+                        payload.configuration = {
+                            mode: 'advanced',
+                            strings: stringsConfig
+                        }
                     }
+                    
+                    console.log('📤 Payload envoyé:', payload)
                     
                     const response = await axios.post('/api/audits/create-multi-modules', payload)
                     
+                    console.log('✅ Réponse API:', response.data)
+                    
                     // Rediriger vers l'audit créé
                     if (response.data.success) {
+                        alert(\`✅ Audit créé avec succès !\\n\\nToken: \${response.data.audit_token}\\n\\nRedirection...\`)
                         window.location.href = \`/audit/\${response.data.audit_token}\`
                     }
                 } catch (error) {
-                    console.error('Erreur création audit:', error)
-                    alert('Erreur lors de la création de l\\'audit : ' + (error.response?.data?.error || error.message))
+                    console.error('❌ Erreur création audit:', error)
+                    const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message
+                    alert('❌ Erreur lors de la création de l\\'audit :\\n\\n' + errorMsg)
                     btn.disabled = false
                     btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
                 }
             })
             
-            // Initialisation
+            // ========================================================================
+            // INITIALISATION
+            // ========================================================================
             loadInterventions()
         </script>
     </body>
