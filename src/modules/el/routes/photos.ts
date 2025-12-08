@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { D1Database, R2Bucket, KVNamespace } from '@cloudflare/workers-types'
 import { cache, cacheInvalidator } from '../../../middleware/cache'
+import { PhotoStandardizationService } from '../../../services/PhotoStandardizationService'
 
 type Bindings = {
   DB: D1Database
@@ -53,23 +54,39 @@ elPhotosRoutes.post('/upload',
     
     const elModuleId = (modules[0] as any).id
     
-    // Generate R2 key: el_photos/{audit_token}/{module_identifier}/{timestamp}_{random}.{ext}
-    const timestamp = Date.now()
-    const randomStr = Math.random().toString(36).substring(2, 10)
+    // Generate R2 key via Service
     const ext = file.name.split('.').pop() || 'jpg'
-    const r2Key = `el_photos/${auditToken}/${moduleIdentifier}/${timestamp}_${randomStr}.${ext}`
+    const finalPhotoType = photoType || 'el'
+    
+    const r2Key = PhotoStandardizationService.generateStandardizedKey(
+      auditToken,
+      finalPhotoType,
+      ext,
+      stringNumber,
+      positionInString
+    )
+    
+    const r2Metadata = PhotoStandardizationService.getR2Metadata(
+      auditToken,
+      finalPhotoType,
+      moduleIdentifier,
+      stringNumber,
+      positionInString,
+      gpsLatitude,
+      gpsLongitude
+    )
     
     // Upload to R2
     const arrayBuffer = await file.arrayBuffer()
     await R2.put(r2Key, arrayBuffer, {
       httpMetadata: {
         contentType: file.type || 'image/jpeg'
-      }
+      },
+      customMetadata: r2Metadata
     })
     
-    // Generate public URL (format: https://{bucket}.{account}.r2.cloudflarestorage.com/{key})
-    // Note: For production, you should use a custom domain or R2 public bucket URL
-    const r2Url = `https://diagpv-el-photos.public.r2.dev/${r2Key}`
+    // Use unified view route
+    const r2Url = `/api/photos/view/${r2Key}`
     
     // Insert metadata to D1
     const result = await DB.prepare(`
@@ -403,21 +420,44 @@ elPhotosRoutes.post('/batch-upload',
           
           const elModuleId = (modules[0] as any).id
           
-          // Generate R2 key
-          const timestamp = Date.now()
-          const randomStr = Math.random().toString(36).substring(2, 10)
+          // Generate R2 key via Service
           const ext = file.name.split('.').pop() || 'jpg'
-          const r2Key = `el_photos/${auditToken}/${moduleIdentifier}/${timestamp}_${randomStr}.${ext}`
+          const finalPhotoType = photoType || 'el'
+          
+          let sNum: number | undefined
+          let mNum: number | undefined
+          const match = moduleIdentifier.match(/S(\d+)[-_]M?(\d+)/i)
+          if (match) {
+            sNum = parseInt(match[1])
+            mNum = parseInt(match[2])
+          }
+          
+          const r2Key = PhotoStandardizationService.generateStandardizedKey(
+            auditToken,
+            finalPhotoType,
+            ext,
+            sNum,
+            mNum
+          )
+          
+          const r2Metadata = PhotoStandardizationService.getR2Metadata(
+            auditToken,
+            finalPhotoType,
+            moduleIdentifier,
+            sNum,
+            mNum
+          )
           
           // Upload to R2
           const arrayBuffer = await file.arrayBuffer()
           await R2.put(r2Key, arrayBuffer, {
             httpMetadata: {
               contentType: file.type || 'image/jpeg'
-            }
+            },
+            customMetadata: r2Metadata
           })
           
-          const r2Url = `https://diagpv-el-photos.public.r2.dev/${r2Key}`
+          const r2Url = `/api/photos/view/${r2Key}`
           
           // Insert to D1
           const result = await DB.prepare(`

@@ -98,6 +98,13 @@ import designerModule from './modules/designer'
 app.route('/', designerModule)
 
 // ============================================================================
+// MODULE UNIFIED EDITOR - ÉDITEUR 100% UNIFIÉ (V2 SCHÉMA + SATELLITE)
+// Fusionne les fonctionnalités "1" et "3" selon la stratégie "Number One"
+// ============================================================================
+import unifiedEditorModule from './modules/unified-editor'
+app.route('/', unifiedEditorModule)
+
+// ============================================================================
 // MODULE AUDITS - GESTION AUDITS MULTI-MODULES (MASTER)
 // ============================================================================
 import auditsRoutes from './modules/audits/routes'

@@ -111,8 +111,72 @@ self.addEventListener('sync', (event) => {
   
   if (event.tag === 'sync-observations') {
     event.waitUntil(syncOfflineObservations())
+  } else if (event.tag === 'sync-photos') {
+    event.waitUntil(syncPhotos())
   }
 })
+
+// Helper IndexedDB
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('diagpv-db', 1)
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result
+      if (!db.objectStoreNames.contains('uploadQueue')) {
+        db.createObjectStore('uploadQueue', { keyPath: 'id', autoIncrement: true })
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function syncPhotos() {
+  try {
+    const db = await openDB()
+    const tx = db.transaction('uploadQueue', 'readonly')
+    const store = tx.objectStore('uploadQueue')
+    const request = store.getAll()
+    
+    const photos = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    
+    if (photos.length === 0) return true
+    
+    console.log(`[SW] Syncing ${photos.length} photos...`)
+    
+    for (const photo of photos) {
+      try {
+        // Re-créer FormData ou JSON body
+        // Note: photo.data contient les données brutes
+        
+        const response = await fetch('/api/photos/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(photo.data)
+        })
+        
+        if (response.ok) {
+          // Supprimer de la queue
+          const delTx = db.transaction('uploadQueue', 'readwrite')
+          delTx.objectStore('uploadQueue').delete(photo.id)
+          console.log(`[SW] Photo ${photo.id} synced`)
+        }
+      } catch (err) {
+        console.error(`[SW] Failed to sync photo ${photo.id}`, err)
+      }
+    }
+    
+    return true
+  } catch (error) {
+    console.error('[SW] Sync photos failed:', error)
+    throw error
+  }
+}
 
 async function syncOfflineObservations() {
   try {
