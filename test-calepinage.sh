@@ -79,12 +79,10 @@ check_response "$response" "arrow-1" "Layout contient flèches"
 check_response "$response" "Zone Test" "Layout contient zones"
 echo ""
 
-# Test 5: Vérifier que l'éditeur se charge
-echo "🔍 Test 5: Éditeur HTML se charge"
-response=$(curl -s "$BASE_URL/api/calepinage/editor/$PROJECT_ID?module_type=$MODULE_TYPE")
-check_response "$response" "Éditeur de Calepinage" "Éditeur HTML"
-check_response "$response" "canvas" "Canvas présent"
-check_response "$response" "tool-btn" "Boutons outils présents"
+# Test 5: Vérifier que le Unified Editor se charge (NOUVEAU)
+echo "🔍 Test 5: Unified Editor se charge"
+response=$(curl -s "$BASE_URL/unified-editor/$PROJECT_ID")
+check_response "$response" "Digital Twin Studio" "Éditeur Unifié HTML"
 echo ""
 
 # Test 6: Vérifier que le viewer génère du SVG
@@ -150,7 +148,7 @@ echo "   1. ✅ API Health Check"
 echo "   2. ✅ Liste layouts"
 echo "   3. ✅ Créer layout"
 echo "   4. ✅ Récupérer layout"
-echo "   5. ✅ Éditeur HTML"
+echo "   5. ✅ Unified Editor"
 echo "   6. ✅ Viewer SVG"
 echo "   7. ✅ Update layout"
 echo "   8. ✅ Vérifier update"
