@@ -29,4 +29,11 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', async (c: Context) => {
   return c.redirect(`/static/pv/editor.html?plantId=${plantId}&zoneId=${zoneId}`)
 })
 
+// Éditeur V2 PRO (Unified Editor / Calepinage)
+app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c: Context) => {
+  const zoneId = c.req.param('zoneId')
+  // Redirection vers le nouvel éditeur unifié
+  return c.redirect(`/unified-editor/${zoneId}`)
+})
+
 export default app
