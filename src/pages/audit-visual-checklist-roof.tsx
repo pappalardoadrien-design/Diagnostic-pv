@@ -3,14 +3,14 @@
 // ============================================================================
 // Checklist audit visuel toiture avec démontage 25 panneaux
 
-export function getGirasoleToitureChecklistPage() {
+export function getRoofChecklistPage() {
   return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Checklist GIRASOLE - Toiture</title>
+    <title>Checklist Toiture - Toiture</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -34,7 +34,7 @@ export function getGirasoleToitureChecklistPage() {
         <div class="bg-gradient-to-r from-orange-500 to-red-600 text-white p-6 rounded-lg shadow-lg mb-6">
             <h1 class="text-2xl font-bold">
                 <i class="fas fa-hard-hat mr-2"></i>
-                Audit Toiture GIRASOLE
+                Audit Toiture Standard
             </h1>
             <p class="text-sm mt-2 opacity-90">DTU 40.35 + ETN + Notice Montage</p>
             <div id="audit-info" class="mt-4 text-sm bg-white/20 p-3 rounded">
@@ -386,7 +386,7 @@ export function getGirasoleToitureChecklistPage() {
         }
 
         function saveDraft() {
-            localStorage.setItem(\`girasole-toiture-draft-\${auditToken}\`, JSON.stringify({
+            localStorage.setItem(\`roof-draft-\${auditToken}\`, JSON.stringify({
                 checklistData,
                 photos,
                 timestamp: Date.now()
@@ -394,7 +394,7 @@ export function getGirasoleToitureChecklistPage() {
         }
 
         function loadDraft() {
-            const draft = localStorage.getItem(\`girasole-toiture-draft-\${auditToken}\`);
+            const draft = localStorage.getItem(\`roof-draft-\${auditToken}\`);
             if (draft) {
                 const data = JSON.parse(draft);
                 checklistData = data.checklistData || {};
@@ -447,7 +447,7 @@ export function getGirasoleToitureChecklistPage() {
                     await axios.post(\`/api/visual/inspections/\${auditToken}\`, inspection);
                 }
 
-                localStorage.removeItem(\`girasole-toiture-draft-\${auditToken}\`);
+                localStorage.removeItem(\`roof-draft-\${auditToken}\`);
                 alert('✅ Audit toiture soumis !');
                 window.location.href = \`/audit/\${auditToken}/visual\`;
             } catch (error) {

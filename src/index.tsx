@@ -27,10 +27,10 @@ import { getAuditIsolationPage } from './pages/audit-isolation'
 import { getPhotosUploadPage } from './pages/photos-upload'
 import { getAnalyticsDashboardPage } from './pages/analytics-dashboard'
 import { getPhotosGalleryPage } from './pages/photos-gallery'
-import { getGirasoleConformiteChecklistPage } from './pages/audit-visual-girasole-conformite'
-import { getGirasoleToitureChecklistPage } from './pages/audit-visual-girasole-toiture'
-import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
-import { getGirasoleConfigAuditsPage } from './pages/girasole-config-audits'
+import { getStandardChecklistPage } from './pages/audit-visual-checklist-standard'
+import { getRoofChecklistPage } from './pages/audit-visual-checklist-roof'
+// import { getGirasoleDashboardPage } from './pages/girasole-dashboard'
+// import { getGirasoleConfigAuditsPage } from './pages/girasole-config-audits'
 import { getCrmClientsListPage } from './pages/crm-clients-list'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
 import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
@@ -587,7 +587,8 @@ app.get('/audit/:token/isolation', (c) => {
 // ============================================================================
 // GIRASOLE - MISSION 52 CENTRALES PV
 // ============================================================================
-// Dashboard GIRASOLE - Vue d'ensemble mission 52 centrales
+// Dashboard GIRASOLE - Vue d'ensemble mission 52 centrales (DÉSACTIVÉ)
+/*
 app.get('/girasole/dashboard', (c) => {
   return c.html(getGirasoleDashboardPage())
 })
@@ -596,7 +597,19 @@ app.get('/girasole/dashboard', (c) => {
 app.get('/girasole/config-audits', (c) => {
   return c.html(getGirasoleConfigAuditsPage())
 })
+*/
 
+// Checklist Conformité NF C 15-100 (Standard)
+app.get('/audit/:token/visual/standard', (c) => {
+  return c.html(getStandardChecklistPage())
+})
+
+// Checklist Toiture DTU 40.35 (Standard)
+app.get('/audit/:token/visual/roof', (c) => {
+  return c.html(getRoofChecklistPage())
+})
+
+/* ANCIENNES ROUTES GIRASOLE
 // Checklist Conformité NF C 15-100 + UTE C 15-712 (centrales SOL)
 app.get('/audit/:token/visual/girasole/conformite', (c) => {
   return c.html(getGirasoleConformiteChecklistPage())
@@ -606,6 +619,7 @@ app.get('/audit/:token/visual/girasole/conformite', (c) => {
 app.get('/audit/:token/visual/girasole/toiture', (c) => {
   return c.html(getGirasoleToitureChecklistPage())
 })
+*/
 
 // ============================================================================
 // PAGE CRM CLIENTS LIST - LISTE CLIENTS
