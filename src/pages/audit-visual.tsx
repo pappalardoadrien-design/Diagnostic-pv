@@ -32,14 +32,37 @@ export function getAuditVisualPage() {
             
             <!-- Boutons Actions -->
             <div class="max-w-6xl mx-auto mb-8 space-y-4">
-                <button onclick="generateMultiModuleReport()" class="w-full bg-green-600 hover:bg-green-700 px-6 py-4 rounded-lg font-black text-xl">
-                    <i class="fas fa-file-pdf mr-2"></i>
-                    RAPPORT PDF MULTI-MODULES
-                </button>
-                <button id="btnAddInspection" class="w-full bg-teal-600 hover:bg-teal-700 px-6 py-4 rounded-lg font-black text-xl">
-                    <i class="fas fa-plus-circle mr-2"></i>
-                    AJOUTER UNE OBSERVATION
-                </button>
+                <!-- Checklists Standards -->
+                <div class="grid md:grid-cols-2 gap-4">
+                    <button onclick="window.location.href='/audit/'+window.location.pathname.split('/')[2]+'/visual/standard'" class="bg-blue-600 hover:bg-blue-700 px-6 py-4 rounded-lg font-black text-xl flex items-center justify-center transition-colors shadow-lg border-2 border-blue-400">
+                        <i class="fas fa-clipboard-check mr-3"></i>
+                        CHECKLIST STANDARD
+                        <span class="text-sm font-normal ml-2 opacity-75">(NF C 15-100)</span>
+                    </button>
+                    <button onclick="window.location.href='/audit/'+window.location.pathname.split('/')[2]+'/visual/roof'" class="bg-orange-600 hover:bg-orange-700 px-6 py-4 rounded-lg font-black text-xl flex items-center justify-center transition-colors shadow-lg border-2 border-orange-400">
+                        <i class="fas fa-hard-hat mr-3"></i>
+                        CHECKLIST TOITURE
+                        <span class="text-sm font-normal ml-2 opacity-75">(DTU 40.35)</span>
+                    </button>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <button onclick="window.open('/api/calepinage/editor/'+window.location.pathname.split('/')[2], '_blank')" class="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-lg font-black text-xl border-2 border-purple-400">
+                        <i class="fas fa-map-marked-alt mr-2"></i>
+                        PLAN / DESIGNER
+                    </button>
+                    <button id="btnAddInspection" class="w-full bg-teal-600 hover:bg-teal-700 px-6 py-4 rounded-lg font-black text-xl border-2 border-teal-400">
+                        <i class="fas fa-plus-circle mr-2"></i>
+                        OBSERVATION RAPIDE
+                    </button>
+                </div>
+
+                <div class="grid md:grid-cols-1 gap-4">
+                    <button onclick="generateMultiModuleReport()" class="w-full bg-green-600 hover:bg-green-700 px-6 py-4 rounded-lg font-black text-xl border-2 border-green-400">
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        RAPPORT PDF COMPLET
+                    </button>
+                </div>
             </div>
             
             <!-- Statistiques -->

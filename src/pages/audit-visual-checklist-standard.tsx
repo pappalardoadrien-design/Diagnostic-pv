@@ -4,14 +4,14 @@
 // Checklist audit visuel conformité pour centrales SOL
 // Workflow 12 étapes - Format GIRASOLE
 
-export function getGirasoleConformiteChecklistPage() {
+export function getStandardChecklistPage() {
   return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Checklist GIRASOLE - Conformité</title>
+    <title>Checklist Standard - Conformité</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="manifest" href="/static/manifest.json">
@@ -40,7 +40,7 @@ export function getGirasoleConformiteChecklistPage() {
         <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-6 rounded-lg shadow-lg mb-6">
             <h1 class="text-2xl font-bold">
                 <i class="fas fa-clipboard-check mr-2"></i>
-                Audit Conformité GIRASOLE
+                Audit Conformité Standard
             </h1>
             <p class="text-sm mt-2 opacity-90">NF C 15-100 + UTE C 15-712</p>
             <div id="audit-info" class="mt-4 text-sm bg-white/20 p-3 rounded">
@@ -518,7 +518,7 @@ export function getGirasoleConformiteChecklistPage() {
         // SAVE/LOAD DRAFT
         // ========================================================================
         function saveDraft() {
-            localStorage.setItem(\`girasole-draft-\${auditToken}\`, JSON.stringify({
+            localStorage.setItem(\`standard-draft-\${auditToken}\`, JSON.stringify({
                 checklistData,
                 photos,
                 timestamp: Date.now()
@@ -526,7 +526,7 @@ export function getGirasoleConformiteChecklistPage() {
         }
 
         function loadDraft() {
-            const draft = localStorage.getItem(\`girasole-draft-\${auditToken}\`);
+            const draft = localStorage.getItem(\`standard-draft-\${auditToken}\`);
             if (draft) {
                 const data = JSON.parse(draft);
                 checklistData = data.checklistData || {};
@@ -588,7 +588,7 @@ export function getGirasoleConformiteChecklistPage() {
                     await axios.post(\`/api/visual/inspections/\${auditToken}\`, inspection);
                 }
 
-                localStorage.removeItem(\`girasole-draft-\${auditToken}\`);
+                localStorage.removeItem(\`standard-draft-\${auditToken}\`);
                 alert('✅ Audit soumis avec succès !');
                 window.location.href = \`/audit/\${auditToken}/visual\`;
             } catch (error) {
