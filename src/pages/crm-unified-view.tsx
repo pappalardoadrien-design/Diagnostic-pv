@@ -238,7 +238,7 @@ crmUnifiedViewPage.get('/', async (c) => {
                       <div>
                         <p class="font-semibold text-gray-800">\${project.name}</p>
                         <p class="text-sm text-gray-600">\${project.site_address || 'Adresse non renseignée'}</p>
-                        ${String.raw`<p class="text-xs text-gray-500 mt-1">${project.total_modules || 0} modules · ${project.installation_power || 0} kWp</p>`}
+                        <p class="text-xs text-gray-500 mt-1">\${project.total_modules || 0} modules · \${project.installation_power || 0} kWp</p>
                       </div>
                       <button 
                         onclick="loadProjectDetails(\${project.id})" 
@@ -324,7 +324,7 @@ crmUnifiedViewPage.get('/', async (c) => {
                           'bg-gray-100 text-gray-800'
                         }">\${intervention.status}</span>
                       </div>
-                      ${String.raw`${intervention.audit_count > 0 ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">${intervention.audit_count} audit(s)</span>` : ''}`}
+                      \${intervention.audit_count > 0 ? \`<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">\${intervention.audit_count} audit(s)</span>\` : ''}
                     </div>
                   </div>
                 \`;

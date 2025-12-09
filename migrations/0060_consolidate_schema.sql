@@ -1,7 +1,7 @@
 -- MIGRATION 0060: CONSOLIDATE SCHEMA & INTERCONNECTION
 -- Assure que la table de résultats consolidés est parfaitement alignée avec le Digital Twin
 
--- 1. Réinitialiser diagnosis_results pour garantir la structure (car créée potentiellement avec module_id avant)
+-- 1. Réinitialiser diagnosis_results pour garantir la structure
 DROP TABLE IF EXISTS diagnosis_results;
 
 CREATE TABLE diagnosis_results (

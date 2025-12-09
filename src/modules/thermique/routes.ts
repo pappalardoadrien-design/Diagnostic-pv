@@ -7,7 +7,13 @@
 
 import { Hono } from 'hono';
 
-const thermiqueRoutes = new Hono<{ Bindings: CloudflareBindings }>();
+type Bindings = {
+  DB: D1Database
+  KV: KVNamespace
+  R2: R2Bucket
+}
+
+const thermiqueRoutes = new Hono<{ Bindings: Bindings }>();
 
 /**
  * POST /api/thermique/measurement/create

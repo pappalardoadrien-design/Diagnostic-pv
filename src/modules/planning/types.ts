@@ -26,7 +26,6 @@ export interface Intervention {
   intervention_date: string; // ISO date YYYY-MM-DD
   duration_hours: number | null;
   status: InterventionStatus;
-  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,7 +45,6 @@ export interface CreateInterventionRequest {
   notes?: string;
   intervention_date: string; // ISO date YYYY-MM-DD
   duration_hours?: number;
-  notes?: string;
 }
 
 export interface UpdateInterventionRequest {
@@ -55,7 +53,6 @@ export interface UpdateInterventionRequest {
   intervention_date?: string;
   duration_hours?: number;
   status?: InterventionStatus;
-  notes?: string;
 }
 
 export interface AssignTechnicianRequest {
