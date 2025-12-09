@@ -331,6 +331,32 @@ export function getMobileFieldModePage() {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+            // IndexedDB Helper
+            function openDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open('diagpv-db', 1)
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result
+                        if (!db.objectStoreNames.contains('uploadQueue')) {
+                            db.createObjectStore('uploadQueue', { keyPath: 'id', autoIncrement: true })
+                        }
+                    }
+                    request.onsuccess = () => resolve(request.result)
+                    request.onerror = () => reject(request.error)
+                })
+            }
+
+            async function saveToQueue(data) {
+                const db = await openDB()
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction('uploadQueue', 'readwrite')
+                    const store = tx.objectStore('uploadQueue')
+                    const request = store.add({ data: data, timestamp: Date.now() })
+                    request.onsuccess = () => resolve(request.result)
+                    request.onerror = () => reject(request.error)
+                })
+            }
+
             let currentAudit = null
             let currentModule = 'EL'
             let currentPosition = null

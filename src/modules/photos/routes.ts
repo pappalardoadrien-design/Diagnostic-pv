@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { Hono } from 'hono'
+import { PhotoStandardizationService } from '../../services/PhotoStandardizationService'
 
 type Bindings = {
   DB: D1Database
@@ -26,13 +27,52 @@ const photos = new Hono<{ Bindings: Bindings }>()
 // ============================================================================
 photos.post('/upload', async (c) => {
   try {
-    const formData = await c.req.formData()
-    const file = formData.get('file') as File
-    const auditToken = formData.get('audit_token') as string
-    const photoType = formData.get('photo_type') as string
-    const moduleId = formData.get('module_id') as string | null
-    const stringNumber = formData.get('string_number') as string | null
-    const moduleNumber = formData.get('module_number') as string | null
+    let file: any
+    let auditToken: string
+    let photoType: string
+    let moduleId: string | null = null
+    let stringNumber: string | null = null
+    let moduleNumber: string | null = null
+
+    const contentType = c.req.header('content-type') || ''
+
+    if (contentType.includes('application/json')) {
+      const body = await c.req.json()
+      auditToken = body.audit_token
+      photoType = body.module_type || body.photo_type
+      moduleId = body.module_id
+      stringNumber = body.string_number ? String(body.string_number) : null
+      moduleNumber = body.module_number ? String(body.module_number) : null
+
+      if (body.photo_data) {
+        const matches = body.photo_data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+        if (matches) {
+          const type = matches[1]
+          const binStr = atob(matches[2])
+          const len = binStr.length
+          const bytes = new Uint8Array(len)
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binStr.charCodeAt(i)
+          }
+          const buffer = bytes.buffer
+          
+          file = {
+            name: `upload.${type.split('/')[1]}`,
+            type: type,
+            size: buffer.byteLength,
+            arrayBuffer: async () => buffer
+          }
+        }
+      }
+    } else {
+      const formData = await c.req.formData()
+      file = formData.get('file') as File
+      auditToken = formData.get('audit_token') as string
+      photoType = formData.get('photo_type') as string
+      moduleId = formData.get('module_id') as string | null
+      stringNumber = formData.get('string_number') as string | null
+      moduleNumber = formData.get('module_number') as string | null
+    }
 
     if (!file) {
       return c.json({ success: false, error: 'Fichier requis' }, 400)
@@ -51,17 +91,24 @@ photos.post('/upload', async (c) => {
       return c.json({ success: false, error: 'Le fichier doit être une image' }, 400)
     }
 
-    // Générer nom unique
-    const timestamp = Date.now()
-    const randomId = Math.random().toString(36).substring(2, 15)
+    // Générer nom standardisé via Service
     const extension = file.name.split('.').pop() || 'jpg'
-    
-    let fileName = `${auditToken}/${photoType}/${timestamp}-${randomId}.${extension}`
-    
-    // Si module spécifique, ajouter dans chemin
-    if (stringNumber && moduleNumber) {
-      fileName = `${auditToken}/${photoType}/S${stringNumber}-${moduleNumber}/${timestamp}-${randomId}.${extension}`
-    }
+    const fileName = PhotoStandardizationService.generateStandardizedKey(
+      auditToken,
+      photoType,
+      extension,
+      stringNumber,
+      moduleNumber
+    )
+
+    // Préparer métadonnées R2 via Service
+    const r2Metadata = PhotoStandardizationService.getR2Metadata(
+      auditToken,
+      photoType,
+      moduleId,
+      stringNumber,
+      moduleNumber
+    )
 
     // Upload vers R2
     const buffer = await file.arrayBuffer()
@@ -69,20 +116,13 @@ photos.post('/upload', async (c) => {
       httpMetadata: {
         contentType: file.type
       },
-      customMetadata: {
-        audit_token: auditToken,
-        photo_type: photoType,
-        module_id: moduleId || '',
-        string_number: stringNumber || '',
-        module_number: moduleNumber || '',
-        uploaded_at: new Date().toISOString()
-      }
+      customMetadata: r2Metadata
     })
 
-    // Générer URL publique (nécessite configuration Custom Domain ou R2.dev)
+    // Générer URL publique
     const publicUrl = `/api/photos/view/${fileName}`
 
-    // Enregistrer métadonnées dans D1 (adapter au schéma existant)
+    // Enregistrer métadonnées dans D1
     await c.env.DB.prepare(`
       INSERT INTO photos (
         audit_token, module_type, photo_data, photo_format, photo_size,
@@ -90,8 +130,8 @@ photos.post('/upload', async (c) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       auditToken,
-      photoType.toUpperCase(), // module_type: 'EL', 'THERMAL', 'VISUAL', 'IV'
-      '', // photo_data vide (utilise R2 au lieu de Base64)
+      photoType.toUpperCase(),
+      '', // photo_data vide (utilise R2)
       file.type,
       file.size,
       stringNumber ? parseInt(stringNumber) : null,
@@ -292,19 +332,22 @@ photos.post('/bulk-upload', async (c) => {
           continue
         }
 
-        const timestamp = Date.now()
-        const randomId = Math.random().toString(36).substring(2, 15)
         const extension = file.name.split('.').pop() || 'jpg'
-        const fileName = `${auditToken}/${photoType}/${timestamp}-${randomId}.${extension}`
+        const fileName = PhotoStandardizationService.generateStandardizedKey(
+          auditToken,
+          photoType,
+          extension
+        )
+
+        const r2Metadata = PhotoStandardizationService.getR2Metadata(
+          auditToken,
+          photoType
+        )
 
         const buffer = await file.arrayBuffer()
         await c.env.R2.put(fileName, buffer, {
           httpMetadata: { contentType: file.type },
-          customMetadata: {
-            audit_token: auditToken,
-            photo_type: photoType,
-            uploaded_at: new Date().toISOString()
-          }
+          customMetadata: r2Metadata
         })
 
         const publicUrl = `/api/photos/view/${fileName}`

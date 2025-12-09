@@ -92,10 +92,11 @@ app.route('/api/el', elModule)
 app.route('/', pvModule)
 
 // ============================================================================
-// MODULE DESIGNER SATELLITE - CARTOGRAPHIE SATELLITE GOOGLE MAPS
+// MODULE UNIFIED EDITOR - ÉDITEUR 100% UNIFIÉ (V2 SCHÉMA + SATELLITE)
+// Fusionne les fonctionnalités "1" et "3" selon la stratégie "Number One"
 // ============================================================================
-import designerModule from './modules/designer'
-app.route('/', designerModule)
+import unifiedEditorModule from './modules/unified-editor'
+app.route('/', unifiedEditorModule)
 
 // ============================================================================
 // MODULE AUDITS - GESTION AUDITS MULTI-MODULES (MASTER)
