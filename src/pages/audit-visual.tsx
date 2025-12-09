@@ -47,7 +47,7 @@ export function getAuditVisualPage() {
                 </div>
 
                 <div class="grid md:grid-cols-2 gap-4">
-                    <button onclick="window.open('/api/calepinage/editor/'+window.location.pathname.split('/')[2], '_blank')" class="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-lg font-black text-xl border-2 border-purple-400">
+                    <button onclick="window.open('/unified-editor/'+window.location.pathname.split('/')[2], '_blank')" class="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-lg font-black text-xl border-2 border-purple-400">
                         <i class="fas fa-map-marked-alt mr-2"></i>
                         PLAN / DESIGNER
                     </button>
