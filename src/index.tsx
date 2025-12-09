@@ -176,11 +176,7 @@ app.route('/api/visual', visualRoutes)
 import isolationRoutes from './modules/isolation/routes/index'
 app.route('/api/isolation', isolationRoutes)
 
-// ============================================================================
-// MODULE PHOTOS - UPLOAD & STOCKAGE R2
-// ============================================================================
-import photosRoutes from './modules/photos/routes'
-app.route('/api/photos', photosRoutes)
+
 
 // ============================================================================
 // MODULE REPORTS - RAPPORTS MULTI-MODULES
@@ -285,7 +281,7 @@ app.post('/api/audit/:token/parse-pvserv', async (c) => {
   } catch (error) {
     console.error('Erreur parsing PVserv:', error)
     return c.json({ 
-      error: 'Erreur parsing PVserv: ' + error.message,
+      error: 'Erreur parsing PVserv: ' + (error as Error).message,
       success: false 
     }, 500)
   }

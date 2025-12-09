@@ -7,7 +7,13 @@
 
 import { Context } from 'hono';
 
-export async function getAuditCompletePage(c: Context<{ Bindings: CloudflareBindings }>) {
+type Bindings = {
+  DB: D1Database
+  KV: KVNamespace
+  R2: R2Bucket
+}
+
+export async function getAuditCompletePage(c: Context<{ Bindings: Bindings }>) {
   const { env } = c;
   const { audit_token } = c.req.param();
   
