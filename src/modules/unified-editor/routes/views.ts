@@ -4,6 +4,7 @@ import { unifiedEditorHtmlBase64 } from '../views/unified-editor-html'
 const views = new Hono<{ Bindings: { DB: D1Database } }>()
 
 // Helper to decode base64 (works in Cloudflare Workers using standard atob)
+// We use atob() which is available in the Workers environment
 function decodeBase64(str: string): string {
   try {
     return atob(str)
