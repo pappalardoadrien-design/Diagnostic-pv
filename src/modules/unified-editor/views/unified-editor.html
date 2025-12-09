@@ -37,7 +37,12 @@
                 <div class="flex items-center text-xs text-gray-500 space-x-2">
                     <span id="plantName">Centrale Inconnue</span>
                     <i class="fas fa-chevron-right text-[10px]"></i>
-                    <span id="zoneName">Zone Inconnue</span>
+                    <select id="missionSelector" onchange="updateMissionContext()" class="bg-transparent border-none font-bold text-purple-700 focus:ring-0 cursor-pointer">
+                        <option value="all">Mission Complète (EL + IV + Visuel)</option>
+                        <option value="el">Audit Électroluminescence</option>
+                        <option value="visual">Audit Visuel / Drone</option>
+                        <option value="iv">Audit Courbes I-V</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -53,6 +58,9 @@
         </div>
 
         <div class="flex items-center space-x-3">
+            <button id="btnAutoPlace" onclick="autoPlaceModules()" class="hidden bg-yellow-500 text-white hover:bg-yellow-600 px-3 py-2 rounded-lg text-sm font-bold shadow-md transition-colors animate-pulse">
+                <i class="fas fa-magic mr-2"></i>Placer Modules
+            </button>
             <div id="syncStatus" class="text-xs text-gray-400 hidden">
                 <i class="fas fa-check mr-1"></i>Sauvegardé
             </div>
@@ -73,6 +81,13 @@
             <div class="p-4 border-b border-gray-100">
                 <input type="text" placeholder="Rechercher module..." class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-purple-500">
             </div>
+            
+            <!-- Alert for unplaced modules -->
+            <div id="unplacedAlert" class="hidden bg-yellow-50 border-b border-yellow-100 p-2 text-xs text-yellow-800 flex items-center justify-between">
+                <span>⚠️ <span id="unplacedCount">0</span> modules sans GPS</span>
+                <button onclick="autoPlaceModules()" class="underline font-bold">Placer</button>
+            </div>
+
             <div class="flex-1 overflow-y-auto p-2 space-y-1" id="moduleList">
                 <!-- Modules injected here -->
             </div>
@@ -180,7 +195,7 @@
                             <option value="low_power">🟠 Sous-performance</option>
                         </select>
                     </div>
-                 </div>
+                </div>
 
                 <!-- TAB: Infos -->
                 <div id="tab-info" class="space-y-4 hidden">
@@ -245,6 +260,7 @@
                     renderMapModules();
                     // renderSchematicModules(); // TODO
                     updateStats();
+                    checkUnplacedModules();
                 } else {
                     alert('Erreur chargement: ' + data.error);
                 }
@@ -253,6 +269,20 @@
                 alert('Erreur réseau');
             } finally {
                 document.getElementById('loadingOverlay').classList.add('hidden');
+            }
+        }
+
+        function checkUnplacedModules() {
+            const unplaced = MODULES.filter(m => !m.geo_lat || !m.geo_lon);
+            const count = unplaced.length;
+            document.getElementById('unplacedCount').innerText = count;
+            
+            if(count > 0) {
+                document.getElementById('unplacedAlert').classList.remove('hidden');
+                document.getElementById('btnAutoPlace').classList.remove('hidden');
+            } else {
+                document.getElementById('unplacedAlert').classList.add('hidden');
+                document.getElementById('btnAutoPlace').classList.add('hidden');
             }
         }
 
@@ -283,8 +313,8 @@
                 subdomains:['mt0','mt1','mt2','mt3']
             }).addTo(map);
 
-            // Center map on modules if they exist
-            // (Will be done in renderMapModules)
+            // Add center marker for reference
+            // L.marker(map.getCenter()).addTo(map).bindPopup('Centre de la zone');
         }
 
         function renderMapModules() {
@@ -295,43 +325,208 @@
             if(MODULES.length === 0) return;
 
             const bounds = L.latLngBounds([]);
+            let hasBounds = false;
 
             MODULES.forEach(m => {
                 if(!m.geo_lat || !m.geo_lon) return; // Skip if no GPS
 
                 const color = getStatusColor(m);
+                // Module size approx: 1m x 1.6m -> ~0.00001 deg
+                const width = 0.000015; 
+                const height = 0.00001;
+                
                 const boundsArr = [
                     [m.geo_lat, m.geo_lon], 
-                    [m.geo_lat + 0.00001, m.geo_lon + 0.000015] // Simple rect approx for demo
+                    [m.geo_lat + height, m.geo_lon + width] 
                 ];
 
                 const rect = L.rectangle(boundsArr, {
                     color: color,
                     weight: 1,
-                    fillOpacity: 0.6
+                    fillOpacity: 0.6,
+                    draggable: true // Not native in L.rectangle without plugin?
                 }).addTo(map);
                 
+                // Add simple popup/tooltip
+                rect.bindTooltip(`S${m.string_number}:P${m.position_in_string}`, { permanent: false, direction: 'center' });
+
+                // Make draggable (Manual implementation for Leaflet Rects)
+                enableDrag(rect, m);
+
                 rect.on('click', () => openInspector(m.id));
                 mapMarkers[m.id] = rect;
                 bounds.extend(boundsArr);
+                hasBounds = true;
             });
 
-            if(bounds.isValid()) map.fitBounds(bounds);
+            if(hasBounds) map.fitBounds(bounds);
+        }
+
+        // Leaflet Rectangle Dragging Logic (simplified)
+        function enableDrag(rect, module) {
+            let startPoint = null;
+            let startBounds = null;
+
+            rect.on('mousedown', function(e) {
+                map.dragging.disable();
+                startPoint = e.latlng;
+                startBounds = rect.getBounds();
+                L.DomEvent.stopPropagation(e);
+            });
+
+            map.on('mousemove', function(e) {
+                if(startPoint) {
+                    const latDiff = e.latlng.lat - startPoint.lat;
+                    const lngDiff = e.latlng.lng - startPoint.lng;
+                    
+                    const newSouthWest = L.latLng(startBounds.getSouthWest().lat + latDiff, startBounds.getSouthWest().lng + lngDiff);
+                    const newNorthEast = L.latLng(startBounds.getNorthEast().lat + latDiff, startBounds.getNorthEast().lng + lngDiff);
+                    
+                    rect.setBounds(L.latLngBounds(newSouthWest, newNorthEast));
+                }
+            });
+
+            map.on('mouseup', function(e) {
+                if(startPoint) {
+                    map.dragging.enable();
+                    
+                    // Update Module Data
+                    const center = rect.getBounds().getSouthWest(); // Use SW as origin for simplicity
+                    module.geo_lat = center.lat;
+                    module.geo_lon = center.lng;
+                    module._dirty = true; // Mark as modified
+                    
+                    // Show "Unsaved" indicator
+                    document.getElementById('syncStatus').innerText = 'Modifications non sauvegardées';
+                    document.getElementById('syncStatus').classList.remove('text-gray-400', 'hidden');
+                    document.getElementById('syncStatus').classList.add('text-orange-500');
+
+                    startPoint = null;
+                }
+            });
+        }
+
+        // --- AUTO PLACE LOGIC ---
+        function autoPlaceModules() {
+            if(!confirm("Placer automatiquement les modules sans GPS au centre de l'écran ?")) return;
+
+            const center = map.getCenter();
+            const startLat = center.lat;
+            const startLon = center.lng;
+            const gap = 0.00002; // Gap between modules
+
+            let currentRow = 0;
+            let currentCol = 0;
+            const maxCols = 20; // Break line every 20 modules
+
+            MODULES.forEach(m => {
+                if(!m.geo_lat || !m.geo_lon) {
+                    m.geo_lat = startLat - (currentRow * gap * 1.5); // Rows go down
+                    m.geo_lon = startLon + (currentCol * gap); // Cols go right
+                    m._dirty = true;
+
+                    currentCol++;
+                    if(currentCol >= maxCols) {
+                        currentCol = 0;
+                        currentRow++;
+                    }
+                }
+            });
+
+            renderMapModules();
+            checkUnplacedModules();
+            alert("Modules placés ! Vous pouvez maintenant les déplacer. N'oubliez pas de sauvegarder.");
+        }
+
+        // --- SAVE LOGIC ---
+        async function saveChanges() {
+            const modified = MODULES.filter(m => m._dirty);
+            if(modified.length === 0) {
+                alert("Aucune modification à sauvegarder.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/unified/topology/${ZONE_ID}/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ modules: modified })
+                });
+                
+                const data = await res.json();
+                if(data.success) {
+                    alert('Sauvegarde réussie !');
+                    // Reset dirty flags
+                    modified.forEach(m => delete m._dirty);
+                    document.getElementById('syncStatus').innerText = 'Sauvegardé';
+                    document.getElementById('syncStatus').classList.add('text-gray-400');
+                    document.getElementById('syncStatus').classList.remove('text-orange-500', 'hidden');
+                } else {
+                    alert('Erreur sauvegarde: ' + data.error);
+                }
+            } catch(e) {
+                alert('Erreur réseau lors de la sauvegarde');
+            }
         }
 
         // --- UI LOGIC ---
         function getStatusColor(m) {
-            // Priority: Critical > Warning > OK
-            const status = m.status_el || m.status_visual || 'ok';
-            switch(status) {
-                case 'dead_cell': return '#ef4444'; // Red
-                case 'hotspot': return '#ef4444';
-                case 'bypass_diode': return '#ef4444';
-                case 'microcracks': return '#f97316'; // Orange
-                case 'pid': return '#f97316';
-                case 'ok': return '#22c55e'; // Green
-                default: return '#94a3b8'; // Gray/Unknown
+            // CORRELATION ENGINE (Simple Version)
+            // Priority: Red (Critical) > Orange (Warning) > Green (OK) > Gray (Unknown)
+            
+            const defects = [];
+            if(m.status_el && m.status_el !== 'ok') defects.push({ type: 'el', val: m.status_el });
+            if(m.status_visual && m.status_visual !== 'ok') defects.push({ type: 'vis', val: m.status_visual });
+            if(m.status_iv && m.status_iv !== 'ok') defects.push({ type: 'iv', val: m.status_iv });
+
+            // 1. Critical
+            if(defects.some(d => ['dead_cell', 'hotspot', 'bypass_diode', 'breakage', 'delamination', 'string_open'].includes(d.val))) {
+                return '#ef4444'; // Red
             }
+            // 2. Warning
+            if(defects.some(d => ['microcracks', 'pid', 'dirty', 'vegetation', 'low_power'].includes(d.val))) {
+                return '#f97316'; // Orange
+            }
+            // 3. Info / Measured
+            if(defects.some(d => ['measured'].includes(d.val))) {
+                return '#3b82f6'; // Blue
+            }
+            // 4. OK
+            if(m.status_el === 'ok' || m.status_visual === 'ok' || m.status_iv === 'ok') {
+                return '#22c55e'; // Green
+            }
+
+            return '#94a3b8'; // Gray
+        }
+
+        function updateMissionContext() {
+            const mission = document.getElementById('missionSelector').value;
+            // Filter Tabs
+            const tabs = {
+                'el': document.querySelector('button[onclick="switchTab(\\'el\\')"]'),
+                'visual': document.querySelector('button[onclick="switchTab(\\'visual\\')"]'),
+                'iv': document.querySelector('button[onclick="switchTab(\\'iv\\')"]'),
+            };
+            
+            // Reset all
+            Object.values(tabs).forEach(t => t.style.display = 'block');
+
+            if(mission === 'el') {
+                tabs['visual'].style.display = 'none';
+                tabs['iv'].style.display = 'none';
+                switchTab('el');
+            } else if (mission === 'visual') {
+                tabs['el'].style.display = 'none';
+                tabs['iv'].style.display = 'none';
+                switchTab('visual');
+            } else if (mission === 'iv') {
+                tabs['el'].style.display = 'none';
+                tabs['visual'].style.display = 'none';
+                switchTab('iv');
+            }
+            
+            // Re-render map to reflect context if we want mission-specific coloring (optional)
+            // For now, we keep correlation view as default
         }
 
         function renderModuleList() {
@@ -347,10 +542,15 @@
                 const el = document.createElement('div');
                 el.className = 'flex items-center p-2 hover:bg-purple-50 cursor-pointer rounded text-xs';
                 el.onclick = () => openInspector(m.id);
+                
+                // Indicateur si non placé
+                const unplaced = (!m.geo_lat || !m.geo_lon) ? '<span title="Non placé sur carte">📍❓</span>' : '';
+
                 el.innerHTML = `
                     <div class="w-3 h-3 rounded-full mr-2" style="background-color: ${getStatusColor(m)}"></div>
                     <span class="font-mono font-bold w-16">${m.module_identifier}</span>
-                    <span class="text-gray-400">S${m.string_number}:P${m.position_in_string}</span>
+                    <span class="text-gray-400 mr-2">S${m.string_number}:P${m.position_in_string}</span>
+                    ${unplaced}
                 `;
                 list.appendChild(el);
             });
@@ -422,9 +622,9 @@
             if(!SELECTED_MODULE_ID) return;
             const m = MODULES.find(mod => mod.id === SELECTED_MODULE_ID);
             
-            if(type === 'el') {
-                m.status_el = document.getElementById('inspELStatus').value;
-            }
+            if(type === 'el') m.status_el = document.getElementById('inspELStatus').value;
+            if(type === 'visual') m.status_visual = document.getElementById('inspVisualStatus').value;
+            if(type === 'iv') m.status_iv = document.getElementById('inspIVStatus').value;
             
             // Re-render map marker color immediately
             if(mapMarkers[m.id]) {
