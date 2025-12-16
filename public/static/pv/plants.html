@@ -1,0 +1,319 @@
+
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PV Cartography - Centrales Photovoltaïques</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/diagpv-styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-black text-white min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-7xl">
+            <!-- Header -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="text-4xl font-black text-purple-400 mb-2">
+                            <i class="fas fa-solar-panel mr-3"></i>PV CARTOGRAPHY
+                        </h1>
+                        <p class="text-gray-400 text-lg">Modélisation & Cartographie Centrales Photovoltaïques</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <a href="/" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-home mr-2"></i>ACCUEIL
+                        </a>
+                        <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
+                            <i class="fas fa-chart-line mr-2"></i>AUDITS
+                        </a>
+                        <button id="createPlantBtn" class="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded font-black">
+                            <i class="fas fa-plus mr-2"></i>NOUVELLE CENTRALE
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiques -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-gray-900 rounded-lg p-6 border border-purple-400">
+                    <div class="text-3xl font-black text-purple-400 mb-2" id="statsPlants">0</div>
+                    <div class="text-sm text-gray-400">Centrales</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-6 border border-blue-400">
+                    <div class="text-3xl font-black text-blue-400 mb-2" id="statsZones">0</div>
+                    <div class="text-sm text-gray-400">Zones</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-6 border border-green-400">
+                    <div class="text-3xl font-black text-green-400 mb-2" id="statsModules">0</div>
+                    <div class="text-sm text-gray-400">Modules</div>
+                </div>
+                <div class="bg-gray-900 rounded-lg p-6 border border-yellow-400">
+                    <div class="text-3xl font-black text-yellow-400 mb-2" id="statsPower">0</div>
+                    <div class="text-sm text-gray-400">kWc Total</div>
+                </div>
+            </div>
+
+            <!-- Liste centrales -->
+            <div id="plantsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Chargement -->
+                <div class="col-span-full text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-4xl text-purple-400 mb-4"></i>
+                    <p class="text-gray-400">Chargement centrales...</p>
+                </div>
+            </div>
+
+            <!-- Message vide -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <i class="fas fa-solar-panel text-6xl text-gray-600 mb-4"></i>
+                <p class="text-gray-400 text-xl mb-6">Aucune centrale PV créée</p>
+                <button onclick="showCreatePlantModal()" class="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded font-black text-lg">
+                    <i class="fas fa-plus mr-2"></i>CRÉER MA PREMIÈRE CENTRALE
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Création Centrale -->
+        <div id="createPlantModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 border-2 border-purple-400 rounded-lg p-6 max-w-2xl w-full">
+                <h3 class="text-2xl font-black mb-4 text-purple-400">
+                    <i class="fas fa-plus-circle mr-2"></i>NOUVELLE CENTRALE PV
+                </h3>
+                
+                <form id="createPlantForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Nom de la centrale *</label>
+                        <input type="text" id="plantName" required
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                               placeholder="Ex: Centrale Solaire Marseille">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Type d'installation *</label>
+                        <select id="plantType" required
+                                class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none">
+                            <option value="rooftop">Toiture</option>
+                            <option value="ground">Sol</option>
+                            <option value="carport">Ombrière</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Adresse</label>
+                            <input type="text" id="plantAddress"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                                   placeholder="123 Rue du Soleil">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Ville</label>
+                            <input type="text" id="plantCity"
+                                   class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 focus:border-purple-400 focus:outline-none"
+                                   placeholder="Marseille">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded font-black">
+                            <i class="fas fa-save mr-2"></i>CRÉER CENTRALE
+                        </button>
+                        <button type="button" id="cancelCreateBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
+                            ANNULER
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+        // Script PV Cartography - Liste centrales
+        let plants = []
+
+        async function loadPlants() {
+            try {
+                const response = await fetch('/api/pv/plants')
+                const data = await response.json()
+                
+                plants = data.plants || []
+                
+                updateStats()
+                renderPlantsList()
+            } catch (error) {
+                console.error('Erreur chargement centrales:', error)
+                showAlert('Erreur chargement centrales', 'error')
+            }
+        }
+
+        function updateStats() {
+            const totalZones = plants.reduce((sum, p) => sum + (p.zone_count || 0), 0)
+            const totalModules = plants.reduce((sum, p) => sum + (p.module_count || 0), 0)
+            const totalPower = plants.reduce((sum, p) => sum + (p.total_power_wp || 0), 0)
+            
+            document.getElementById('statsPlants').textContent = plants.length
+            document.getElementById('statsZones').textContent = totalZones
+            document.getElementById('statsModules').textContent = totalModules.toLocaleString()
+            document.getElementById('statsPower').textContent = (totalPower / 1000).toFixed(1)
+        }
+
+        function renderPlantsList() {
+            const container = document.getElementById('plantsList')
+            const emptyState = document.getElementById('emptyState')
+            
+            if (plants.length === 0) {
+                container.classList.add('hidden')
+                emptyState.classList.remove('hidden')
+                return
+            }
+            
+            container.classList.remove('hidden')
+            emptyState.classList.add('hidden')
+            
+            const typeIcons = {
+                rooftop: 'fa-building',
+                ground: 'fa-mountain',
+                carport: 'fa-car'
+            }
+            
+            const typeLabels = {
+                rooftop: 'Toiture',
+                ground: 'Sol',
+                carport: 'Ombrière'
+            }
+            
+            container.innerHTML = plants.map(plant => `
+                <div class="bg-gray-900 rounded-lg border-2 border-gray-700 hover:border-purple-400 transition-all p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-black text-purple-400 mb-1">${plant.plant_name}</h3>
+                            <p class="text-sm text-gray-400">
+                                <i class="fas ${typeIcons[plant.plant_type] || 'fa-solar-panel'} mr-1"></i>
+                                ${typeLabels[plant.plant_type] || plant.plant_type}
+                            </p>
+                        </div>
+                        <button onclick="deletePlant(${plant.id})" 
+                                class="text-red-400 hover:text-red-300" title="Supprimer">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-3 mb-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-blue-400">${plant.zone_count || 0}</div>
+                            <div class="text-xs text-gray-500">Zones</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-green-400">${plant.module_count || 0}</div>
+                            <div class="text-xs text-gray-500">Modules</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-yellow-400">${((plant.total_power_wp || 0) / 1000).toFixed(1)}</div>
+                            <div class="text-xs text-gray-500">kWc</div>
+                        </div>
+                    </div>
+                    
+                    ${plant.address || plant.city ? `
+                        <p class="text-sm text-gray-400 mb-4">
+                            <i class="fas fa-map-marker-alt mr-1"></i>
+                            ${plant.address || ''} ${plant.city || ''}
+                        </p>
+                    ` : ''}
+                    
+                    <div class="flex gap-2">
+                        <a href="/pv/plant/${plant.id}" 
+                           class="flex-1 bg-purple-600 hover:bg-purple-700 py-2 rounded font-bold text-center">
+                            <i class="fas fa-eye mr-1"></i>VOIR
+                        </a>
+                    </div>
+                </div>
+            `).join('')
+        }
+
+        function showCreatePlantModal() {
+            document.getElementById('createPlantModal').classList.remove('hidden')
+        }
+
+        function hideCreatePlantModal() {
+            document.getElementById('createPlantModal').classList.add('hidden')
+            document.getElementById('createPlantForm').reset()
+        }
+
+        async function createPlant(formData) {
+            try {
+                const response = await fetch('/api/pv/plants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                })
+                
+                const result = await response.json()
+                
+                if (result.success) {
+                    showAlert('Centrale créée avec succès !', 'success')
+                    hideCreatePlantModal()
+                    loadPlants()
+                } else {
+                    showAlert('Erreur création centrale', 'error')
+                }
+            } catch (error) {
+                console.error('Erreur:', error)
+                showAlert('Erreur création centrale', 'error')
+            }
+        }
+
+        async function deletePlant(plantId) {
+            if (!confirm('Supprimer cette centrale et toutes ses données ?')) return
+            
+            try {
+                const response = await fetch(`/api/pv/plants/${plantId}`, {
+                    method: 'DELETE'
+                })
+                
+                if (response.ok) {
+                    showAlert('Centrale supprimée', 'success')
+                    loadPlants()
+                }
+            } catch (error) {
+                console.error('Erreur suppression:', error)
+                showAlert('Erreur suppression centrale', 'error')
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                info: 'bg-blue-600'
+            }
+            
+            const alert = document.createElement('div')
+            alert.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 font-bold`
+            alert.textContent = message
+            
+            document.body.appendChild(alert)
+            
+            setTimeout(() => alert.remove(), 3000)
+        }
+
+        // Event listeners
+        document.getElementById('createPlantBtn').addEventListener('click', showCreatePlantModal)
+        document.getElementById('cancelCreateBtn').addEventListener('click', hideCreatePlantModal)
+        
+        document.getElementById('createPlantForm').addEventListener('submit', (e) => {
+            e.preventDefault()
+            
+            const formData = {
+                plant_name: document.getElementById('plantName').value,
+                plant_type: document.getElementById('plantType').value,
+                address: document.getElementById('plantAddress').value || null,
+                city: document.getElementById('plantCity').value || null
+            }
+            
+            createPlant(formData)
+        })
+
+        // Init
+        loadPlants()
+        </script>
+    </body>
+    </html>
+  

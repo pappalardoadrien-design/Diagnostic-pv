@@ -498,8 +498,87 @@ async function aggregateThermalModule(
   request: GenerateUnifiedReportRequest
 ): Promise<ThermalModuleData> {
   
-  // TODO: Implémenter quand table thermal_reports existe
-  return createEmptyThermalData();
+  try {
+    // 1. Déterminer audit_token
+    let auditToken = request.auditElToken;
+
+    if (!auditToken && request.plantId) {
+      // Tenter de retrouver le dernier audit EL lié à cette centrale
+      const audit = await DB.prepare(`
+        SELECT ea.audit_token 
+        FROM el_audits ea
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ? 
+        ORDER BY ea.created_at DESC 
+        LIMIT 1
+      `).bind(request.plantId).first();
+      
+      if (audit) {
+        auditToken = (audit as any).audit_token;
+      }
+    }
+
+    if (!auditToken) {
+      return createEmptyThermalData();
+    }
+
+    // 2. Récupérer mesures thermiques (via Jointure Interventions ou directement audit_token)
+    // On privilégie la jointure standard utilisée dans le module thermique
+    const measurements = await DB.prepare(`
+      SELECT tm.*
+      FROM thermal_measurements tm
+      JOIN interventions i ON tm.intervention_id = i.id
+      JOIN audits a ON a.intervention_id = i.id
+      WHERE a.audit_token = ?
+    `).bind(auditToken).all();
+
+    if (!measurements.results || measurements.results.length === 0) {
+      // Fallback: Essayer via audit_token direct (si migration effectuée)
+      const directMeasurements = await DB.prepare(`
+        SELECT * FROM thermal_measurements WHERE audit_token = ?
+      `).bind(auditToken).all();
+
+      if (!directMeasurements.results || directMeasurements.results.length === 0) {
+        return createEmptyThermalData();
+      }
+      measurements.results = directMeasurements.results;
+    }
+
+    // 3. Calculs statistiques
+    const results = measurements.results as any[];
+    const totalMeasurements = results.length;
+    
+    // Compter défauts
+    const criticalHotspots = results.filter(m => m.defect_type === 'hotspot' && m.severity_level >= 4).length;
+    const allHotspots = results.filter(m => m.defect_type === 'hotspot').length;
+    const bypassDiodes = results.filter(m => m.defect_type === 'bypass_diode').length;
+    
+    // Trouver T° Max absolue et Delta T Max
+    const maxTemp = Math.max(...results.map(m => m.temperature_max || 0));
+    const maxDeltaT = Math.max(...results.map(m => m.delta_t_max || 0));
+
+    // Générer résumé textuel
+    let summary = `${totalMeasurements} mesure(s) thermique(s). `;
+    if (criticalHotspots > 0) {
+      summary += `ATTENTION: ${criticalHotspots} hotspot(s) critique(s) détecté(s) (Sévérité ≥ 4). `;
+    } else if (allHotspots > 0) {
+      summary += `${allHotspots} hotspot(s) détecté(s). `;
+    } else {
+      summary += "Aucune anomalie thermique majeure. ";
+    }
+    summary += `Delta T Max: ${maxDeltaT.toFixed(1)}°C.`;
+
+    return {
+      hasData: true,
+      reportUrl: null, // Pas de PDF externe pour l'instant
+      hotSpotsCount: allHotspots + bypassDiodes,
+      summary: summary
+    };
+
+  } catch (error) {
+    console.error('Erreur agrégation Thermique:', error);
+    return createEmptyThermalData();
+  }
 }
 
 function createEmptyThermalData(): ThermalModuleData {

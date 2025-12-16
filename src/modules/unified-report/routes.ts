@@ -189,8 +189,43 @@ unifiedReportRoutes.get('/preview', async (c) => {
       isolationCount = (isolationTests as any)?.count || 0;
     }
     
-    // Module Thermique (TODO)
-    thermalCount = 0;
+    // Module Thermique
+    if (auditElToken) {
+      // Via audit token
+      const thermalMeasurements = await DB.prepare(`
+        SELECT COUNT(*) as count 
+        FROM thermal_measurements tm
+        JOIN interventions i ON tm.intervention_id = i.id
+        JOIN audits a ON a.intervention_id = i.id
+        WHERE a.audit_token = ?
+      `).bind(auditElToken).first();
+      
+      thermalCount = (thermalMeasurements as any)?.count || 0;
+      
+      // Fallback si count 0 (migration audit_token direct)
+      if (thermalCount === 0) {
+        const directThermal = await DB.prepare(`
+          SELECT COUNT(*) as count FROM thermal_measurements WHERE audit_token = ?
+        `).bind(auditElToken).first();
+        if ((directThermal as any)?.count > 0) {
+          thermalCount = (directThermal as any).count;
+        }
+      }
+      
+    } else if (plantId) {
+      // Via plantId -> EL Audits -> Interventions
+      const thermalMeasurements = await DB.prepare(`
+        SELECT COUNT(*) as count 
+        FROM thermal_measurements tm
+        JOIN interventions i ON tm.intervention_id = i.id
+        JOIN audits a ON a.intervention_id = i.id
+        JOIN el_audits ea ON ea.audit_token = a.audit_token
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ?
+      `).bind(plantId).first();
+      
+      thermalCount = (thermalMeasurements as any)?.count || 0;
+    }
     
     const response: PreviewAvailableDataResponse = {
       success: true,

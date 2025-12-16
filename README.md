@@ -6,6 +6,13 @@
 
 ### 🏗️ Architecture Monolithe Modulaire
 
+### 🚀 DASHBOARD UNIFIÉ (CONTROL TOWER)
+Une interface centrale "Tour de Contrôle" unifie désormais l'expérience utilisateur :
+- **Vue Globale** : KPIs temps réel, Alertes Critiques, État du système.
+- **Explorateur Unifié** : Navigation hiérarchique fluide (Client → Projets → Interventions → Audits).
+- **Intégration** : Accès direct aux modules CRM, Planning et Audits sans changer de contexte.
+- **URL** : `/crm/dashboard` ou `/dashboard`
+
 ```
 diagnostic-hub/
 ├── src/modules/
@@ -13,6 +20,9 @@ diagnostic-hub/
 │   ├── iv-curves/                ✅ Courbes I-V (PRODUCTION)
 │   ├── visual-inspection/        ✅ Contrôles visuels IEC 62446-1 (PRODUCTION)
 │   ├── pv-cartography/           ✅ Cartographie PV (PRODUCTION)
+│   ├── crm/                      ✅ CRM (Clients/Projets) (PRODUCTION)
+│   ├── planning/                 ✅ Planning Interventions (PRODUCTION)
+│   ├── audits/                   ✅ Gestion Audits Unifiée (PRODUCTION)
 │   ├── thermique/                🔜 Thermographie
 │   ├── isolation/                🔜 Tests isolation
 │   └── expertise/                🔜 Expertise post-sinistre
@@ -312,8 +322,10 @@ diagnostic-hub/
 ## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production**: https://925dfced.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT**
+- **Production**: https://5cd316f4.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT (15/12/2025)**
 - **Domaine principal**: https://diagnostic-hub.pages.dev
+- **Dashboard Unifié**: https://diagnostic-hub.pages.dev/dashboard
+- **Nouveau Création Audit**: https://diagnostic-hub.pages.dev/audits/create
 - **Sandbox Dev**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev (test handles interactifs)
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
