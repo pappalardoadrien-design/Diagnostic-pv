@@ -38,6 +38,7 @@ import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
 import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getLoginPage } from './pages/login'
+import crmUnifiedViewPage from './pages/crm-unified-view'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
