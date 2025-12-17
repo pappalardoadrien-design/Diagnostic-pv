@@ -39,6 +39,30 @@ export async function aggregateUnifiedReportData(
     includeModules.includes('thermal') ? aggregateThermalModule(DB, request) : createEmptyThermalData()
   ]);
   
+  // Récupération des données OFFICIELLES du CRM (Source de vérité)
+  let officialClientName = null;
+  let officialProjectName = null;
+  let officialLocation = null;
+
+  if (request.plantId) {
+    try {
+      const crmData = await DB.prepare(`
+        SELECT c.company_name, p.name as project_name, p.address_city, p.site_address
+        FROM projects p
+        JOIN crm_clients c ON p.client_id = c.id
+        WHERE p.id = ?
+      `).bind(request.plantId).first();
+
+      if (crmData) {
+        officialClientName = crmData.company_name;
+        officialProjectName = crmData.project_name;
+        officialLocation = crmData.site_address ? `${crmData.site_address}, ${crmData.address_city || ''}` : crmData.address_city;
+      }
+    } catch (e) {
+      console.warn('Impossible de récupérer les données CRM pour le rapport', e);
+    }
+  }
+
   // Calcul synthèse globale
   const totalModules = elData.hasData ? elData.totalModules : 0;
   const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0);
@@ -48,9 +72,10 @@ export async function aggregateUnifiedReportData(
   const report: UnifiedReportData = {
     reportToken,
     plantId: request.plantId || null,
-    plantName: elData.projectName || visualData.projectName || 'Centrale PV',
-    clientName: elData.clientName || visualData.projectName || 'Client',
-    location: elData.location || 'Localisation inconnue',
+    // Priorité aux données CRM, sinon fallback sur les données d'audit
+    plantName: officialProjectName || elData.projectName || visualData.projectName || 'Centrale PV',
+    clientName: officialClientName || elData.clientName || visualData.projectName || 'Client',
+    location: officialLocation || elData.location || 'Localisation inconnue',
     generatedAt: new Date().toISOString(),
     generatedBy: request.generatedBy || null,
     
