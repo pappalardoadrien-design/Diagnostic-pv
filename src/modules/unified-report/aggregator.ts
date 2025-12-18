@@ -1,6 +1,6 @@
 /**
  * Aggregator - Logique agrégation données multi-modules
- * Collecte données EL, IV, Visuels, Isolation, Thermique
+ * Collecte données EL, IV, Visuels, Isolation, Thermique, Photos
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -11,6 +11,7 @@ import type {
   VisualModuleData,
   IsolationModuleData,
   ThermalModuleData,
+  PhotosModuleData,
   GenerateUnifiedReportRequest
 } from './types/index.js';
 import {
@@ -28,41 +29,18 @@ export async function aggregateUnifiedReportData(
 ): Promise<UnifiedReportData> {
   
   const reportToken = generateReportToken();
-  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal'];
+  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos'];
   
   // Agrégation parallèle
-  const [elData, ivData, visualData, isolationData, thermalData] = await Promise.all([
+  const [elData, ivData, visualData, isolationData, thermalData, photosData] = await Promise.all([
     includeModules.includes('el') ? aggregateELModule(DB, request) : createEmptyELData(),
     includeModules.includes('iv') ? aggregateIVModule(DB, request) : createEmptyIVData(),
     includeModules.includes('visual') ? aggregateVisualModule(DB, request) : createEmptyVisualData(),
     includeModules.includes('isolation') ? aggregateIsolationModule(DB, request) : createEmptyIsolationData(),
-    includeModules.includes('thermal') ? aggregateThermalModule(DB, request) : createEmptyThermalData()
+    includeModules.includes('thermal') ? aggregateThermalModule(DB, request) : createEmptyThermalData(),
+    includeModules.includes('photos') ? aggregatePhotosModule(DB, request) : createEmptyPhotosData()
   ]);
   
-  // Récupération des données OFFICIELLES du CRM (Source de vérité)
-  let officialClientName = null;
-  let officialProjectName = null;
-  let officialLocation = null;
-
-  if (request.plantId) {
-    try {
-      const crmData = await DB.prepare(`
-        SELECT c.company_name, p.name as project_name, p.address_city, p.site_address
-        FROM projects p
-        JOIN crm_clients c ON p.client_id = c.id
-        WHERE p.id = ?
-      `).bind(request.plantId).first();
-
-      if (crmData) {
-        officialClientName = crmData.company_name;
-        officialProjectName = crmData.project_name;
-        officialLocation = crmData.site_address ? `${crmData.site_address}, ${crmData.address_city || ''}` : crmData.address_city;
-      }
-    } catch (e) {
-      console.warn('Impossible de récupérer les données CRM pour le rapport', e);
-    }
-  }
-
   // Calcul synthèse globale
   const totalModules = elData.hasData ? elData.totalModules : 0;
   const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0);
@@ -73,9 +51,9 @@ export async function aggregateUnifiedReportData(
     reportToken,
     plantId: request.plantId || null,
     // Priorité aux données CRM, sinon fallback sur les données d'audit
-    plantName: officialProjectName || elData.projectName || visualData.projectName || 'Centrale PV',
-    clientName: officialClientName || elData.clientName || visualData.projectName || 'Client',
-    location: officialLocation || elData.location || 'Localisation inconnue',
+    plantName: elData.projectName || visualData.projectName || 'Centrale PV',
+    clientName: elData.clientName || visualData.projectName || 'Client',
+    location: elData.location || 'Localisation inconnue',
     generatedAt: new Date().toISOString(),
     generatedBy: request.generatedBy || null,
     
@@ -84,6 +62,14 @@ export async function aggregateUnifiedReportData(
     visualModule: visualData,
     isolationModule: isolationData,
     thermalModule: thermalData,
+
+    modules: {
+        photos: {
+            enabled: photosData.hasData,
+            count: photosData.totalPhotos,
+            data: photosData
+        }
+    },
     
     summary: {
       totalModulesAudited: totalModules,
@@ -96,6 +82,28 @@ export async function aggregateUnifiedReportData(
     
     recommendations: [] // Généré après
   };
+
+  // Récupération des données OFFICIELLES du CRM (Source de vérité)
+  if (request.plantId) {
+    try {
+      const crmData = await DB.prepare(`
+        SELECT c.company_name, p.name as project_name, p.address_city, p.site_address
+        FROM projects p
+        JOIN crm_clients c ON p.client_id = c.id
+        WHERE p.id = ?
+      `).bind(request.plantId).first();
+
+      if (crmData) {
+        // Override avec les données officielles si disponibles
+        report.clientName = crmData.company_name as string || report.clientName;
+        report.plantName = crmData.project_name as string || report.plantName;
+        const address = crmData.site_address ? `${crmData.site_address}, ${crmData.address_city || ''}` : crmData.address_city;
+        report.location = address as string || report.location;
+      }
+    } catch (e) {
+      console.warn('Impossible de récupérer les données CRM pour le rapport', e);
+    }
+  }
   
   // Calculs finaux
   report.summary.overallConformityRate = calculateOverallConformity(report);
@@ -614,6 +622,73 @@ function createEmptyThermalData(): ThermalModuleData {
     summary: null
   };
 }
+
+// ============================================================================
+// MODULE PHOTOS - GALERIE & PREUVES
+// ============================================================================
+
+async function aggregatePhotosModule(
+  DB: D1Database,
+  request: GenerateUnifiedReportRequest
+): Promise<PhotosModuleData> {
+  
+  try {
+     let auditToken = request.auditElToken;
+
+    if (!auditToken && request.plantId) {
+      // Tenter de retrouver le dernier audit EL lié à cette centrale
+      const audit = await DB.prepare(`
+        SELECT ea.audit_token 
+        FROM el_audits ea
+        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+        WHERE pcal.pv_plant_id = ? 
+        ORDER BY ea.created_at DESC 
+        LIMIT 1
+      `).bind(request.plantId).first();
+      
+      if (audit) {
+        auditToken = (audit as any).audit_token;
+      }
+    }
+
+    if (!auditToken) {
+      return createEmptyPhotosData();
+    }
+
+    const photos = await DB.prepare(`
+      SELECT photo_url, manual_comment, manual_tag 
+      FROM el_photos 
+      WHERE audit_token = ?
+    `).bind(auditToken).all();
+
+    if (!photos.results || photos.results.length === 0) {
+        return createEmptyPhotosData();
+    }
+
+    return {
+        hasData: true,
+        totalPhotos: photos.results.length,
+        photos: photos.results.map((p: any) => ({
+            url: p.photo_url,
+            description: p.manual_comment || '',
+            tag: p.manual_tag || 'Autre'
+        }))
+    };
+
+  } catch (error) {
+    console.error('Erreur agrégation Photos:', error);
+    return createEmptyPhotosData();
+  }
+}
+
+function createEmptyPhotosData(): PhotosModuleData {
+  return {
+    hasData: false,
+    totalPhotos: 0,
+    photos: []
+  };
+}
+
 
 // ============================================================================
 // RECOMMANDATIONS

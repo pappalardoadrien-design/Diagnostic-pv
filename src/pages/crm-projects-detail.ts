@@ -1,5 +1,5 @@
-// Page Détail Projet/Site CRM - Vue complète avec interventions et audits
-// Navigation vers édition, suppression, création intervention
+// Page Détail Projet/Site CRM - Hub Central ("Cockpit Projet")
+// Nouvelle version "Plateforme Pro" - Centralisation Designer, Audits, Rapports
 
 export function getCrmProjectsDetailPage() {
   return `
@@ -8,196 +8,301 @@ export function getCrmProjectsDetailPage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Détail Site - CRM DiagPV</title>
+    <title>Cockpit Projet - DiagPV</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background: #f8fafc; }
-        .section-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
-        .badge-active { background: #dcfce7; color: #166534; }
-        .badge-completed { background: #dbeafe; color: #1e3a8a; }
-        .badge-pending { background: #fef3c7; color: #92400e; }
-        .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
-        .info-row:last-child { border-bottom: none; }
-        .intervention-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; }
-        .type-el { background: #fef3c7; color: #92400e; }
-        .type-iv { background: #dbeafe; color: #1e3a8a; }
-        .type-visuels { background: #e0e7ff; color: #3730a3; }
-        .type-isolation { background: #fce7f3; color: #831843; }
-        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal.active { display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: white; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        body { background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; }
+        
+        /* Composants Pros */
+        .card { 
+            background: white; 
+            border-radius: 12px; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+            overflow: hidden;
+        }
+        
+        .btn-primary { 
+            background: #16a34a; 
+            color: white; 
+            padding: 0.5rem 1rem; 
+            border-radius: 0.5rem; 
+            font-weight: 600; 
+            transition: all 0.2s; 
+        }
+        .btn-primary:hover { background: #15803d; }
+        
+        .btn-secondary { 
+            background: white; 
+            color: #475569; 
+            border: 1px solid #cbd5e1; 
+            padding: 0.5rem 1rem; 
+            border-radius: 0.5rem; 
+            font-weight: 600; 
+            transition: all 0.2s; 
+        }
+        .btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
+
+        .btn-action-large {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 2px dashed #cbd5e1;
+            color: #64748b;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .btn-action-large:hover {
+            border-color: #16a34a;
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+
+        /* Status Badges */
+        .status-badge { padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        .status-active { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .status-draft { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+        /* Map Preview */
+        .map-preview {
+            height: 200px;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            position: relative;
+        }
+        .map-preview img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .designer-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .map-preview:hover .designer-overlay { opacity: 1; }
+
+        /* Modale */
+        .modal { display: none; position: fixed; z-index: 100; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-box { background: white; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: modalSlide 0.3s ease-out; }
+        
+        @keyframes modalSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
-<body class="min-h-screen">
+<body>
 
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="/crm/projects" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        <i class="fas fa-solar-panel text-blue-600 mr-2"></i>
-                        <span id="project-name">Chargement...</span>
-                    </h1>
-                    <span id="project-status-badge" class="badge"></span>
+    <!-- NAV BAR PRO -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="/crm/projects" class="text-gray-400 hover:text-gray-700 transition">
+                    <i class="fas fa-arrow-left text-lg"></i>
+                </a>
+                <div class="h-6 w-px bg-gray-300"></div>
+                <div class="flex flex-col">
+                    <div class="text-xs font-bold text-gray-500 uppercase tracking-wider" id="client-name-header">CLIENT</div>
+                    <div class="font-bold text-lg text-gray-900" id="project-name-header">Chargement...</div>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <button id="delete-project-btn" class="border border-red-300 hover:bg-red-50 text-red-700 px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-trash mr-2"></i>
-                        Supprimer
-                    </button>
-                    <a id="edit-project-btn" href="#" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-edit mr-2"></i>
-                        Modifier
-                    </a>
-                    <a id="create-intervention-btn" href="/planning/create" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-plus mr-2"></i>
-                        Nouvelle Intervention
-                    </a>
-                </div>
+                <span id="header-status-badge" class="status-badge status-draft ml-2">...</span>
             </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <!-- Client Info Banner -->
-        <div class="section-card p-4 mb-6 bg-blue-50 border-l-4 border-blue-600">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-blue-900">Client propriétaire :</p>
-                    <a id="client-link" href="#" class="text-lg font-bold text-blue-600 hover:underline"></a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Informations Techniques -->
-        <div class="section-card p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                Informations Techniques
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Nom du site</span>
-                        <span id="info-project-name" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Puissance totale</span>
-                        <span id="info-power" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Nombre de modules</span>
-                        <span id="info-modules" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Type de module</span>
-                        <span id="info-module-type" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Type d'onduleur</span>
-                        <span id="info-inverter" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Date d'installation</span>
-                        <span id="info-install-date" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Localisation -->
-        <div class="section-card p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>
-                Localisation
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Adresse</span>
-                        <span id="info-address" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Coordonnées GPS</span>
-                        <span id="info-gps" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notes -->
-        <div id="notes-section" class="section-card p-6 mb-6" style="display: none;">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-sticky-note text-blue-600 mr-2"></i>
-                Notes
-            </h2>
-            <p id="notes-content" class="text-gray-700 whitespace-pre-wrap"></p>
-        </div>
-
-        <!-- Interventions -->
-        <div class="section-card p-6 mb-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-calendar-check text-blue-600 mr-2"></i>
-                    Interventions sur ce site (<span id="interventions-count">0</span>)
-                </h2>
-                <a href="/planning/create" class="text-blue-600 hover:text-blue-700 font-medium">
-                    <i class="fas fa-plus mr-1"></i>
-                    Créer intervention
+            
+            <div class="flex items-center gap-3">
+                <button onclick="deleteProject()" class="text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-semibold transition">
+                    <i class="fas fa-trash mr-2"></i>Supprimer
+                </button>
+                <a href="#" id="edit-btn" class="btn-secondary text-sm">
+                    <i class="fas fa-cog mr-2"></i>Paramètres
                 </a>
             </div>
-            <div id="interventions-list">
-                <!-- Populated by JS -->
-            </div>
         </div>
+    </nav>
 
-        <!-- Audits -->
-        <div class="section-card p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
-                Audits réalisés (<span id="audits-count">0</span>)
-            </h2>
-            <div id="audits-list">
-                <!-- Populated by JS -->
+    <!-- CONTENU PRINCIPAL -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- COLONNE GAUCHE : IDENTITÉ & JUMEAU NUMÉRIQUE -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- Carte Jumeau Numérique -->
+                <div class="card">
+                    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                        <h3 class="font-bold text-gray-800"><i class="fas fa-map mr-2 text-indigo-600"></i>Jumeau Numérique</h3>
+                        <a href="#" id="designer-link-header" class="text-xs font-bold text-indigo-600 hover:underline">OUVRIR DESIGNER ↗</a>
+                    </div>
+                    
+                    <div class="map-preview group" id="map-container">
+                        <div class="text-center p-6">
+                            <i class="fas fa-satellite text-4xl mb-2 text-gray-300"></i>
+                            <p class="text-sm">Aperçu carte</p>
+                        </div>
+                        <a href="#" id="designer-link-overlay" class="designer-overlay">
+                            <button class="bg-white text-indigo-600 px-6 py-3 rounded-full font-bold shadow-lg transform group-hover:scale-105 transition">
+                                <i class="fas fa-pen mr-2"></i>Modifier le plan
+                            </button>
+                        </a>
+                    </div>
+                    
+                    <div class="p-4 bg-indigo-50 border-t border-indigo-100">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <div class="text-gray-500 text-xs">Puissance</div>
+                                <div class="font-bold text-gray-900" id="power-display">-</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-500 text-xs">Modules</div>
+                                <div class="font-bold text-gray-900" id="modules-display">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte Identité Site -->
+                <div class="card p-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Fiche Technique</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="mt-1 text-gray-400"><i class="fas fa-map-marker-alt"></i></div>
+                            <div>
+                                <div class="text-xs text-gray-500 font-bold uppercase">Adresse</div>
+                                <div class="text-sm text-gray-900" id="address-display">...</div>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="mt-1 text-gray-400"><i class="fas fa-solar-panel"></i></div>
+                            <div>
+                                <div class="text-xs text-gray-500 font-bold uppercase">Matériel</div>
+                                <div class="text-sm text-gray-900" id="hardware-display">...</div>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="mt-1 text-gray-400"><i class="fas fa-user-tie"></i></div>
+                            <div>
+                                <div class="text-xs text-gray-500 font-bold uppercase">Propriétaire</div>
+                                <a href="#" id="client-link" class="text-sm text-blue-600 hover:underline font-bold">...</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-        </div>
 
-    </main>
-
-    <!-- Modal Confirmation Suppression -->
-    <div id="delete-modal" class="modal">
-        <div class="modal-content">
-            <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
-                    Confirmer la suppression
-                </h3>
-                <p class="text-gray-600 mb-6">
-                    Êtes-vous sûr de vouloir supprimer ce site ? Cette action est irréversible et supprimera également :
-                </p>
-                <ul class="list-disc list-inside text-gray-600 mb-6 space-y-1">
-                    <li>Toutes les interventions liées</li>
-                    <li>Tous les audits associés</li>
-                </ul>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-delete-btn" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
-                        Annuler
-                    </button>
-                    <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                        Supprimer définitivement
+            <!-- COLONNE DROITE : MISSIONS & RAPPORTS -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- En-tête Section Missions -->
+                <div class="flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">Missions & Audits</h2>
+                        <p class="text-gray-500 text-sm">Historique des interventions sur ce site</p>
+                    </div>
+                    <button onclick="openMissionModal()" class="btn-primary shadow-lg shadow-green-200">
+                        <i class="fas fa-plus mr-2"></i>Nouvelle Mission
                     </button>
                 </div>
+
+                <!-- Liste des Missions (Cards) -->
+                <div id="missions-list" class="space-y-4">
+                    <!-- Loading state -->
+                    <div class="card p-8 text-center text-gray-400">
+                        <i class="fas fa-circle-notch fa-spin text-2xl mb-2"></i>
+                        <p>Chargement des missions...</p>
+                    </div>
+                </div>
+
+                <!-- Empty State (si aucune mission) -->
+                <div id="empty-missions" class="hidden">
+                    <button onclick="openMissionModal()" class="w-full btn-action-large">
+                        <div class="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4 text-green-600">
+                            <i class="fas fa-plus text-2xl"></i>
+                        </div>
+                        <span class="font-bold text-lg text-gray-800">Planifier la première mission</span>
+                        <span class="text-sm mt-1">Audit EL, Thermographie, Inspection Visuelle...</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL CRÉATION MISSION -->
+    <div id="mission-modal" class="modal">
+        <div class="modal-box">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Nouvelle Mission</h3>
+                <button onclick="closeMissionModal()" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Sélection Type -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-3">Type d'intervention</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="mission_type" value="EL" class="peer sr-only" checked>
+                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-green-500 peer-checked:bg-green-50 hover:bg-gray-50 transition text-center">
+                                <i class="fas fa-moon text-indigo-600 mb-1 block text-xl"></i>
+                                <span class="text-sm font-bold text-gray-700">Audit EL</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="mission_type" value="THERMO" class="peer sr-only">
+                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-green-500 peer-checked:bg-green-50 hover:bg-gray-50 transition text-center">
+                                <i class="fas fa-fire text-red-500 mb-1 block text-xl"></i>
+                                <span class="text-sm font-bold text-gray-700">Thermique</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="mission_type" value="IV" class="peer sr-only">
+                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-green-500 peer-checked:bg-green-50 hover:bg-gray-50 transition text-center">
+                                <i class="fas fa-chart-line text-blue-500 mb-1 block text-xl"></i>
+                                <span class="text-sm font-bold text-gray-700">Courbes IV</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="mission_type" value="VISUAL" class="peer sr-only">
+                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-green-500 peer-checked:bg-green-50 hover:bg-gray-50 transition text-center">
+                                <i class="fas fa-eye text-orange-500 mb-1 block text-xl"></i>
+                                <span class="text-sm font-bold text-gray-700">Visuel</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Date prévue</label>
+                    <input type="date" id="mission-date" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-500 outline-none">
+                </div>
+
+                <!-- Technicien -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Technicien assigné</label>
+                    <select id="mission-tech" class="w-full border border-gray-300 rounded-lg p-3 bg-white outline-none">
+                        <option value="">-- Choisir un technicien --</option>
+                        <option value="1">Adrien Pappalardo</option>
+                        <option value="2">Technicien Réseau 01</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 bg-gray-50 rounded-b-16 flex justify-end gap-3">
+                <button onclick="closeMissionModal()" class="btn-secondary">Annuler</button>
+                <button onclick="createMission()" class="btn-primary px-6">Créer la mission</button>
             </div>
         </div>
     </div>
@@ -205,236 +310,193 @@ export function getCrmProjectsDetailPage() {
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const projectId = urlParams.get('id');
-
-        if (!projectId) {
-            alert('ID projet manquant');
-            window.location.href = '/crm/projects';
-        }
-
         let projectData = null;
-        let clientData = null;
-        let interventionsData = [];
-        let auditsData = [];
 
-        // Load all data
+        // --- INIT ---
         async function init() {
-            await loadProject();
-            await Promise.all([
-                loadClient(),
-                loadInterventions(),
-                loadAudits()
-            ]);
-
-            renderProjectInfo();
-            renderInterventions();
-            renderAudits();
-        }
-
-        async function loadProject() {
-            const response = await fetch(\`/api/crm/projects/\${projectId}\`);
-            if (!response.ok) {
-                alert('Projet non trouvé');
-                window.location.href = '/crm/projects';
-                return;
-            }
-            const data = await response.json();
-            projectData = data.project;
-        }
-
-        async function loadClient() {
-            if (!projectData || !projectData.client_id) return;
+            if (!projectId) return window.location.href = '/crm/projects';
             
-            const response = await fetch(\`/api/crm/clients/\${projectData.client_id}\`);
-            if (response.ok) {
-                const data = await response.json();
-                clientData = data.client;
+            await loadProjectData();
+            loadMissions();
+        }
+
+        // --- DATA LOADING ---
+        async function loadProjectData() {
+            try {
+                const res = await fetch(\`/api/crm/projects/\${projectId}\`);
+                const data = await res.json();
+                
+                if (!data.project) throw new Error('Projet introuvable');
+                projectData = data.project;
+
+                // Update UI
+                document.getElementById('project-name-header').textContent = projectData.name || projectData.project_name;
+                document.getElementById('header-status-badge').textContent = projectData.status || 'Actif';
+                
+                document.getElementById('power-display').textContent = (projectData.total_power_kwp || 0) + ' kWp';
+                document.getElementById('modules-display').textContent = projectData.module_count || 0;
+                
+                const addr = [projectData.address_street, projectData.address_city].filter(Boolean).join(', ');
+                document.getElementById('address-display').textContent = addr || 'Adresse non renseignée';
+                
+                const hw = [projectData.module_type, projectData.inverter_type].filter(Boolean).join(' / ');
+                document.getElementById('hardware-display').textContent = hw || 'Non spécifié';
+
+                // Client Link
+                if (projectData.client_id) {
+                    loadClientName(projectData.client_id);
+                }
+
+                // Links
+                document.getElementById('edit-btn').href = \`/crm/projects/edit?id=\${projectId}\`;
+                
+                // MAP & DESIGNER LINK
+                // IMPORTANT : C'est ici qu'on fait le lien avec la carto
+                // Le Designer a besoin du plantId (qui est l'ID du projet ici) et d'un zoneId par défaut (souvent 1)
+                const designerUrl = \`/pv/plant/\${projectId}/zone/1/designer\`; 
+                document.getElementById('designer-link-header').href = designerUrl;
+                document.getElementById('designer-link-overlay').href = designerUrl;
+
+            } catch (e) {
+                console.error(e);
+                alert('Erreur chargement projet');
             }
         }
 
-        async function loadInterventions() {
-            const response = await fetch(\`/api/planning/interventions?project_id=\${projectId}\`);
-            if (response.ok) {
-                const data = await response.json();
-                interventionsData = data.interventions || [];
+        async function loadClientName(clientId) {
+            const res = await fetch(\`/api/crm/clients/\${clientId}\`);
+            const data = await res.json();
+            if (data.client) {
+                const link = document.getElementById('client-link');
+                link.textContent = data.client.company_name;
+                link.href = \`/crm/clients/detail?id=\${clientId}\`;
+                document.getElementById('client-name-header').textContent = data.client.company_name;
             }
         }
 
-        async function loadAudits() {
-            // Load all audits for this project's interventions
-            const response = await fetch(\`/api/audits\`); // Correct endpoint: plural 'audits'
-            if (response.ok) {
-                const data = await response.json();
-                const projectInterventionIds = interventionsData.map(i => i.id);
-                auditsData = (data.audits || []).filter(a => 
-                    projectInterventionIds.includes(a.intervention_id)
-                );
-            }
-        }
+        async function loadMissions() {
+            // On charge les "Interventions" qui servent de conteneur aux audits
+            // C'est ça la notion de "Mission"
+            const res = await fetch(\`/api/planning/interventions?project_id=\${projectId}\`);
+            const data = await res.json();
+            const missions = data.interventions || [];
 
-        function renderProjectInfo() {
-            // Header
-            // Support both .project_name (old) and .name (new DB schema)
-            const pName = projectData.name || projectData.project_name || 'Sans nom';
-            document.getElementById('project-name').textContent = pName;
-            const statusBadge = document.getElementById('project-status-badge');
-            statusBadge.textContent = (projectData.status || 'active').toUpperCase();
-            statusBadge.className = 'badge badge-' + (projectData.status || 'active');
+            const list = document.getElementById('missions-list');
+            list.innerHTML = '';
 
-            // Client banner
-            if (clientData) {
-                const clientLink = document.getElementById('client-link');
-                clientLink.textContent = clientData.company_name;
-                clientLink.href = \`/crm/clients/detail?id=\${clientData.id}\`;
-            }
-
-            // Technical info
-            document.getElementById('info-project-name').textContent = pName;
-            document.getElementById('info-power').textContent = projectData.total_power_kwp ? projectData.total_power_kwp + ' kWp' : 'N/A';
-            document.getElementById('info-modules').textContent = projectData.module_count || 'N/A';
-            document.getElementById('info-module-type').textContent = projectData.module_type || 'N/A';
-            document.getElementById('info-inverter').textContent = projectData.inverter_type || 'N/A';
-            document.getElementById('info-install-date').textContent = projectData.installation_date ? 
-                new Date(projectData.installation_date).toLocaleDateString('fr-FR') : 'N/A';
-
-            // Location
-            const address = [
-                projectData.address_street,
-                projectData.address_postal_code,
-                projectData.address_city
-            ].filter(Boolean).join(', ');
-            document.getElementById('info-address').textContent = address || 'Non renseigné';
-
-            const gps = projectData.gps_latitude && projectData.gps_longitude ? 
-                \`\${projectData.gps_latitude}, \${projectData.gps_longitude}\` : 'N/A';
-            document.getElementById('info-gps').textContent = gps;
-
-            // Notes
-            if (projectData.notes) {
-                document.getElementById('notes-section').style.display = 'block';
-                document.getElementById('notes-content').textContent = projectData.notes;
-            }
-
-            // Buttons
-            document.getElementById('edit-project-btn').href = \`/crm/projects/edit?id=\${projectId}\`;
-        }
-
-        function renderInterventions() {
-            const container = document.getElementById('interventions-list');
-            document.getElementById('interventions-count').textContent = interventionsData.length;
-
-            if (interventionsData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 italic">Aucune intervention enregistrée</p>';
+            if (missions.length === 0) {
+                document.getElementById('empty-missions').classList.remove('hidden');
                 return;
             }
 
-            const sorted = [...interventionsData].sort((a, b) => 
-                new Date(b.intervention_date) - new Date(a.intervention_date)
-            );
+            // Pour chaque mission, on va chercher s'il y a des audits liés (EL, etc)
+            // Note: Dans une V2 optimisée, l'API interventions devrait retourner les audits liés directement
+            
+            missions.sort((a,b) => new Date(b.intervention_date) - new Date(a.intervention_date)).forEach(m => {
+                const date = new Date(m.intervention_date).toLocaleDateString('fr-FR');
+                const types = m.intervention_type.split(',').map(t => t.trim());
+                
+                let badges = types.map(t => {
+                    let color = 'bg-gray-100 text-gray-600';
+                    if(t.includes('EL')) color = 'bg-indigo-100 text-indigo-700 border-indigo-200';
+                    if(t.includes('THERMO')) color = 'bg-red-100 text-red-700 border-red-200';
+                    if(t.includes('IV')) color = 'bg-blue-100 text-blue-700 border-blue-200';
+                    return \`<span class="px-2 py-1 rounded text-xs font-bold border \${color} mr-2">\${t}</span>\`;
+                }).join('');
 
-            container.innerHTML = \`
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Technicien</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        \${sorted.map(intervention => \`
-                            <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                <td class="px-4 py-3 text-sm">\${new Date(intervention.intervention_date).toLocaleDateString('fr-FR')}</td>
-                                <td class="px-4 py-3">
-                                    <span class="intervention-badge type-\${intervention.intervention_type}">
-                                        \${intervention.intervention_type.toUpperCase()}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3 text-sm">\${intervention.technician_name || 'Non assigné'}</td>
-                                <td class="px-4 py-3 text-sm">\${intervention.status}</td>
-                                <td class="px-4 py-3">
-                                    <a href="/planning/detail?id=\${intervention.id}" class="text-blue-600 hover:text-blue-700 text-sm">
-                                        Détails
+                list.innerHTML += \`
+                <div class="card p-5 hover:border-green-400 transition group">
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-4">
+                            <div class="bg-gray-100 w-16 h-16 rounded-lg flex flex-col items-center justify-center text-gray-500 font-bold border border-gray-200">
+                                <span class="text-xl">\${date.split('/')[0]}</span>
+                                <span class="text-xs uppercase">\${new Date(m.intervention_date).toLocaleString('default', {month:'short'})}</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center mb-1">
+                                    <h4 class="font-bold text-gray-900 text-lg mr-3">Intervention #\${m.id}</h4>
+                                    \${badges}
+                                </div>
+                                <div class="text-sm text-gray-500 mb-2">
+                                    <i class="fas fa-user-hard-hat mr-2"></i>\${m.technician_name || 'Non assigné'}
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <a href="/audit/create?intervention_id=\${m.id}" class="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md flex items-center">
+                                        <i class="fas fa-play mr-1.5"></i>LANCER AUDIT
                                     </a>
-                                </td>
-                            </tr>
-                        \`).join('')}
-                    </tbody>
-                </table>
-            \`;
-        }
-
-        function renderAudits() {
-            const container = document.getElementById('audits-list');
-            document.getElementById('audits-count').textContent = auditsData.length;
-
-            if (auditsData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 italic">Aucun audit enregistré</p>';
-                return;
-            }
-
-            const sorted = [...auditsData].sort((a, b) => 
-                new Date(b.created_at) - new Date(a.created_at)
-            );
-
-            container.innerHTML = \`
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date création</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Modules</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        \${sorted.map(audit => \`
-                            <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                <td class="px-4 py-3 text-sm">\${new Date(audit.created_at).toLocaleDateString('fr-FR')}</td>
-                                <td class="px-4 py-3">
-                                    <span class="intervention-badge type-el">EL</span>
-                                </td>
-                                <td class="px-4 py-3 text-sm">\${audit.modules_diagnosed || 0} / \${audit.total_modules || 0}</td>
-                                <td class="px-4 py-3">
-                                    <a href="/audit/\${audit.audit_token}" target="_blank" class="text-blue-600 hover:text-blue-700 text-sm">
-                                        Ouvrir audit
+                                    <a href="#" class="text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-md border border-gray-200">
+                                        <i class="fas fa-file-pdf mr-1.5"></i>RAPPORT
                                     </a>
-                                </td>
-                            </tr>
-                        \`).join('')}
-                    </tbody>
-                </table>
-            \`;
-        }
-
-        // Delete project modal
-        document.getElementById('delete-project-btn').addEventListener('click', () => {
-            document.getElementById('delete-modal').classList.add('active');
-        });
-
-        document.getElementById('cancel-delete-btn').addEventListener('click', () => {
-            document.getElementById('delete-modal').classList.remove('active');
-        });
-
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-            const response = await fetch(\`/api/crm/projects/\${projectId}\`, {
-                method: 'DELETE'
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="status-badge \${m.status === 'TERMINE' ? 'status-active' : 'status-draft'}">\${m.status}</span>
+                        </div>
+                    </div>
+                </div>
+                \`;
             });
+        }
 
-            if (response.ok) {
-                alert('Site supprimé avec succès');
-                window.location.href = '/crm/projects';
-            } else {
-                const data = await response.json();
-                alert('Erreur: ' + (data.error || 'Impossible de supprimer le site'));
+        // --- ACTIONS ---
+        function openMissionModal() {
+            // Set default date to today
+            document.getElementById('mission-date').valueAsDate = new Date();
+            document.getElementById('mission-modal').classList.add('active');
+        }
+
+        function closeMissionModal() {
+            document.getElementById('mission-modal').classList.remove('active');
+        }
+
+        async function createMission() {
+            const date = document.getElementById('mission-date').value;
+            const tech = document.getElementById('mission-tech').value;
+            
+            // Récupérer types cochés
+            const types = Array.from(document.querySelectorAll('input[name="mission_type"]:checked'))
+                .map(cb => cb.value)
+                .join(',');
+
+            if (!date || !types) return alert('Date et type requis');
+
+            // Création via API Planning
+            // Note: On simule une création simplifiée
+            try {
+                const res = await fetch('/api/planning/interventions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        project_id: projectId,
+                        date: date,
+                        type: types,
+                        technician_id: tech || null,
+                        status: 'PLANIFIE'
+                    })
+                });
+
+                if (res.ok) {
+                    closeMissionModal();
+                    loadMissions(); // Refresh
+                } else {
+                    alert('Erreur création mission');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Erreur réseau');
             }
-        });
+        }
 
-        // Initialize
+        async function deleteProject() {
+            if(confirm('Êtes-vous sûr de vouloir supprimer ce site et toutes ses données ?')) {
+                await fetch(\`/api/crm/projects/\${projectId}\`, { method: 'DELETE' });
+                window.location.href = '/crm/projects';
+            }
+        }
+
         init();
     </script>
-
 </body>
 </html>
   `;

@@ -230,6 +230,12 @@ app.get('/audits/create', (c) => {
   return c.html(getAuditsCreatePage())
 })
 
+// Page Upload Photos EL (Integration Picsellia)
+app.get('/audit/:token/photos', (c) => {
+  const token = c.req.param('token')
+  return c.html(getAuditPhotosPage(token))
+})
+
 // === PAGES CRM ===
 app.get('/crm/dashboard', (c) => c.html(getCrmDashboardPage()))
 app.get('/dashboard', (c) => c.html(getCrmDashboardPage())) // Alias
@@ -765,6 +771,20 @@ app.get('/', (c) => {
         </style>
         <meta name="theme-color" content="#000000">
         <link rel="manifest" href="/manifest.json">
+        <script>
+          // Enregistrement du Service Worker pour le mode PWA (Offline)
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                  console.log('✅ DiagPV "Mode Terrain" prêt (SW registered):', registration.scope);
+                })
+                .catch(error => {
+                  console.log('❌ Erreur Service Worker:', error);
+                });
+            });
+          }
+        </script>
     </head>
     <body class="bg-black text-white min-h-screen font-bold">
 

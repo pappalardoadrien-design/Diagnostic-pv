@@ -583,6 +583,23 @@ export function getAuditsCreatePage() {
             // ========================================================================
             // INITIALISATION
             // ========================================================================
+            
+            // Check for URL parameters (pre-fill)
+            const urlParams = new URLSearchParams(window.location.search);
+            const interventionIdParam = urlParams.get('intervention_id');
+            
+            if (interventionIdParam) {
+                // Wait for interventions list to load, then select it
+                const checkInterval = setInterval(() => {
+                    const select = document.getElementById('intervention_id');
+                    if (select && select.options.length > 1) {
+                        select.value = interventionIdParam;
+                        loadInterventionDetails(interventionIdParam); // Trigger preview
+                        clearInterval(checkInterval);
+                    }
+                }, 500);
+            }
+            
             loadInterventions()
         </script>
     </body>

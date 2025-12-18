@@ -103,6 +103,10 @@ export interface ELPhoto {
   uploaded_at: string;
   uploaded_by?: string;
   
+  // Champs Manuels (Transition Picsellia)
+  manual_tag?: string;
+  manual_comment?: string;
+  
   // Analyse IA
   ai_analyzed: boolean;
   ai_analyzed_at?: string;
@@ -147,6 +151,8 @@ export interface PhotoUploadRequest {
     file_data: string;                 // Base64 ou Blob URL
     file_size: number;
     file_type: string;
+    manual_tag?: string;
+    manual_comment?: string;
   }>;
   uploaded_by?: string;
 }

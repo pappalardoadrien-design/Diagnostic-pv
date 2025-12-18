@@ -31,14 +31,14 @@ export function getAuditPhotosPage(auditToken: string) {
             <div id="dropZone" class="border-4 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-green-500 transition">
                 <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
                 <p class="text-xl font-bold mb-2">Glissez vos photos ici</p>
-                <p class="text-gray-600 mb-4">ou cliquez pour sélectionner</p>
+                <p class="text-gray-600 mb-4">Formats supportés : JPG, PNG, THERMAL</p>
                 <input type="file" id="fileInput" multiple accept="image/*" class="hidden">
                 <button onclick="document.getElementById('fileInput').click()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold">
                     <i class="fas fa-folder-open mr-2"></i>Sélectionner Photos
                 </button>
             </div>
 
-            <div id="photosList" class="mt-6 grid grid-cols-4 gap-4"></div>
+            <div id="photosList" class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
             <div id="uploadProgress" class="hidden mt-6">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -99,12 +99,39 @@ export function getAuditPhotosPage(auditToken: string) {
 
         function displayPhotos() {
             photosList.innerHTML = selectedFiles.map((file, index) => \`
-                <div class="relative">
-                    <img src="\${URL.createObjectURL(file)}" class="w-full h-32 object-cover rounded-lg">
-                    <button onclick="removePhoto(\${index})" class="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="text-xs mt-1 truncate">\${file.name}</div>
+                <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative group">
+                    <div class="aspect-video w-full overflow-hidden rounded-md mb-3 bg-gray-100 relative">
+                        <img src="\${URL.createObjectURL(file)}" class="w-full h-full object-cover">
+                        <button onclick="removePhoto(\${index})" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-8 h-8 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-110">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="font-bold text-sm truncate" title="\${file.name}">
+                            <i class="fas fa-image mr-1 text-gray-400"></i> \${file.name}
+                        </div>
+                        
+                        <!-- Manual Tagging (Future AI Placeholder) -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Défaut principal</label>
+                            <select id="tag-\${index}" class="w-full text-sm border-gray-300 rounded-md p-2 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none">
+                                <option value="">-- Sélectionner --</option>
+                                <option value="hotspot">🔥 Point Chaud (Hotspot)</option>
+                                <option value="diode">⚡ Diode Bypass</option>
+                                <option value="crack">🕸️ Microfissure</option>
+                                <option value="glass">🔨 Casse Verre</option>
+                                <option value="vegetation">🌿 Ombrage / Végétation</option>
+                                <option value="connector">🔌 Connecteur / Câble</option>
+                            </select>
+                        </div>
+
+                        <!-- Manual Comment -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Observation Expert</label>
+                            <textarea id="comment-\${index}" rows="2" class="w-full text-sm border-gray-300 rounded-md p-2 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none" placeholder="Ex: Delta T > 20°C..."></textarea>
+                        </div>
+                    </div>
                 </div>
             \`).join('');
         }
@@ -129,15 +156,21 @@ export function getAuditPhotosPage(auditToken: string) {
             try {
                 const photos = await Promise.all(selectedFiles.map(async (file, index) => {
                     const base64 = await fileToBase64(file);
-                    const moduleId = \`M\${String(index + 1).padStart(3, '0')}\`;
+                    // Récupération des données manuelles
+                    const tag = document.getElementById(\`tag-\${index}\`).value;
+                    const comment = document.getElementById(\`comment-\${index}\`).value;
                     
                     return {
-                        module_id: moduleId,
-                        string_number: Math.floor(index / 24) + 1,
+                        module_id: null, // Pas de lien module obligatoire
+                        string_number: null,
                         file_name: file.name,
                         file_data: base64,
                         file_size: file.size,
-                        file_type: file.type
+                        file_type: file.type,
+                        // Nouveaux champs "Picsellia-Ready"
+                        manual_tag: tag || 'unclassified',
+                        manual_comment: comment || '',
+                        ai_status: 'pending_upload' // Prêt pour le futur
                     };
                 }));
 
@@ -178,12 +211,19 @@ export function getAuditPhotosPage(auditToken: string) {
                 
                 if (response.data.photos && response.data.photos.length > 0) {
                     grid.innerHTML = response.data.photos.map(photo => \`
-                        <div class="bg-white rounded-lg shadow p-4">
-                            <img src="\${photo.photo_url}" class="w-full h-48 object-cover rounded mb-2">
-                            <div class="text-sm font-bold">\${photo.module_id}</div>
-                            <div class="text-xs text-gray-600">String \${photo.string_number}</div>
-                            <div class="text-xs text-gray-500 mt-2">
-                                \${photo.ai_status === 'completed' ? '✅ Analysé' : '⏳ En attente'}
+                        <div class="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                            <div class="relative aspect-video">
+                                <img src="\${photo.photo_url}" class="w-full h-full object-cover">
+                                \${photo.manual_tag ? \`<span class="absolute top-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded font-bold backdrop-blur">\${photo.manual_tag}</span>\` : ''}
+                            </div>
+                            <div class="p-4">
+                                <div class="text-sm font-bold text-gray-900 mb-1 truncate">\${photo.file_name}</div>
+                                \${photo.manual_comment ? \`<p class="text-sm text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">\${photo.manual_comment}</p>\` : '<p class="text-xs text-gray-400 italic">Aucun commentaire</p>'}
+                                
+                                <div class="mt-3 flex items-center justify-between text-xs text-gray-500 border-t pt-2">
+                                    <span class="flex items-center"><i class="fas fa-robot mr-1 \${photo.ai_status === 'completed' ? 'text-green-500' : 'text-gray-300'}"></i> IA: \${photo.ai_status || 'En attente'}</span>
+                                    <span>\${new Date(photo.created_at).toLocaleDateString()}</span>
+                                </div>
                             </div>
                         </div>
                     \`).join('');

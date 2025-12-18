@@ -26,6 +26,41 @@ app.post('/api/pv/zones/:zoneId/save-designer-layout', async (c: Context) => {
       `).bind(zoneId, JSON.stringify(modules), JSON.stringify(map_center), zoom).run()
     }
 
+    // --- SYNC TO PV_MODULES (Digital Twin) ---
+    // Update real GPS coordinates AND STRINGING in the main modules table
+    if (modules && modules.length > 0) {
+      // 1. Update GPS
+      const stmtGPS = DB.prepare(`
+        UPDATE pv_modules 
+        SET latitude = ?, longitude = ?
+        WHERE id = ?
+      `)
+      
+      const batchGPS = modules.map((m: any) => {
+        return stmtGPS.bind(m.lat, m.lon, m.module_id)
+      })
+      
+      await DB.batch(batchGPS)
+
+      // 2. Update Stringing (if defined)
+      const modulesWithString = modules.filter((m: any) => m.string_number && m.position_in_string)
+      
+      if (modulesWithString.length > 0) {
+        const stmtString = DB.prepare(`
+          UPDATE pv_modules 
+          SET string_number = ?, position_in_string = ?
+          WHERE id = ?
+        `)
+        
+        const batchString = modulesWithString.map((m: any) => {
+          return stmtString.bind(m.string_number, m.position_in_string, m.module_id)
+        })
+        
+        await DB.batch(batchString)
+      }
+    }
+    // -----------------------------------------
+
     return c.json({ success: true })
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)

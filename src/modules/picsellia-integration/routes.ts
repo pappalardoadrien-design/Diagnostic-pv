@@ -88,14 +88,16 @@ app.post('/upload-photos', async (c) => {
             audit_token, module_id, string_number,
             photo_url, file_name, file_size, file_type,
             uploaded_by, audit_date, location,
-            ai_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ai_status, manual_tag, manual_comment
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
           ON CONFLICT(audit_token, module_id) DO UPDATE SET
             photo_url = excluded.photo_url,
             file_name = excluded.file_name,
             file_size = excluded.file_size,
             uploaded_at = datetime('now'),
-            uploaded_by = excluded.uploaded_by
+            uploaded_by = excluded.uploaded_by,
+            manual_tag = excluded.manual_tag,
+            manual_comment = excluded.manual_comment
         `).bind(
           audit_token,
           photo.module_id,
@@ -106,7 +108,9 @@ app.post('/upload-photos', async (c) => {
           photo.file_type,
           uploaded_by || null,
           audit.audit_date,
-          audit.location
+          audit.location,
+          photo.manual_tag,
+          photo.manual_comment
         ).run();
 
         results.push({

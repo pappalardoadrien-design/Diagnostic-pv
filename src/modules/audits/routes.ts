@@ -177,7 +177,7 @@ auditsRouter.post('/create-multi-modules', async (c) => {
     if (intervention_id) {
       let intervention;
       try {
-        // Tentative 1: Avec toutes les colonnes (si migration appliquée)
+        // Tentative 1: Avec toutes les colonnes
         intervention = await env.DB.prepare(`
           SELECT 
             i.id, i.intervention_date, i.intervention_type,
@@ -426,8 +426,15 @@ auditsRouter.post('/create-multi-modules', async (c) => {
     }
     
     // ========================================================================
-    // MODULE I-V : Marquer comme activé (données ajoutées via import CSV)
+    // MODULES ANNEXES (Photos) - Initialisation
     // ========================================================================
+    if (true) { // Toujours actif
+        result.modules.photos = {
+            enabled: true,
+            url: `/audit/${auditToken}/photos`,
+            api_url: `/api/audit/${auditToken}/photos`
+        }
+    }
     if (modulesEnabled.includes('IV')) {
       result.modules.iv = {
         enabled: true,

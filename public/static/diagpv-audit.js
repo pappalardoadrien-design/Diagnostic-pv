@@ -567,63 +567,82 @@ class DiagPVAudit {
                 technicianId: this.technicianId
             }
 
+            // Stratégie "Optimistic UI" avec gestion Offline
+            const applyLocalUpdate = () => {
+                selectedModule.status = selectedStatus
+                selectedModule.comment = comment || null
+                selectedModule.technician_id = this.technicianId
+                selectedModule.updated_at = new Date().toISOString()
+
+                this.modules.set(moduleId, selectedModule)
+                this.updateModuleButton(moduleId)
+                this.updateProgress()
+                this.renderStringNavigation()
+                this.saveOfflineData()
+                this.closeModal()
+            }
+
             const response = await fetch(`/api/el/audit/${this.auditToken}/module/${moduleId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updateData)
             })
 
+            // Si le serveur renvoie 503 (Mode Offline détecté par SW) ou une autre erreur
             if (!response.ok) {
+                // Gestion spécifique mode Offline (503 ou erreur réseau attrapée plus bas)
+                if (response.status === 503) {
+                    throw new Error('OFFLINE_MODE')
+                }
+                
                 let errorData
-                let fullError
                 try {
-                    fullError = await response.json()
-                    console.error('❌ Erreur complète:', fullError)
-                    errorData = fullError.error || fullError.details || JSON.stringify(fullError)
-                    // Afficher TOUS les détails
-                    if (fullError.details) errorData += ` | Détails: ${fullError.details}`
-                    if (fullError.query) errorData += ` | Query: ${JSON.stringify(fullError.query)}`
-                    if (fullError.stack) errorData += ` | Stack: ${fullError.stack}`
+                    const json = await response.json()
+                    errorData = json.error || json.details || JSON.stringify(json)
                 } catch {
                     errorData = await response.text()
                 }
-                console.error('❌ Erreur HTTP', response.status, errorData)
-                logAudit('❌ Erreur HTTP', response.status, errorData)
-                throw new Error(`❌ Erreur ${response.status}: ${errorData}`)
+                throw new Error(`Erreur ${response.status}: ${errorData}`)
             }
 
-            // Mise à jour locale immédiate
-            selectedModule.status = selectedStatus
-            selectedModule.comment = comment || null
-            selectedModule.technician_id = this.technicianId
-            selectedModule.updated_at = new Date().toISOString()
-
-            // Mise à jour Map
-            this.modules.set(moduleId, selectedModule)
-
-            // Mise à jour interface
-            this.updateModuleButton(moduleId)
-            this.updateProgress()
-            this.renderStringNavigation()
-
-            // Sauvegarde offline
-            this.saveOfflineData()
-
-            this.closeModal()
+            // Succès serveur
+            applyLocalUpdate()
             this.showAlert(`Module ${moduleId} mis à jour`, 'success')
-
-            logAudit('✅ Module mis à jour:', moduleId, '→', selectedStatus)
+            logAudit('✅ Module mis à jour (Serveur):', moduleId, '→', selectedStatus)
 
         } catch (err) {
-            errorAudit('Erreur validation module:', err)
+            // Gestion erreur (Offline ou autre)
+            const isOffline = err.message === 'OFFLINE_MODE' || !navigator.onLine
             
-            // Mode offline - queue pour sync ultérieure
-            if (!navigator.onLine) {
+            if (isOffline) {
+                // Mode Offline : on applique l'update localement et on met en file d'attente
+                const updateData = {
+                    status: this.selectedStatus,
+                    comment: document.getElementById('moduleComment').value.trim() || null,
+                    technicianId: this.technicianId
+                }
+                
+                // Appliquer l'update localement (Optimistic UI)
+                const moduleId = this.selectedModule.module_id
+                const selectedModule = this.modules.get(moduleId)
+                if (selectedModule) {
+                    selectedModule.status = this.selectedStatus
+                    selectedModule.comment = updateData.comment
+                    selectedModule.technician_id = this.technicianId
+                    selectedModule.updated_at = new Date().toISOString()
+                    
+                    this.updateModuleButton(moduleId)
+                    this.updateProgress()
+                    this.renderStringNavigation()
+                    this.saveOfflineData()
+                }
+                
                 this.queueOfflineUpdate(updateData)
-                this.showAlert('Mis à jour en mode offline - Sera synchronisé', 'warning')
+                this.closeModal()
+                this.showAlert('Sauvegardé hors ligne 💾', 'warning')
+                logAudit('💾 Module mis à jour (Offline):', moduleId)
             } else {
+                errorAudit('Erreur validation module:', err)
                 this.showAlert('Erreur: ' + err.message, 'error')
             }
         }
@@ -1164,6 +1183,30 @@ class DiagPVAudit {
         }
     }
 
+    // Helper pour mise à jour locale
+    updateLocalModuleState(moduleId, status, comment) {
+        let module = this.modules.get(moduleId)
+        if (!module) {
+            module = {
+                module_id: moduleId,
+                status: 'pending',
+                comment: null,
+                technician_id: this.technicianId,
+                updated_at: new Date().toISOString()
+            }
+            this.modules.set(moduleId, module)
+        }
+        
+        module.status = status
+        if (comment) module.comment = comment
+        module.updated_at = new Date().toISOString()
+        module.technician_id = this.technicianId
+        
+        // Mise à jour visuelle bouton
+        // Note: updateModuleButton fait déjà les checks d'existence
+        this.updateModuleButton(moduleId)
+    }
+
     // Cleanup lors fermeture
     destroy() {
         if (this.eventSource) {
@@ -1396,6 +1439,13 @@ class DiagPVAudit {
                 logAudit(`🔄 Traitement lot ${i + 1}/${batches.length} (${batch.length} modules)`)
 
                 try {
+                    // Vérification préalable mode Offline (optimisation)
+                    const isOfflineMode = !navigator.onLine
+                    
+                    if (isOfflineMode) {
+                        throw new Error('OFFLINE_MODE') // Forcer le passage en catch
+                    }
+
                     // Appel API pour ce lot
                     const response = await fetch(`/api/el/audit/${this.auditToken}/bulk-update`, {
                         method: 'POST',
@@ -1411,6 +1461,7 @@ class DiagPVAudit {
                     })
 
                     if (!response.ok) {
+                        if (response.status === 503) throw new Error('OFFLINE_MODE')
                         throw new Error(`Erreur lot ${i + 1}: ${response.statusText}`)
                     }
 
@@ -1421,76 +1472,65 @@ class DiagPVAudit {
                     totalUpdated += result.updated || 0
                     totalNotFound += result.notFound || 0
 
-                    // Mise à jour locale des modules de ce lot
+                    // Mise à jour locale des modules de ce lot (Succès Serveur)
                     batch.forEach(moduleId => {
-                        let module = this.modules.get(moduleId)
-                        if (!module) {
-                            // Créer le module en local s'il n'existe pas
-                            module = {
-                                module_id: moduleId,
-                                status: 'pending',
-                                comment: null,
-                                technician_id: this.technicianId,
-                                updated_at: new Date().toISOString()
-                            }
-                            this.modules.set(moduleId, module)
-                        }
-                        
-                        // Mettre à jour le statut
-                        module.status = this.bulkActionStatus
-                        if (comment) {
-                            module.comment = comment
-                        }
-                        module.updated_at = new Date().toISOString()
-                        module.technician_id = this.technicianId
-                        
-                        // Mise à jour visuelle immédiate du module
-                        this.updateModuleButton(moduleId)
+                        this.updateLocalModuleState(moduleId, this.bulkActionStatus, comment)
                     })
 
-                    // Mise à jour interface progressive pour les gros lots
+                    // Mise à jour interface progressive
                     if (batches.length > 3) {
                         this.renderModulesGrid()
                         this.updateProgress()
                     }
 
                 } catch (err) {
-                    errorAudit(`❌ Erreur lot ${i + 1}:`, error)
-                    hasErrors = true
-                    // On continue avec les autres lots
+                    // GESTION OFFLINE BULK
+                    if (err.message === 'OFFLINE_MODE' || !navigator.onLine) {
+                        logAudit(`⚠️ Lot ${i + 1} basculé en OFFLINE`)
+                        
+                        // Pour chaque module du lot, on l'ajoute à la queue individuelle
+                        // (C'est moins efficace que du bulk offline, mais ça réutilise la sync existante)
+                        batch.forEach(moduleId => {
+                            // 1. Update local
+                            this.updateLocalModuleState(moduleId, this.bulkActionStatus, comment)
+                            
+                            // 2. Queue
+                            this.queueOfflineUpdate({
+                                status: this.bulkActionStatus,
+                                comment: comment || null,
+                                technicianId: this.technicianId
+                            })
+                        })
+                        
+                        totalNotFound += batch.length // On utilise "notFound" temporairement pour dire "Local"
+                        // Pas d'erreur, c'est géré
+                    } else {
+                        errorAudit(`❌ Erreur lot ${i + 1}:`, err)
+                        hasErrors = true
+                    }
                 }
             }
 
-            logAudit(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local, erreurs: ${hasErrors}`)
+            logAudit(`✅ Traitement terminé: ${totalUpdated} serveur, ${totalNotFound} local/offline`)
 
             // Re-rendu final de l'interface  
             logAudit('🎨 Re-rendu final interface après multi-sélection')
             this.renderModulesGrid()
             this.updateProgress()
-            
-            // Vérification finale des couleurs
-            setTimeout(() => {
-                modulesToUpdate.forEach(moduleId => {
-                    const btn = document.querySelector(`[data-module-id="${moduleId}"]`)
-                    const module = this.modules.get(moduleId)
-                    if (btn && module) {
-                        logAudit(`🎨 Module ${moduleId}: statut=${module.status}, classes=${btn.className}`)
-                    }
-                })
-            }, 100)
+            this.saveOfflineData() // Sauvegarde globale état
             
             this.exitMultiSelectMode()
             this.closeBulkModal()
 
-            // Message de résultat final
+            // Message de résultat final adapté
             if (hasErrors) {
-                this.showAlert(`⚠️ ${modulesToUpdate.length} modules traités avec quelques erreurs (voir console)`, 'warning')
-            } else if (totalUpdated > 0 && totalNotFound > 0) {
-                this.showAlert(`✅ ${totalUpdated} modules sauvés serveur, ${totalNotFound} modules locaux`, 'success')
-            } else if (totalUpdated > 0) {
-                this.showAlert(`✅ ${totalUpdated} modules mis à jour avec succès !`, 'success')
+                this.showAlert(`⚠️ Traitement terminé avec des erreurs réseau`, 'warning')
+            } else if (totalNotFound > 0 && totalUpdated === 0) {
+                this.showAlert(`💾 ${totalNotFound} modules sauvegardés HORS LIGNE (sera synchronisé)`, 'warning')
+            } else if (totalNotFound > 0) {
+                this.showAlert(`✅ ${totalUpdated} sauvés serveur, 💾 ${totalNotFound} sauvés local`, 'success')
             } else {
-                this.showAlert(`⚠️ ${modulesToUpdate.length} modules mis à jour localement (audit non synchronisé)`, 'warning')
+                this.showAlert(`✅ ${totalUpdated} modules mis à jour avec succès !`, 'success')
             }
 
         } catch (err) {

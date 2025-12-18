@@ -561,14 +561,24 @@ crmRoutes.post('/projects', async (c) => {
         body.technical_notes
       ).run();
 
-      const project = await DB.prepare('SELECT * FROM projects WHERE id = ?')
-        .bind(result.meta.last_row_id)
-        .first();
+      // Créer automatiquement la Zone 1 par défaut
+      await env.DB.prepare(`
+        INSERT INTO pv_zones (
+          plant_id, zone_name, zone_type, zone_order, azimuth, tilt
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        result.meta.last_row_id,
+        'Zone 1 (Défaut)',
+        'rooftop',
+        1,
+        180,
+        30
+      ).run()
 
       return c.json({
         success: true,
         project,
-        message: 'Projet créé avec succès'
+        message: 'Projet créé avec succès (Zone 1 initialisée)'
       });
 
     } catch (dbError: any) {

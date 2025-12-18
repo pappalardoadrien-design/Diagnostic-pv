@@ -119,6 +119,20 @@ export interface ThermalModuleData {
 }
 
 // ============================================================================
+// MODULE PHOTOS - GALERIE & PREUVES
+// ============================================================================
+
+export interface PhotosModuleData {
+  hasData: boolean;
+  totalPhotos: number;
+  photos: Array<{
+    url: string;
+    description: string;
+    tag: string;
+  }>;
+}
+
+// ============================================================================
 // RAPPORT UNIFIÉ - AGRÉGATION
 // ============================================================================
 
@@ -138,6 +152,9 @@ export interface UnifiedReportData {
   visualModule: VisualModuleData;
   isolationModule: IsolationModuleData;
   thermalModule: ThermalModuleData;
+  modules: { // Structure flexible pour extension
+      photos?: { enabled: boolean; count: number; data: PhotosModuleData };
+  };
   
   // Synthèse globale
   summary: {
@@ -168,7 +185,7 @@ export interface GenerateUnifiedReportRequest {
   plantId?: number;
   auditElToken?: string; // Si rapport basé sur audit EL spécifique
   inspectionToken?: string; // Si rapport basé sur inspection visuelle
-  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal')[];
+  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal' | 'photos')[];
   generatedBy?: string;
   additionalNotes?: string;
 }

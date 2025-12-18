@@ -462,6 +462,48 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
             }
         }
         
+        // Charger la localisation depuis le CRM/Projet
+        async function loadPlantLocation() {
+            try {
+                // On récupère les infos de la centrale
+                const response = await fetch(\`/api/pv/plants/\${plantId}\`);
+                const data = await response.json();
+                
+                if (data.success && data.plant) {
+                    const p = data.plant;
+                    
+                    // Priorité 1 : Coordonnées GPS précises (si enregistrées dans le CRM)
+                    if (p.latitude && p.longitude) {
+                        updateStatus(\`📍 Centrage sur coordonnées CRM\`);
+                        map.setView([p.latitude, p.longitude], 19); // Zoom précis
+                        
+                        // Petit marqueur visuel pour dire "C'est là"
+                        L.circleMarker([p.latitude, p.longitude], {
+                            radius: 8,
+                            fillColor: "#ff0000",
+                            color: "#fff",
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(map).bindPopup(\`<b>\${p.plant_name}</b><br>Position CRM\`).openPopup();
+                        
+                        return;
+                    }
+                    
+                    // Priorité 2 : Adresse postale (si pas de GPS)
+                    const fullAddress = [p.address, p.postal_code, p.city].filter(Boolean).join(', ');
+                    if (fullAddress) {
+                        updateStatus(\`🔎 Recherche adresse CRM : \${fullAddress}\`);
+                        document.getElementById('addressSearch').value = fullAddress;
+                        // On lance la recherche auto
+                        searchAddress();
+                    }
+                }
+            } catch (e) {
+                console.error("Erreur chargement localisation plant:", e);
+            }
+        }
+
         // Placer tous les modules sur la carte
         function placeModulesOnMap() {
             if (pvModules.length === 0) {
@@ -705,12 +747,15 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
                 const layoutData = moduleMarkers.map(marker => {
                     const bounds = marker.getBounds();
                     const center = bounds.getCenter();
+                    const data = marker.options.moduleData;
                     
                     return {
-                        module_id: marker.options.moduleData.id,
+                        module_id: data.id,
                         lat: center.lat,
                         lon: center.lng,
-                        rotation: 0 // TODO: récupérer rotation réelle
+                        rotation: 0,
+                        string_number: data.string_number,
+                        position_in_string: data.position_in_string
                     };
                 });
                 
@@ -790,6 +835,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
         
         // Initialisation
         initMap();
+        loadPlantLocation(); // Nouvelle fonction pour centrer sur l'adresse CRM
         loadZone();
         loadModules();
         </script>
