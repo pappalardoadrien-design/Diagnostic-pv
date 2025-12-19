@@ -33,8 +33,11 @@ export function getRapportsCustomPage() {
             <div class="border-b-4 border-green-600 pb-8">
                 <div class="flex justify-between items-end">
                     <div>
-                        <h1 class="text-4xl font-black text-slate-900 tracking-tighter mb-2">DIAG<span class="text-green-600">PV</span></h1>
-                        <div class="text-sm font-bold text-slate-500 uppercase tracking-widest">Expertise Photovoltaïque</div>
+                        <!-- LOGO OFFICIEL -->
+                        <div class="text-4xl font-black tracking-tighter text-slate-900 leading-tight mb-2">
+                            DIAGNOSTIC<br><span class="text-green-600">PHOTOVOLTAÏQUE</span>
+                        </div>
+                        <div class="text-sm font-bold text-slate-500 uppercase tracking-widest">Expertise Indépendante</div>
                     </div>
                     <div class="text-6xl font-black text-slate-100" id="report-year">2025</div>
                 </div>
@@ -155,7 +158,6 @@ export function getRapportsCustomPage() {
             const token = urlParams.get('token');
 
             if (!token) {
-                // ÉCHAPPEMENT CORRIGÉ ICI (Backticks internes)
                 document.getElementById('loading-screen').innerHTML = \`
                     <div class="text-center p-8 text-red-600">
                         <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
@@ -179,7 +181,6 @@ export function getRapportsCustomPage() {
 
             } catch (e) {
                 console.error(e);
-                // ÉCHAPPEMENT CORRIGÉ ICI
                 document.getElementById('loading-screen').innerHTML = \`
                     <div class="text-center p-8 text-red-600">
                         <i class="fas fa-server text-4xl mb-4"></i>
@@ -216,10 +217,8 @@ export function getRapportsCustomPage() {
                 table.strings.forEach(string => {
                     let modulesHtml = '';
                     
-                    // Générer les modules du string
                     string.modules.forEach(mod => {
                         const style = SEVERITY_COLORS[mod.sev] || SEVERITY_COLORS['OK'];
-                        // ÉCHAPPEMENT CORRIGÉ ICI
                         const label = mod.code ? \`<span class="text-[5px] font-black text-white">\${mod.code}</span>\` : \`<span class="text-[5px] text-slate-300 opacity-0">\${mod.idx}</span>\`;
                         
                         modulesHtml += \`
@@ -253,7 +252,6 @@ export function getRapportsCustomPage() {
 
             // Stats Note
             const critCount = data.stats.critical;
-            // ÉCHAPPEMENT CORRIGÉ ICI
             document.getElementById('expert-note').innerHTML = \`
                 L'audit a révélé <strong>\${critCount} défauts critiques</strong> nécessitant une intervention. 
                 La cartographie met en évidence une concentration sur la \${data.tables[0].name}, suggérant un problème localisé (ombrage ou défaut série).
@@ -264,7 +262,6 @@ export function getRapportsCustomPage() {
             document.getElementById('report-content').classList.remove('hidden');
         }
 
-        // Load
         window.addEventListener('DOMContentLoaded', initReport);
     </script>
   `;
