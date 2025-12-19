@@ -922,56 +922,73 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
   try {
     const { DB } = c.env;
 
-    // 1. KPI
-    const clientsCount = await DB.prepare('SELECT COUNT(*) as count FROM crm_clients WHERE status = "active"').first<{count: number}>();
-    const projectsCount = await DB.prepare('SELECT COUNT(*) as count FROM projects WHERE status = "active"').first<{count: number}>();
-    const auditsCount = await DB.prepare('SELECT COUNT(*) as count FROM audits WHERE status = "in_progress"').first<{count: number}>();
+    // Helper pour sécuriser les compteurs
+    const safeCount = async (query: string, params: any[] = []) => {
+      try {
+        const res = await DB.prepare(query).bind(...params).first<{count: number}>();
+        return res?.count || 0;
+      } catch (e) {
+        console.warn(`KPI Error (${query}):`, e);
+        return 0;
+      }
+    };
+
+    // 1. KPI (Sécurisés)
+    const clientsCount = await safeCount('SELECT COUNT(*) as count FROM crm_clients WHERE status = "active"');
+    const projectsCount = await safeCount('SELECT COUNT(*) as count FROM projects WHERE status = "active"');
+    const auditsCount = await safeCount('SELECT COUNT(*) as count FROM audits WHERE status = "in_progress"');
     
     // Interventions cette semaine
     const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const interventionsCount = await DB.prepare(`
+    const interventionsCount = await safeCount(`
       SELECT COUNT(*) as count FROM interventions 
       WHERE intervention_date >= ? AND intervention_date <= ? AND status != "cancelled"
-    `).bind(today, nextWeek).first<{count: number}>();
+    `, [today, nextWeek]);
 
     // Défauts critiques (EL)
-    const criticalDefects = await DB.prepare(`
-      SELECT COUNT(*) as count FROM el_modules WHERE severity_level >= 3
-    `).first<{count: number}>();
+    const criticalDefects = await safeCount('SELECT COUNT(*) as count FROM el_modules WHERE severity_level >= 3');
 
     // 2. AUDITS RÉCENTS (5)
-    const recentAudits = await DB.prepare(`
-      SELECT a.*, c.company_name as client_company
-      FROM audits a
-      LEFT JOIN crm_clients c ON a.client_id = c.id
-      WHERE a.status = "in_progress"
-      ORDER BY a.updated_at DESC
-      LIMIT 5
-    `).all();
+    let recentAudits = [];
+    try {
+      const res = await DB.prepare(`
+        SELECT a.*, c.company_name as client_company
+        FROM audits a
+        LEFT JOIN crm_clients c ON a.client_id = c.id
+        WHERE a.status = "in_progress"
+        ORDER BY a.updated_at DESC
+        LIMIT 5
+      `).all();
+      recentAudits = res.results || [];
+    } catch (e) { console.warn('Recent Audits Error:', e); }
 
     // 3. INTERVENTIONS PROCHAINES (5)
-    const upcomingInterventions = await DB.prepare(`
-      SELECT i.*, p.name as project_name, c.company_name as client_name, i.intervention_date as date_souhaitee, i.status as statut
-      FROM interventions i
-      LEFT JOIN projects p ON i.project_id = p.id
-      LEFT JOIN crm_clients c ON i.client_id = c.id
-      WHERE i.intervention_date >= ?
-      ORDER BY i.intervention_date ASC
-      LIMIT 5
-    `).bind(today).all();
+    let upcomingInterventions = [];
+    try {
+      const res = await DB.prepare(`
+        SELECT i.*, p.name as project_name, c.company_name as client_name, i.intervention_date as date_souhaitee, i.status as statut
+        FROM interventions i
+        LEFT JOIN projects p ON i.project_id = p.id
+        LEFT JOIN crm_clients c ON i.client_id = c.id
+        WHERE i.intervention_date >= ?
+        ORDER BY i.intervention_date ASC
+        LIMIT 5
+      `).bind(today).all();
+      upcomingInterventions = res.results || [];
+    } catch (e) { console.warn('Upcoming Interventions Error:', e); }
 
     return c.json({
       success: true,
       kpi: {
-        clients_active: clientsCount?.count || 0,
-        projects_active: projectsCount?.count || 0,
-        audits_active: auditsCount?.count || 0,
-        interventions_week: interventionsCount?.count || 0,
-        critical_defects: criticalDefects?.count || 0
+        clients_active: clientsCount,
+        projects_active: projectsCount,
+        audits_active: auditsCount,
+        interventions_week: interventionsCount,
+        critical_defects: criticalDefects
       },
-      audits: recentAudits.results,
-      interventions: upcomingInterventions.results,
+      audits: recentAudits,
+      interventions: upcomingInterventions,
       alerts: [],
       timestamp: new Date().toISOString()
     });
