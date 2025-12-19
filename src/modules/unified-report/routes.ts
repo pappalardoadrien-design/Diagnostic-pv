@@ -108,6 +108,32 @@ unifiedReportRoutes.post('/generate', async (c) => {
 });
 
 // ============================================================================
+// GET /api/report/unified/data/:auditToken - Données brutes pour rendu dynamique
+// ============================================================================
+unifiedReportRoutes.get('/data/:auditToken', async (c) => {
+  const { DB } = c.env;
+  const auditToken = c.req.param('auditToken');
+  
+  try {
+    // On utilise l'agrégateur existant pour récupérer toutes les données liées à ce token
+    // L'agrégateur est intelligent : il trouve le projet, le client, et tous les modules (EL, IV, etc.)
+    const reportData = await aggregateUnifiedReportData(DB, { auditElToken: auditToken });
+    
+    return c.json({
+      success: true,
+      reportData
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération données dynamiques:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    }, 500);
+  }
+});
+
+// ============================================================================
 // GET /api/report/unified/preview - Aperçu données disponibles
 // ============================================================================
 unifiedReportRoutes.get('/preview', async (c) => {
