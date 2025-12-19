@@ -175,6 +175,14 @@ export interface UnifiedReportData {
     estimatedImpact: string | null; // kWh/an, €/an
     deadline: string | null;
   }>;
+
+  // Notes de terrain (Vocales / Textuelles)
+  fieldNotes?: Array<{
+    id: number;
+    content: string;
+    technicianId: string | null;
+    createdAt: string;
+  }>;
 }
 
 // ============================================================================

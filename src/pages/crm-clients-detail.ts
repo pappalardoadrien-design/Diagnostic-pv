@@ -1,546 +1,455 @@
-// Page Détail Client CRM - Vue complète avec sites, contacts, interventions et historique
-// Navigation vers édition, suppression, création site
+import { getLayout } from './layout.js';
 
 export function getCrmClientsDetailPage() {
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Détail Client - CRM DiagPV</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f8fafc; }
-        .section-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
-        .badge-active { background: #dcfce7; color: #166534; }
-        .badge-inactive { background: #fee2e2; color: #991b1b; }
-        .badge-prospect { background: #fef3c7; color: #92400e; }
-        .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
-        .info-row:last-child { border-bottom: none; }
-        .tab-button { padding: 12px 24px; border-bottom: 3px solid transparent; cursor: pointer; }
-        .tab-button.active { border-bottom-color: #2563eb; color: #2563eb; font-weight: 600; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .project-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-        .project-card:hover { background: #f3f4f6; }
-        .intervention-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; }
-        .type-el { background: #fef3c7; color: #92400e; }
-        .type-iv { background: #dbeafe; color: #1e3a8a; }
-        .type-visuels { background: #e0e7ff; color: #3730a3; }
-        .type-isolation { background: #fce7f3; color: #831843; }
-        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal.active { display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: white; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-    </style>
-</head>
-<body class="min-h-screen">
-
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="/crm/clients" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        <i class="fas fa-building text-blue-600 mr-2"></i>
-                        <span id="client-name">Chargement...</span>
-                    </h1>
-                    <span id="client-status-badge" class="badge"></span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <button id="delete-client-btn" class="border border-red-300 hover:bg-red-50 text-red-700 px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-trash mr-2"></i>
-                        Supprimer
-                    </button>
-                    <a id="edit-client-btn" href="#" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-edit mr-2"></i>
-                        Modifier
-                    </a>
-                    <a id="create-project-btn" href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-plus mr-2"></i>
-                        Nouveau Site
-                    </a>
+  const content = `
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Header & Actions -->
+        <div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div class="flex items-start gap-4">
+                <a href="/crm/clients" class="mt-2 text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <div class="flex items-center gap-3 mb-1">
+                        <h1 id="client-name" class="text-3xl font-black text-slate-900 tracking-tight">Chargement...</h1>
+                        <span id="client-status-badge" class="hidden px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border"></span>
+                    </div>
+                    <p class="text-slate-500 font-medium flex items-center gap-2">
+                        <i class="far fa-building"></i>
+                        <span id="client-type-label">...</span>
+                        <span class="text-slate-300 mx-2">|</span>
+                        <i class="fas fa-fingerprint text-slate-400"></i>
+                        <span id="info-siret" class="font-mono text-sm">...</span>
+                    </p>
                 </div>
             </div>
-        </div>
-    </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <!-- Informations Générales -->
-        <div class="section-card p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                Informations Générales
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Raison sociale</span>
-                        <span id="info-company-name" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">SIRET</span>
-                        <span id="info-siret" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">TVA Intracommunautaire</span>
-                        <span id="info-vat" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Type</span>
-                        <span id="info-client-type" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Statut</span>
-                        <span id="info-status" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Date de création</span>
-                        <span id="info-created-at" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Dernière modification</span>
-                        <span id="info-updated-at" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Contact Principal -->
-        <div class="section-card p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-user text-blue-600 mr-2"></i>
-                Contact Principal
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Nom complet</span>
-                        <span id="contact-name" class="font-medium text-gray-900"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Email</span>
-                        <a id="contact-email" href="#" class="font-medium text-blue-600 hover:underline"></a>
-                    </div>
-                </div>
-                <div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Téléphone</span>
-                        <a id="contact-phone" href="#" class="font-medium text-blue-600 hover:underline"></a>
-                    </div>
-                    <div class="info-row">
-                        <span class="text-gray-600">Rôle</span>
-                        <span id="contact-role" class="font-medium text-gray-900"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Adresse -->
-        <div class="section-card p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>
-                Adresse
-            </h2>
-            <p id="address-full" class="text-gray-700"></p>
-        </div>
-
-        <!-- Notes -->
-        <div id="notes-section" class="section-card p-6 mb-6" style="display: none;">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                <i class="fas fa-sticky-note text-blue-600 mr-2"></i>
-                Notes
-            </h2>
-            <p id="notes-content" class="text-gray-700 whitespace-pre-wrap"></p>
-        </div>
-
-        <!-- Tabs Navigation -->
-        <div class="section-card mb-6">
-            <div class="border-b border-gray-200 flex">
-                <button class="tab-button active" data-tab="sites">
-                    <i class="fas fa-solar-panel mr-2"></i>
-                    Sites / Projets (<span id="sites-count">0</span>)
+            <div class="flex items-center gap-3">
+                <button id="delete-client-btn" class="px-4 py-2.5 text-red-600 font-bold bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100">
+                    <i class="fas fa-trash-alt mr-2"></i>Supprimer
                 </button>
-                <button class="tab-button" data-tab="interventions">
-                    <i class="fas fa-calendar-check mr-2"></i>
-                    Interventions (<span id="interventions-count">0</span>)
-                </button>
-                <button class="tab-button" data-tab="audits">
-                    <i class="fas fa-clipboard-check mr-2"></i>
-                    Audits (<span id="audits-count">0</span>)
-                </button>
-            </div>
-
-            <!-- Tab Content: Sites -->
-            <div id="tab-sites" class="tab-content active p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Liste des Sites</h3>
-                    <a id="add-site-btn" href="#" class="text-blue-600 hover:text-blue-700 font-medium">
-                        <i class="fas fa-plus mr-1"></i>
-                        Ajouter un site
-                    </a>
-                </div>
-                <div id="sites-list">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <!-- Tab Content: Interventions -->
-            <div id="tab-interventions" class="tab-content p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Historique des Interventions</h3>
-                <div id="interventions-list">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <!-- Tab Content: Audits -->
-            <div id="tab-audits" class="tab-content p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Historique des Audits</h3>
-                <div id="audits-list">
-                    <!-- Populated by JS -->
-                </div>
+                <a id="edit-client-btn" href="#" class="px-4 py-2.5 text-slate-600 font-bold bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors shadow-sm">
+                    <i class="fas fa-pen mr-2"></i>Modifier
+                </a>
+                <a id="create-project-btn" href="#" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 transform hover:-translate-y-0.5 flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Nouveau Site
+                </a>
             </div>
         </div>
 
-    </main>
-
-    <!-- Modal Confirmation Suppression -->
-    <div id="delete-modal" class="modal">
-        <div class="modal-content">
-            <div class="p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
-                    Confirmer la suppression
+        <!-- Info Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Carte Identité -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-info-circle"></i> Coordonnées
                 </h3>
-                <p class="text-gray-600 mb-6">
-                    Êtes-vous sûr de vouloir supprimer ce client ? Cette action est irréversible et supprimera également :
-                </p>
-                <ul class="list-disc list-inside text-gray-600 mb-6 space-y-1">
-                    <li>Tous les sites/projets associés</li>
-                    <li>Toutes les interventions liées</li>
-                    <li>Tous les audits associés</li>
-                </ul>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-delete-btn" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
-                        Annuler
-                    </button>
-                    <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                        Supprimer définitivement
-                    </button>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Adresse</div>
+                            <div id="address-full" class="text-slate-900 font-medium">...</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">TVA Intra</div>
+                            <div id="info-vat" class="text-slate-900 font-medium font-mono">...</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Client depuis le</div>
+                            <div id="info-created-at" class="text-slate-900 font-medium">...</div>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Carte Contact Principal -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-user-circle"></i> Contact Principal
+                </h3>
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xl">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <div id="contact-name" class="text-lg font-bold text-slate-900">...</div>
+                        <div id="contact-role" class="text-sm font-medium text-slate-500">...</div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <a id="contact-email-link" href="#" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+                        <i class="fas fa-envelope text-slate-400 group-hover:text-blue-500"></i>
+                        <span id="contact-email" class="font-medium text-sm truncate">...</span>
+                    </a>
+                    <a id="contact-phone-link" href="#" class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-green-50 hover:text-green-600 transition-colors group">
+                        <i class="fas fa-phone text-slate-400 group-hover:text-green-500"></i>
+                        <span id="contact-phone" class="font-medium text-sm">...</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Carte Notes -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-5">
+                    <i class="fas fa-sticky-note text-6xl"></i>
+                </div>
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-pen-alt"></i> Notes Internes
+                </h3>
+                <div id="notes-content" class="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap min-h-[100px]">
+                    <em class="text-slate-400">Aucune note pour ce client.</em>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onglets & Contenu -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+            
+            <!-- Tab Headers -->
+            <div class="flex border-b border-slate-200 bg-slate-50/50">
+                <button class="tab-btn active group px-8 py-5 text-sm font-bold border-b-2 border-transparent hover:bg-white transition-all relative flex items-center gap-2" data-target="sites">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                    Sites & Projets
+                    <span id="sites-count" class="ml-2 px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs">0</span>
+                </button>
+                <button class="tab-btn group px-8 py-5 text-sm font-bold border-b-2 border-transparent hover:bg-white transition-all relative flex items-center gap-2" data-target="interventions">
+                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                    Missions & Planning
+                    <span id="interventions-count" class="ml-2 px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs">0</span>
+                </button>
+                <button class="tab-btn group px-8 py-5 text-sm font-bold border-b-2 border-transparent hover:bg-white transition-all relative flex items-center gap-2" data-target="audits">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    Rapports d'Audit
+                    <span id="audits-count" class="ml-2 px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs">0</span>
+                </button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="p-8">
+                
+                <!-- Sites Tab -->
+                <div id="tab-sites" class="tab-content active space-y-4">
+                    <div id="sites-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- JS injected content -->
+                    </div>
+                </div>
+
+                <!-- Interventions Tab -->
+                <div id="tab-interventions" class="tab-content hidden">
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-xs uppercase font-black text-slate-500">
+                                <tr>
+                                    <th class="px-6 py-4">Date</th>
+                                    <th class="px-6 py-4">Type</th>
+                                    <th class="px-6 py-4">Site</th>
+                                    <th class="px-6 py-4">Technicien</th>
+                                    <th class="px-6 py-4">Statut</th>
+                                    <th class="px-6 py-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="interventions-list-container" class="divide-y divide-slate-100 bg-white">
+                                <!-- JS injected content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Audits Tab -->
+                <div id="tab-audits" class="tab-content hidden">
+                     <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-xs uppercase font-black text-slate-500">
+                                <tr>
+                                    <th class="px-6 py-4">Date</th>
+                                    <th class="px-6 py-4">Type</th>
+                                    <th class="px-6 py-4">Site</th>
+                                    <th class="px-6 py-4">Modules</th>
+                                    <th class="px-6 py-4 text-right">Rapport</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audits-list-container" class="divide-y divide-slate-100 bg-white">
+                                <!-- JS injected content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 
+    <!-- Logic -->
     <script>
+        // --- DATA STATE ---
         const urlParams = new URLSearchParams(window.location.search);
         const clientId = urlParams.get('id');
-
-        if (!clientId) {
-            alert('ID client manquant');
-            window.location.href = '/crm/clients';
-        }
-
         let clientData = null;
         let projectsData = [];
         let interventionsData = [];
         let auditsData = [];
 
-        // Load all data
+        // --- INIT ---
         async function init() {
-            await Promise.all([
-                loadClient(),
-                loadProjects(),
-                loadInterventions(),
-                loadAudits()
-            ]);
+            if(!clientId) return window.location.href = '/crm/clients';
 
-            updateCounts();
-            renderSites();
-            renderInterventions();
-            renderAudits();
-        }
+            try {
+                // Fetch Core Data
+                const clientRes = await fetch(\`/api/crm/clients/\${clientId}\`);
+                const clientJson = await clientRes.json();
+                if(!clientJson.success) throw new Error('Client introuvable');
+                clientData = clientJson.client;
 
-        async function loadClient() {
-            const response = await fetch(\`/api/crm/clients/\${clientId}\`);
-            if (!response.ok) {
-                alert('Client non trouvé');
-                window.location.href = '/crm/clients';
-                return;
-            }
-            const data = await response.json();
-            clientData = data.client;
-            renderClientInfo();
-        }
+                // Render Header First
+                renderClientHeader();
+                renderClientCards();
 
-        async function loadProjects() {
-            const response = await fetch(\`/api/crm/clients/\${clientId}/projects\`);
-            if (response.ok) {
-                const data = await response.json();
-                projectsData = data.projects || [];
-            }
-        }
+                // Fetch Related Data in Parallel
+                const [projectsRes, interventionsRes, auditsRes] = await Promise.all([
+                    fetch(\`/api/crm/clients/\${clientId}/projects\`).then(r => r.json()).catch(e => ({projects: []})),
+                    fetch(\`/api/planning/interventions?client_id=\${clientId}\`).then(r => r.json()).catch(e => ({interventions: []})),
+                    fetch(\`/api/audits\`).then(r => r.json()).catch(e => ({audits: []})) // Fallback needed: normally filtered by backend
+                ]);
 
-        async function loadInterventions() {
-            const response = await fetch(\`/api/planning/interventions?client_id=\${clientId}\`);
-            if (response.ok) {
-                const data = await response.json();
-                interventionsData = data.interventions || [];
-            }
-        }
-
-        async function loadAudits() {
-            // Load all audits for this client's interventions
-            const response = await fetch(\`/api/audits\`); // Correct endpoint: plural 'audits'
-            if (response.ok) {
-                const data = await response.json();
+                projectsData = projectsRes.projects || [];
+                interventionsData = interventionsRes.interventions || [];
+                
+                // Client-side filtering for audits (mock approach)
                 const clientInterventionIds = interventionsData.map(i => i.id);
-                auditsData = (data.audits || []).filter(a => 
-                    clientInterventionIds.includes(a.intervention_id)
-                );
+                auditsData = (auditsRes.audits || []).filter(a => clientInterventionIds.includes(a.intervention_id));
+
+                // Update UI
+                updateCounters();
+                renderSitesList();
+                renderInterventionsList();
+                renderAuditsList();
+
+            } catch (err) {
+                console.error(err);
+                alert('Erreur de chargement: ' + err.message);
             }
         }
 
-        function renderClientInfo() {
-            // Header
+        // --- RENDERERS ---
+        function renderClientHeader() {
             document.getElementById('client-name').textContent = clientData.company_name;
-            const statusBadge = document.getElementById('client-status-badge');
-            statusBadge.textContent = clientData.status.toUpperCase();
-            statusBadge.className = 'badge badge-' + clientData.status;
+            document.getElementById('info-siret').textContent = clientData.siret || 'SIRET Non renseigné';
+            document.getElementById('client-type-label').textContent = clientData.client_type === 'company' ? 'Entreprise' : 'Particulier';
+            
+            const badge = document.getElementById('client-status-badge');
+            badge.classList.remove('hidden');
+            
+            const styles = {
+                'active': 'bg-green-100 text-green-700 border-green-200',
+                'inactive': 'bg-slate-100 text-slate-600 border-slate-200',
+                'prospect': 'bg-amber-100 text-amber-700 border-amber-200'
+            };
+            badge.className = \`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border \${styles[clientData.status] || styles.inactive}\`;
+            badge.textContent = clientData.status;
 
-            // General info
-            document.getElementById('info-company-name').textContent = clientData.company_name;
-            document.getElementById('info-siret').textContent = clientData.siret || 'N/A';
-            document.getElementById('info-vat').textContent = clientData.vat_number || 'N/A';
-            document.getElementById('info-client-type').textContent = clientData.client_type || 'N/A';
-            document.getElementById('info-status').textContent = clientData.status;
-            document.getElementById('info-created-at').textContent = new Date(clientData.created_at).toLocaleDateString('fr-FR');
-            document.getElementById('info-updated-at').textContent = new Date(clientData.updated_at).toLocaleDateString('fr-FR');
-
-            // Contact
-            document.getElementById('contact-name').textContent = clientData.contact_name || 'N/A';
-            const emailEl = document.getElementById('contact-email');
-            if (clientData.contact_email) {
-                emailEl.textContent = clientData.contact_email;
-                emailEl.href = 'mailto:' + clientData.contact_email;
-            } else {
-                emailEl.textContent = 'N/A';
-                emailEl.removeAttribute('href');
-            }
-            const phoneEl = document.getElementById('contact-phone');
-            if (clientData.contact_phone) {
-                phoneEl.textContent = clientData.contact_phone;
-                phoneEl.href = 'tel:' + clientData.contact_phone;
-            } else {
-                phoneEl.textContent = 'N/A';
-                phoneEl.removeAttribute('href');
-            }
-            document.getElementById('contact-role').textContent = clientData.contact_role || 'N/A';
-
-            // Address
-            const address = [
-                clientData.address_street,
-                clientData.address_postal_code,
-                clientData.address_city
-            ].filter(Boolean).join(', ');
-            document.getElementById('address-full').textContent = address || 'Adresse non renseignée';
-
-            // Notes
-            if (clientData.notes) {
-                document.getElementById('notes-section').style.display = 'block';
-                document.getElementById('notes-content').textContent = clientData.notes;
-            }
-
-            // Buttons
+            // Links
             document.getElementById('edit-client-btn').href = \`/crm/clients/edit?id=\${clientId}\`;
             document.getElementById('create-project-btn').href = \`/crm/projects/create?client_id=\${clientId}\`;
-            document.getElementById('add-site-btn').href = \`/crm/projects/create?client_id=\${clientId}\`;
         }
 
-        function updateCounts() {
+        function renderClientCards() {
+            // Address
+            const addr = [clientData.address_street, clientData.address_postal_code, clientData.address_city].filter(Boolean).join(', ');
+            document.getElementById('address-full').textContent = addr || 'N/A';
+            document.getElementById('info-vat').textContent = clientData.vat_number || 'N/A';
+            document.getElementById('info-created-at').textContent = new Date(clientData.created_at).toLocaleDateString('fr-FR');
+
+            // Contact
+            document.getElementById('contact-name').textContent = clientData.main_contact_name || 'Aucun contact';
+            document.getElementById('contact-role').textContent = clientData.main_contact_role || '';
+            
+            const emailEl = document.getElementById('contact-email');
+            if(clientData.main_contact_email) {
+                emailEl.textContent = clientData.main_contact_email;
+                document.getElementById('contact-email-link').href = 'mailto:' + clientData.main_contact_email;
+            } else {
+                emailEl.textContent = 'Non renseigné';
+                document.getElementById('contact-email-link').classList.add('pointer-events-none', 'opacity-50');
+            }
+
+            const phoneEl = document.getElementById('contact-phone');
+            if(clientData.main_contact_phone) {
+                phoneEl.textContent = clientData.main_contact_phone;
+                document.getElementById('contact-phone-link').href = 'tel:' + clientData.main_contact_phone;
+            } else {
+                phoneEl.textContent = 'Non renseigné';
+                document.getElementById('contact-phone-link').classList.add('pointer-events-none', 'opacity-50');
+            }
+
+            // Notes
+            if(clientData.notes) {
+                document.getElementById('notes-content').textContent = clientData.notes;
+            }
+        }
+
+        function updateCounters() {
             document.getElementById('sites-count').textContent = projectsData.length;
             document.getElementById('interventions-count').textContent = interventionsData.length;
             document.getElementById('audits-count').textContent = auditsData.length;
         }
 
-        function renderSites() {
-            const container = document.getElementById('sites-list');
-            if (projectsData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 italic">Aucun site enregistré</p>';
+        function renderSitesList() {
+            const container = document.getElementById('sites-list-container');
+            if(projectsData.length === 0) {
+                container.innerHTML = \`
+                    <div class="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <i class="fas fa-solar-panel text-3xl text-slate-300 mb-3"></i>
+                        <p class="text-slate-500 font-medium">Aucun site associé à ce client.</p>
+                        <a href="/crm/projects/create?client_id=\${clientId}" class="text-blue-600 font-bold hover:underline mt-2 inline-block">Créer un site</a>
+                    </div>
+                \`;
                 return;
             }
 
-            container.innerHTML = projectsData.map(project => {
-                const interventionsCount = interventionsData.filter(i => i.project_id === project.id).length;
+            container.innerHTML = projectsData.map(p => {
+                const pInterventions = interventionsData.filter(i => i.project_id === p.id).length;
                 return \`
-                    <div class="project-card">
-                        <div class="flex items-start justify-between mb-2">
+                    <a href="/crm/projects/detail?id=\${p.id}" class="group block bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-3">
                             <div>
-                                <h4 class="font-semibold text-gray-900 text-lg">\${project.project_name}</h4>
-                                <p class="text-sm text-gray-600">\${project.address_street || ''}, \${project.address_postal_code || ''} \${project.address_city || ''}</p>
+                                <h4 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">\${p.project_name}</h4>
+                                <p class="text-xs text-slate-500 mt-1"><i class="fas fa-map-pin mr-1"></i> \${p.address_city || 'Ville inconnue'}</p>
                             </div>
-                            <a href="/crm/projects/detail?id=\${project.id}" class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                                Voir détails →
-                            </a>
+                            <span class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                <i class="fas fa-chevron-right text-xs"></i>
+                            </span>
                         </div>
-                        <div class="flex items-center space-x-4 text-sm text-gray-600 mt-3">
-                            <span><i class="fas fa-bolt mr-1"></i>\${project.total_power_kwp || 'N/A'} kWp</span>
-                            <span><i class="fas fa-solar-panel mr-1"></i>\${project.module_count || 'N/A'} modules</span>
-                            <span><i class="fas fa-calendar-check mr-1"></i>\${interventionsCount} intervention(s)</span>
+                        <div class="flex items-center gap-4 text-xs font-medium text-slate-600 border-t border-slate-100 pt-3">
+                            <span class="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
+                                <i class="fas fa-bolt text-amber-500"></i> \${p.total_power_kwp || '?'} kWp
+                            </span>
+                             <span class="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
+                                <i class="fas fa-th text-slate-400"></i> \${p.module_count || '?'} modules
+                            </span>
+                             <span class="ml-auto text-slate-400">
+                                \${pInterventions} mission(s)
+                            </span>
                         </div>
-                    </div>
+                    </a>
                 \`;
             }).join('');
         }
 
-        function renderInterventions() {
-            const container = document.getElementById('interventions-list');
-            if (interventionsData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 italic">Aucune intervention enregistrée</p>';
+        function renderInterventionsList() {
+            const container = document.getElementById('interventions-list-container');
+            if(interventionsData.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-500 italic">Aucune intervention planifiée ou réalisée.</td></tr>';
                 return;
             }
 
-            const sorted = [...interventionsData].sort((a, b) => 
-                new Date(b.intervention_date) - new Date(a.intervention_date)
-            );
-
-            container.innerHTML = \`
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Site</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Technicien</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        \${sorted.map(intervention => {
-                            const project = projectsData.find(p => p.id === intervention.project_id);
-                            return \`
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-sm">\${new Date(intervention.intervention_date).toLocaleDateString('fr-FR')}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="intervention-badge type-\${intervention.intervention_type}">
-                                            \${intervention.intervention_type.toUpperCase()}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm">\${project ? project.project_name : 'N/A'}</td>
-                                    <td class="px-4 py-3 text-sm">\${intervention.technician_name || 'Non assigné'}</td>
-                                    <td class="px-4 py-3 text-sm">\${intervention.status}</td>
-                                    <td class="px-4 py-3">
-                                        <a href="/planning/detail?id=\${intervention.id}" class="text-blue-600 hover:text-blue-700 text-sm">
-                                            Détails
-                                        </a>
-                                    </td>
-                                </tr>
-                            \`;
-                        }).join('')}
-                    </tbody>
-                </table>
-            \`;
+            container.innerHTML = interventionsData.map(i => {
+                const project = projectsData.find(p => p.id === i.project_id);
+                return \`
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4 text-sm font-bold text-slate-700">\${new Date(i.intervention_date).toLocaleDateString('fr-FR')}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-blue-100 text-blue-800">
+                                \${i.intervention_type}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-600">\${project ? project.project_name : 'Site inconnu'}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">\${i.technician_name || 'Non assigné'}</td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs font-bold \${i.status === 'completed' ? 'text-green-600' : 'text-slate-500'}">
+                                \${i.status === 'completed' ? 'Terminée' : i.status}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="/planning/detail?id=\${i.id}" class="text-slate-400 hover:text-blue-600 font-bold text-sm">Voir</a>
+                        </td>
+                    </tr>
+                \`;
+            }).join('');
         }
 
-        function renderAudits() {
-            const container = document.getElementById('audits-list');
-            if (auditsData.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 italic">Aucun audit enregistré</p>';
+        function renderAuditsList() {
+            const container = document.getElementById('audits-list-container');
+            if(auditsData.length === 0) {
+                container.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-500 italic">Aucun rapport d\\'audit généré.</td></tr>';
                 return;
             }
-
-            const sorted = [...auditsData].sort((a, b) => 
-                new Date(b.created_at) - new Date(a.created_at)
-            );
-
-            container.innerHTML = \`
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date création</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Site</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Modules</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        \${sorted.map(audit => {
-                            const intervention = interventionsData.find(i => i.id === audit.intervention_id);
-                            const project = intervention ? projectsData.find(p => p.id === intervention.project_id) : null;
-                            return \`
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-sm">\${new Date(audit.created_at).toLocaleDateString('fr-FR')}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="intervention-badge type-el">EL</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm">\${project ? project.project_name : 'N/A'}</td>
-                                    <td class="px-4 py-3 text-sm">\${audit.modules_diagnosed || 0} / \${audit.total_modules || 0}</td>
-                                    <td class="px-4 py-3">
-                                        <a href="/el/audit?token=\${audit.audit_token}" target="_blank" class="text-blue-600 hover:text-blue-700 text-sm">
-                                            Ouvrir audit
-                                        </a>
-                                    </td>
-                                </tr>
-                            \`;
-                        }).join('')}
-                    </tbody>
-                </table>
-            \`;
+             container.innerHTML = auditsData.map(a => {
+                const intervention = interventionsData.find(i => i.id === a.intervention_id);
+                const project = intervention ? projectsData.find(p => p.id === intervention.project_id) : null;
+                return \`
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4 text-sm font-bold text-slate-700">\${new Date(a.created_at).toLocaleDateString('fr-FR')}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide bg-purple-100 text-purple-800">
+                                EL
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-600">\${project ? project.project_name : '-'}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">\${a.modules_diagnosed || 0} / \${a.total_modules || 0}</td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="/el/audit?token=\${a.audit_token}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-bold text-xs transition-colors">
+                                <i class="fas fa-file-pdf"></i> Rapport
+                            </a>
+                        </td>
+                    </tr>
+                \`;
+            }).join('');
         }
 
-        // Tab switching
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', () => {
-                const tabName = button.dataset.tab;
+        // --- TABS LOGIC ---
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Reset styling
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active', 'border-blue-600', 'text-blue-600', 'bg-slate-50');
+                    b.classList.add('border-transparent', 'text-slate-500');
+                });
                 
-                // Update buttons
-                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-                
-                // Update content
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.getElementById('tab-' + tabName).classList.add('active');
+                // Active styling
+                btn.classList.add('active', 'border-blue-600', 'text-blue-600', 'bg-slate-50');
+                btn.classList.remove('border-transparent', 'text-slate-500');
+
+                // Switch content
+                const target = btn.dataset.target;
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById('tab-' + target).classList.remove('hidden');
             });
         });
 
-        // Delete client modal
-        document.getElementById('delete-client-btn').addEventListener('click', () => {
-            document.getElementById('delete-modal').classList.add('active');
+        // --- DELETE LOGIC ---
+        document.getElementById('delete-client-btn').addEventListener('click', async () => {
+             if(!confirm('Attention ! Cette action est irréversible.\\n\\nLa suppression du client entraînera la perte de tous les historiques, audits et données associées.\\n\\nConfirmer la suppression ?')) return;
+
+             try {
+                const res = await fetch(\`/api/crm/clients/\${clientId}\`, { method: 'DELETE' });
+                const data = await res.json();
+                if(data.success) window.location.href = '/crm/clients';
+                else alert('Erreur: ' + data.error);
+             } catch(e) {
+                 console.error(e);
+                 alert('Erreur serveur');
+             }
         });
 
-        document.getElementById('cancel-delete-btn').addEventListener('click', () => {
-            document.getElementById('delete-modal').classList.remove('active');
-        });
-
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-            const response = await fetch(\`/api/crm/clients/\${clientId}\`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                alert('Client supprimé avec succès');
-                window.location.href = '/crm/clients';
-            } else {
-                const data = await response.json();
-                alert('Erreur: ' + (data.error || 'Impossible de supprimer le client'));
-            }
-        });
-
-        // Initialize
+        // START
         init();
     </script>
-
-</body>
-</html>
   `;
+
+  return getLayout('Fiche Client', content, 'clients');
 }

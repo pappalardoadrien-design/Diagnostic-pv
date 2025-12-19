@@ -1,436 +1,270 @@
-/**
- * Page /iv-curves - Interface Module Courbes I-V
- * Upload PVServ + Visualisation courbes
- */
+import { getLayout } from './layout.js';
 
 export function getIVCurvesPage() {
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Module Courbes I-V - DiagPV</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-        .diagpv-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-        }
-        .conformity-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.875rem;
-        }
-        .conformity-ok { background: #dcfce7; color: #166534; }
-        .conformity-warning { background: #fef3c7; color: #92400e; }
-    </style>
-</head>
-<body class="min-h-screen p-6">
-    
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="diagpv-card">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-4xl font-black text-gray-800 mb-2">
-                        <i class="fas fa-chart-line text-blue-600 mr-3"></i>
-                        MODULE COURBES I-V
-                    </h1>
-                    <p class="text-gray-600 font-semibold">Mesures PVServ - Fill Factor & Résistance Série</p>
-                </div>
-                <button onclick="showUploadModal()" class="btn-primary">
-                    <i class="fas fa-upload mr-2"></i>
-                    UPLOAD PVSERV
-                </button>
-            </div>
+  const content = `
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight flex items-center">
+                <span class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-xl">
+                    <i class="fas fa-wave-square"></i>
+                </span>
+                Courbes I-V
+            </h1>
+            <p class="text-slate-500 font-medium ml-14">Analyse de performance String par String</p>
         </div>
-        
-        <!-- Statistiques -->
-        <div id="statsContainer" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card">
-                <div class="text-4xl font-black text-blue-600" id="totalCurves">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Courbes Total</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-green-600" id="avgFF">-</div>
-                <div class="text-gray-600 font-semibold mt-2">FF Moyen</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-purple-600" id="avgRds">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Rds Moyen (Ω)</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-orange-600" id="outOfTolerance">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Hors Tolérance</div>
-            </div>
+        <button onclick="openUploadModal()" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center">
+            <i class="fas fa-cloud-upload-alt mr-2"></i>
+            Import PVSyst / PVServ
+        </button>
+    </div>
+
+    <!-- DASHBOARD STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Total Courbes</div>
+            <div class="text-3xl font-black text-slate-800" id="totalCurves">-</div>
         </div>
-        
-        <!-- Filtres -->
-        <div class="diagpv-card">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-filter text-purple-600 mr-2"></i>
-                Filtres
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">String</label>
-                    <select id="filterString" onchange="loadCurves()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Tous les strings</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">FF Min</label>
-                    <input type="number" id="filterFFMin" step="0.01" placeholder="0.00" onchange="loadCurves()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Audit Token</label>
-                    <input type="text" id="filterAuditToken" placeholder="PV-1-XXX" onchange="loadCurves()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div class="flex items-end">
-                    <button onclick="resetFilters()" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-bold hover:bg-gray-300">
-                        <i class="fas fa-redo mr-2"></i>
-                        Réinitialiser
-                    </button>
-                </div>
-            </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Fill Factor Moyen</div>
+            <div class="text-3xl font-black text-green-500" id="avgFF">-</div>
         </div>
-        
-        <!-- Graphique FF par String -->
-        <div class="diagpv-card">
-            <h3 class="text-2xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-chart-bar text-green-600 mr-2"></i>
-                Fill Factor par String
-            </h3>
-            <div style="height: 300px;">
-                <canvas id="ffChart"></canvas>
-            </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Rds Moyenne</div>
+            <div class="text-3xl font-black text-purple-500" id="avgRds">- <span class="text-lg text-slate-400">Ω</span></div>
         </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Hors Tolérance</div>
+            <div class="text-3xl font-black text-red-500" id="outOfTolerance">-</div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <!-- Tableau Courbes -->
-        <div class="diagpv-card">
-            <h3 class="text-2xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-list text-blue-600 mr-2"></i>
-                Liste Courbes I-V
-                <span id="curveCount" class="text-sm text-gray-500 ml-2"></span>
-            </h3>
+        <!-- LEFT: FILTERS & LIST -->
+        <div class="lg:col-span-1 space-y-6">
             
-            <div id="loadingSpinner" class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
-                <p class="text-gray-600 mt-4 font-semibold">Chargement courbes...</p>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 class="font-bold text-slate-800 mb-4 flex items-center">
+                    <i class="fas fa-filter text-slate-400 mr-2"></i>Filtres
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">String</label>
+                        <select id="filterString" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium">
+                            <option value="">Tous</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Performance Min (FF)</label>
+                        <input type="range" min="0" max="100" value="0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        <div class="flex justify-between text-xs text-slate-400 mt-1">
+                            <span>0%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col max-h-[600px]">
+                <div class="p-4 border-b border-slate-100 bg-slate-50/50 font-bold text-slate-700 text-sm">
+                    Liste des Mesures
+                </div>
+                <div class="overflow-y-auto flex-1 p-2 space-y-2" id="curvesList">
+                    <!-- Items injected via JS -->
+                    <div class="p-8 text-center text-slate-400 text-sm">Chargement...</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT: CHART & DETAILS -->
+        <div class="lg:col-span-2 space-y-6">
             
-            <div id="curvesTable" style="display: none;" class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
+            <!-- Main Chart -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="font-black text-slate-800 text-lg">Analyse Graphique</h2>
+                    <div class="flex gap-2">
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">Courbe I-V</span>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500">Courbe P-V</span>
+                    </div>
+                </div>
+                <div class="h-80 w-full relative">
+                    <canvas id="ivChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Details Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-xs uppercase font-black text-slate-500">
                         <tr>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">String</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Module</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">FF</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Rds (Ω)</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Uf (V)</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Date</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Audit</th>
+                            <th class="px-6 py-4">String</th>
+                            <th class="px-6 py-4">Voc (V)</th>
+                            <th class="px-6 py-4">Isc (A)</th>
+                            <th class="px-6 py-4">Pmax (W)</th>
+                            <th class="px-6 py-4">FF (%)</th>
                         </tr>
                     </thead>
-                    <tbody id="curvesBody">
+                    <tbody class="divide-y divide-slate-100" id="detailsTable">
+                        <!-- Data -->
                     </tbody>
                 </table>
             </div>
-            
-            <div id="noCurves" style="display: none;" class="text-center py-12">
-                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-                <p class="text-gray-600 font-semibold text-lg">Aucune courbe I-V trouvée</p>
-                <button onclick="showUploadModal()" class="btn-primary mt-4">
-                    <i class="fas fa-upload mr-2"></i>
-                    Upload Premier Fichier
-                </button>
-            </div>
+
         </div>
     </div>
-    
-    <!-- Modal Upload -->
-    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-xl p-8 max-w-2xl w-full mx-4">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">
-                    <i class="fas fa-upload text-blue-600 mr-2"></i>
-                    Upload Fichier PVServ
-                </h2>
-                <button onclick="closeUploadModal()" class="text-gray-500 hover:text-gray-800 text-2xl">
-                    <i class="fas fa-times"></i>
+
+    <!-- MODAL UPLOAD -->
+    <div id="uploadModal" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl font-black text-slate-800">Import Données</h3>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             
-            <form id="uploadForm" onsubmit="uploadPVServ(event)">
-                <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Audit Token *</label>
-                    <input type="text" id="uploadAuditToken" required placeholder="PV-1-XXXXX" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    <p class="text-sm text-gray-500 mt-1">Token de l'audit EL lié aux mesures</p>
+            <form id="uploadForm" class="p-8 space-y-6">
+                <div class="border-2 border-dashed border-blue-200 bg-blue-50 rounded-xl p-10 text-center hover:border-blue-400 transition-colors cursor-pointer relative">
+                    <input type="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <i class="fas fa-file-csv text-4xl text-blue-300 mb-3"></i>
+                    <p class="font-bold text-blue-800">Glisser un fichier CSV / PVServ</p>
+                    <p class="text-xs text-blue-500 mt-1">ou cliquer pour parcourir</p>
                 </div>
                 
-                <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Fichier PVServ (TXT ou XLSM) *</label>
-                    <input type="file" id="uploadFile" required accept=".txt,.xlsm" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                </div>
-                
-                <div class="flex space-x-4">
-                    <button type="button" onclick="closeUploadModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-bold hover:bg-gray-300">
-                        Annuler
-                    </button>
-                    <button type="submit" class="flex-1 btn-primary">
-                        <i class="fas fa-cloud-upload-alt mr-2"></i>
-                        Upload
-                    </button>
-                </div>
+                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition-all">
+                    IMPORTER
+                </button>
             </form>
-            
-            <div id="uploadProgress" style="display: none;" class="text-center py-8">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
-                <p class="text-gray-700 font-bold">Upload en cours...</p>
-            </div>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        let allCurves = [];
-        let ffChart = null;
-        
+        // --- STATE ---
+        let ivChart = null;
+
+        // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
-            loadCurves();
+            initChart();
+            loadMockData();
         });
-        
-        async function loadCurves() {
-            try {
-                document.getElementById('loadingSpinner').style.display = 'block';
-                document.getElementById('curvesTable').style.display = 'none';
-                document.getElementById('noCurves').style.display = 'none';
-                
-                const auditToken = document.getElementById('filterAuditToken').value;
-                const stringNum = document.getElementById('filterString').value;
-                const ffMin = parseFloat(document.getElementById('filterFFMin').value) || null;
-                
-                let url = '/api/iv-curves';
-                const params = [];
-                if (auditToken) params.push(\`auditToken=\${auditToken}\`);
-                if (stringNum) params.push(\`stringNumber=\${stringNum}\`);
-                if (params.length > 0) url += '?' + params.join('&');
-                
-                const response = await axios.get(url);
-                
-                if (response.data.success) {
-                    allCurves = response.data.curves || [];
-                    
-                    // Filtrer FF min côté client
-                    if (ffMin !== null) {
-                        allCurves = allCurves.filter(c => c.ff >= ffMin);
-                    }
-                    
-                    displayCurves(allCurves);
-                    updateStats(allCurves);
-                    updateChart(allCurves);
-                    populateStringFilter(allCurves);
-                }
-            } catch (error) {
-                console.error('Erreur chargement courbes:', error);
-                document.getElementById('loadingSpinner').style.display = 'none';
-                document.getElementById('noCurves').style.display = 'block';
-            }
-        }
-        
-        function displayCurves(curves) {
-            document.getElementById('loadingSpinner').style.display = 'none';
-            
-            if (curves.length === 0) {
-                document.getElementById('curvesTable').style.display = 'none';
-                document.getElementById('noCurves').style.display = 'block';
-                return;
-            }
-            
-            document.getElementById('curvesTable').style.display = 'block';
-            document.getElementById('noCurves').style.display = 'none';
-            document.getElementById('curveCount').textContent = \`(\${curves.length} courbe(s))\`;
-            
-            const tbody = document.getElementById('curvesBody');
-            tbody.innerHTML = curves.map(c => \`
-                <tr class="border-t border-gray-200 hover:bg-gray-50">
-                    <td class="px-4 py-3 font-bold text-blue-600">String \${c.string_number}</td>
-                    <td class="px-4 py-3">\${c.module_number || '-'}</td>
-                    <td class="px-4 py-3">
-                        <span class="conformity-badge \${c.ff >= 0.7 ? 'conformity-ok' : 'conformity-warning'}">
-                            \${c.ff.toFixed(3)}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">\${c.rds.toFixed(2)}</td>
-                    <td class="px-4 py-3">\${c.uf.toFixed(2)}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">\${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
-                    <td class="px-4 py-3 text-sm font-mono text-gray-600">\${c.audit_token.substring(0, 12)}...</td>
-                </tr>
-            \`).join('');
-        }
-        
-        function updateStats(curves) {
-            if (curves.length === 0) return;
-            
-            const avgFF = curves.reduce((sum, c) => sum + c.ff, 0) / curves.length;
-            const avgRds = curves.reduce((sum, c) => sum + c.rds, 0) / curves.length;
-            const outOfTol = curves.filter(c => c.ff < 0.7).length;
-            
-            document.getElementById('totalCurves').textContent = curves.length;
-            document.getElementById('avgFF').textContent = avgFF.toFixed(3);
-            document.getElementById('avgRds').textContent = avgRds.toFixed(2);
-            document.getElementById('outOfTolerance').textContent = outOfTol;
-        }
-        
-        function updateChart(curves) {
-            if (curves.length === 0) return;
-            
-            // Grouper par string
-            const byString = {};
-            curves.forEach(c => {
-                if (!byString[c.string_number]) byString[c.string_number] = [];
-                byString[c.string_number].push(c.ff);
-            });
-            
-            const strings = Object.keys(byString).sort((a, b) => parseInt(a) - parseInt(b));
-            const avgFFs = strings.map(s => {
-                const ffs = byString[s];
-                return ffs.reduce((sum, ff) => sum + ff, 0) / ffs.length;
-            });
-            
-            const ctx = document.getElementById('ffChart');
-            if (ffChart) ffChart.destroy();
-            
-            ffChart = new Chart(ctx, {
-                type: 'bar',
+
+        // --- CHART ---
+        function initChart() {
+            const ctx = document.getElementById('ivChart').getContext('2d');
+            ivChart = new Chart(ctx, {
+                type: 'line',
                 data: {
-                    labels: strings.map(s => \`String \${s}\`),
-                    datasets: [{
-                        label: 'Fill Factor Moyen',
-                        data: avgFFs,
-                        backgroundColor: 'rgba(37, 99, 235, 0.8)',
-                        borderColor: 'rgb(37, 99, 235)',
-                        borderWidth: 2
-                    }]
+                    labels: [0, 100, 200, 300, 400, 500, 600, 700, 800],
+                    datasets: [
+                        {
+                            label: 'String 1 (Ref)',
+                            data: [10, 9.9, 9.8, 9.7, 9.5, 9.0, 7.5, 4.0, 0],
+                            borderColor: '#2563eb',
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'String 2 (Mesure)',
+                            data: [9.8, 9.7, 9.6, 9.5, 9.3, 8.5, 6.0, 2.0, 0],
+                            borderColor: '#ef4444',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom' } },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 1,
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toFixed(2);
-                                }
-                            }
-                        }
+                        x: { title: { display: true, text: 'Voltage (V)' } },
+                        y: { title: { display: true, text: 'Current (A)' } }
                     }
                 }
             });
         }
-        
-        function populateStringFilter(curves) {
-            const strings = [...new Set(curves.map(c => c.string_number))].sort((a, b) => a - b);
-            const select = document.getElementById('filterString');
-            const currentValue = select.value;
-            
-            select.innerHTML = '<option value="">Tous les strings</option>' + 
-                strings.map(s => \`<option value="\${s}">String \${s}</option>\`).join('');
-            
-            if (currentValue) select.value = currentValue;
-        }
-        
-        function resetFilters() {
-            document.getElementById('filterString').value = '';
-            document.getElementById('filterFFMin').value = '';
-            document.getElementById('filterAuditToken').value = '';
-            loadCurves();
-        }
-        
-        function showUploadModal() {
-            document.getElementById('uploadModal').classList.remove('hidden');
-        }
-        
-        function closeUploadModal() {
-            document.getElementById('uploadModal').classList.add('hidden');
-            document.getElementById('uploadForm').reset();
-        }
-        
-        async function uploadPVServ(event) {
-            event.preventDefault();
-            
-            const auditToken = document.getElementById('uploadAuditToken').value;
-            const file = document.getElementById('uploadFile').files[0];
-            
-            if (!file) {
-                alert('Veuillez sélectionner un fichier');
-                return;
+
+        // --- MOCK DATA ---
+        function loadMockData() {
+            document.getElementById('totalCurves').textContent = '24';
+            document.getElementById('avgFF').textContent = '78%';
+            document.getElementById('avgRds').textContent = '0.45';
+            document.getElementById('outOfTolerance').textContent = '2';
+
+            const list = document.getElementById('curvesList');
+            list.innerHTML = '';
+            for(let i=1; i<=10; i++) {
+                list.innerHTML += \`
+                    <div class="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">S\${i}</div>
+                            <div>
+                                <div class="font-bold text-slate-700 text-sm">String 0\${i}</div>
+                                <div class="text-xs text-slate-400">10:4\${i} AM</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-slate-800 text-sm">78.5%</div>
+                            <div class="text-[10px] text-green-500 font-bold">OK</div>
+                        </div>
+                    </div>
+                \`;
             }
-            
-            try {
-                document.getElementById('uploadForm').style.display = 'none';
-                document.getElementById('uploadProgress').style.display = 'block';
-                
-                const text = await file.text();
-                
-                const response = await axios.post('/api/iv-curves/upload', {
-                    auditToken,
-                    fileContent: text,
-                    fileName: file.name
-                });
-                
-                if (response.data.success) {
-                    alert(\`Upload réussi !\\n\${response.data.curvesCount} courbes importées\`);
-                    closeUploadModal();
-                    document.getElementById('uploadForm').style.display = 'block';
-                    document.getElementById('uploadProgress').style.display = 'none';
-                    loadCurves();
-                } else {
-                    throw new Error(response.data.error || 'Erreur upload');
-                }
-            } catch (error) {
-                console.error('Erreur upload:', error);
-                alert('Erreur upload: ' + (error.response?.data?.error || error.message));
-                document.getElementById('uploadForm').style.display = 'block';
-                document.getElementById('uploadProgress').style.display = 'none';
-            }
+
+            const table = document.getElementById('detailsTable');
+            table.innerHTML = \`
+                <tr class="hover:bg-slate-50">
+                    <td class="px-6 py-4 font-bold text-slate-700">String 01</td>
+                    <td class="px-6 py-4">820 V</td>
+                    <td class="px-6 py-4">9.8 A</td>
+                    <td class="px-6 py-4 font-bold text-slate-900">6.2 kW</td>
+                    <td class="px-6 py-4"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">78.2%</span></td>
+                </tr>
+                <tr class="hover:bg-slate-50">
+                    <td class="px-6 py-4 font-bold text-slate-700">String 02</td>
+                    <td class="px-6 py-4">815 V</td>
+                    <td class="px-6 py-4">9.6 A</td>
+                    <td class="px-6 py-4 font-bold text-slate-900">6.0 kW</td>
+                    <td class="px-6 py-4"><span class="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold">74.5%</span></td>
+                </tr>
+            \`;
         }
+
+        // --- MODAL ---
+        const modal = document.getElementById('uploadModal');
+        const modalContent = document.getElementById('modalContent');
+
+        window.openUploadModal = function() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        window.closeUploadModal = function() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Upload simulé !');
+            closeUploadModal();
+        });
+
     </script>
-    
-</body>
-</html>
   `;
+
+  return getLayout('Courbes I-V', content, 'audit-iv');
 }

@@ -1,243 +1,179 @@
-// Page Liste Projets/Sites CRM - Vue d'ensemble tous sites avec filtres
-// Navigation vers création, détail, édition
+import { getLayout } from './layout.js';
 
 export function getCrmProjectsListPage() {
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liste Sites/Projets - CRM DiagPV</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f8fafc; }
-        .project-row:hover { background: #f9fafb; }
-        .stat-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .badge-status { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
-        .badge-active { background: #dcfce7; color: #166534; }
-        .badge-completed { background: #dbeafe; color: #1e3a8a; }
-        .badge-pending { background: #fef3c7; color: #92400e; }
-    </style>
-</head>
-<body class="min-h-screen">
-
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="/" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <h1 class="text-2xl font-bold text-gray-900">
-                        <i class="fas fa-solar-panel text-blue-600 mr-2"></i>
-                        Gestion Sites / Projets
-                    </h1>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <a href="/crm/clients" class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-building mr-2"></i>
-                        Voir Clients
-                    </a>
-                    <a href="/crm/projects/create" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                        <i class="fas fa-plus mr-2"></i>
-                        Nouveau Site
-                    </a>
-                </div>
+  const content = `
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-3xl font-black text-slate-900 tracking-tight">Sites & Centrales</h2>
+                <p class="text-slate-500 mt-1 font-medium">Parc photovoltaïque géré et projets en cours</p>
             </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-600 text-sm font-medium">Total Sites</p>
-                        <p id="stat-total" class="text-3xl font-bold text-gray-900 mt-1">0</p>
-                    </div>
-                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg">
-                        <i class="fas fa-solar-panel text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-600 text-sm font-medium">Puissance Totale</p>
-                        <p id="stat-power" class="text-3xl font-bold text-gray-900 mt-1">0 kWp</p>
-                    </div>
-                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg">
-                        <i class="fas fa-bolt text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-600 text-sm font-medium">Modules Totaux</p>
-                        <p id="stat-modules" class="text-3xl font-bold text-gray-900 mt-1">0</p>
-                    </div>
-                    <div class="bg-green-100 text-green-600 p-3 rounded-lg">
-                        <i class="fas fa-layer-group text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-600 text-sm font-medium">Interventions</p>
-                        <p id="stat-interventions" class="text-3xl font-bold text-gray-900 mt-1">0</p>
-                    </div>
-                    <div class="bg-purple-100 text-purple-600 p-3 rounded-lg">
-                        <i class="fas fa-calendar-check text-2xl"></i>
-                    </div>
-                </div>
+            <div class="flex items-center gap-3">
+                <a href="/crm/clients" class="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
+                    <i class="fas fa-users mr-2 text-slate-400"></i>Voir les Clients
+                </a>
+                <a href="/crm/projects/create" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 transform hover:-translate-y-0.5 flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Nouveau Site
+                </a>
             </div>
         </div>
 
-        <!-- Filters & Search -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-search mr-1"></i>
-                        Rechercher
-                    </label>
-                    <input type="text" id="search-input" placeholder="Nom site, ville, client..." 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            
+            <!-- Total Sites -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-blue-300 transition-colors">
+                <div class="absolute right-0 top-0 h-full w-1 bg-blue-500"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-100 transition-colors">
+                        <i class="fas fa-solar-panel text-xl"></i>
+                    </div>
                 </div>
+                <div class="text-3xl font-black text-slate-900 mb-1" id="stat-total">...</div>
+                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Sites</div>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-building mr-1"></i>
-                        Client
-                    </label>
-                    <select id="filter-client" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <option value="">Tous les clients</option>
-                    </select>
+            <!-- Puissance Totale -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-yellow-300 transition-colors">
+                <div class="absolute right-0 top-0 h-full w-1 bg-yellow-500"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-yellow-50 rounded-xl text-yellow-600 group-hover:bg-yellow-100 transition-colors">
+                        <i class="fas fa-bolt text-xl"></i>
+                    </div>
                 </div>
+                <div class="text-3xl font-black text-slate-900 mb-1" id="stat-power">...</div>
+                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Puissance Installée</div>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Statut
-                    </label>
-                    <select id="filter-status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <option value="">Tous les statuts</option>
-                        <option value="active">Actif</option>
-                        <option value="completed">Terminé</option>
-                        <option value="pending">En attente</option>
-                    </select>
+            <!-- Modules -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-green-300 transition-colors">
+                <div class="absolute right-0 top-0 h-full w-1 bg-green-500"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-green-50 rounded-xl text-green-600 group-hover:bg-green-100 transition-colors">
+                        <i class="fas fa-th text-xl"></i>
+                    </div>
                 </div>
+                <div class="text-3xl font-black text-slate-900 mb-1" id="stat-modules">...</div>
+                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Modules Diagnostiqués</div>
+            </div>
+
+            <!-- Interventions -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-purple-300 transition-colors">
+                <div class="absolute right-0 top-0 h-full w-1 bg-purple-500"></div>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-purple-50 rounded-xl text-purple-600 group-hover:bg-purple-100 transition-colors">
+                        <i class="fas fa-calendar-check text-xl"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-black text-slate-900 mb-1" id="stat-interventions">...</div>
+                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Missions Totales</div>
             </div>
         </div>
 
-        <!-- Projects Table -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <!-- Filters -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-4">
+            <div class="relative flex-1 w-full">
+                <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                <input type="text" id="search-input" placeholder="Nom du site, ville, client..." 
+                       class="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 font-medium">
+            </div>
+            
+            <div class="flex gap-4 w-full md:w-auto">
+                <select id="filter-client" class="px-4 py-3 bg-slate-50 border-none rounded-lg text-slate-700 font-bold focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[200px]">
+                    <option value="">Tous les clients</option>
+                    <!-- Populated by JS -->
+                </select>
+
+                <select id="filter-status" class="px-4 py-3 bg-slate-50 border-none rounded-lg text-slate-700 font-bold focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                    <option value="">Tous statuts</option>
+                    <option value="active">Actif</option>
+                    <option value="pending">En attente</option>
+                    <option value="completed">Terminé</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Nom du Site
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Client
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Localisation
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Puissance
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Modules
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Interventions
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Statut
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Actions
-                            </th>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200">
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Site / Projet</th>
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Client Propriétaire</th>
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Localisation</th>
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Technique</th>
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Statut</th>
+                            <th class="px-6 py-4 text-right text-xs font-black text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="projects-tbody" class="bg-white divide-y divide-gray-200">
-                        <!-- Populated by JS -->
+                    <tbody id="projects-tbody" class="divide-y divide-slate-100">
+                        <!-- Loading State -->
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <div class="inline-flex items-center text-slate-400 font-medium">
+                                    <i class="fas fa-circle-notch fa-spin mr-3 text-blue-500"></i>
+                                    Chargement des données...
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
 
             <!-- Empty State -->
-            <div id="empty-state" class="text-center py-12" style="display: none;">
-                <i class="fas fa-solar-panel text-gray-300 text-6xl mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Aucun site trouvé</h3>
-                <p class="text-gray-500 mb-6">Commencez par créer votre premier site</p>
-                <a href="/crm/projects/create" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-solar-panel text-slate-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-1">Aucun site trouvé</h3>
+                <p class="text-slate-500 max-w-sm mx-auto mb-6">Commencez par ajouter un nouveau site à la base de données.</p>
+                <a href="/crm/projects/create" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition">
                     <i class="fas fa-plus mr-2"></i>
                     Créer un site
                 </a>
             </div>
         </div>
 
-    </main>
+    </div>
 
     <script>
         let allProjects = [];
         let allClients = [];
         let allInterventions = [];
 
-        // Load all data
+        // --- INIT ---
         async function init() {
-            await Promise.all([
-                loadProjects(),
-                loadClients(),
-                loadInterventions()
-            ]);
+            try {
+                // Parallel Loading
+                const [projectsRes, clientsRes, interventionsRes] = await Promise.all([
+                    fetch('/api/crm/projects').then(r => r.json()),
+                    fetch('/api/crm/clients').then(r => r.json()),
+                    fetch('/api/planning/interventions').then(r => r.json())
+                ]);
 
-            populateClientFilter();
-            updateStats();
-            renderProjects();
-            setupFilters();
-        }
+                allProjects = projectsRes.projects || [];
+                allClients = clientsRes.clients || [];
+                allInterventions = interventionsRes.interventions || [];
 
-        async function loadProjects() {
-            const response = await fetch('/api/crm/projects');
-            if (response.ok) {
-                const data = await response.json();
-                allProjects = data.projects || [];
+                populateClientFilter();
+                updateStats();
+                renderProjects();
+                
+            } catch (err) {
+                console.error('Init Error:', err);
+                document.getElementById('projects-tbody').innerHTML = \`
+                    <tr><td colspan="6" class="px-6 py-8 text-center text-red-500 font-bold">Erreur de chargement des données.</td></tr>
+                \`;
             }
         }
 
-        async function loadClients() {
-            const response = await fetch('/api/crm/clients');
-            if (response.ok) {
-                const data = await response.json();
-                allClients = data.clients || [];
-            }
-        }
-
-        async function loadInterventions() {
-            const response = await fetch('/api/planning/interventions');
-            if (response.ok) {
-                const data = await response.json();
-                allInterventions = data.interventions || [];
-            }
-        }
-
+        // --- RENDERERS ---
         function populateClientFilter() {
             const select = document.getElementById('filter-client');
-            allClients.forEach(client => {
+            allClients.sort((a,b) => a.company_name.localeCompare(b.company_name)).forEach(client => {
                 const option = document.createElement('option');
                 option.value = client.id;
                 option.textContent = client.company_name;
@@ -246,26 +182,30 @@ export function getCrmProjectsListPage() {
         }
 
         function updateStats() {
+            // Total Sites
             document.getElementById('stat-total').textContent = allProjects.length;
 
+            // Total Power
             const totalPower = allProjects.reduce((sum, p) => sum + (parseFloat(p.total_power_kwp) || 0), 0);
-            document.getElementById('stat-power').textContent = totalPower.toFixed(2) + ' kWp';
+            document.getElementById('stat-power').textContent = totalPower.toLocaleString('fr-FR', {maximumFractionDigits: 1}) + ' kWc';
 
+            // Total Modules
             const totalModules = allProjects.reduce((sum, p) => sum + (parseInt(p.module_count) || 0), 0);
-            document.getElementById('stat-modules').textContent = totalModules;
+            document.getElementById('stat-modules').textContent = totalModules.toLocaleString('fr-FR');
 
+            // Total Interventions
             document.getElementById('stat-interventions').textContent = allInterventions.length;
         }
 
         function renderProjects() {
             const tbody = document.getElementById('projects-tbody');
             const emptyState = document.getElementById('empty-state');
-
+            
             const searchTerm = document.getElementById('search-input').value.toLowerCase();
             const filterClient = document.getElementById('filter-client').value;
             const filterStatus = document.getElementById('filter-status').value;
 
-            let filtered = allProjects.filter(project => {
+            const filtered = allProjects.filter(project => {
                 const client = allClients.find(c => c.id === project.client_id);
                 const clientName = client ? client.company_name : '';
 
@@ -282,69 +222,81 @@ export function getCrmProjectsListPage() {
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '';
-                emptyState.style.display = 'block';
+                tbody.parentElement.classList.add('hidden');
+                emptyState.classList.remove('hidden');
                 return;
             }
 
-            emptyState.style.display = 'none';
+            tbody.parentElement.classList.remove('hidden');
+            emptyState.classList.add('hidden');
 
             tbody.innerHTML = filtered.map(project => {
                 const client = allClients.find(c => c.id === project.client_id);
-                const clientName = client ? client.company_name : 'N/A';
-                
+                const clientName = client ? client.company_name : 'Client inconnu';
                 const interventionsCount = allInterventions.filter(i => i.project_id === project.id).length;
 
-                const statusClass = project.status === 'active' ? 'badge-active' : 
-                                   project.status === 'completed' ? 'badge-completed' : 'badge-pending';
-
                 return \`
-                    <tr class="project-row">
+                    <tr class="group hover:bg-blue-50/30 transition-colors cursor-pointer border-b last:border-0 border-slate-100"
+                        onclick="window.location.href='/crm/projects/detail?id=\${project.id}'">
+                        
+                        <!-- Nom Site -->
                         <td class="px-6 py-4">
-                            <div class="flex items-center">
-                                <i class="fas fa-solar-panel text-blue-600 mr-3"></i>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 text-lg flex-shrink-0">
+                                    <i class="fas fa-solar-panel"></i>
+                                </div>
                                 <div>
-                                    <p class="font-semibold text-gray-900">\${project.name || project.project_name}</p>
-                                    <p class="text-xs text-gray-500">Créé le \${new Date(project.created_at).toLocaleDateString('fr-FR')}</p>
+                                    <div class="font-bold text-slate-900">\${project.name || project.project_name}</div>
+                                    <div class="text-xs text-slate-400">Ajouté le \${new Date(project.created_at).toLocaleDateString('fr-FR')}</div>
                                 </div>
                             </div>
                         </td>
+
+                        <!-- Client -->
                         <td class="px-6 py-4">
-                            <a href="/crm/clients/detail?id=\${project.client_id}" class="text-blue-600 hover:underline">
+                            <div class="text-sm font-bold text-slate-700 hover:text-blue-600 transition-colors" onclick="event.stopPropagation(); window.location.href='/crm/clients/detail?id=\${project.client_id}'">
                                 \${clientName}
-                            </a>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-700">
-                            \${project.address_city || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-700">
-                            <i class="fas fa-bolt text-yellow-500 mr-1"></i>
-                            \${project.total_power_kwp || 'N/A'} kWp
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-700">
-                            <i class="fas fa-layer-group text-green-500 mr-1"></i>
-                            \${project.module_count || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-700">
-                            <i class="fas fa-calendar-check text-purple-500 mr-1"></i>
-                            \${interventionsCount}
-                        </td>
+
+                        <!-- Localisation -->
                         <td class="px-6 py-4">
-                            <span class="badge-status \${statusClass}">
-                                \${project.status || 'pending'}
-                            </span>
+                            <div class="text-sm text-slate-600">
+                                <i class="fas fa-map-marker-alt text-slate-300 mr-1.5"></i>
+                                \${project.address_city || 'N/A'}
+                            </div>
                         </td>
+
+                        <!-- Technique -->
                         <td class="px-6 py-4">
-                            <div class="flex items-center space-x-2">
-                                <a href="/crm/projects/detail?id=\${project.id}" 
-                                   class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                                    <i class="fas fa-eye mr-1"></i>
-                                    Voir
-                                </a>
-                                <a href="/crm/projects/edit?id=\${project.id}" 
-                                   class="text-gray-600 hover:text-gray-700 text-sm font-medium">
-                                    <i class="fas fa-edit mr-1"></i>
-                                    Modifier
-                                </a>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs font-medium text-slate-600">
+                                    <i class="fas fa-bolt text-amber-500 w-4"></i>
+                                    \${project.total_power_kwp || '-'} kWc
+                                </span>
+                                <span class="text-xs font-medium text-slate-600">
+                                    <i class="fas fa-th text-slate-400 w-4"></i>
+                                    \${project.module_count || '-'} modules
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- Statut -->
+                        <td class="px-6 py-4">
+                            \${getStatusBadge(project.status)}
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="px-6 py-4 text-right">
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-2">
+                                <button onclick="event.stopPropagation(); window.location.href='/crm/projects/edit?id=\${project.id}'" 
+                                        class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Modifier">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); deleteProject(\${project.id})" 
+                                        class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Supprimer">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -352,17 +304,39 @@ export function getCrmProjectsListPage() {
             }).join('');
         }
 
-        function setupFilters() {
-            document.getElementById('search-input').addEventListener('input', renderProjects);
-            document.getElementById('filter-client').addEventListener('change', renderProjects);
-            document.getElementById('filter-status').addEventListener('change', renderProjects);
+        function getStatusBadge(status) {
+            const styles = {
+                'active': 'bg-green-100 text-green-700 border-green-200',
+                'pending': 'bg-amber-100 text-amber-700 border-amber-200',
+                'completed': 'bg-blue-100 text-blue-700 border-blue-200'
+            };
+            const labels = {
+                'active': 'Actif',
+                'pending': 'En attente',
+                'completed': 'Terminé'
+            };
+            const style = styles[status] || styles['pending'];
+            const label = labels[status] || status;
+
+            return \`<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border \${style}">\${label}</span>\`;
         }
 
-        // Initialize
+        // --- ACTIONS ---
+        async function deleteProject(id) {
+            if(!confirm('Attention ! Suppression irréversible.\\n\\nConfirmer ?')) return;
+            // TODO: Implement delete API call
+            alert('Fonctionnalité de suppression à implémenter (API)');
+        }
+
+        // --- LISTENERS ---
+        document.getElementById('search-input').addEventListener('input', renderProjects);
+        document.getElementById('filter-client').addEventListener('change', renderProjects);
+        document.getElementById('filter-status').addEventListener('change', renderProjects);
+
+        // START
         init();
     </script>
-
-</body>
-</html>
   `;
+
+  return getLayout('Sites & Projets', content, 'projects');
 }

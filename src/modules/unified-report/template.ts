@@ -404,6 +404,33 @@ export function generateReportHTML(data: UnifiedReportData): string {
     </div>
     ` : ''}
 
+    <!-- NOTES DE TERRAIN -->
+    ${data.fieldNotes && data.fieldNotes.length > 0 ? `
+    <div class="page">
+        <h2 class="numbered-section text-2xl font-bold mb-8 text-gray-900 flex items-center">
+            <span class="w-8 h-8 bg-gray-600 text-white rounded flex items-center justify-center text-sm mr-3 shadow-lg">
+                <i class="fas fa-microphone-alt"></i>
+            </span>
+            NOTES DE TERRAIN & DICTÉE VOCALE
+        </h2>
+        
+        <div class="space-y-4">
+            ${data.fieldNotes.map(note => `
+            <div class="bg-gray-50 border-l-4 border-blue-500 p-4 rounded-r-lg shadow-sm no-break">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <i class="fas fa-user-clock mr-1"></i>
+                        ${new Date(note.createdAt).toLocaleString('fr-FR')} 
+                        ${note.technicianId ? `• Tech: ${note.technicianId}` : ''}
+                    </span>
+                </div>
+                <p class="text-gray-800 italic leading-relaxed">"${note.content}"</p>
+            </div>
+            `).join('')}
+        </div>
+    </div>
+    ` : ''}
+
     <!-- MODULE COURBES I-V -->
     ${data.ivModule.hasData ? `
     <div class="page">

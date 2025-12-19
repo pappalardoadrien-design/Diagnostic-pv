@@ -1031,6 +1031,65 @@ auditsRouter.get('/:token/report', async (c) => {
 })
 
 // ============================================================================
+// POST /api/el/audit/:token/notes - Ajouter une note (vocale ou texte)
+// ============================================================================
+auditsRouter.post('/:token/notes', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  const { content, technicianId } = await c.req.json()
+
+  if (!content) {
+    return c.json({ error: 'Contenu note requis' }, 400)
+  }
+
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO el_audit_notes (audit_token, content, technician_id)
+      VALUES (?, ?, ?)
+    `).bind(token, content, technicianId || null).run()
+
+    return c.json({
+      success: true,
+      noteId: result.meta.last_row_id,
+      message: 'Note ajoutée avec succès'
+    })
+  } catch (error: any) {
+    console.error('Erreur ajout note:', error)
+    return c.json({ 
+      error: 'Erreur lors de l\'ajout de la note',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
+// GET /api/el/audit/:token/notes - Récupérer les notes d'un audit
+// ============================================================================
+auditsRouter.get('/:token/notes', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+
+  try {
+    const notes = await env.DB.prepare(`
+      SELECT * FROM el_audit_notes 
+      WHERE audit_token = ? 
+      ORDER BY created_at DESC
+    `).bind(token).all()
+
+    return c.json({
+      success: true,
+      notes: notes.results
+    })
+  } catch (error: any) {
+    console.error('Erreur récupération notes:', error)
+    return c.json({ 
+      error: 'Erreur récupération notes',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
 // IMPORT ET MONTAGE ROUTES MODULES SOUS /:token
 // ============================================================================
 import modulesRouter from './modules'

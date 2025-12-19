@@ -25,6 +25,10 @@ class DiagPVAudit {
         // Propriétés affichage
         this.viewMode = 'string' // 'string' ou 'physical'
         
+        // Propriétés Assistant Vocal
+        this.isListening = false
+        this.recognition = null
+        
         this.init()
     }
 
@@ -37,6 +41,7 @@ class DiagPVAudit {
             this.setupEventListeners()
             this.setupRealtimeSync()
             this.setupOfflineSupport()
+            this.setupVoiceAssistant() // Nouveau module vocal
         } catch (err) {
             errorAudit('Erreur initialisation:', err)
             this.showAlert('Erreur chargement audit: ' + err.message, 'error')
@@ -67,6 +72,33 @@ class DiagPVAudit {
         this.updateProgress()
         this.renderStringNavigation()
         this.renderModulesGrid()
+        
+        // Ajout du bouton micro flottant
+        this.renderVoiceButton()
+    }
+    
+    renderVoiceButton() {
+        const btn = document.createElement('button')
+        btn.id = 'voiceAssistantBtn'
+        btn.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-20 h-20 rounded-full bg-blue-600 text-white shadow-2xl flex items-center justify-center transition-all active:scale-95 border-4 border-white'
+        btn.innerHTML = '<i class="fas fa-microphone text-3xl"></i>'
+        btn.title = "Maintenir pour parler (Push-to-Talk)"
+        document.body.appendChild(btn)
+        
+        // Styles d'animation d'écoute
+        const style = document.createElement('style')
+        style.textContent = `
+            @keyframes pulse-ring {
+                0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+                70% { box-shadow: 0 0 0 20px rgba(37, 99, 235, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+            }
+            .listening-mode {
+                background-color: #ef4444 !important; /* Rouge quand écoute */
+                animation: pulse-ring 1.5s infinite;
+            }
+        `
+        document.head.appendChild(style)
     }
 
     renderStringNavigation() {
@@ -317,6 +349,180 @@ class DiagPVAudit {
         // Gestion toucher/glisser pour navigation rapide
         this.setupTouchGestures()
     }
+
+    // ============================================================================
+    // ASSISTANT VOCAL (PUSH-TO-TALK)
+    // ============================================================================
+    
+    setupVoiceAssistant() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            this.showAlert("Assistant vocal non supporté sur ce navigateur", "warning")
+            return
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        this.recognition = new SpeechRecognition()
+        this.recognition.lang = 'fr-FR'
+        this.recognition.continuous = false // Arrête d'écouter quand on lâche
+        this.recognition.interimResults = false
+
+        const btn = document.getElementById('voiceAssistantBtn')
+        
+        // PUSH-TO-TALK LOGIC
+        
+        // 1. Appui (Start)
+        const startListening = (e) => {
+            e.preventDefault()
+            if (this.isListening) return
+            
+            try {
+                this.recognition.start()
+                this.isListening = true
+                btn.classList.add('listening-mode')
+                btn.innerHTML = '<i class="fas fa-wave-square text-3xl"></i>'
+                // Petit retour haptique
+                if (navigator.vibrate) navigator.vibrate(50)
+            } catch (err) {
+                console.error("Erreur start voice:", err)
+            }
+        }
+
+        // 2. Relâchement (Stop)
+        const stopListening = (e) => {
+            e.preventDefault()
+            if (!this.isListening) return
+            
+            this.recognition.stop()
+            this.isListening = false
+            btn.classList.remove('listening-mode')
+            btn.innerHTML = '<i class="fas fa-microphone text-3xl"></i>'
+        }
+
+        // Mouse events
+        btn.addEventListener('mousedown', startListening)
+        btn.addEventListener('mouseup', stopListening)
+        btn.addEventListener('mouseleave', stopListening) // Si on sort du bouton
+
+        // Touch events (Mobile)
+        btn.addEventListener('touchstart', startListening)
+        btn.addEventListener('touchend', stopListening)
+
+        // 3. Résultat
+        this.recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript.toLowerCase().trim()
+            logAudit('🎤 Voix reçue:', transcript)
+            this.processVoiceCommand(transcript)
+        }
+
+        this.recognition.onerror = (event) => {
+            logAudit('🎤 Erreur voix:', event.error)
+            this.isListening = false
+            btn.classList.remove('listening-mode')
+            btn.innerHTML = '<i class="fas fa-microphone-slash text-3xl"></i>'
+            setTimeout(() => btn.innerHTML = '<i class="fas fa-microphone text-3xl"></i>', 1000)
+        }
+    }
+
+    processVoiceCommand(text) {
+        // Nettoyage texte (suppression "euuuh", ponctuation)
+        text = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+        
+        // Regex pour détecter commande de grille : "String 2 Panneau 6 HS"
+        // Accepte: "String 2", "Chaîne 2", "Rangée 2" ... "Panneau 6", "Module 6"
+        const gridRegex = /(string|chaîne|rangée)\s*(\d+).*?(panneau|module)\s*(\d+)\s*(.*)/i
+        const match = text.match(gridRegex)
+
+        if (match) {
+            // MODE SNIPER (COMMANDE GRILLE)
+            const stringNum = parseInt(match[2])
+            const modulePos = parseInt(match[4])
+            const command = match[5].trim()
+
+            // Trouver le module ID correspondant
+            const module = Array.from(this.modules.values()).find(m => 
+                m.string_number === stringNum && 
+                m.position_in_string === modulePos
+            )
+
+            if (module) {
+                // Déduire statut
+                const status = this.parseVoiceStatus(command)
+                if (status) {
+                    // Action !
+                    this.selectedModule = module
+                    this.selectedStatus = status
+                    
+                    // Simuler validation (ajouter commentaire auto ?)
+                    document.getElementById('moduleComment').value = "Commande vocale: " + command
+                    this.validateModuleStatus() // Utilise la fonction existante robuste
+                    
+                    this.showAlert(`🎤 S${stringNum}.${modulePos} → ${command.toUpperCase()}`, 'success')
+                } else {
+                    this.showAlert(`❓ Statut "${command}" non reconnu`, 'warning')
+                }
+            } else {
+                this.showAlert(`❌ Module S${stringNum} P${modulePos} introuvable`, 'error')
+            }
+
+        } else {
+            // MODE DICTAPHONE (NOTE GÉNÉRALE)
+            // Tout ce qui n'est pas une commande grille est une note
+            this.addGeneralVoiceNote(text)
+        }
+    }
+
+    parseVoiceStatus(command) {
+        if (command.includes('hs') || command.includes('mort') || command.includes('dead') || command.includes('cassé')) return 'dead'
+        if (command.includes('inégalité') || command.includes('jaune') || command.includes('différence')) return 'inequality'
+        if (command.includes('micro') || command.includes('fissure') || command.includes('orange')) return 'microcracks'
+        if (command.includes('ouvert') || command.includes('coupé') || command.includes('bleu')) return 'string_open'
+        if (command.includes('ok') || command.includes('bon') || command.includes('ras') || command.includes('vert')) return 'ok'
+        return null
+    }
+
+    async addGeneralVoiceNote(text) {
+        logAudit('📝 Note vocale détectée:', text)
+        this.showAlert('⏳ Enregistrement note...', 'info')
+        
+        try {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: text,
+                    technicianId: this.technicianId
+                })
+            })
+
+            if (!response.ok) throw new Error('Erreur sauvegarde note')
+
+            this.showAlert(`📝 Note enregistrée : "${text}"`, 'success')
+            
+            // Feedback sonore
+            if (window.speechSynthesis) {
+                const utterance = new SpeechSynthesisUtterance("Note enregistrée");
+                utterance.lang = 'fr-FR';
+                window.speechSynthesis.speak(utterance);
+            }
+
+        } catch (err) {
+            errorAudit('Erreur note vocale:', err)
+            // Fallback localStorage en cas d'erreur réseau
+            let notes = JSON.parse(localStorage.getItem(`voice_notes_${this.auditToken}`) || '[]')
+            notes.push({
+                text: text,
+                date: new Date().toISOString(),
+                technician: this.technicianId,
+                synced: false
+            })
+            localStorage.setItem(`voice_notes_${this.auditToken}`, JSON.stringify(notes))
+            this.showAlert(`💾 Note sauvegardée HORS LIGNE`, 'warning')
+        }
+    }
+
+    // ============================================================================
+    // FIN ASSISTANT VOCAL
+    // ============================================================================
 
     openModuleModal(moduleId) {
         logAudit('📝 Ouverture modal pour module:', moduleId)

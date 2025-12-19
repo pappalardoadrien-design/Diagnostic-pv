@@ -1,608 +1,366 @@
-// ============================================================================
-// PAGE CRÉATION AUDIT MULTI-MODULES - UNIFIED FLOW
-// ============================================================================
-// Flux unifié : CRM (Maître) -> Audit (Esclave)
-// L'utilisateur sélectionne une intervention et visualise la config héritée.
-// ============================================================================
+import { getLayout } from './layout.js';
 
 export function getAuditsCreatePage() {
-  return `
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Créer Audit Multi-Modules - Diagnostic PV</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <link href="/static/diagpv-styles.css" rel="stylesheet">
-    </head>
-    <body class="bg-black text-white min-h-screen font-bold">
-        <div class="container mx-auto p-6">
-            <!-- En-tête -->
-            <div class="mb-6">
-                <a href="/crm/dashboard" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
-                    <i class="fas fa-arrow-left mr-2"></i>
-                    Retour au Dashboard
-                </a>
+  const content = `
+    <div class="max-w-3xl mx-auto">
+        <!-- HEADER -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 shadow-lg shadow-green-200 mb-4">
+                <i class="fas fa-rocket text-2xl text-white"></i>
             </div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Nouvelle Mission</h1>
+            <p class="text-slate-500 font-medium">Lancer une séquence d'audit terrain</p>
+        </div>
+
+        <!-- WIZARD CARD -->
+        <div class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden relative">
             
-            <header class="mb-8 text-center">
-                <div class="inline-flex items-center mb-4">
-                    <i class="fas fa-plus-circle text-5xl text-green-400 mr-4"></i>
-                    <h1 class="text-4xl font-black">CRÉER NOUVEL AUDIT</h1>
-                </div>
-                <p class="text-xl text-gray-300">Flux Unifié : CRM &rarr; Audit</p>
-            </header>
-            
-            <div class="max-w-4xl mx-auto">
-                <!-- Sélection du mode -->
-                <div class="bg-gray-900 rounded-lg p-6 border-2 border-yellow-400 mb-8">
-                    <h2 class="text-2xl font-black mb-6 text-center">
-                        <i class="fas fa-cog mr-2 text-yellow-400"></i>
-                        MODE DE CRÉATION
+            <!-- PROGRESS BAR -->
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-slate-100">
+                <div class="h-full bg-gradient-to-r from-green-400 to-emerald-500 w-1/3 transition-all duration-500" id="progress-bar"></div>
+            </div>
+
+            <form id="createAuditForm" class="p-8">
+                
+                <!-- STEP 1 : CIBLE -->
+                <div id="step-1" class="step-content">
+                    <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm mr-3 font-black">1</span>
+                        Quel site auditer ?
                     </h2>
                     
-                    <div class="grid md:grid-cols-3 gap-6">
-                        <button id="btn-mode-intervention" class="mode-btn active bg-gradient-to-br from-purple-900 to-purple-700 rounded-lg p-8 border-4 border-purple-400 hover:scale-105 transition-transform duration-200 shadow-2xl">
-                            <i class="fas fa-calendar-check text-5xl text-purple-200 mb-4"></i>
-                            <h3 class="text-2xl font-black mb-2">DEPUIS INTERVENTION</h3>
-                            <p class="text-purple-200">Hérite automatiquement la config PV du site (CRM)</p>
-                        </button>
+                    <div class="space-y-4">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Intervention ou Projet</label>
+                        <div class="relative group">
+                            <i class="fas fa-search absolute left-4 top-4 text-slate-400 group-hover:text-green-500 transition-colors"></i>
+                            <select id="intervention_id" class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-green-500 focus:bg-white outline-none font-bold text-slate-700 transition-all cursor-pointer appearance-none">
+                                <option value="">Chargement des dossiers...</option>
+                            </select>
+                            <div class="absolute right-4 top-4 pointer-events-none text-slate-400">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                        </div>
                         
-                        <button id="btn-mode-manual" class="mode-btn bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-600 hover:scale-105 transition-transform duration-200 opacity-75">
-                            <i class="fas fa-keyboard text-5xl text-gray-400 mb-4"></i>
-                            <h3 class="text-2xl font-black mb-2">SAISIE SIMPLE</h3>
-                            <p class="text-gray-400">Configuration uniforme</p>
-                        </button>
-                        
-                        <button id="btn-mode-advanced" class="mode-btn bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg p-8 border-4 border-gray-600 hover:scale-105 transition-transform duration-200 opacity-75">
-                            <i class="fas fa-cogs text-5xl text-gray-400 mb-4"></i>
-                            <h3 class="text-2xl font-black mb-2">CONFIG AVANCÉE</h3>
-                            <p class="text-gray-400">Strings non uniformes</p>
-                        </button>
+                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                            <p class="text-sm text-blue-700 font-medium">
+                                Sélectionnez une intervention planifiée pour lier automatiquement le rapport au planning.
+                                Sinon, choisissez un projet pour un audit inopiné.
+                            </p>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Formulaire -->
-                <form id="createAuditForm" class="space-y-8">
-                    <!-- OPTION A : Depuis intervention -->
-                    <div id="form-intervention" class="bg-gray-900 rounded-lg p-6 border-2 border-purple-400">
-                        <h3 class="text-xl font-black mb-4 text-purple-400">
-                            <i class="fas fa-calendar-check mr-2"></i>
-                            SÉLECTIONNER UNE INTERVENTION
-                        </h3>
-                        
-                        <div class="mb-6">
-                            <label class="block text-lg font-bold mb-2">Intervention :</label>
-                            <select id="intervention_id" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-purple-400 focus:outline-none">
-                                <option value="">Chargement...</option>
-                            </select>
-                        </div>
 
-                        <!-- PREVIEW CONFIGURATION -->
-                        <div id="config-preview" class="hidden">
-                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
-                                <h4 class="text-lg font-bold text-gray-300 mb-3 border-b border-gray-600 pb-2">
-                                    <i class="fas fa-info-circle mr-2"></i> Configuration détectée (CRM)
-                                </h4>
-                                <div id="config-details" class="grid grid-cols-2 gap-4 text-sm">
-                                    <!-- Rempli par JS -->
-                                </div>
-                                <div id="config-strings-preview" class="mt-4 p-3 bg-black rounded border border-gray-700 text-xs font-mono text-green-400">
-                                    <!-- Rempli par JS -->
-                                </div>
-                                <div id="config-warning" class="hidden mt-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">
-                                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                                    Aucune configuration technique trouvée dans le projet. L'audit sera créé vide.
+                <!-- STEP 2 : TECHNIQUE (AUTO) -->
+                <div id="step-2" class="step-content hidden opacity-0 transition-all duration-300 transform translate-y-4">
+                    <div class="my-8 border-t border-slate-100"></div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm mr-3 font-black">2</span>
+                        Vérification Technique
+                    </h2>
+
+                    <div id="config-card" class="bg-slate-50 rounded-xl p-5 border border-slate-200 transition-all">
+                        <div class="flex items-start gap-4">
+                            <div id="config-icon" class="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center text-2xl shadow-sm flex-shrink-0">
+                                <i class="fas fa-cog text-slate-400"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h4 id="project-name-display" class="font-black text-slate-800 text-lg truncate">...</h4>
+                                <div id="config-details" class="text-sm text-slate-500 mt-1 space-y-1 font-medium">
+                                    <!-- JS Filled -->
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- OPTION B : Saisie manuelle simple -->
-                    <div id="form-manual" class="bg-gray-900 rounded-lg p-6 border-2 border-gray-600 hidden">
-                        <h3 class="text-xl font-black mb-4 text-gray-400">
-                            <i class="fas fa-keyboard mr-2"></i>
-                            SAISIE SIMPLE (Strings uniformes)
-                        </h3>
                         
-                        <div class="space-y-4">
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Nom du projet :</label>
-                                    <input type="text" id="project_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Centrale PV Toulouse">
-                                </div>
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Client :</label>
-                                    <input type="text" id="client_name" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Engie">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Localisation :</label>
-                                <input type="text" id="location" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 31000 Toulouse">
-                            </div>
-                            
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Nombre de strings :</label>
-                                    <input type="number" id="stringCount" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 10">
-                                </div>
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Modules par string :</label>
-                                    <input type="number" id="modulesPerString" min="1" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 20">
-                                </div>
-                            </div>
+                        <!-- Warning Auto -->
+                        <div id="config-warning" class="hidden mt-4 bg-amber-50 text-amber-800 text-xs font-bold p-3 rounded-lg border border-amber-200 flex items-center gap-3">
+                            <i class="fas fa-exclamation-triangle text-xl"></i>
+                            <span>Configuration technique incomplète. Une grille par défaut sera générée.</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- STEP 3 : OUTILS -->
+                <div id="step-3" class="step-content hidden opacity-0 transition-all duration-300 transform translate-y-4">
+                    <div class="my-8 border-t border-slate-100"></div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm mr-3 font-black">3</span>
+                        Outils à activer
+                    </h2>
                     
-                    <!-- OPTION C : Configuration avancée (strings non uniformes) -->
-                    <div id="form-advanced" class="bg-gray-900 rounded-lg p-6 border-2 border-gray-600 hidden">
-                        <h3 class="text-xl font-black mb-4 text-yellow-400">
-                            <i class="fas fa-cogs mr-2"></i>
-                            CONFIGURATION AVANCÉE (Strings non uniformes)
-                        </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- EL -->
+                        <label class="cursor-pointer relative group">
+                            <input type="checkbox" name="modules" value="EL" checked class="peer sr-only">
+                            <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-slate-300 transition-all h-full flex flex-col items-center text-center">
+                                <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-moon"></i>
+                                </div>
+                                <span class="font-bold text-slate-700 text-sm peer-checked:text-purple-800">Électro (EL)</span>
+                            </div>
+                            <div class="absolute top-3 right-3 text-purple-500 opacity-0 peer-checked:opacity-100 transition-opacity">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </label>
                         
-                        <div class="space-y-4">
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Nom du projet :</label>
-                                    <input type="text" id="project_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Centrale PV Toulouse">
+                        <!-- Thermographie -->
+                        <label class="cursor-pointer relative group">
+                            <input type="checkbox" name="modules" value="THERMO" class="peer sr-only">
+                            <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-red-500 peer-checked:bg-red-50 hover:border-slate-300 transition-all h-full flex flex-col items-center text-center">
+                                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-fire"></i>
                                 </div>
-                                <div>
-                                    <label class="block text-lg font-bold mb-2">Client :</label>
-                                    <input type="text" id="client_name_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: Engie">
-                                </div>
+                                <span class="font-bold text-slate-700 text-sm peer-checked:text-red-800">Thermique</span>
                             </div>
-                            
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Localisation :</label>
-                                <input type="text" id="location_adv" class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-yellow-400 focus:outline-none" placeholder="Ex: 31000 Toulouse">
+                            <div class="absolute top-3 right-3 text-red-500 opacity-0 peer-checked:opacity-100 transition-opacity">
+                                <i class="fas fa-check-circle"></i>
                             </div>
-                            
-                            <div class="border-2 border-yellow-400 rounded-lg p-4 bg-black">
-                                <div class="flex items-center justify-between mb-4">
-                                    <h4 class="text-lg font-black text-yellow-400">
-                                        <i class="fas fa-list mr-2"></i>
-                                        CONFIGURATION DES STRINGS
-                                    </h4>
-                                    <button type="button" id="addStringBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-bold">
-                                        <i class="fas fa-plus mr-1"></i> Ajouter String
-                                    </button>
+                        </label>
+
+                        <!-- Visuel -->
+                        <label class="cursor-pointer relative group">
+                            <input type="checkbox" name="modules" value="VISUAL" class="peer sr-only">
+                            <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-orange-500 peer-checked:bg-orange-50 hover:border-slate-300 transition-all h-full flex flex-col items-center text-center">
+                                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-eye"></i>
                                 </div>
-                                
-                                <div id="stringsContainer" class="space-y-3">
-                                    <!-- Les strings seront ajoutées ici dynamiquement -->
-                                </div>
-                                
-                                <div class="mt-4 p-3 bg-green-900 border border-green-400 rounded-lg">
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-bold text-green-400">TOTAL MODULES :</span>
-                                        <span id="totalModulesCount" class="text-2xl font-black text-green-400">0</span>
-                                    </div>
-                                </div>
+                                <span class="font-bold text-slate-700 text-sm peer-checked:text-orange-800">Visuel</span>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Sélection des modules -->
-                    <div class="bg-gray-900 rounded-lg p-6 border-2 border-green-400">
-                        <h3 class="text-xl font-black mb-4 text-green-400">
-                            <i class="fas fa-th mr-2"></i>
-                            MODULES À ACTIVER
-                        </h3>
-                        
-                        <div class="grid md:grid-cols-2 gap-4">
-                            <label class="module-checkbox cursor-pointer">
-                                <input type="checkbox" name="modules" value="EL" checked class="hidden peer">
-                                <div class="peer-checked:bg-green-900 peer-checked:border-green-400 bg-gray-800 border-2 border-gray-600 rounded-lg p-4 hover:border-green-400 transition-colors">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <i class="fas fa-moon text-3xl text-green-400"></i>
-                                            <div>
-                                                <p class="text-lg font-black">EL - Électroluminescence</p>
-                                                <p class="text-sm text-gray-400">Audit nocturne + Cartographie</p>
-                                            </div>
-                                        </div>
-                                        <i class="fas fa-check-circle text-2xl text-green-400 peer-checked:block hidden"></i>
-                                    </div>
+                            <div class="absolute top-3 right-3 text-orange-500 opacity-0 peer-checked:opacity-100 transition-opacity">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </label>
+
+                        <!-- IV Curves -->
+                        <label class="cursor-pointer relative group">
+                            <input type="checkbox" name="modules" value="IV" class="peer sr-only">
+                            <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-slate-300 transition-all h-full flex flex-col items-center text-center">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-wave-square"></i>
                                 </div>
-                            </label>
-                            
-                            <label class="module-checkbox cursor-pointer">
-                                <input type="checkbox" name="modules" value="IV" class="hidden peer">
-                                <div class="peer-checked:bg-orange-900 peer-checked:border-orange-400 bg-gray-800 border-2 border-gray-600 rounded-lg p-4 hover:border-orange-400 transition-colors">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <i class="fas fa-chart-line text-3xl text-orange-400"></i>
-                                            <div>
-                                                <p class="text-lg font-black">I-V - Courbes I-V</p>
-                                                <p class="text-sm text-gray-400">Mesures électriques</p>
-                                            </div>
-                                        </div>
-                                        <i class="fas fa-check-circle text-2xl text-orange-400"></i>
-                                    </div>
-                                </div>
-                            </label>
-                            
-                            <label class="module-checkbox cursor-pointer">
-                                <input type="checkbox" name="modules" value="VISUAL" class="hidden peer">
-                                <div class="peer-checked:bg-teal-900 peer-checked:border-teal-400 bg-gray-800 border-2 border-gray-600 rounded-lg p-4 hover:border-teal-400 transition-colors">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <i class="fas fa-eye text-3xl text-teal-400"></i>
-                                            <div>
-                                                <p class="text-lg font-black">VISUELS - Contrôles</p>
-                                                <p class="text-sm text-gray-400">Inspection visuelle</p>
-                                            </div>
-                                        </div>
-                                        <i class="fas fa-check-circle text-2xl text-teal-400"></i>
-                                    </div>
-                                </div>
-                            </label>
-                            
-                            <label class="module-checkbox cursor-pointer">
-                                <input type="checkbox" name="modules" value="ISOLATION" class="hidden peer">
-                                <div class="peer-checked:bg-red-900 peer-checked:border-red-400 bg-gray-800 border-2 border-gray-600 rounded-lg p-4 hover:border-red-400 transition-colors">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <i class="fas fa-bolt text-3xl text-red-400"></i>
-                                            <div>
-                                                <p class="text-lg font-black">ISOLATION - Tests</p>
-                                                <p class="text-sm text-gray-400">Tests isolation DC/AC</p>
-                                            </div>
-                                        </div>
-                                        <i class="fas fa-check-circle text-2xl text-red-400"></i>
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
+                                <span class="font-bold text-slate-700 text-sm peer-checked:text-blue-800">Courbes I-V</span>
+                            </div>
+                            <div class="absolute top-3 right-3 text-blue-500 opacity-0 peer-checked:opacity-100 transition-opacity">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </label>
                     </div>
-                    
-                    <!-- Bouton création -->
-                    <div class="text-center">
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 px-12 py-4 rounded-lg font-black text-2xl shadow-2xl transform hover:scale-105 transition-transform">
-                            <i class="fas fa-plus-circle mr-3"></i>
-                            CRÉER L'AUDIT
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-        <script>
-            let currentMode = 'intervention'
-            let stringConfigCounter = 0
-            
-            // ========================================================================
-            // GESTION DES BOUTONS DE MODE
-            // ========================================================================
-            function switchMode(mode) {
-                currentMode = mode
-                
-                // Reset tous les boutons
-                const buttons = ['btn-mode-intervention', 'btn-mode-manual', 'btn-mode-advanced']
-                buttons.forEach(btnId => {
-                    const btn = document.getElementById(btnId)
-                    btn.classList.remove('active', 'border-purple-400', 'border-yellow-400', 'from-purple-900', 'to-purple-700', 'from-yellow-900', 'to-yellow-700')
-                    btn.classList.add('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                })
-                
-                // Reset tous les formulaires
-                document.getElementById('form-intervention').classList.add('hidden')
-                document.getElementById('form-manual').classList.add('hidden')
-                document.getElementById('form-advanced').classList.add('hidden')
-                
-                // Activer le mode sélectionné
-                if (mode === 'intervention') {
-                    document.getElementById('btn-mode-intervention').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                    document.getElementById('btn-mode-intervention').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                    document.getElementById('form-intervention').classList.remove('hidden')
-                } else if (mode === 'manual') {
-                    document.getElementById('btn-mode-manual').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                    document.getElementById('btn-mode-manual').classList.add('active', 'border-purple-400', 'from-purple-900', 'to-purple-700')
-                    document.getElementById('form-manual').classList.remove('hidden')
-                } else if (mode === 'advanced') {
-                    document.getElementById('btn-mode-advanced').classList.remove('opacity-75', 'border-gray-600', 'from-gray-800', 'to-gray-700')
-                    document.getElementById('btn-mode-advanced').classList.add('active', 'border-yellow-400', 'from-yellow-900', 'to-yellow-700')
-                    document.getElementById('form-advanced').classList.remove('hidden')
-                }
-            }
-            
-            document.getElementById('btn-mode-intervention').addEventListener('click', () => switchMode('intervention'))
-            document.getElementById('btn-mode-manual').addEventListener('click', () => switchMode('manual'))
-            document.getElementById('btn-mode-advanced').addEventListener('click', () => switchMode('advanced'))
-            
-            // ========================================================================
-            // MODE AVANCÉ : GESTION STRINGS INÉGAUX
-            // ========================================================================
-            function updateTotalModules() {
-                let total = 0
-                document.querySelectorAll('.string-module-count').forEach(input => {
-                    total += parseInt(input.value) || 0
-                })
-                document.getElementById('totalModulesCount').textContent = total
-            }
-            
-            function addStringConfig() {
-                stringConfigCounter++
-                const container = document.getElementById('stringsContainer')
-                
-                const stringItem = document.createElement('div')
-                stringItem.className = 'string-config-item flex items-center gap-3 bg-gray-900 p-3 rounded-lg border border-gray-700'
-                stringItem.innerHTML = \`
-                    <div class="flex-shrink-0 w-24">
-                        <span class="block text-center bg-yellow-900 text-yellow-400 px-3 py-2 rounded font-black">STRING \${stringConfigCounter}</span>
-                    </div>
-                    <div class="flex-grow">
-                        <input type="number" 
-                               min="0" 
-                               placeholder="Nombre de modules" 
-                               class="string-module-count w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-white focus:border-yellow-400 focus:outline-none"
-                               value="20">
-                    </div>
-                    <button type="button" class="remove-string-btn flex-shrink-0 bg-red-600 hover:bg-red-700 px-3 py-2 rounded font-bold">
-                        <i class="fas fa-trash"></i>
+                </div>
+
+                <!-- ACTION BAR -->
+                <div class="mt-8 pt-6">
+                    <button type="submit" id="submitBtn" disabled 
+                        class="w-full py-4 bg-slate-100 text-slate-400 font-black rounded-xl transition-all cursor-not-allowed flex items-center justify-center group">
+                        <span class="mr-2 group-hover:scale-105 transition-transform">SÉLECTIONNEZ UN SITE</span>
+                        <i class="fas fa-arrow-right opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
                     </button>
-                \`
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        // --- LOGIC ---
+        
+        async function loadInterventions() {
+            try {
+                const [resInterventions, resProjects] = await Promise.all([
+                    axios.get('/api/planning/interventions'),
+                    axios.get('/api/crm/projects')
+                ]);
+
+                const select = document.getElementById('intervention_id');
+                select.innerHTML = '<option value="">-- Choisir un dossier --</option>';
                 
-                container.appendChild(stringItem)
-                
-                // Event listener pour suppression
-                stringItem.querySelector('.remove-string-btn').addEventListener('click', () => {
-                    stringItem.remove()
-                    updateTotalModules()
-                })
-                
-                // Event listener pour mise à jour total
-                stringItem.querySelector('.string-module-count').addEventListener('input', updateTotalModules)
-                
-                updateTotalModules()
-            }
-            
-            document.getElementById('addStringBtn').addEventListener('click', addStringConfig)
-            
-            // Ajouter 2 strings par défaut
-            addStringConfig()
-            addStringConfig()
-            
-            // ========================================================================
-            // CHARGER LES INTERVENTIONS
-            // ========================================================================
-            async function loadInterventions() {
-                try {
-                    const response = await axios.get('/api/planning/interventions')
-                    const select = document.getElementById('intervention_id')
+                // Group 1: Interventions Planifiées
+                if (resInterventions.data.interventions.length > 0) {
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = "📅 AGENDA (Conseillé)";
                     
-                    if (response.data.interventions && response.data.interventions.length > 0) {
-                        select.innerHTML = '<option value="">-- Sélectionner une intervention --</option>'
-                        
-                        response.data.interventions.forEach(intervention => {
-                            const date = new Date(intervention.intervention_date).toLocaleDateString('fr-FR')
-                            const option = document.createElement('option')
-                            option.value = intervention.id
-                            option.textContent = \`\${intervention.intervention_type} - \${intervention.project_name || 'N/A'} - \${date}\`
-                            select.appendChild(option)
-                        })
-                    } else {
-                        // Aucune intervention → Activer mode MANUEL automatiquement
-                        select.innerHTML = '<option value="">⚠️ Aucune intervention disponible</option>'
-                        select.disabled = true
-                        
-                        setTimeout(() => {
-                            alert('ℹ️ Aucune intervention existante.\\n\\nPassage automatique en mode SAISIE SIMPLE.\\n\\nVous pouvez aussi utiliser le mode CONFIG AVANCÉE pour des strings inégaux.')
-                            switchMode('manual')
-                        }, 500)
-                    }
-                } catch (error) {
-                    console.error('Erreur chargement interventions:', error)
-                    document.getElementById('intervention_id').innerHTML = '<option value="">Erreur de chargement</option>'
-                    
-                    setTimeout(() => {
-                        alert('⚠️ Impossible de charger les interventions.\\n\\nVeuillez utiliser le mode SAISIE SIMPLE ou AVANCÉE.')
-                        switchMode('manual')
-                    }, 500)
-                }
-            }
-            
-            // ========================================================================
-            // CHARGER DÉTAILS INTERVENTION (PREVIEW CONFIG)
-            // ========================================================================
-            async function loadInterventionDetails(id) {
-                if (!id) {
-                    document.getElementById('config-preview').classList.add('hidden')
-                    return
+                    resInterventions.data.interventions
+                        .sort((a,b) => new Date(b.intervention_date) - new Date(a.intervention_date))
+                        .forEach(i => {
+                            const date = new Date(i.intervention_date).toLocaleDateString('fr-FR');
+                            const opt = document.createElement('option');
+                            opt.value = 'INT:' + i.id;
+                            opt.textContent = \`\${date} • \${i.project_name || 'Projet sans nom'} (\${i.client_name || '?'})\`;
+                            optGroup.appendChild(opt);
+                        });
+                    select.appendChild(optGroup);
                 }
 
-                try {
-                    const response = await axios.get(\`/api/planning/interventions/\${id}\`)
-                    const intervention = response.data.intervention
+                // Group 2: Tous les Projets
+                if (resProjects.data.projects.length > 0) {
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = "📂 TOUS LES SITES";
                     
-                    const previewDiv = document.getElementById('config-preview')
-                    const detailsDiv = document.getElementById('config-details')
-                    const stringsDiv = document.getElementById('config-strings-preview')
-                    const warningDiv = document.getElementById('config-warning')
+                    resProjects.data.projects.sort((a,b) => (a.name||'').localeCompare(b.name||'')).forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = 'PROJ:' + p.id;
+                        opt.textContent = \`\${p.name || p.project_name} • \${p.address_city || ''}\`;
+                        optGroup.appendChild(opt);
+                    });
+                    select.appendChild(optGroup);
+                }
+
+            } catch(e) { 
+                console.error(e);
+                const select = document.getElementById('intervention_id');
+                select.innerHTML = '<option value="">Erreur chargement (hors ligne ?)</option>';
+            }
+        }
+
+        async function loadSelectionDetails(value) {
+            const step2 = document.getElementById('step-2');
+            const step3 = document.getElementById('step-3');
+            const btn = document.getElementById('submitBtn');
+            const details = document.getElementById('config-details');
+            const icon = document.getElementById('config-icon');
+            const warning = document.getElementById('config-warning');
+            const progress = document.getElementById('progress-bar');
+            
+            if (!value) {
+                step2.classList.add('hidden', 'opacity-0', 'translate-y-4');
+                step3.classList.add('hidden', 'opacity-0', 'translate-y-4');
+                progress.style.width = '33%';
+                
+                btn.disabled = true;
+                btn.className = "w-full py-4 bg-slate-100 text-slate-400 font-black rounded-xl transition-all cursor-not-allowed flex items-center justify-center";
+                btn.innerHTML = "<span>SÉLECTIONNEZ UN SITE</span>";
+                return;
+            }
+
+            // Show Loading State
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> ANALYSE...';
+            
+            // Unfold Steps
+            step2.classList.remove('hidden');
+            setTimeout(() => step2.classList.remove('opacity-0', 'translate-y-4'), 50);
+            
+            step3.classList.remove('hidden');
+            setTimeout(() => step3.classList.remove('opacity-0', 'translate-y-4'), 150);
+            
+            progress.style.width = '100%';
+
+            try {
+                const [type, id] = value.split(':');
+                let project = null;
+
+                if (type === 'INT') {
+                    const res = await axios.get(\`/api/planning/interventions/\${id}\`);
+                    project = res.data.intervention;
+                } else {
+                    const res = await axios.get(\`/api/crm/projects/\${id}\`);
+                    project = res.data.project;
+                }
+
+                // Render Details
+                document.getElementById('project-name-display').textContent = project.project_name || project.name;
+                details.innerHTML = \`
+                    <div class="flex items-center"><i class="fas fa-user-tie w-6 text-center text-slate-400"></i> \${project.client_name || 'Client inconnu'}</div>
+                    <div class="flex items-center"><i class="fas fa-map-marker-alt w-6 text-center text-slate-400"></i> \${project.address_city || project.location || 'Loc. N/A'}</div>
+                    <div class="flex items-center mt-2 pt-2 border-t border-slate-200 text-xs">
+                        <span class="bg-slate-200 px-2 py-1 rounded font-bold mr-2 text-slate-600">\${project.total_power_kwp || '?'} kWc</span>
+                        <span class="bg-slate-200 px-2 py-1 rounded font-bold text-slate-600">\${project.module_count || '?'} Mods</span>
+                    </div>
+                \`;
+
+                // Technical Check
+                const hasConfig = project.strings_configuration || (project.module_count && project.string_count);
+                
+                if (hasConfig) {
+                    icon.className = "w-14 h-14 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-2xl shadow-sm flex-shrink-0";
+                    icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                    warning.classList.add('hidden');
+                } else {
+                    icon.className = "w-14 h-14 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl shadow-sm flex-shrink-0";
+                    icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    warning.classList.remove('hidden');
+                }
+
+                // Enable Submit
+                btn.disabled = false;
+                btn.className = "w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-black rounded-xl shadow-xl shadow-green-200 hover:shadow-2xl hover:-translate-y-1 transform transition-all flex items-center justify-center text-lg";
+                btn.innerHTML = \`<i class="fas fa-rocket mr-3"></i> LANCER LA MISSION\`;
+
+            } catch (e) {
+                console.error(e);
+                btn.innerHTML = "ERREUR CHARGEMENT";
+                alert("Erreur lors de la récupération des données.");
+            }
+        }
+
+        document.getElementById('intervention_id').addEventListener('change', (e) => loadSelectionDetails(e.target.value));
+
+        // --- SUBMIT ---
+        document.getElementById('createAuditForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const originalContent = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-sync fa-spin mr-2"></i> INITIALISATION...';
+
+            try {
+                const selection = document.getElementById('intervention_id').value;
+                const [type, id] = selection.split(':');
+                const modules = Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value);
+
+                const payload = { modules };
+                
+                if (type === 'INT') {
+                    payload.intervention_id = parseInt(id);
+                } else {
+                    // Fallback Mode: Create phantom intervention or link project directly
+                    const resProj = await axios.get(\`/api/crm/projects/\${id}\`);
+                    const proj = resProj.data.project;
                     
-                    previewDiv.classList.remove('hidden')
-                    warningDiv.classList.add('hidden')
-                    stringsDiv.innerHTML = ''
+                    payload.project_name = proj.name;
+                    payload.client_name = proj.client_name;
+                    payload.location = proj.address_city;
                     
-                    detailsDiv.innerHTML = \`
-                        <div><span class="text-gray-400">Projet:</span> <span class="text-white">\${intervention.project_name || 'N/A'}</span></div>
-                        <div><span class="text-gray-400">Puissance:</span> <span class="text-white">\${intervention.total_power_kwp || 'N/A'} kWp</span></div>
-                        <div><span class="text-gray-400">Modules:</span> <span class="text-white">\${intervention.module_count || 'N/A'} (\${intervention.module_type || '?'})</span></div>
-                        <div><span class="text-gray-400">Onduleurs:</span> <span class="text-white">\${intervention.inverter_count || 'N/A'} (\${intervention.inverter_type || '?'})</span></div>
-                    \`
-                    
-                    if (intervention.strings_configuration) {
+                    if (proj.strings_configuration) {
                         try {
-                            const config = JSON.parse(intervention.strings_configuration)
-                            if (config.mode === 'advanced' && config.strings) {
-                                const summary = config.strings.map(s => \`S\${s.mpptNumber}:\${s.moduleCount}\`).join(' | ')
-                                stringsDiv.innerHTML = \`✅ CONFIGURATION STRINGS : \${summary}\`
-                            } else {
-                                stringsDiv.innerHTML = \`✅ CONFIG SIMPLE : \${config.stringCount || '?'} strings x \${config.modulesPerString || '?'} modules\`
-                            }
-                        } catch(e) {
-                            stringsDiv.innerHTML = '❌ Erreur de lecture de la configuration (JSON invalide)'
-                        }
-                    } else {
-                        warningDiv.classList.remove('hidden')
-                        stringsDiv.innerHTML = '<span class="text-gray-500">Pas de configuration strings détectée</span>'
+                            payload.configuration = JSON.parse(proj.strings_configuration);
+                        } catch(e) {}
                     }
+                }
 
-                } catch (error) {
-                    console.error('Erreur chargement détails:', error)
+                const res = await axios.post('/api/audits/create-multi-modules', payload);
+                if (res.data.success) {
+                    window.location.href = \`/audit/\${res.data.audit_token}\`;
+                } else {
+                    throw new Error(res.data.error || "Erreur inconnue");
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Erreur: " + err.message);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        });
+
+        // Init
+        const params = new URLSearchParams(window.location.search);
+        const intId = params.get('intervention_id');
+        
+        loadInterventions().then(() => {
+            if (intId) {
+                const select = document.getElementById('intervention_id');
+                const val = 'INT:' + intId;
+                if (select.querySelector(\`option[value="\${val}"]\`)) {
+                    select.value = val;
+                    loadSelectionDetails(val);
                 }
             }
+        });
 
-            document.getElementById('intervention_id').addEventListener('change', (e) => {
-                loadInterventionDetails(e.target.value)
-            })
+    </script>
+  `;
 
-            // ========================================================================
-            // SOUMISSION FORMULAIRE
-            // ========================================================================
-            document.getElementById('createAuditForm').addEventListener('submit', async (e) => {
-                e.preventDefault()
-                
-                // Récupérer les modules sélectionnés
-                const modules = Array.from(document.querySelectorAll('input[name="modules"]:checked'))
-                    .map(input => input.value)
-                
-                if (modules.length === 0) {
-                    alert('⚠️ Veuillez sélectionner au moins un module')
-                    return
-                }
-                
-                const btn = e.target.querySelector('button[type="submit"]')
-                btn.disabled = true
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> CRÉATION EN COURS...'
-                
-                try {
-                    let payload = { modules }
-                    
-                    // MODE INTERVENTION
-                    if (currentMode === 'intervention') {
-                        const interventionId = document.getElementById('intervention_id').value
-                        if (!interventionId) {
-                            alert('⚠️ Veuillez sélectionner une intervention')
-                            btn.disabled = false
-                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
-                            return
-                        }
-                        payload.intervention_id = parseInt(interventionId)
-                    } 
-                    // MODE MANUEL (strings uniformes)
-                    else if (currentMode === 'manual') {
-                        payload.project_name = document.getElementById('project_name').value
-                        payload.client_name = document.getElementById('client_name').value
-                        payload.location = document.getElementById('location').value
-                        
-                        if (!payload.project_name || !payload.client_name) {
-                            alert('⚠️ Veuillez remplir le nom du projet et du client')
-                            btn.disabled = false
-                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
-                            return
-                        }
-                        
-                        const stringCount = parseInt(document.getElementById('stringCount').value)
-                        const modulesPerString = parseInt(document.getElementById('modulesPerString').value)
-                        
-                        if (stringCount && modulesPerString) {
-                            payload.configuration = {
-                                mode: 'simple',
-                                stringCount,
-                                modulesPerString
-                            }
-                        }
-                    } 
-                    // MODE AVANCÉ (strings inégaux)
-                    else if (currentMode === 'advanced') {
-                        payload.project_name = document.getElementById('project_name_adv').value
-                        payload.client_name = document.getElementById('client_name_adv').value
-                        payload.location = document.getElementById('location_adv').value
-                        
-                        if (!payload.project_name || !payload.client_name) {
-                            alert('⚠️ Veuillez remplir le nom du projet et du client')
-                            btn.disabled = false
-                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
-                            return
-                        }
-                        
-                        // Récupérer configuration strings inégaux
-                        const stringsConfig = []
-                        document.querySelectorAll('.string-config-item').forEach((item, index) => {
-                            const moduleCount = parseInt(item.querySelector('.string-module-count').value) || 0
-                            if (moduleCount > 0) {
-                                stringsConfig.push({
-                                    id: index + 1,
-                                    mpptNumber: index + 1,
-                                    moduleCount: moduleCount,
-                                    physicalRow: index + 1,
-                                    physicalCol: 0
-                                })
-                            }
-                        })
-                        
-                        if (stringsConfig.length === 0) {
-                            alert('⚠️ Veuillez ajouter au moins une string avec des modules')
-                            btn.disabled = false
-                            btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
-                            return
-                        }
-                        
-                        payload.configuration = {
-                            mode: 'advanced',
-                            strings: stringsConfig
-                        }
-                    }
-                    
-                    console.log('📤 Payload envoyé:', payload)
-                    
-                    const response = await axios.post('/api/audits/create-multi-modules', payload)
-                    
-                    console.log('✅ Réponse API:', response.data)
-                    
-                    // Rediriger vers l'audit créé
-                    if (response.data.success) {
-                        alert(\`✅ Audit créé avec succès !\\n\\nToken: \${response.data.audit_token}\\n\\nRedirection...\`)
-                        window.location.href = \`/audit/\${response.data.audit_token}\`
-                    }
-                } catch (error) {
-                    console.error('❌ Erreur création audit:', error)
-                    const errorMsg = error.response?.data?.error || error.response?.data?.details || error.message
-                    alert('❌ Erreur lors de la création de l\'audit :\\n\\n' + errorMsg)
-                    btn.disabled = false
-                    btn.innerHTML = '<i class="fas fa-plus-circle mr-3"></i>CRÉER L\\'AUDIT'
-                }
-            })
-            
-            // ========================================================================
-            // INITIALISATION
-            // ========================================================================
-            
-            // Check for URL parameters (pre-fill)
-            const urlParams = new URLSearchParams(window.location.search);
-            const interventionIdParam = urlParams.get('intervention_id');
-            
-            if (interventionIdParam) {
-                // Wait for interventions list to load, then select it
-                const checkInterval = setInterval(() => {
-                    const select = document.getElementById('intervention_id');
-                    if (select && select.options.length > 1) {
-                        select.value = interventionIdParam;
-                        loadInterventionDetails(interventionIdParam); // Trigger preview
-                        clearInterval(checkInterval);
-                    }
-                }, 500);
-            }
-            
-            loadInterventions()
-        </script>
-    </body>
-    </html>
-  `
+  return getLayout('Nouvelle Mission', content, 'new-audit');
 }

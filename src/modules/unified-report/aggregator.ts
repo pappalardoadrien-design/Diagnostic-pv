@@ -1,6 +1,6 @@
 /**
  * Aggregator - Logique agrégation données multi-modules
- * Collecte données EL, IV, Visuels, Isolation, Thermique, Photos
+ * Collecte données EL, IV, Visuels, Isolation, Thermique, Photos, Notes
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -32,13 +32,14 @@ export async function aggregateUnifiedReportData(
   const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos'];
   
   // Agrégation parallèle
-  const [elData, ivData, visualData, isolationData, thermalData, photosData] = await Promise.all([
+  const [elData, ivData, visualData, isolationData, thermalData, photosData, fieldNotes] = await Promise.all([
     includeModules.includes('el') ? aggregateELModule(DB, request) : createEmptyELData(),
     includeModules.includes('iv') ? aggregateIVModule(DB, request) : createEmptyIVData(),
     includeModules.includes('visual') ? aggregateVisualModule(DB, request) : createEmptyVisualData(),
     includeModules.includes('isolation') ? aggregateIsolationModule(DB, request) : createEmptyIsolationData(),
     includeModules.includes('thermal') ? aggregateThermalModule(DB, request) : createEmptyThermalData(),
-    includeModules.includes('photos') ? aggregatePhotosModule(DB, request) : createEmptyPhotosData()
+    includeModules.includes('photos') ? aggregatePhotosModule(DB, request) : createEmptyPhotosData(),
+    getAuditNotes(DB, request)
   ]);
   
   // Calcul synthèse globale
@@ -70,6 +71,8 @@ export async function aggregateUnifiedReportData(
             data: photosData
         }
     },
+    
+    fieldNotes, // Notes vocales/textuelles
     
     summary: {
       totalModulesAudited: totalModules,
@@ -687,6 +690,56 @@ function createEmptyPhotosData(): PhotosModuleData {
     totalPhotos: 0,
     photos: []
   };
+}
+
+// ============================================================================
+// RÉCUPÉRATION NOTES DE TERRAIN
+// ============================================================================
+
+async function getAuditNotes(
+  DB: D1Database,
+  request: GenerateUnifiedReportRequest
+): Promise<UnifiedReportData['fieldNotes']> {
+  if (!request.auditElToken && !request.plantId) return [];
+  
+  try {
+    let auditToken = request.auditElToken;
+    
+    // Si pas de token direct, on cherche le dernier audit de la centrale
+    if (!auditToken && request.plantId) {
+        const audit = await DB.prepare(`
+            SELECT ea.audit_token 
+            FROM el_audits ea
+            JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+            WHERE pcal.pv_plant_id = ? 
+            ORDER BY ea.created_at DESC 
+            LIMIT 1
+        `).bind(request.plantId).first();
+        
+        if (audit) {
+            auditToken = (audit as any).audit_token;
+        }
+    }
+
+    if (!auditToken) return [];
+
+    const notes = await DB.prepare(`
+      SELECT id, content, technician_id, created_at 
+      FROM el_audit_notes 
+      WHERE audit_token = ? 
+      ORDER BY created_at ASC
+    `).bind(auditToken).all();
+    
+    return notes.results.map((n: any) => ({
+      id: n.id,
+      content: n.content,
+      technicianId: n.technician_id,
+      createdAt: n.created_at
+    }));
+  } catch (e) {
+    console.warn('Erreur récupération notes:', e);
+    return [];
+  }
 }
 
 

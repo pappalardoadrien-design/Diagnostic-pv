@@ -23,12 +23,10 @@
   ],
   
   // Configuration R2 pour stockage photos EL (intégration Picsellia)
-  // NOTE: R2 désactivé temporairement - à activer depuis Dashboard Cloudflare
-  // puis décommenter la section ci-dessous
-  // "r2_buckets": [
-  //   {
-  //     "binding": "R2",
-  //     "bucket_name": "diagpv-photos"
-  //   }
-  // ]
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "diagpv-photos"
+    }
+  ]
 }

@@ -283,27 +283,7 @@ app.get('/girasole/checklist/toiture/:projectId', (c) => {
 app.route('/api/picsellia', picselliaRoutes)
 
 // ============================================================================
-// ANCIENNES ROUTES API RETIRÉES - REMPLACÉES PAR MODULE MODULAIRE
-// ============================================================================
-// Les routes suivantes ont été migrées vers src/modules/el/ (Point 4.1)
-// et montées sous /api/el/ (voir ligne 27)
-//
-// ROUTES MIGRÉES:
-// - POST /api/el/audit/create-from-json
-// - POST /api/el/audit/create
-// - GET /api/el/dashboard/audits
-// - GET /api/el/audit/:token
-// - PUT /api/el/audit/:token
-// - DELETE /api/el/audit/:token
-// - POST /api/el/audit/:token/module/:moduleId
-// - POST /api/el/audit/:token/module
-// - POST /api/el/audit/:token/bulk-update
-//
-// ROUTES CONSERVÉES (PVserv parser):
-// - POST /api/audit/:token/parse-pvserv
-// - POST /api/audit/:token/save-measurements
-// - GET /api/audit/:token/measurements
-// - GET /api/audit/:token/report
+// ROUTES LEGACY (PVserv parser)
 // ============================================================================
 
 // ============================================================================
@@ -573,9 +553,14 @@ app.get('/admin/emergency-db-fix', async (c) => {
 // ============================================================================
 
 // ============================================================================
-// PAGE D'ACCUEIL - DIAGNOSTIC HUB
+// PAGE D'ACCUEIL - REDIRECTION VERS CRM (DIAGPV OS V2)
 // ============================================================================
 app.get('/', (c) => {
+  return c.redirect('/crm/dashboard');
+})
+
+// ANCIENNE PAGE D'ACCUEIL (ACCESSIBLE VIA /TOOLS SI BESOIN)
+app.get('/tools', (c) => {
   return c.html(`
     <!DOCTYPE html>
     <html lang="fr">
@@ -1060,182 +1045,10 @@ app.get('/audit/:token/photos', (c) => {
 })
 
 // ============================================================================
-// ROUTE MODULE EL - INTERFACE CRÉATION AUDIT ÉLECTROLUMINESCENCE
+// ROUTE MODULE EL - REDIRECTION VERS DASHBOARD CRM
 // ============================================================================
 app.get('/el', (c) => {
-  return c.html(`
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Module EL - Création Audit Électroluminescence</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <link href="/static/diagpv-styles.css" rel="stylesheet">
-        <meta name="theme-color" content="#000000">
-    </head>
-    <body class="bg-black text-white min-h-screen font-bold">
-        <div class="container mx-auto p-6">
-            <!-- En-tête retour Hub -->
-            <div class="mb-6 flex justify-between items-center">
-                <a href="/" class="inline-flex items-center text-yellow-400 hover:text-yellow-300 text-lg">
-                    <i class="fas fa-arrow-left mr-2"></i>
-                    Retour au Diagnostic Hub
-                </a>
-                <div class="flex gap-3">
-                    <a href="/dashboard" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded font-bold">
-                        <i class="fas fa-chart-line mr-1"></i>DASHBOARD
-                    </a>
-                    <a href="/pv/plants" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-bold">
-                        <i class="fas fa-solar-panel mr-1"></i>PV CARTO
-                    </a>
-                </div>
-            </div>
-            
-            <!-- En-tête Module EL -->
-            <header class="mb-8 text-center">
-                <div class="inline-flex items-center mb-4">
-                    <i class="fas fa-moon text-4xl text-green-400 mr-4"></i>
-                    <h1 class="text-4xl font-black">MODULE EL - ÉLECTROLUMINESCENCE</h1>
-                </div>
-                <p class="text-xl text-gray-300">Interface Terrfont-black mb-6 text-center">
-                        <i class="fas fa-plus-circle mr-2 text-green-400"></i>
-                        NOUVEL AUDIT ÉLECTROLUMINESCENCE
-                    </h2>
-                    
-                    <form id="createAuditForm" class="space-y-6">
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Nom du projet :</label>
-                                <input type="text" id="projectName" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Client :</label>
-                                <input type="text" id="clientName" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
-                            </div>
-                        </div>
-                        
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Localisation :</label>
-                                <input type="text" id="location" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-lg font-bold mb-2">Date :</label>
-                                <input type="date" id="auditDate" required 
-                                       class="w-full bg-black border-2 border-gray-600 rounded-lg px-4 py-3 text-lg focus:border-green-400 focus:outline-none">
-                            </div>
-                        </div>
-                        
-                        <div class="bg-gray-800 rounded-lg p-6 border border-gray-600">
-                            <h3 class="text-xl font-bold mb-4 text-green-400">CONFIGURATION OU UPLOAD PLAN</h3>
-                            
-                            <div class="mb-6">
-                                <h4 class="text-lg font-bold mb-3">Option A - Configuration manuelle :</h4>
-                                
-                                <div id="simpleConfig" class="grid md:grid-cols-3 gap-4 mb-4">
-                                    <div>
-                                        <label class="block text-sm font-bold mb-2">Nombre de strings :</label>
-                                        <input type="number" id="stringCount" min="1" max="100" 
-                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-green-400 focus:outline-none">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-bold mb-2">Modules par string :</label>
-                                        <input type="number" id="modulesPerString" min="1" max="50" 
-                                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-green-400 focus:outline-none">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-bold mb-2">Total modules :</label>
-                                        <div id="totalModules" class="bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg text-green-400 font-black">0</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="text-center mb-4 space-x-3">
-                                    <button type="button" id="toggleAdvancedConfig" 
-                                            class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg font-bold text-sm">
-                                        <i class="fas fa-cog mr-2"></i>CONFIGURATION AVANCÉE
-                                    </button>
-                                    <button type="button" id="loadExampleConfig" 
-                                            class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold text-sm">
-                                        <i class="fas fa-magic mr-2"></i>EXEMPLE MPPT
-                                    </button>
-                                </div>
-                                
-                                <div id="advancedConfig" class="hidden bg-gray-700 rounded-lg p-4 border border-orange-400">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <h5 class="text-lg font-bold text-orange-400">Configuration par String/MPPT</h5>
-                                        <button type="button" id="addStringBtn" 
-                                                class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-bold">
-                                            <i class="fas fa-plus mr-1"></i>Ajouter String
-                                        </button>
-                                    </div>
-                                    
-                                    <div id="stringsList" class="space-y-2 max-h-60 overflow-y-auto">
-                                    </div>
-                                    
-                                    <div class="mt-4 p-3 bg-gray-800 rounded border-l-4 border-green-400">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-sm font-bold">TOTAL CONFIGURATION :</span>
-                                            <span id="advancedTotal" class="text-green-400 font-black text-lg">0 modules</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="border-t border-gray-600 pt-6">
-                                <h4 class="text-lg font-bold mb-3">Option B - Upload plan :</h4>
-                                <div class="flex items-center space-x-4">
-                                    <input type="file" id="planFile" accept=".pdf,.png,.jpg,.jpeg" class="hidden">
-                                    <button type="button" onclick="document.getElementById('planFile').click()" 
-                                            class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-bold text-lg">
-                                        <i class="fas fa-paperclip mr-2"></i>CHARGER PLAN PDF/IMAGE
-                                    </button>
-                                    <span id="planFileName" class="text-gray-400"></span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" 
-                                class="w-full bg-green-600 hover:bg-green-700 py-4 rounded-lg font-black text-xl transition-colors">
-                            <i class="fas fa-rocket mr-2"></i>CRÉER L'AUDIT
-                        </button>
-                    </form>
-                </div>
-                
-                <div class="mt-8 grid md:grid-cols-2 gap-6">
-                    <div class="bg-gray-900 rounded-lg p-6 border border-gray-600">
-                        <h3 class="text-xl font-bold mb-4 flex items-center">
-                            <i class="fas fa-history mr-2 text-blue-400"></i>
-                            MES AUDITS RÉCENTS
-                        </h3>
-                        <div id="recentAudits" class="space-y-2 mb-4">
-                            <p class="text-gray-400">Aucun audit récent trouvé</p>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-gray-900 rounded-lg p-6 border border-orange-400">
-                        <h3 class="text-xl font-bold mb-4 text-orange-400 flex items-center">
-                            <i class="fas fa-tachometer-alt mr-2"></i>
-                            TABLEAU DE BORD
-                        </h3>
-                        <p class="text-gray-300 mb-4">Gérez tous vos audits en cours</p>
-                        <a href="/dashboard" class="w-full bg-orange-600 hover:bg-orange-700 py-3 rounded-lg font-black text-lg flex items-center justify-center">
-                            <i class="fas fa-chart-line mr-2"></i>
-                            ACCÉDER AU DASHBOARD
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script src="/static/diagpv-app.js"></script>
-    </body>
-    </html>
-  `)
+  return c.redirect('/crm/dashboard');
 })
 
 // Page d'audit terrain nocturne

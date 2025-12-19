@@ -1,590 +1,345 @@
-/**
- * Page /rapports - Interface Gestion Rapports Unifiés
- * Phase 4C - Module Rapport Unifié
- */
+import { getLayout } from './layout.js';
 
 export function getRapportsPage() {
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapports Unifiés - DiagPV</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  // Simulé : Données complètes du projet Brugnac
+  const auditData = {
+    ref: "SOL BRUGNAC",
+    date: "12 SEPTEMBRE 2025",
+    dates_intervention: "du 2 au 5 septembre 2025",
+    lieu: "BRUGNAC (47260)",
+    gps: "44.4433, 0.4773",
+    contexte: "En juin 2025, l’installation photovoltaïque au sol a subi d’importants dégâts dus à un épisode de grêle. Lors d’un contrôle visuel effectué par l’installateur, plus de 200 dommages ont été relevés au niveau du verre des modules.",
+    mission: "La mission confiée à notre équipe consistait à déterminer si les modules photovoltaïques non endommagés visuellement présentaient des défauts internes (microfissures) via électroluminescence.",
+    specs: {
+        puissance: "250 kWc",
+        nb_panneaux: "650",
+        marque: "SunPower",
+        tech: "Mono-Perc",
+        orientation: "SUD 180°",
+        mise_en_service: "15/01/2020",
+        raccordement: "Injection HTA"
+    },
+    meteo: {
+        ciel: "Dégagé",
+        temp: "24°C",
+        vent: "Faible (10 km/h Ouest)",
+        irradiance: "N/A (Nuit)"
+    },
+    defauts: [
+        { id: "M-102", type: "Impact Grêle (X-Shape)", severite: "Critique", img: "https://t4.ftcdn.net/jpg/01/56/16/17/360_F_156161722_fM5k5J5x5x5x5x5x.jpg" }, // Placeholder
+        { id: "M-103", type: "Micro-fissures multiples", severite: "Majeur", img: "https://t4.ftcdn.net/jpg/01/56/16/17/360_F_156161722_fM5k5J5x5x5x5x5x.jpg" },
+        { id: "M-145", type: "Déconnexion Cellule", severite: "Critique", img: "https://t4.ftcdn.net/jpg/01/56/16/17/360_F_156161722_fM5k5J5x5x5x5x5x.jpg" },
+        { id: "M-201", type: "Défaut d'isolement (Suspecté)", severite: "Majeur", img: "https://t4.ftcdn.net/jpg/01/56/16/17/360_F_156161722_fM5k5J5x5x5x5x5x.jpg" },
+    ],
+    stats: {
+        total: 650,
+        ok: 420,
+        mineur: 150,
+        majeur: 50,
+        critique: 30
+    }
+  };
+
+  const content = `
+    <!-- HEADER ACTIONS -->
+    <div class="max-w-5xl mx-auto mb-8 print:hidden flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900">Générateur de Rapports</h1>
+            <p class="text-slate-500">Mode: Audit Complet (Expertise)</p>
+        </div>
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2">
+            <i class="fas fa-print"></i> Imprimer le Rapport PDF
+        </button>
+    </div>
+
+    <!-- ================================================================================================ -->
+    <!-- PAGE 1 : COUVERTURE -->
+    <!-- ================================================================================================ -->
+    <div class="report-page relative bg-white shadow-2xl print:shadow-none p-[2cm] flex flex-col justify-between">
+        
+        <!-- EN-TÊTE -->
+        <div class="flex justify-between items-start border-b-2 border-green-500 pb-6">
+            <div>
+                <div class="flex items-center gap-3 text-green-600 mb-2">
+                    <i class="fas fa-solar-panel text-4xl"></i>
+                    <span class="text-2xl font-black tracking-tighter">DIAG<span class="text-slate-800">PV</span></span>
+                </div>
+                <div class="text-xs text-slate-500 font-medium leading-relaxed">
+                    3 Rue Apollo, 31240 L’UNION<br>
+                    05.81.10.16.59 • contact@diagpv.fr<br>
+                    RCS 792972309
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-5xl font-black text-slate-100">2025</div>
+                <div class="text-sm font-bold text-green-600 uppercase tracking-widest mt-1">Rapport d'Expertise</div>
+            </div>
+        </div>
+
+        <!-- TITRE -->
+        <div class="text-center my-auto">
+            <div class="inline-block px-6 py-2 bg-green-50 text-green-800 font-bold text-sm rounded-full mb-6 uppercase tracking-wide border border-green-100">
+                Audit Technique • Électroluminescence
+            </div>
+            <h1 class="text-6xl font-black text-slate-900 mb-6 leading-tight">
+                SITE REF :<br><span class="text-green-600">${auditData.ref}</span>
+            </h1>
+            <p class="text-2xl text-slate-500 font-medium">${auditData.date}</p>
+        </div>
+
+        <!-- ILLUSTRATION -->
+        <div class="h-64 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center relative overflow-hidden mb-12">
+            <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px;"></div>
+            <i class="fas fa-camera-retro text-6xl text-slate-300"></i>
+            <div class="absolute bottom-4 right-4 bg-white/80 px-3 py-1 rounded text-xs font-bold text-slate-500 backdrop-blur">
+                Vue d'ensemble du site
+            </div>
+        </div>
+
+        <!-- PIED DE PAGE -->
+        <div class="text-center text-slate-400 text-xs uppercase tracking-widest border-t border-slate-100 pt-6">
+            Diagnostic Photovoltaïque • Expertise Indépendante & Technique • ${auditData.lieu}
+        </div>
+    </div>
+
+    <!-- ================================================================================================ -->
+    <!-- PAGE 2 : CONTEXTE & FICHE TECHNIQUE -->
+    <!-- ================================================================================================ -->
+    <div class="report-page bg-white shadow-2xl print:shadow-none p-[2cm] mt-8 print:mt-0 relative">
+        
+        <!-- HEADER LIGHT -->
+        <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-8">
+            <span class="text-xs font-bold text-slate-400 uppercase">Réf: ${auditData.ref}</span>
+            <span class="text-xs font-bold text-slate-400">Page 2</span>
+        </div>
+
+        <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+            <span class="w-8 h-8 bg-slate-900 text-white rounded flex items-center justify-center text-sm">1</span>
+            Contexte & Mission
+        </h2>
+
+        <div class="grid gap-8 mb-12">
+            <div class="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                <h3 class="font-bold text-slate-800 mb-2 uppercase text-sm tracking-wide">Contexte</h3>
+                <p class="text-slate-600 text-sm leading-relaxed text-justify">
+                    ${auditData.contexte}
+                </p>
+            </div>
+            
+            <div class="pl-6 border-l-4 border-green-500">
+                <h3 class="font-bold text-green-700 mb-2 uppercase text-sm tracking-wide">Objectif de la mission</h3>
+                <p class="text-slate-600 text-sm leading-relaxed text-justify">
+                    ${auditData.mission}
+                </p>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+            <span class="w-8 h-8 bg-slate-900 text-white rounded flex items-center justify-center text-sm">2</span>
+            Fiche Technique Installation
+        </h2>
+
+        <div class="overflow-hidden rounded-xl border border-slate-200">
+            <table class="w-full text-sm">
+                <tbody>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-3 px-4 font-bold text-slate-500 w-1/2 bg-slate-50">Puissance Centrale</td>
+                        <td class="py-3 px-4 font-black text-slate-900">${auditData.specs.puissance}</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-3 px-4 font-bold text-slate-500 bg-slate-50">Nombre de Modules</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${auditData.specs.nb_panneaux}</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-3 px-4 font-bold text-slate-500 bg-slate-50">Marque / Modèle</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${auditData.specs.marque}</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-3 px-4 font-bold text-slate-500 bg-slate-50">Technologie</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${auditData.specs.tech}</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                        <td class="py-3 px-4 font-bold text-slate-500 bg-slate-50">Orientation</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${auditData.specs.orientation}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3 px-4 font-bold text-slate-500 bg-slate-50">Mise en service</td>
+                        <td class="py-3 px-4 font-bold text-slate-800">${auditData.specs.mise_en_service}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Note Conditions -->
+        <div class="mt-8 p-4 border border-blue-100 bg-blue-50 rounded-lg flex items-start gap-3">
+            <i class="fas fa-cloud-moon text-blue-500 mt-1"></i>
+            <div class="text-xs text-blue-800">
+                <strong>Conditions d'intervention :</strong><br>
+                Météo: ${auditData.meteo.ciel}, Temp: ${auditData.meteo.temp}, Vent: ${auditData.meteo.vent}.<br>
+                L'inspection EL a été réalisée de nuit pour garantir une qualité d'image optimale sans pollution lumineuse.
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================================================ -->
+    <!-- PAGE 3 : RÉSULTATS DÉTAILLÉS (La "Planche") -->
+    <!-- ================================================================================================ -->
+    <div class="report-page bg-white shadow-2xl print:shadow-none p-[2cm] mt-8 print:mt-0 relative">
+        
+        <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-8">
+            <span class="text-xs font-bold text-slate-400 uppercase">Réf: ${auditData.ref}</span>
+            <span class="text-xs font-bold text-slate-400">Page 3</span>
+        </div>
+
+        <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+            <span class="w-8 h-8 bg-slate-900 text-white rounded flex items-center justify-center text-sm">3</span>
+            Analyse des Anomalies
+        </h2>
+
+        <p class="text-slate-600 text-sm mb-8 text-justify">
+            L'inspection par électroluminescence a permis de mettre en évidence des défauts invisibles à l'œil nu. 
+            Voici une sélection des anomalies caractéristiques relevées sur la centrale.
+        </p>
+
+        <!-- GRILLE DE DÉFAUTS -->
+        <div class="grid grid-cols-2 gap-6">
+            
+            ${auditData.defauts.map(d => `
+            <div class="break-inside-avoid border border-slate-200 rounded-xl overflow-hidden">
+                <div class="h-48 bg-slate-900 relative flex items-center justify-center">
+                    <i class="fas fa-moon text-slate-600 text-4xl"></i>
+                    <span class="absolute top-2 left-2 bg-black/50 text-white text-xs font-mono px-2 py-1 rounded">
+                        ${d.id}
+                    </span>
+                    <span class="absolute top-2 right-2 bg-white text-slate-900 text-xs font-bold px-2 py-1 rounded shadow">
+                        EL
+                    </span>
+                </div>
+                <div class="p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-bold text-slate-800 text-sm">${d.type}</div>
+                        <span class="text-[10px] uppercase font-bold px-2 py-1 rounded ${d.severite === 'Critique' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}">
+                            ${d.severite}
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-tight">
+                        Impact structurel confirmé. Risque de perte de production localisée et d'évolution vers un point chaud.
+                    </p>
+                </div>
+            </div>
+            `).join('')}
+
+        </div>
+
+        <div class="mt-8 text-center">
+            <div class="inline-flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-50 px-4 py-2 rounded-full">
+                <i class="fas fa-plus-circle"></i>
+                Voir annexe pour la liste complète des 200+ défauts
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================================================ -->
+    <!-- PAGE 4 : SYNTHÈSE & CONCLUSION -->
+    <!-- ================================================================================================ -->
+    <div class="report-page bg-white shadow-2xl print:shadow-none p-[2cm] mt-8 print:mt-0 relative">
+        
+        <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-8">
+            <span class="text-xs font-bold text-slate-400 uppercase">Réf: ${auditData.ref}</span>
+            <span class="text-xs font-bold text-slate-400">Page 4</span>
+        </div>
+
+        <h2 class="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
+            <span class="w-8 h-8 bg-green-600 text-white rounded flex items-center justify-center text-sm">4</span>
+            Synthèse & Conclusion
+        </h2>
+
+        <!-- TABLEAU STATS -->
+        <div class="mb-10">
+            <h3 class="font-bold text-slate-700 uppercase text-xs tracking-wide mb-4">Répartition des défauts</h3>
+            
+            <div class="flex gap-4 mb-4">
+                <div class="flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
+                    <div class="text-3xl font-black text-slate-800">${auditData.stats.total}</div>
+                    <div class="text-xs font-bold text-slate-400 uppercase">Modules Testés</div>
+                </div>
+                <div class="flex-1 bg-green-50 p-4 rounded-xl border border-green-200 text-center">
+                    <div class="text-3xl font-black text-green-600">${auditData.stats.ok}</div>
+                    <div class="text-xs font-bold text-green-700 uppercase">Conformes</div>
+                </div>
+                <div class="flex-1 bg-red-50 p-4 rounded-xl border border-red-200 text-center">
+                    <div class="text-3xl font-black text-red-600">${auditData.stats.critique}</div>
+                    <div class="text-xs font-bold text-red-700 uppercase">Critiques</div>
+                </div>
+            </div>
+
+            <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden flex">
+                <div class="bg-green-500 h-full" style="width: ${(auditData.stats.ok/auditData.stats.total)*100}%"></div>
+                <div class="bg-orange-400 h-full" style="width: ${(auditData.stats.mineur/auditData.stats.total)*100}%"></div>
+                <div class="bg-red-500 h-full" style="width: ${(auditData.stats.critique/auditData.stats.total)*100}%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-400 mt-2 font-medium">
+                <span>Conforme</span>
+                <span>Anomalies</span>
+            </div>
+        </div>
+
+        <!-- AVIS D'EXPERT -->
+        <div class="bg-slate-50 border-l-4 border-slate-900 p-6 rounded-r-xl mb-10">
+            <h3 class="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                <i class="fas fa-certificate"></i> Avis de l'expert
+            </h3>
+            <p class="text-slate-600 text-sm leading-relaxed text-justify mb-4">
+                L'audit révèle un taux de défaillance significatif (environ ${(auditData.stats.critique/auditData.stats.total*100).toFixed(1)}% de défauts critiques) directement corrélé à l'épisode de grêle mentionné.
+                Les impacts de type "X-Shape" visibles en EL confirment que les dégâts ne se limitent pas au verre mais affectent la structure des cellules.
+            </p>
+            <p class="text-slate-600 text-sm leading-relaxed text-justify">
+                <strong>Préconisation :</strong> Le remplacement immédiat des ${auditData.stats.critique} modules critiques est impératif pour la sécurité électrique. Une surveillance accrue (monitoring string) est recommandée pour les ${auditData.stats.majeur} modules présentant des défauts majeurs.
+            </p>
+        </div>
+
+        <!-- SIGNATURE -->
+        <div class="flex justify-end mt-12">
+            <div class="text-center">
+                <div class="text-xs font-bold text-slate-400 uppercase mb-4">Pour DiagPV</div>
+                <div class="font-black text-slate-900 text-lg">Fabien CORRERA</div>
+                <div class="text-xs text-slate-500">Expert Photovoltaïque</div>
+                <!-- Signature simulée -->
+                <div class="mt-2 font-script text-3xl text-blue-900 opacity-80 rotate-[-5deg]">F. Correra</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- STYLES -->
     <style>
-        body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-        
-        .diagpv-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            padding: 2rem;
-            margin-bottom: 2rem;
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+        .font-script { font-family: 'Dancing Script', cursive; }
+
+        .report-page {
+            width: 21cm;
+            height: 29.7cm;
+            margin: 0 auto;
+            overflow: hidden;
         }
-        
-        .conformity-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.875rem;
-        }
-        
-        .conformity-high { background: #dcfce7; color: #166534; }
-        .conformity-medium { background: #fef3c7; color: #92400e; }
-        .conformity-low { background: #fee2e2; color: #991b1b; }
-        
-        .module-tag {
-            display: inline-block;
-            padding: 2px 8px;
-            margin: 2px;
-            background: #e0e7ff;
-            color: #3730a3;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(22, 163, 74, 0.3);
-        }
-        
-        .btn-secondary {
-            background: white;
-            color: #374151;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 600;
-            border: 2px solid #e5e7eb;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-secondary:hover {
-            border-color: #16a34a;
-            color: #16a34a;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th {
-            background: #f9fafb;
-            padding: 12px;
-            text-align: left;
-            font-weight: 700;
-            color: #374151;
-            border-bottom: 2px solid #e5e7eb;
-        }
-        
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #f3f4f6;
-        }
-        
-        tr:hover {
-            background: #f9fafb;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 1000;
-            overflow: auto;
-        }
-        
-        .modal-content {
-            background: white;
-            margin: 2% auto;
-            width: 95%;
-            max-width: 1200px;
-            border-radius: 12px;
-            max-height: 90vh;
-            overflow: auto;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: #166534;
-        }
-        
-        .stat-label {
-            color: #6b7280;
-            font-weight: 600;
-            margin-top: 0.5rem;
+
+        @media print {
+            body { background: white; -webkit-print-color-adjust: exact; }
+            .print\\:hidden { display: none !important; }
+            .print\\:shadow-none { box-shadow: none !important; }
+            .print\\:mt-0 { margin-top: 0 !important; }
+            
+            /* Force page breaks */
+            .report-page {
+                break-after: page;
+                break-inside: avoid;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
         }
     </style>
-</head>
-<body class="min-h-screen p-6">
-    
-    <!-- Header DiagPV -->
-    <div class="max-w-7xl mx-auto">
-        <div class="diagpv-card">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-4xl font-black text-gray-800 mb-2">
-                        <i class="fas fa-file-alt text-green-600 mr-3"></i>
-                        RAPPORTS UNIFIÉS
-                    </h1>
-                    <p class="text-gray-600 font-semibold">Gestion centralisée des audits multi-modules DiagPV</p>
-                </div>
-                <button onclick="showGenerateForm()" class="btn-primary">
-                    <i class="fas fa-plus mr-2"></i>
-                    NOUVEAU RAPPORT
-                </button>
-            </div>
-        </div>
-        
-        <!-- Statistiques Globales -->
-        <div id="statsContainer" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card">
-                <div class="stat-value" id="totalReports">-</div>
-                <div class="stat-label">Rapports Générés</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avgConformity">-</div>
-                <div class="stat-label">Conformité Moyenne</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="criticalIssues">-</div>
-                <div class="stat-label">Défauts Critiques</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="recentReports">-</div>
-                <div class="stat-label">Cette Semaine</div>
-            </div>
-        </div>
-        
-        <!-- Filtres -->
-        <div class="diagpv-card">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-filter text-blue-600 mr-2"></i>
-                Filtres
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Centrale</label>
-                    <select id="filterPlantId" onchange="loadReports()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Toutes les centrales</option>
-                        <option value="1">Centrale Test (ID 1)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Date Min</label>
-                    <input type="date" id="filterDateMin" onchange="loadReports()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Conformité Min</label>
-                    <input type="number" id="filterConformityMin" min="0" max="100" placeholder="0-100" onchange="loadReports()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div class="flex items-end">
-                    <button onclick="resetFilters()" class="btn-secondary w-full">
-                        <i class="fas fa-redo mr-2"></i>
-                        Réinitialiser
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Tableau Rapports -->
-        <div class="diagpv-card">
-            <h3 class="text-2xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-list text-purple-600 mr-2"></i>
-                Liste des Rapports
-                <span id="reportCount" class="text-sm text-gray-500 ml-2"></span>
-            </h3>
-            
-            <div id="loadingSpinner" class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-4xl text-green-600"></i>
-                <p class="text-gray-600 mt-4 font-semibold">Chargement des rapports...</p>
-            </div>
-            
-            <div id="reportsTable" style="display: none;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Token</th>
-                            <th>Titre</th>
-                            <th>Client</th>
-                            <th>Date</th>
-                            <th>Auditeur</th>
-                            <th>Conformité</th>
-                            <th>Modules</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportsBody">
-                    </tbody>
-                </table>
-            </div>
-            
-            <div id="noReports" style="display: none;" class="text-center py-12">
-                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-                <p class="text-gray-600 font-semibold text-lg">Aucun rapport trouvé</p>
-                <button onclick="showGenerateForm()" class="btn-primary mt-4">
-                    <i class="fas fa-plus mr-2"></i>
-                    Générer Premier Rapport
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal Visualisation Rapport -->
-    <div id="reportModal" class="modal">
-        <div class="modal-content">
-            <div class="p-6 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <h2 class="text-2xl font-bold text-gray-800">
-                    <i class="fas fa-file-pdf text-red-600 mr-2"></i>
-                    Rapport <span id="modalReportToken"></span>
-                </h2>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-800 text-2xl">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="reportContent" class="p-6"></div>
-        </div>
-    </div>
-    
-    <!-- Modal Génération Rapport -->
-    <div id="generateModal" class="modal">
-        <div class="modal-content">
-            <div class="p-6 border-b border-gray-200 flex items-center justify-between bg-green-50">
-                <h2 class="text-2xl font-bold text-gray-800">
-                    <i class="fas fa-plus-circle text-green-600 mr-2"></i>
-                    Générer Nouveau Rapport
-                </h2>
-                <button onclick="closeGenerateModal()" class="text-gray-500 hover:text-gray-800 text-2xl">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-6">
-                <form id="generateForm" onsubmit="generateReport(event)">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">Centrale PV *</label>
-                            <select id="genPlantId" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                <option value="">-- Sélectionner --</option>
-                                <option value="1">Centrale Test (ID 1)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">Date Audit *</label>
-                            <input type="date" id="genAuditDate" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">Titre Rapport *</label>
-                            <input type="text" id="genReportTitle" required placeholder="Ex: Audit Annuel 2025" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">Nom Client *</label>
-                            <input type="text" id="genClientName" required placeholder="Ex: EDF Renouvelables" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Auditeur</label>
-                        <select id="genAuditorName" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">-- Optionnel --</option>
-                            <option value="Adrien PAPPALARDO">Adrien PAPPALARDO</option>
-                            <option value="Fabien CORRERA">Fabien CORRERA</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Aperçu Données Disponibles -->
-                    <div id="previewData" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6" style="display: none;">
-                        <h4 class="font-bold text-blue-800 mb-2">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            Données Disponibles
-                        </h4>
-                        <div id="previewModules" class="text-sm text-gray-700"></div>
-                    </div>
-                    
-                    <div class="flex space-x-4">
-                        <button type="button" onclick="previewAvailableData()" class="btn-secondary flex-1">
-                            <i class="fas fa-search mr-2"></i>
-                            Aperçu Données
-                        </button>
-                        <button type="submit" class="btn-primary flex-1">
-                            <i class="fas fa-file-pdf mr-2"></i>
-                            Générer Rapport
-                        </button>
-                    </div>
-                </form>
-                
-                <div id="generateProgress" style="display: none;" class="text-center py-8">
-                    <i class="fas fa-spinner fa-spin text-4xl text-green-600 mb-4"></i>
-                    <p class="text-gray-700 font-bold">Génération en cours...</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <script>
-        // État global
-        let allReports = [];
-        
-        // Chargement initial
-        document.addEventListener('DOMContentLoaded', () => {
-            loadReports();
-            updateStats();
-            
-            // Date par défaut = aujourd'hui
-            document.getElementById('genAuditDate').valueAsDate = new Date();
-        });
-        
-        // Charger tous les rapports
-        async function loadReports() {
-            const plantId = document.getElementById('filterPlantId').value;
-            
-            try {
-                document.getElementById('loadingSpinner').style.display = 'block';
-                document.getElementById('reportsTable').style.display = 'none';
-                document.getElementById('noReports').style.display = 'none';
-                
-                let url = '/api/report/unified/plant/1'; // TODO: Dynamiser quand multi-centrales
-                if (plantId) {
-                    url = \`/api/report/unified/plant/\${plantId}\`;
-                }
-                
-                const response = await axios.get(url);
-                
-                if (response.data.success) {
-                    allReports = response.data.reports || [];
-                    applyFiltersAndDisplay();
-                }
-            } catch (error) {
-                console.error('Erreur chargement rapports:', error);
-                document.getElementById('loadingSpinner').style.display = 'none';
-                document.getElementById('noReports').style.display = 'block';
-            }
-        }
-        
-        // Appliquer filtres et afficher
-        function applyFiltersAndDisplay() {
-            const dateMin = document.getElementById('filterDateMin').value;
-            const conformityMin = parseInt(document.getElementById('filterConformityMin').value) || 0;
-            
-            let filtered = allReports.filter(r => {
-                if (dateMin && r.auditDate < dateMin) return false;
-                if (r.overallConformityRate < conformityMin) return false;
-                return true;
-            });
-            
-            displayReports(filtered);
-        }
-        
-        // Afficher rapports
-        function displayReports(reports) {
-            document.getElementById('loadingSpinner').style.display = 'none';
-            
-            if (reports.length === 0) {
-                document.getElementById('reportsTable').style.display = 'none';
-                document.getElementById('noReports').style.display = 'block';
-                return;
-            }
-            
-            document.getElementById('reportsTable').style.display = 'block';
-            document.getElementById('noReports').style.display = 'none';
-            document.getElementById('reportCount').textContent = \`(\${reports.length} rapport(s))\`;
-            
-            const tbody = document.getElementById('reportsBody');
-            tbody.innerHTML = reports.map(r => \`
-                <tr>
-                    <td class="font-mono text-sm text-gray-600">\${r.reportToken.substring(0, 16)}...</td>
-                    <td class="font-semibold">\${r.reportTitle}</td>
-                    <td>\${r.clientName}</td>
-                    <td>\${new Date(r.auditDate).toLocaleDateString('fr-FR')}</td>
-                    <td class="text-sm text-gray-600">\${r.auditorName || '-'}</td>
-                    <td>
-                        <span class="conformity-badge \${getConformityClass(r.overallConformityRate)}">
-                            \${r.overallConformityRate}%
-                        </span>
-                    </td>
-                    <td>
-                        \${r.modulesIncluded.map(m => \`<span class="module-tag">\${m.toUpperCase()}</span>\`).join(' ')}
-                    </td>
-                    <td>
-                        <button onclick="viewReport('\${r.reportToken}')" class="btn-secondary text-xs">
-                            <i class="fas fa-eye mr-1"></i>Voir
-                        </button>
-                    </td>
-                </tr>
-            \`).join('');
-        }
-        
-        // Classe conformité
-        function getConformityClass(rate) {
-            if (rate >= 80) return 'conformity-high';
-            if (rate >= 60) return 'conformity-medium';
-            return 'conformity-low';
-        }
-        
-        // Réinitialiser filtres
-        function resetFilters() {
-            document.getElementById('filterPlantId').value = '';
-            document.getElementById('filterDateMin').value = '';
-            document.getElementById('filterConformityMin').value = '';
-            loadReports();
-        }
-        
-        // Mettre à jour statistiques
-        async function updateStats() {
-            // TODO: Endpoint API dédié pour stats globales
-            // Pour l'instant, calculer depuis allReports
-            if (allReports.length > 0) {
-                const avgConf = Math.round(allReports.reduce((sum, r) => sum + r.overallConformityRate, 0) / allReports.length);
-                const criticals = allReports.reduce((sum, r) => sum + r.criticalIssuesCount, 0);
-                
-                document.getElementById('totalReports').textContent = allReports.length;
-                document.getElementById('avgConformity').textContent = avgConf + '%';
-                document.getElementById('criticalIssues').textContent = criticals;
-                document.getElementById('recentReports').textContent = allReports.filter(r => {
-                    const weekAgo = new Date();
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    return new Date(r.createdAt) > weekAgo;
-                }).length;
-            }
-        }
-        
-        // Afficher formulaire génération
-        function showGenerateForm() {
-            document.getElementById('generateModal').style.display = 'block';
-        }
-        
-        // Fermer modal génération
-        function closeGenerateModal() {
-            document.getElementById('generateModal').style.display = 'none';
-            document.getElementById('generateForm').reset();
-            document.getElementById('previewData').style.display = 'none';
-        }
-        
-        // Aperçu données disponibles
-        async function previewAvailableData() {
-            const plantId = document.getElementById('genPlantId').value;
-            if (!plantId) {
-                alert('Veuillez sélectionner une centrale');
-                return;
-            }
-            
-            try {
-                const response = await axios.get(\`/api/report/unified/preview?plantId=\${plantId}\`);
-                
-                if (response.data.success) {
-                    const data = response.data;
-                    const modules = [];
-                    if (data.availableModules.el) modules.push(\`✅ EL (\${data.dataSummary.elAuditsCount} audit(s))\`);
-                    if (data.availableModules.iv) modules.push(\`✅ IV (\${data.dataSummary.ivCurvesCount} courbe(s))\`);
-                    if (data.availableModules.visual) modules.push(\`✅ Visuels (\${data.dataSummary.visualInspectionsCount} inspection(s))\`);
-                    if (data.availableModules.isolation) modules.push(\`✅ Isolation (\${data.dataSummary.isolationTestsCount} test(s))\`);
-                    
-                    document.getElementById('previewModules').innerHTML = modules.join('<br>');
-                    document.getElementById('previewData').style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Erreur aperçu:', error);
-                alert('Erreur récupération données');
-            }
-        }
-        
-        // Générer rapport
-        async function generateReport(event) {
-            event.preventDefault();
-            
-            const formData = {
-                plantId: parseInt(document.getElementById('genPlantId').value),
-                reportTitle: document.getElementById('genReportTitle').value,
-                clientName: document.getElementById('genClientName').value,
-                auditDate: document.getElementById('genAuditDate').value,
-                auditorName: document.getElementById('genAuditorName').value || null
-            };
-            
-            try {
-                document.getElementById('generateForm').style.display = 'none';
-                document.getElementById('generateProgress').style.display = 'block';
-                
-                const response = await axios.post('/api/report/unified/generate', formData);
-                
-                if (response.data.success) {
-                    alert(\`Rapport généré avec succès !\\nToken: \${response.data.reportToken}\`);
-                    closeGenerateModal();
-                    document.getElementById('generateForm').style.display = 'block';
-                    document.getElementById('generateProgress').style.display = 'none';
-                    loadReports();
-                    updateStats();
-                } else {
-                    throw new Error(response.data.error || 'Erreur génération');
-                }
-            } catch (error) {
-                console.error('Erreur génération rapport:', error);
-                alert('Erreur génération rapport: ' + (error.response?.data?.error || error.message));
-                document.getElementById('generateForm').style.display = 'block';
-                document.getElementById('generateProgress').style.display = 'none';
-            }
-        }
-        
-        // Visualiser rapport
-        async function viewReport(token) {
-            try {
-                const response = await axios.get(\`/api/report/unified/\${token}\`);
-                
-                if (response.data.success) {
-                    const report = response.data.report;
-                    document.getElementById('modalReportToken').textContent = token;
-                    document.getElementById('reportContent').innerHTML = report.htmlContent;
-                    document.getElementById('reportModal').style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Erreur chargement rapport:', error);
-                alert('Erreur chargement rapport');
-            }
-        }
-        
-        // Fermer modal
-        function closeModal() {
-            document.getElementById('reportModal').style.display = 'none';
-        }
-        
-        // Fermer modals au clic extérieur
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-            }
-        }
-    </script>
-    
-</body>
-</html>
   `;
+
+  return getLayout('Rapport Expert', content, 'rapports');
 }

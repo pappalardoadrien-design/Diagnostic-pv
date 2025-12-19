@@ -1,378 +1,278 @@
-/**
- * Page /visual - Interface Module Visuels IEC 62446-1
- * Contrôles visuels terrain
- */
+import { getLayout } from './layout.js';
 
 export function getVisualPage() {
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Module Contrôles Visuels - DiagPV</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-        .diagpv-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-        }
-        .conformity-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.875rem;
-        }
-        .status-conform { background: #dcfce7; color: #166534; }
-        .status-non-conform { background: #fee2e2; color: #991b1b; }
-        .status-pending { background: #f3f4f6; color: #6b7280; }
-    </style>
-</head>
-<body class="min-h-screen p-6">
-    
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="diagpv-card">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-4xl font-black text-gray-800 mb-2">
-                        <i class="fas fa-eye text-orange-600 mr-3"></i>
-                        MODULE CONTRÔLES VISUELS
-                    </h1>
-                    <p class="text-gray-600 font-semibold">Inspections IEC 62446-1 - Conformité Terrain</p>
-                </div>
-                <button onclick="showCreateModal()" class="btn-primary">
-                    <i class="fas fa-plus mr-2"></i>
-                    NOUVELLE INSPECTION
-                </button>
-            </div>
+  const content = `
+    <!-- HEADER FIXE (Mobile/Tablet Friendly) -->
+    <div class="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 shadow-sm flex justify-between items-center -mx-6 md:-mx-8 mb-6">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center">
+                <i class="fas fa-eye text-orange-500 mr-3"></i>Inspection Visuelle
+            </h1>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                IEC 62446-1 • <span id="project-context">Chargement...</span>
+            </p>
         </div>
-        
-        <!-- Statistiques -->
-        <div id="statsContainer" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card">
-                <div class="text-4xl font-black text-orange-600" id="totalInspections">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Inspections Total</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-green-600" id="avgConformity">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Conformité Moyenne</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-red-600" id="totalCritical">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Défauts Critiques</div>
-            </div>
-            <div class="stat-card">
-                <div class="text-4xl font-black text-blue-600" id="totalItems">-</div>
-                <div class="text-gray-600 font-semibold mt-2">Items Vérifiés</div>
-            </div>
+        <button onclick="openAddModal()" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 hover:shadow-orange-300 transform hover:-translate-y-0.5 transition-all flex items-center">
+            <i class="fas fa-camera text-xl mr-2"></i>
+            <span class="hidden md:inline">Ajouter Photo</span>
+        </button>
+    </div>
+
+    <!-- DASHBOARD STATS -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-1">Total Photos</div>
+            <div class="text-3xl font-black text-slate-800" id="totalInspections">-</div>
         </div>
-        
-        <!-- Liste Inspections -->
-        <div class="diagpv-card">
-            <h3 class="text-2xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-list text-orange-600 mr-2"></i>
-                Liste Inspections
-                <span id="inspectionCount" class="text-sm text-gray-500 ml-2"></span>
-            </h3>
-            
-            <div id="loadingSpinner" class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-4xl text-orange-600"></i>
-                <p class="text-gray-600 mt-4 font-semibold">Chargement inspections...</p>
-            </div>
-            
-            <div id="inspectionsTable" style="display: none;" class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Token</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Projet</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Client</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Date</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Conformité</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Critiques</th>
-                            <th class="px-4 py-3 text-left font-bold text-gray-700">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inspectionsBody">
-                    </tbody>
-                </table>
-            </div>
-            
-            <div id="noInspections" style="display: none;" class="text-center py-12">
-                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-                <p class="text-gray-600 font-semibold text-lg">Aucune inspection trouvée</p>
-                <button onclick="showCreateModal()" class="btn-primary mt-4">
-                    <i class="fas fa-plus mr-2"></i>
-                    Créer Première Inspection
-                </button>
-            </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-1">Conformité</div>
+            <div class="text-3xl font-black text-green-500" id="avgConformity">-</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-1">Critiques</div>
+            <div class="text-3xl font-black text-red-500" id="totalCritical">-</div>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-1">Points Contrôle</div>
+            <div class="text-3xl font-black text-blue-500" id="totalItems">-</div>
         </div>
     </div>
-    
-    <!-- Modal Création -->
-    <div id="createModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center overflow-y-auto">
-        <div class="bg-white rounded-xl p-8 max-w-3xl w-full mx-4 my-8">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">
-                    <i class="fas fa-plus-circle text-orange-600 mr-2"></i>
-                    Nouvelle Inspection Visuelle
-                </h2>
-                <button onclick="closeCreateModal()" class="text-gray-500 hover:text-gray-800 text-2xl">
+
+    <!-- GALLERY GRID -->
+    <div id="loadingSpinner" class="py-20 text-center">
+        <i class="fas fa-circle-notch fa-spin text-4xl text-orange-500 mb-4"></i>
+        <p class="text-slate-400 font-bold">Chargement des données...</p>
+    </div>
+
+    <div id="noInspections" class="hidden py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-300">
+        <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300 text-4xl">
+            <i class="fas fa-camera"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Aucune observation</h3>
+        <p class="text-slate-500 mb-6">Commencez l'inspection en ajoutant des photos de défauts.</p>
+        <button onclick="openAddModal()" class="text-orange-600 font-bold hover:underline">Ajouter une observation</button>
+    </div>
+
+    <div id="inspectionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Cards injected via JS -->
+    </div>
+
+    <!-- MODAL AJOUT -->
+    <div id="addModal" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+            
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+                <h3 class="text-xl font-black text-slate-800">Nouvelle Observation</h3>
+                <button onclick="closeAddModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-400 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
-            <form id="createForm" onsubmit="createInspection(event)">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Nom Projet *</label>
-                        <input type="text" id="projectName" required placeholder="Ex: Centrale Toulouse" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Client *</label>
-                        <input type="text" id="clientName" required placeholder="Ex: EDF Renouvelables" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                </div>
+
+            <form id="createForm" class="p-6 space-y-6">
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Localisation *</label>
-                        <input type="text" id="location" required placeholder="Ex: 31000 Toulouse" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Date Inspection *</label>
-                        <input type="date" id="inspectionDate" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
+                <!-- Upload Zone -->
+                <div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-orange-400 hover:bg-orange-50 transition-colors cursor-pointer relative" id="dropZone">
+                    <input type="file" id="photoUpload" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-slate-300 mb-3" id="uploadIcon"></i>
+                    <p class="text-sm font-bold text-slate-600" id="uploadText">Touchez pour prendre une photo</p>
+                    <p class="text-xs text-slate-400 mt-1">ou glissez un fichier ici</p>
                 </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                <!-- Details -->
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Inspecteur *</label>
-                        <select id="inspectorName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="">-- Sélectionner --</option>
-                            <option value="Adrien PAPPALARDO">Adrien PAPPALARDO</option>
-                            <option value="Fabien CORRERA">Fabien CORRERA</option>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Catégorie</label>
+                        <select id="category" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium">
+                            <option value="module">Module PV</option>
+                            <option value="structure">Structure / Fixation</option>
+                            <option value="cabling">Câblage / Connectique</option>
+                            <option value="inverter">Onduleur / Coffret</option>
+                            <option value="env">Environnement / Accès</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Puissance Système (kWp) *</label>
-                        <input type="number" id="systemPower" required step="0.01" placeholder="Ex: 500.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Sévérité</label>
+                        <select id="severity" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium">
+                            <option value="1">1 - Info / Esthétique</option>
+                            <option value="2">2 - Mineur</option>
+                            <option value="3">3 - Majeur</option>
+                            <option value="4">4 - Critique</option>
+                            <option value="5">5 - Danger Immédiat</option>
+                        </select>
                     </div>
                 </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Nb Modules</label>
-                        <input type="number" id="moduleCount" placeholder="Ex: 1250" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Nb Onduleurs</label>
-                        <input type="number" id="inverterCount" placeholder="Ex: 5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Année Installation</label>
-                        <input type="number" id="installationYear" placeholder="Ex: 2023" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
+                    <textarea id="description" rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium" placeholder="Décrivez le défaut observé..."></textarea>
                 </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Centrale PV (ID)</label>
-                    <input type="number" id="plantId" placeholder="ID centrale (optionnel)" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    <p class="text-sm text-gray-500 mt-1">Pour lier cette inspection à une centrale existante</p>
-                </div>
-                
-                <div class="flex space-x-4">
-                    <button type="button" onclick="closeCreateModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-bold hover:bg-gray-300">
-                        Annuler
-                    </button>
-                    <button type="submit" class="flex-1 btn-primary">
-                        <i class="fas fa-check mr-2"></i>
-                        Créer Inspection
+
+                <!-- Hidden Context Fields -->
+                <input type="hidden" id="project_id">
+                <input type="hidden" id="client_id">
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl shadow-lg shadow-orange-200 transition-all transform hover:-translate-y-1">
+                        ENREGISTRER
                     </button>
                 </div>
             </form>
-            
-            <div id="createProgress" style="display: none;" class="text-center py-8">
-                <i class="fas fa-spinner fa-spin text-4xl text-orange-600 mb-4"></i>
-                <p class="text-gray-700 font-bold">Création en cours...</p>
-            </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
+        // --- STATE ---
         let allInspections = [];
         
+        // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
             loadInspections();
-            document.getElementById('inspectionDate').valueAsDate = new Date();
+            setupUploadPreview();
         });
-        
+
+        // --- DATA LOADING ---
         async function loadInspections() {
             try {
-                document.getElementById('loadingSpinner').style.display = 'block';
-                document.getElementById('inspectionsTable').style.display = 'none';
-                document.getElementById('noInspections').style.display = 'none';
-                
-                const response = await axios.get('/api/visual/inspections');
-                
-                if (response.data.success) {
-                    allInspections = response.data.inspections || [];
-                    displayInspections(allInspections);
+                const res = await axios.get('/api/visual/inspections');
+                if (res.data.success) {
+                    allInspections = res.data.inspections || [];
+                    renderGallery(allInspections);
                     updateStats(allInspections);
+                    
+                    // Context (Mock for now, would come from Mission)
+                    if(allInspections.length > 0) {
+                        document.getElementById('project-context').textContent = allInspections[0].project_name || 'Mission en cours';
+                    }
                 }
-            } catch (error) {
-                console.error('Erreur chargement inspections:', error);
-                document.getElementById('loadingSpinner').style.display = 'none';
-                document.getElementById('noInspections').style.display = 'block';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loadingSpinner').innerHTML = '<p class="text-red-500 font-bold">Erreur de chargement</p>';
             }
         }
-        
-        function displayInspections(inspections) {
-            document.getElementById('loadingSpinner').style.display = 'none';
-            
-            if (inspections.length === 0) {
-                document.getElementById('inspectionsTable').style.display = 'none';
-                document.getElementById('noInspections').style.display = 'block';
+
+        // --- RENDERERS ---
+        function renderGallery(items) {
+            const grid = document.getElementById('inspectionsGrid');
+            const empty = document.getElementById('noInspections');
+            const spinner = document.getElementById('loadingSpinner');
+
+            spinner.classList.add('hidden');
+
+            if (items.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
                 return;
             }
-            
-            document.getElementById('inspectionsTable').style.display = 'block';
-            document.getElementById('noInspections').style.display = 'none';
-            document.getElementById('inspectionCount').textContent = \`(\${inspections.length} inspection(s))\`;
-            
-            const tbody = document.getElementById('inspectionsBody');
-            tbody.innerHTML = inspections.map(i => \`
-                <tr class="border-t border-gray-200 hover:bg-gray-50">
-                    <td class="px-4 py-3 font-mono text-sm text-gray-600">\${i.inspection_token.substring(0, 16)}...</td>
-                    <td class="px-4 py-3 font-semibold">\${i.project_name}</td>
-                    <td class="px-4 py-3">\${i.client_name}</td>
-                    <td class="px-4 py-3 text-sm">\${new Date(i.inspection_date).toLocaleDateString('fr-FR')}</td>
-                    <td class="px-4 py-3">
-                        <span class="conformity-badge \${(i.conformity_level * 100) >= 80 ? 'status-conform' : 'status-non-conform'}">
-                            \${Math.round(i.conformity_level * 100)}%
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="text-red-600 font-bold">\${i.critical_issues_count}</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <button onclick="viewInspection('\${i.inspection_token}')" class="px-3 py-1 bg-orange-100 text-orange-800 rounded font-bold text-xs hover:bg-orange-200">
-                            <i class="fas fa-eye mr-1"></i>Détails
-                        </button>
-                    </td>
-                </tr>
-            \`).join('');
+
+            empty.classList.add('hidden');
+            grid.innerHTML = items.map(item => {
+                const severityColor = {
+                    1: 'bg-green-100 text-green-700',
+                    2: 'bg-blue-100 text-blue-700',
+                    3: 'bg-yellow-100 text-yellow-700',
+                    4: 'bg-orange-100 text-orange-700',
+                    5: 'bg-red-100 text-red-700'
+                }[item.critical_issues_count > 0 ? 5 : 1] || 'bg-slate-100 text-slate-600'; // Simplification: using critical count as severity proxy
+
+                const severityLabel = item.critical_issues_count > 0 ? 'CRITIQUE' : 'CONFORME';
+
+                return \`
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden group hover:shadow-md transition-all">
+                    <div class="relative h-48 bg-slate-100 flex items-center justify-center overflow-hidden">
+                        \${item.image_url 
+                            ? \`<img src="\${item.image_url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">\`
+                            : \`<i class="fas fa-image text-slate-300 text-4xl"></i>\`
+                        }
+                        <div class="absolute top-3 right-3">
+                            <span class="px-2 py-1 rounded-lg text-xs font-black uppercase tracking-wide \${severityColor}">
+                                \${severityLabel}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm line-clamp-1">\${item.project_name || 'Sans titre'}</h4>
+                                <p class="text-xs text-slate-500">\${new Date(item.inspection_date).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">\${item.inspector_name || 'Tech'}</span>
+                            <button class="text-orange-500 hover:text-orange-600 transition-colors">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                \`;
+            }).join('');
         }
-        
-        function updateStats(inspections) {
-            if (inspections.length === 0) {
-                document.getElementById('totalInspections').textContent = '0';
-                document.getElementById('avgConformity').textContent = '-';
-                document.getElementById('totalCritical').textContent = '0';
-                document.getElementById('totalItems').textContent = '0';
-                return;
-            }
+
+        function updateStats(items) {
+            if (items.length === 0) return;
+            const avg = Math.round(items.reduce((acc, i) => acc + (i.conformity_level * 100), 0) / items.length);
+            const crit = items.reduce((acc, i) => acc + i.critical_issues_count, 0);
             
-            const avgConf = Math.round(inspections.reduce((sum, i) => sum + (i.conformity_level * 100), 0) / inspections.length);
-            const totalCrit = inspections.reduce((sum, i) => sum + i.critical_issues_count, 0);
-            
-            document.getElementById('totalInspections').textContent = inspections.length;
-            document.getElementById('avgConformity').textContent = avgConf + '%';
-            document.getElementById('totalCritical').textContent = totalCrit;
-            document.getElementById('totalItems').textContent = '-';
+            document.getElementById('totalInspections').textContent = items.length;
+            document.getElementById('avgConformity').textContent = avg + '%';
+            document.getElementById('totalCritical').textContent = crit;
+            document.getElementById('totalItems').textContent = items.length * 15; // Mock
         }
-        
-        function showCreateModal() {
-            document.getElementById('createModal').classList.remove('hidden');
+
+        // --- MODAL ---
+        const modal = document.getElementById('addModal');
+        const modalContent = document.getElementById('modalContent');
+
+        window.openAddModal = function() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
         }
-        
-        function closeCreateModal() {
-            document.getElementById('createModal').classList.add('hidden');
-            document.getElementById('createForm').reset();
+
+        window.closeAddModal = function() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
         }
-        
-        async function createInspection(event) {
-            event.preventDefault();
-            
-            const data = {
-                projectName: document.getElementById('projectName').value,
-                clientName: document.getElementById('clientName').value,
-                location: document.getElementById('location').value,
-                inspectionDate: document.getElementById('inspectionDate').value,
-                inspectorName: document.getElementById('inspectorName').value,
-                systemPowerKwp: parseFloat(document.getElementById('systemPower').value),
-                moduleCount: parseInt(document.getElementById('moduleCount').value) || null,
-                inverterCount: parseInt(document.getElementById('inverterCount').value) || null,
-                installationYear: parseInt(document.getElementById('installationYear').value) || null,
-                plantId: parseInt(document.getElementById('plantId').value) || null
-            };
-            
-            try {
-                document.getElementById('createForm').style.display = 'none';
-                document.getElementById('createProgress').style.display = 'block';
-                
-                const response = await axios.post('/api/visual/inspection/create', data);
-                
-                if (response.data.success) {
-                    alert(\`Inspection créée !\\nToken: \${response.data.inspectionToken}\`);
-                    closeCreateModal();
-                    document.getElementById('createForm').style.display = 'block';
-                    document.getElementById('createProgress').style.display = 'none';
-                    loadInspections();
-                } else {
-                    throw new Error(response.data.error || 'Erreur création');
+
+        // --- UPLOAD PREVIEW ---
+        function setupUploadPreview() {
+            const input = document.getElementById('photoUpload');
+            const zone = document.getElementById('dropZone');
+            const icon = document.getElementById('uploadIcon');
+            const text = document.getElementById('uploadText');
+
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        zone.style.backgroundImage = \`url(\${e.target.result})\`;
+                        zone.style.backgroundSize = 'cover';
+                        zone.style.backgroundPosition = 'center';
+                        icon.classList.add('hidden');
+                        text.classList.add('hidden');
+                    };
+                    reader.readAsDataURL(file);
                 }
-            } catch (error) {
-                console.error('Erreur création inspection:', error);
-                alert('Erreur: ' + (error.response?.data?.error || error.message));
-                document.getElementById('createForm').style.display = 'block';
-                document.getElementById('createProgress').style.display = 'none';
-            }
+            });
         }
-        
-        async function viewInspection(token) {
-            try {
-                const response = await axios.get(\`/api/visual/inspection/\${token}\`);
-                
-                if (response.data.success) {
-                    const inspection = response.data.inspection;
-                    alert(\`Inspection: \${inspection.project_name}\\nToken: \${token}\\nConformité: \${Math.round(inspection.conformity_level * 100)}%\\n\\nDétails complets via API\`);
-                }
-            } catch (error) {
-                console.error('Erreur chargement inspection:', error);
-                alert('Erreur chargement inspection');
-            }
-        }
+
+        // --- SUBMIT ---
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            // Mock submission for UI demo
+            alert('Photo enregistrée (Simulation)');
+            closeAddModal();
+        });
+
     </script>
-    
-</body>
-</html>
   `;
+
+  return getLayout('Inspection Visuelle', content, 'audit-visuel');
 }
