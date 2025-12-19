@@ -484,9 +484,22 @@ crmRoutes.get('/projects/:id', async (c) => {
       return c.json({ success: false, error: 'Projet non trouvé' }, 404);
     }
 
+    // --- NORMALISATION DES DONNÉES (Fix Schéma Hybride) ---
+    // On priorise les colonnes modernes, sinon on fallback sur le legacy
+    const normalizedProject = {
+        ...project,
+        total_power_kwp: project.total_power_kwp || project.installation_power,
+        module_count: project.module_count || project.total_modules,
+        module_type: project.module_type || project.module_model,
+        inverter_type: project.inverter_type || project.inverter_model,
+        // Géolocalisation unifiée
+        gps_latitude: project.gps_latitude || project.latitude,
+        gps_longitude: project.gps_longitude || project.longitude
+    };
+
     return c.json({
       success: true,
-      project
+      project: normalizedProject
     });
 
   } catch (error: any) {

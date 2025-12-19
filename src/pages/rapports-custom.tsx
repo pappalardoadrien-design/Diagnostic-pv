@@ -155,28 +155,39 @@ export function getRapportsCustomPage() {
             const token = urlParams.get('token');
 
             if (!token) {
-                // MODE DEMO (Si pas de token)
-                loadMockData();
+                // ÉCHAPPEMENT CORRIGÉ ICI (Backticks internes)
+                document.getElementById('loading-screen').innerHTML = \`
+                    <div class="text-center p-8 text-red-600">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <h2 class="text-2xl font-bold">Token Manquant</h2>
+                        <p class="mt-2">Impossible de générer le rapport sans identifiant d'audit.</p>
+                        <a href="/crm/dashboard" class="mt-6 inline-block px-6 py-3 bg-slate-800 text-white rounded-lg font-bold">Retour Dashboard</a>
+                    </div>
+                \`;
                 return;
             }
 
             try {
-                // 1. Récupérer les données réelles
-                // Note: Dans un vrai déploiement, ces endpoints doivent exister.
-                // Ici, on simule l'appel mais on structure la donnée comme si elle venait de la BDD
+                // APPEL API RÉEL
+                const res = await axios.get('/api/report/unified/data/' + token);
                 
-                // Appel API simulé pour la structure finale (votre backend Hono le gérera)
-                // const res = await axios.get('/api/audit/' + token + '/report-data');
-                // const data = res.data;
+                if(!res.data || !res.data.success) {
+                    throw new Error("Données incomplètes ou audit inexistant");
+                }
                 
-                // Pour la démo "Live" sans backend peuplé, on simule la réponse d'un audit "ZI PLANE BASSE"
-                const data = getMockData(token); 
-                
-                renderReport(data);
+                renderReport(res.data.reportData);
 
             } catch (e) {
                 console.error(e);
-                alert("Erreur lors de la génération des données");
+                // ÉCHAPPEMENT CORRIGÉ ICI
+                document.getElementById('loading-screen').innerHTML = \`
+                    <div class="text-center p-8 text-red-600">
+                        <i class="fas fa-server text-4xl mb-4"></i>
+                        <h2 class="text-2xl font-bold">Erreur de Génération</h2>
+                        <p class="mt-2 text-slate-600">\${e.message || "Erreur technique serveur"}</p>
+                        <button onclick="location.reload()" class="mt-6 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-bold">Réessayer</button>
+                    </div>
+                \`;
             }
         }
 
@@ -208,6 +219,7 @@ export function getRapportsCustomPage() {
                     // Générer les modules du string
                     string.modules.forEach(mod => {
                         const style = SEVERITY_COLORS[mod.sev] || SEVERITY_COLORS['OK'];
+                        // ÉCHAPPEMENT CORRIGÉ ICI
                         const label = mod.code ? \`<span class="text-[5px] font-black text-white">\${mod.code}</span>\` : \`<span class="text-[5px] text-slate-300 opacity-0">\${mod.idx}</span>\`;
                         
                         modulesHtml += \`
@@ -241,6 +253,7 @@ export function getRapportsCustomPage() {
 
             // Stats Note
             const critCount = data.stats.critical;
+            // ÉCHAPPEMENT CORRIGÉ ICI
             document.getElementById('expert-note').innerHTML = \`
                 L'audit a révélé <strong>\${critCount} défauts critiques</strong> nécessitant une intervention. 
                 La cartographie met en évidence une concentration sur la \${data.tables[0].name}, suggérant un problème localisé (ombrage ou défaut série).
@@ -249,39 +262,6 @@ export function getRapportsCustomPage() {
             // Afficher
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('report-content').classList.remove('hidden');
-        }
-
-        function getMockData(token) {
-            // Simulation intelligente basée sur le token
-            return {
-                project: {
-                    ref: "ZI PLANE BASSE (AUDIT-" + token.substring(0,4) + ")",
-                    client: "SOLAR SUD",
-                    date: new Date().toLocaleDateString('fr-FR'),
-                    power: "1337.5 kWc",
-                    modules_count: "3850",
-                    inverters: "12x Huawei 100KTL",
-                    location: "81660 Bout-du-Pont-de-Larn"
-                },
-                stats: { critical: 5 },
-                tables: [
-                    {
-                        name: "Zone 1 - Onduleur A",
-                        strings: [
-                            { id: "S.01", modules: Array.from({length:20}, (_,i) => ({idx:i+1, sev: i===4?5:'OK', code: i===4?'HOT':null})) },
-                            { id: "S.02", modules: Array.from({length:20}, (_,i) => ({idx:i+1, sev: 'OK'})) },
-                            { id: "S.03", modules: Array.from({length:20}, (_,i) => ({idx:i+1, sev: i>15?3:'OK', code: i>15?'PID':null})) },
-                        ]
-                    },
-                    {
-                        name: "Zone 1 - Onduleur B",
-                        strings: [
-                            { id: "S.04", modules: Array.from({length:20}, (_,i) => ({idx:i+1, sev: 'OK'})) },
-                            { id: "S.05", modules: Array.from({length:20}, (_,i) => ({idx:i+1, sev: 5, code: 'CAS'})) }, // String completement rouge simulé
-                        ]
-                    }
-                ]
-            };
         }
 
         // Load

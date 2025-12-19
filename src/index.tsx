@@ -1045,10 +1045,11 @@ app.get('/audit/:token/photos', (c) => {
 })
 
 // ============================================================================
-// ROUTE MODULE EL - REDIRECTION VERS DASHBOARD CRM
+// ROUTE MODULE EL - ACCÈS DIRECT CRÉATION
 // ============================================================================
 app.get('/el', (c) => {
-  return c.redirect('/crm/dashboard');
+  // Redirection vers le Wizard de création qui pré-coche "EL"
+  return c.redirect('/audits/create?type=EL');
 })
 
 // Page d'audit terrain nocturne
