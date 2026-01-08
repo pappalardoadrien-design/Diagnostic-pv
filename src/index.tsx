@@ -34,7 +34,10 @@ import { getAuditsCreatePage } from './pages/audits-create'
 import { getCrmDashboardPage } from './pages/crm-dashboard'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
 import { getCrmClientsListPage } from './pages/crm-clients-list'
+import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
+import { getCrmProjectsListPage } from './pages/crm-projects-list'
 import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
+import { getCrmProjectsDetailPage } from './pages/crm-projects-detail'
 import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getLoginPage } from './pages/login'
@@ -171,11 +174,6 @@ app.route('/api/visual', visualInspectionModule)
 app.route('/api/thermique', thermiqueRoutes)
 
 // ============================================================================
-// MODULE THERMIQUE - THERMOGRAPHIE IR (Rétabli)
-// ============================================================================
-app.route('/api/thermique', thermiqueRoutes)
-
-// ============================================================================
 // MODULE ISOLATION - TESTS D'ISOLEMENT IEC 62446 (Phase 2 - Module 4/6)
 // ============================================================================
 // Module Tests Isolement DC/AC conformes norme IEC 62446
@@ -240,8 +238,11 @@ app.get('/audit/:token/photos', (c) => {
 app.get('/crm/dashboard', (c) => c.html(getCrmDashboardPage()))
 app.get('/dashboard', (c) => c.html(getCrmDashboardPage())) // Alias
 app.get('/crm/clients', (c) => c.html(getCrmClientsListPage()))
+app.get('/crm/clients/detail', (c) => c.html(getCrmClientsDetailPage()))
 app.get('/crm/clients/create', (c) => c.html(getCrmClientsCreatePage()))
+app.get('/crm/projects', (c) => c.html(getCrmProjectsListPage()))
 app.get('/crm/projects/create', (c) => c.html(getCrmProjectsCreatePage()))
+app.get('/crm/projects/detail', (c) => c.html(getCrmProjectsDetailPage()))
 
 // === PAGES PLANNING ===
 app.get('/planning', (c) => c.html(getPlanningDashboardPage()))
