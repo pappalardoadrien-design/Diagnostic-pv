@@ -74,8 +74,8 @@ app.get('/example/:id', (c) => {
 
 ## Prérequis avant refactoring
 
-- [ ] Backup complet du projet (FAIT: https://www.genspark.ai/api/files/s/pls0TlRv)
-- [ ] Tests automatisés pour chaque route (À FAIRE)
+- [x] Backup complet du projet (FAIT: https://www.genspark.ai/api/files/s/pls0TlRv)
+- [x] Tests automatisés pour chaque route (FAIT: tests/api-health-check.sh - 32/33 tests OK)
 - [ ] Documentation des dépendances entre templates
 - [ ] Environnement de staging pour tester les changements
 
