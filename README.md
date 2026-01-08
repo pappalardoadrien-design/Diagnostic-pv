@@ -322,14 +322,15 @@ diagnostic-hub/
 ## 🚀 Déploiement Production
 
 ### URLs de production
-- **Production**: https://5cd316f4.diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT (15/12/2025)**
-- **Domaine principal**: https://diagnostic-hub.pages.dev
+- **Production**: https://diagnostic-hub.pages.dev ✅ **DERNIER DÉPLOIEMENT (08/01/2026)**
 - **Dashboard Unifié**: https://diagnostic-hub.pages.dev/dashboard
-- **Nouveau Création Audit**: https://diagnostic-hub.pages.dev/audits/create
-- **Sandbox Dev**: https://3000-ihjl3q1cxb8r55v93w6w4-6532622b.e2b.dev (test handles interactifs)
+- **CRM Clients**: https://diagnostic-hub.pages.dev/crm/clients
+- **Planning**: https://diagnostic-hub.pages.dev/planning
+- **GIRASOLE Mission**: https://diagnostic-hub.pages.dev/girasole/dashboard
+- **Création Audit**: https://diagnostic-hub.pages.dev/audits/create
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
-- **Backup**: https://page.gensparksite.com/project_backups/diagnostic-hub-handles-interactifs-v1.tar.gz
+- **R2 Storage**: diagpv-photos (bucket créé le 08/01/2026)
 
 ### Plateforme
 - **Hébergement**: Cloudflare Pages (edge global)
@@ -339,20 +340,19 @@ diagnostic-hub/
 
 ### Tech Stack
 - **Backend**: Hono TypeScript + Cloudflare Workers
-- **Frontend**: Vanilla JavaScript + TailwindCSS CDN
+- **Frontend**: Vanilla JavaScript + Tailwind CSS v4 (Vite plugin + CDN fallback)
+- **Build**: Vite 6.3 + @tailwindcss/vite
 - **Database**: Cloudflare D1 SQLite unified
-- **Storage**: Cloudflare R2 + KV
+- **Storage**: Cloudflare R2 (diagpv-photos) + KV
 - **PWA**: Service Worker offline-first
 
-### Statistiques Production (27/10/2025)
-- ✅ 2 audits migrés: JALIBAT (242 modules) + Les Forges (220 modules)
-- ✅ 462 modules totaux avec 100% d'intégrité
-- ✅ Distribution: 58 OK, 87 microcracks, 182 dead, 135 inequality
-- ✅ Tokens préservés, configurations avancées intactes
-- ✅ Database size: 0.44 MB
-- ✅ **Édition modules opérationnelle** - Tests validation réussis
-- ✅ **Génération rapports PDF** - Imprimables avec stats complètes
-- ✅ **Plan de calepinage physique** - Grille visuelle pour localisation sur site
+### Statistiques Production (08/01/2026)
+- ✅ **7 clients actifs** dans le CRM
+- ✅ **54 projets GIRASOLE** (40 SOL + 14 DOUBLE) - Mission Janvier-Mars 2025
+- ✅ **184 défauts critiques** suivis dans le système
+- ✅ **Modules fonctionnels**: Dashboard, CRM, Planning, GIRASOLE, Audits, EL, PV Carto
+- ✅ **Tailwind CSS v4** installé avec plugin Vite
+- ✅ **Documentation organisée** - 43 fichiers MD dans docs/ (archive, guides, architecture, roadmap)
 
 ## 🔧 Développement Local
 
