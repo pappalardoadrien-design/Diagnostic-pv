@@ -1,0 +1,172 @@
+/* DiagPV OS - Tailwind CSS v4 Entry Point */
+@import "tailwindcss";
+
+/* Custom DiagPV Theme */
+@theme {
+  /* Colors */
+  --color-diagpv-black: #000000;
+  --color-diagpv-white: #ffffff;
+  --color-diagpv-yellow: #fbbf24;
+  --color-diagpv-green: #10b981;
+  --color-diagpv-red: #ef4444;
+  --color-diagpv-orange: #f97316;
+  --color-diagpv-blue: #3b82f6;
+  --color-diagpv-gray: #6b7280;
+  --color-diagpv-purple: #8b5cf6;
+  
+  /* Fonts */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* DiagPV Custom Components */
+@layer components {
+  /* Touch-optimized buttons for field use */
+  .touch-optimized {
+    min-height: 60px;
+    min-width: 60px;
+    padding: 12px;
+    margin: 10px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 2px solid transparent;
+  }
+  
+  .touch-optimized:hover {
+    transform: scale(1.05);
+    border-color: var(--color-diagpv-yellow);
+  }
+  
+  .touch-optimized:active {
+    transform: scale(0.95);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  }
+  
+  /* Module buttons for audit interface */
+  .module-btn {
+    width: 60px;
+    height: 60px;
+    border: 2px solid var(--color-diagpv-white);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--color-diagpv-black);
+    background: var(--color-diagpv-gray);
+    margin: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .module-btn:hover {
+    border-color: var(--color-diagpv-yellow);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+  }
+  
+  /* Module status colors - high visibility for night use */
+  .module-ok {
+    background-color: var(--color-diagpv-green) !important;
+    color: var(--color-diagpv-white) !important;
+    border-color: var(--color-diagpv-green);
+  }
+  
+  .module-inequality {
+    background-color: var(--color-diagpv-yellow) !important;
+    color: var(--color-diagpv-black) !important;
+    border-color: var(--color-diagpv-yellow);
+  }
+  
+  .module-microcracks {
+    background-color: var(--color-diagpv-orange) !important;
+    color: var(--color-diagpv-white) !important;
+    border-color: var(--color-diagpv-orange);
+  }
+  
+  .module-dead {
+    background-color: var(--color-diagpv-red) !important;
+    color: var(--color-diagpv-white) !important;
+    border-color: var(--color-diagpv-red);
+  }
+  
+  .module-string_open {
+    background-color: var(--color-diagpv-blue) !important;
+    color: var(--color-diagpv-white) !important;
+    border-color: var(--color-diagpv-blue);
+  }
+  
+  .module-not_connected {
+    background-color: #4b5563 !important;
+    color: var(--color-diagpv-white) !important;
+    border-color: #4b5563;
+  }
+  
+  .module-pending {
+    background-color: #e5e7eb !important;
+    color: var(--color-diagpv-black) !important;
+    border: 2px dashed #9ca3af !important;
+  }
+  
+  /* Sidebar navigation */
+  .sidebar-link {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: 3px solid transparent;
+  }
+  
+  .sidebar-link:hover {
+    background-color: rgba(255,255,255,0.05);
+    color: white;
+  }
+  
+  .sidebar-link.active {
+    background-color: rgba(255,255,255,0.1);
+    border-left-color: #22c55e;
+    color: white;
+  }
+  
+  /* Cards */
+  .card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+  }
+  
+  /* Loader animation */
+  .loader-dots::after {
+    content: " .";
+    animation: dots 1.5s steps(5, end) infinite;
+  }
+  
+  @keyframes dots {
+    0%, 20% { content: " ."; }
+    40% { content: " .."; }
+    60% { content: " ..."; }
+    80%, 100% { content: ""; }
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
