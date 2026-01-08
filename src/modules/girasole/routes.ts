@@ -35,9 +35,10 @@ girasoleRoutes.get('/projects', async (c) => {
         p.audit_types,
         p.id_referent,
         p.created_at,
-        c.name as client_name
+        COALESCE(c.name, cc.company_name, 'GIRASOLE Energies') as client_name
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN crm_clients cc ON p.client_id = cc.id
       WHERE p.is_girasole = 1
       ORDER BY p.id ASC
     `).all();
@@ -86,11 +87,12 @@ girasoleRoutes.get('/project/:id', async (c) => {
     const project = await DB.prepare(`
       SELECT 
         p.*,
-        c.name as client_name,
-        c.contact_email,
-        c.contact_phone
+        COALESCE(c.name, cc.company_name, 'GIRASOLE Energies') as client_name,
+        COALESCE(c.contact_email, cc.main_contact_email) as contact_email,
+        COALESCE(c.contact_phone, cc.main_contact_phone) as contact_phone
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN crm_clients cc ON p.client_id = cc.id
       WHERE p.id = ? AND p.is_girasole = 1
     `).bind(projectId).first();
     
@@ -229,9 +231,10 @@ girasoleRoutes.post('/inspection/create', async (c) => {
     
     // Récupérer info projet
     const project = await DB.prepare(`
-      SELECT p.*, c.name as client_name
+      SELECT p.*, COALESCE(c.name, cc.company_name, 'GIRASOLE Energies') as client_name
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN crm_clients cc ON p.client_id = cc.id
       WHERE p.id = ?
     `).bind(project_id).first();
     
@@ -398,9 +401,10 @@ girasoleRoutes.get('/report/:token', async (c) => {
     
     // Récupérer projet
     const project = await DB.prepare(`
-      SELECT p.*, c.name as client_name
+      SELECT p.*, COALESCE(c.name, cc.company_name, 'GIRASOLE Energies') as client_name
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN crm_clients cc ON p.client_id = cc.id
       WHERE p.id = ?
     `).bind(inspection.project_id).first();
     
