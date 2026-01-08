@@ -93,6 +93,13 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor', (c) => {
   return c.redirect(`/static/pv/editor.html?plantId=${plantId}&zoneId=${zoneId}`)
 })
 
+// Route Designer sans zone - redirige vers zone 1 par défaut
+app.get('/pv/plant/:plantId/designer', (c) => {
+  const plantId = c.req.param('plantId')
+  // Redirection vers zone 1 par défaut (ou page de sélection de zone)
+  return c.redirect(`/pv/plant/${plantId}/zone/1/designer`)
+})
+
 app.route('/', designerModule)
 
 // ============================================================================
