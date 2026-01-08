@@ -948,7 +948,11 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
 
     // 1. KPI (Sécurisés)
     const clientsCount = await safeCount('SELECT COUNT(*) as count FROM crm_clients WHERE status = "active"');
-    const projectsCount = await safeCount('SELECT COUNT(*) as count FROM projects WHERE status = "active"');
+    
+    // Compter les centrales PV au lieu des projets CRM (interconnexion PV Cartography)
+    const pvPlantsCount = await safeCount('SELECT COUNT(*) as count FROM pv_plants');
+    const projectsCount = pvPlantsCount > 0 ? pvPlantsCount : await safeCount('SELECT COUNT(*) as count FROM projects WHERE status = "active"');
+    
     const auditsCount = await safeCount('SELECT COUNT(*) as count FROM audits WHERE status = "in_progress"');
     
     // Interventions cette semaine

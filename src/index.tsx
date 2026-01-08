@@ -42,6 +42,7 @@ import { getPlanningDashboardPage } from './pages/planning-dashboard'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getLoginPage } from './pages/login'
 import crmUnifiedViewPage from './pages/crm-unified-view'
+import { getPvPlantsListPage } from './pages/pv-plants-list'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -2723,9 +2724,17 @@ app.get('/dashboard', (c) => {
 })
 
 // ============================================================================
-// ROUTE PV CARTOGRAPHY - Liste centrales PV (NOUVEAU - NON-DESTRUCTIF)
+// ROUTE PV CARTOGRAPHY - Liste centrales PV (UNIFIÉ DiagPV OS)
 // ============================================================================
 app.get('/pv/plants', (c) => {
+  return c.html(getPvPlantsListPage())
+})
+
+// ============================================================================
+// ROUTE PV CARTOGRAPHY - ANCIEN CODE (conservé pour référence)
+// ============================================================================
+/*
+app.get('/pv/plants-old', (c) => {
   return c.html(`
     <!DOCTYPE html>
     <html lang="fr">
@@ -3036,6 +3045,7 @@ app.get('/pv/plants', (c) => {
     </html>
   `)
 })
+*/
 
 // ============================================================================
 // ROUTE UNIFIED INSTALLATIONS - Vue combinée EL + PV

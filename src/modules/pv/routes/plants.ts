@@ -41,18 +41,38 @@ plantsRouter.get('/', async (c: Context) => {
   const { env } = c
   
   try {
-    const plants = await env.DB.prepare(`
-      SELECT 
-        p.*,
-        COUNT(DISTINCT z.id) as zone_count,
-        COUNT(m.id) as module_count,
-        SUM(m.power_wp) as total_power_wp
-      FROM pv_plants p
-      LEFT JOIN pv_zones z ON p.id = z.plant_id
-      LEFT JOIN pv_modules m ON z.id = m.zone_id
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `).all()
+    // Essayer avec jointure client, fallback si client_id n'existe pas
+    let plants
+    try {
+      plants = await env.DB.prepare(`
+        SELECT 
+          p.*,
+          c.company_name as client_name,
+          COUNT(DISTINCT z.id) as zone_count,
+          COUNT(m.id) as module_count,
+          SUM(m.power_wp) as total_power_wp
+        FROM pv_plants p
+        LEFT JOIN crm_clients c ON p.client_id = c.id
+        LEFT JOIN pv_zones z ON p.id = z.plant_id
+        LEFT JOIN pv_modules m ON z.id = m.zone_id
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
+      `).all()
+    } catch (e) {
+      // Fallback sans client_id
+      plants = await env.DB.prepare(`
+        SELECT 
+          p.*,
+          COUNT(DISTINCT z.id) as zone_count,
+          COUNT(m.id) as module_count,
+          SUM(m.power_wp) as total_power_wp
+        FROM pv_plants p
+        LEFT JOIN pv_zones z ON p.id = z.plant_id
+        LEFT JOIN pv_modules m ON z.id = m.zone_id
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
+      `).all()
+    }
     
     return c.json({ 
       success: true,
@@ -113,22 +133,52 @@ plantsRouter.post('/', async (c: Context) => {
   const data = await c.req.json()
   
   try {
-    const result = await env.DB.prepare(`
-      INSERT INTO pv_plants (
-        plant_name, plant_type, address, city, postal_code, 
-        country, latitude, longitude, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      data.plant_name || 'Nouvelle Centrale',
-      data.plant_type || 'rooftop',
-      data.address || null,
-      data.city || null,
-      data.postal_code || null,
-      data.country || 'France',
-      data.latitude || null,
-      data.longitude || null,
-      data.notes || null
-    ).run()
+    // Vérifier si la colonne client_id existe
+    let hasClientId = false
+    try {
+      await env.DB.prepare(`SELECT client_id FROM pv_plants LIMIT 1`).first()
+      hasClientId = true
+    } catch (e) {
+      // Colonne n'existe pas encore
+    }
+    
+    let result
+    if (hasClientId && data.client_id) {
+      result = await env.DB.prepare(`
+        INSERT INTO pv_plants (
+          plant_name, plant_type, address, city, postal_code, 
+          country, latitude, longitude, notes, client_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        data.plant_name || 'Nouvelle Centrale',
+        data.plant_type || 'rooftop',
+        data.address || null,
+        data.city || null,
+        data.postal_code || null,
+        data.country || 'France',
+        data.latitude || null,
+        data.longitude || null,
+        data.notes || null,
+        data.client_id || null
+      ).run()
+    } else {
+      result = await env.DB.prepare(`
+        INSERT INTO pv_plants (
+          plant_name, plant_type, address, city, postal_code, 
+          country, latitude, longitude, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        data.plant_name || 'Nouvelle Centrale',
+        data.plant_type || 'rooftop',
+        data.address || null,
+        data.city || null,
+        data.postal_code || null,
+        data.country || 'France',
+        data.latitude || null,
+        data.longitude || null,
+        data.notes || null
+      ).run()
+    }
     
     return c.json({ 
       success: true, 
