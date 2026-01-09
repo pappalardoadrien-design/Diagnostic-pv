@@ -109,21 +109,27 @@ interconnectModule.get('/audit/:token/plant', async (c) => {
     `).bind(token).first()
     
     // Méthode 2: Via el_audit_plants (nouveau workflow PV → EL)
+    // Graceful fallback si la table n'existe pas encore
     if (!result) {
-      result = await env.DB.prepare(`
-        SELECT 
-          p.id AS plant_id,
-          p.plant_name,
-          p.address || ', ' || p.city AS location,
-          p.total_power_kwp,
-          p.module_count AS total_modules,
-          p.latitude,
-          p.longitude
-        FROM el_audit_plants eap
-        JOIN pv_plants p ON eap.plant_id = p.id
-        WHERE eap.audit_token = ?
-        LIMIT 1
-      `).bind(token).first()
+      try {
+        result = await env.DB.prepare(`
+          SELECT 
+            p.id AS plant_id,
+            p.plant_name,
+            p.address || ', ' || p.city AS location,
+            p.total_power_kwp,
+            p.module_count AS total_modules,
+            p.latitude,
+            p.longitude
+          FROM el_audit_plants eap
+          JOIN pv_plants p ON eap.plant_id = p.id
+          WHERE eap.audit_token = ?
+          LIMIT 1
+        `).bind(token).first()
+      } catch (e) {
+        // Table el_audit_plants n'existe pas encore - ignorer
+        console.warn('el_audit_plants table not found, skipping')
+      }
     }
     
     if (!result) {

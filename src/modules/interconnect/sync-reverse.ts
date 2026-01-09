@@ -164,10 +164,15 @@ syncReverseModule.post('/create-audit-from-plant', async (c) => {
     
     // 7. Créer liaison directe audit EL ↔ centrale PV
     // Table el_audit_plants pour navigation bidirectionnelle sans dépendre d'interventions
-    await env.DB.prepare(`
-      INSERT OR IGNORE INTO el_audit_plants (el_audit_id, audit_token, plant_id)
-      VALUES (?, ?, ?)
-    `).bind(auditId, auditToken, plantId).run()
+    // Graceful fallback si la table n'existe pas encore
+    try {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO el_audit_plants (el_audit_id, audit_token, plant_id)
+        VALUES (?, ?, ?)
+      `).bind(auditId, auditToken, plantId).run()
+    } catch (e) {
+      console.warn('el_audit_plants table not found, skipping link creation')
+    }
     
     return c.json({
       success: true,
