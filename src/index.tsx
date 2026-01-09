@@ -1061,6 +1061,11 @@ app.get('/el', (c) => {
   return c.redirect('/audits/create?type=EL');
 })
 
+// Redirection /audit/create vers /audits/create (nouvelle page unifiée)
+app.get('/audit/create', (c) => {
+  return c.redirect('/audits/create')
+})
+
 // Page d'audit terrain nocturne
 app.get('/audit/:token', async (c) => {
   const token = c.req.param('token')
