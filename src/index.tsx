@@ -592,9 +592,7 @@ app.get('/api/diagnostic/interconnect', async (c) => {
     
     // 3. Stats Audits EL
     const audits = await DB.prepare(`
-      SELECT COUNT(*) as count, 
-             SUM(CASE WHEN pv_plant_id IS NOT NULL THEN 1 ELSE 0 END) as linked_to_pv
-      FROM el_audits
+      SELECT COUNT(*) as count FROM el_audits
     `).first() as any
     
     // 4. Liaisons EL ↔ PV existantes
@@ -608,7 +606,6 @@ app.get('/api/diagnostic/interconnect', async (c) => {
       plants_total: plants?.results?.length || 0,
       plants_linked_to_client: plants?.results?.filter((p: any) => p.client_id !== null).length || 0,
       audits_total: audits?.count || 0,
-      audits_linked_to_pv: audits?.linked_to_pv || 0,
       el_pv_links: links?.count || 0
     }
     
@@ -618,11 +615,9 @@ app.get('/api/diagnostic/interconnect', async (c) => {
       kpis,
       plants: plants?.results || [],
       interconnection_status: {
-        crm_pv: kpis.plants_linked_to_client > 0 ? '✅ Actif' : '❌ Non configuré',
-        pv_el: kpis.el_pv_links > 0 ? '✅ Actif' : '❌ Non configuré',
-        recommendation: kpis.plants_linked_to_client === 0 
-          ? 'Exécuter /admin/emergency-db-fix pour ajouter client_id à pv_plants'
-          : 'Interconnexion CRM ↔ PV opérationnelle'
+        crm_pv: kpis.plants_linked_to_client > 0 ? '✅ Actif' : '⚠️ Partiel',
+        pv_el: kpis.el_pv_links > 0 ? '✅ Actif' : '⚠️ Non lié (utiliser Editor V2 > Sync EL)',
+        summary: `${kpis.plants_linked_to_client}/${kpis.plants_total} centrales liées à un client`
       }
     })
   } catch (error: any) {
