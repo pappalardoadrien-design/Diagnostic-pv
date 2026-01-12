@@ -38,7 +38,7 @@ import { getCrmClientsDetailPage } from './pages/crm-clients-detail'
 import { getCrmProjectsListPage } from './pages/crm-projects-list'
 import { getCrmProjectsCreatePage } from './pages/crm-projects-create'
 import { getCrmProjectsDetailPage } from './pages/crm-projects-detail'
-import { getPlanningDashboardPage } from './pages/planning-dashboard'
+import { getPlanningDashboardUnifiedPage } from './pages/planning-dashboard-unified'
 import { getPlanningCreatePage } from './pages/planning-create'
 import { getLoginPage } from './pages/login'
 import crmUnifiedViewPage from './pages/crm-unified-view'
@@ -254,7 +254,7 @@ app.get('/crm/projects/create', (c) => c.html(getCrmProjectsCreatePage()))
 app.get('/crm/projects/detail', (c) => c.html(getCrmProjectsDetailPage()))
 
 // === PAGES PLANNING ===
-app.get('/planning', (c) => c.html(getPlanningDashboardPage()))
+app.get('/planning', (c) => c.html(getPlanningDashboardUnifiedPage()))
 app.get('/planning/create', (c) => c.html(getPlanningCreatePage()))
 
 // === LOGIN ===
