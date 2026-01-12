@@ -313,9 +313,6 @@ export function getPvPlantDetailPage(plantId: string): string {
             <div class="flex items-start justify-between mb-3">
               <div class="flex items-center gap-3">
                 <h4 class="font-bold text-slate-800">\${zone.zone_name}</h4>
-                <a href="/pv/plant/\${PLANT_ID}/zone/\${zone.id}/editor/v2" target="_blank" class="text-purple-500 hover:text-purple-700" title="Ouvrir l'éditeur">
-                  <i class="fas fa-external-link-alt"></i>
-                </a>
                 <button onclick="deleteZone(\${zone.id})" class="text-red-400 hover:text-red-600" title="Supprimer">
                   <i class="fas fa-trash"></i>
                 </button>
@@ -347,13 +344,9 @@ export function getPvPlantDetailPage(plantId: string): string {
             </div>
             
             <div class="flex gap-2 mt-4">
-              <a href="/pv/plant/\${PLANT_ID}/zone/\${zone.id}/designer" 
-                 class="flex-1 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-semibold text-center text-sm transition-colors">
-                <i class="fas fa-edit mr-1"></i> Designer
-              </a>
               <a href="/pv/plant/\${PLANT_ID}/zone/\${zone.id}/editor/v2" 
-                 class="py-2 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold text-sm transition-colors">
-                <i class="fas fa-map"></i>
+                 class="flex-1 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:shadow-lg text-white rounded-lg font-semibold text-center text-sm transition-all">
+                <i class="fas fa-map mr-1"></i> Cartographie
               </a>
             </div>
           </div>
