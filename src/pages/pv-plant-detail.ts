@@ -344,9 +344,9 @@ export function getPvPlantDetailPage(plantId: string): string {
             </div>
             
             <div class="flex gap-2 mt-4">
-              <a href="/pv/plant/\${PLANT_ID}/zone/\${zone.id}/editor/v2" 
+              <a href="/pv/plant/\${PLANT_ID}/zone/\${zone.id}/editor/v3" 
                  class="flex-1 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:shadow-lg text-white rounded-lg font-semibold text-center text-sm transition-all">
-                <i class="fas fa-map mr-1"></i> Cartographie
+                <i class="fas fa-solar-panel mr-1"></i> Éditeur V3
               </a>
             </div>
           </div>

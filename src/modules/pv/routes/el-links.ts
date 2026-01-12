@@ -345,7 +345,7 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
     
     if (existingLink && existingLink.plant_id && existingLink.zone_id) {
       // Rediriger vers l'éditeur existant
-      return c.redirect(`/pv/plant/${existingLink.plant_id}/zone/${existingLink.zone_id}/editor/v2`)
+      return c.redirect(`/pv/plant/${existingLink.plant_id}/zone/${existingLink.zone_id}/editor/v3`)
     }
     
     // 3. Créer nouvelle centrale PV
@@ -481,11 +481,11 @@ app.get('/el-audit/:auditToken/quick-map', async (c) => {
       'linked'
     ).run()
     
-    // 7. Log performance et rediriger vers l'éditeur Canvas V2
+    // 7. Log performance et rediriger vers l'éditeur V3
     const duration = Date.now() - startTime
     console.log(`✅ Quick-map ${auditToken} terminé en ${duration}ms (${elModules.results?.length || 0} modules)`)
     
-    return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v2`)
+    return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v3`)
     
   } catch (error: any) {
     console.error('❌ Erreur quick-map:', error)

@@ -46,8 +46,8 @@ export function renderAuditELPage(c: Context, zoneId: number, zoneName: string, 
         <div class="bg-gradient-to-r from-purple-900 to-indigo-900 shadow-2xl">
             <div class="container mx-auto px-6 py-5 flex justify-between items-center">
                 <div class="flex gap-4 items-center">
-                    <a href="/pv/plant/${plantId}/zone/${zoneId}/editor/v2" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold transition">
-                        <i class="fas fa-arrow-left mr-2"></i>RETOUR CANVAS
+                    <a href="/pv/plant/${plantId}/zone/${zoneId}/editor/v3" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-bold transition">
+                        <i class="fas fa-arrow-left mr-2"></i>RETOUR ÉDITEUR V3
                     </a>
                     <div>
                         <h1 class="text-2xl font-black text-white">
@@ -113,8 +113,8 @@ export function renderAuditELPage(c: Context, zoneId: number, zoneName: string, 
             <div id="emptyState" class="hidden text-center py-20">
                 <i class="fas fa-solar-panel text-6xl text-gray-600 mb-4"></i>
                 <p class="text-xl text-gray-400">Aucun module trouvé dans cette zone</p>
-                <a href="/pv/plant/${plantId}/zone/${zoneId}/editor/v2" class="mt-4 inline-block bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-bold">
-                    Créer des modules dans Canvas V2
+                <a href="/pv/plant/${plantId}/zone/${zoneId}/editor/v3" class="mt-4 inline-block bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-bold">
+                    Créer des modules dans l'Éditeur V3
                 </a>
             </div>
         </div>

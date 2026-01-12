@@ -12,7 +12,7 @@ const app = new Hono()
 app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
   const plantId = c.req.param('plantId')
   const zoneId = c.req.param('zoneId')
-  return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v2`)
+  return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v3`)
 })
 
 export default app
