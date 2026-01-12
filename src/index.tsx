@@ -44,6 +44,7 @@ import { getLoginPage } from './pages/login'
 import crmUnifiedViewPage from './pages/crm-unified-view'
 import { getPvPlantsListPage } from './pages/pv-plants-list'
 import { getPvPlantDetailPage } from './pages/pv-plant-detail'
+import { getPvPlanImportPage } from './pages/pv-plan-import'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -9861,6 +9862,12 @@ app.get('/pv/plant/:plantId/zone/:zoneId/editor/v2', async (c) => {
 app.get('/pv/plant/:id', (c) => {
   const plantId = c.req.param('id')
   return c.html(getPvPlantDetailPage(plantId))
+})
+
+// Route Import Plan pour centrale PV
+app.get('/pv/plant/:id/import-plan', (c) => {
+  const plantId = c.req.param('id')
+  return c.html(getPvPlanImportPage(plantId))
 })
 
 export default app

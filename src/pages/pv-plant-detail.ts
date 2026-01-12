@@ -9,7 +9,11 @@ export function getPvPlantDetailPage(plantId: string): string {
           <i class="fas fa-arrow-left mr-2"></i>Retour aux centrales
         </a>
       </div>
-      <div class="flex gap-3">
+      <div class="flex flex-wrap gap-3">
+        <a href="/pv/plant/${plantId}/import-plan" class="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
+          <i class="fas fa-map"></i>
+          <span>Import Plan</span>
+        </a>
         <button id="createAuditBtn" class="px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all flex items-center gap-2">
           <i class="fas fa-plus-circle"></i>
           <span>Créer Audit EL</span>

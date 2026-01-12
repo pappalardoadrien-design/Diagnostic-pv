@@ -493,6 +493,107 @@ plantsRouter.post('/:plantId/zones/:zoneId/modules', async (c: Context) => {
   }
 })
 
+// ============================================================================
+// POST /api/pv/plants/:plantId/import-modules - Import en masse depuis plan
+// Crée une zone unique et tous les modules avec coordonnées GPS
+// ============================================================================
+plantsRouter.post('/:plantId/import-modules', async (c: Context) => {
+  const { env } = c
+  const plantId = c.req.param('plantId')
+  const { modules, clear_existing, corners, zone_name } = await c.req.json()
+  
+  if (!Array.isArray(modules) || modules.length === 0) {
+    return c.json({ error: 'Aucun module fourni' }, 400)
+  }
+  
+  try {
+    // 1. Vérifier que la centrale existe
+    const plant = await env.DB.prepare('SELECT * FROM pv_plants WHERE id = ?').bind(plantId).first()
+    if (!plant) {
+      return c.json({ error: 'Centrale non trouvée' }, 404)
+    }
+
+    // 2. Créer ou récupérer la zone principale
+    let zoneId: number
+    const existingZone = await env.DB.prepare(
+      'SELECT id FROM pv_zones WHERE plant_id = ? AND zone_name = ?'
+    ).bind(plantId, zone_name || 'Zone Import Plan').first()
+
+    if (existingZone) {
+      zoneId = existingZone.id as number
+      
+      // Supprimer anciens modules si demandé
+      if (clear_existing) {
+        await env.DB.prepare('DELETE FROM pv_modules WHERE zone_id = ?').bind(zoneId).run()
+      }
+    } else {
+      // Créer nouvelle zone
+      const zoneResult = await env.DB.prepare(`
+        INSERT INTO pv_zones (plant_id, zone_name, zone_type, zone_order, outline_coordinates)
+        VALUES (?, ?, 'roof', 1, ?)
+      `).bind(
+        plantId, 
+        zone_name || 'Zone Import Plan',
+        corners ? JSON.stringify(corners) : '[]'
+      ).run()
+      
+      zoneId = zoneResult.meta.last_row_id as number
+    }
+
+    // 3. Insérer tous les modules
+    let created = 0
+    for (const m of modules) {
+      const identifier = m.module_identifier || `${m.string_number}-${m.position_in_string}`
+      
+      await env.DB.prepare(`
+        INSERT INTO pv_modules (
+          zone_id, module_identifier, 
+          latitude, longitude, 
+          string_number, position_in_string,
+          power_wp, module_status,
+          width_meters, height_meters
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        zoneId,
+        identifier,
+        m.latitude || null,
+        m.longitude || null,
+        m.string_number || null,
+        m.position_in_string || null,
+        m.power_wp || 185,
+        m.module_status || 'pending',
+        1.7, // largeur standard module
+        1.0  // hauteur standard module
+      ).run()
+      
+      created++
+    }
+
+    // 4. Mettre à jour les stats de la centrale
+    const totalPower = modules.reduce((sum: number, m: any) => sum + (m.power_wp || 185), 0)
+    await env.DB.prepare(`
+      UPDATE pv_plants 
+      SET module_count = ?, total_power_kwp = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(created, totalPower / 1000, plantId).run()
+
+    return c.json({ 
+      success: true, 
+      created,
+      zone_id: zoneId,
+      total_power_kwc: (totalPower / 1000).toFixed(2),
+      message: `${created} modules importés dans la zone #${zoneId}`
+    })
+
+  } catch (error: any) {
+    console.error('Erreur import modules:', error)
+    return c.json({ 
+      error: 'Erreur import modules',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // PUT /api/pv/plants/:plantId/zones/:zoneId/modules/:moduleId - Modifier module
 plantsRouter.put('/:plantId/zones/:zoneId/modules/:moduleId', async (c: Context) => {
   const { env } = c
