@@ -318,7 +318,7 @@ app.get('/pv/plant/:plantId/zone/:zoneId/designer', (c: Context) => {
                 
                 try {
                     updateStatus('Sync EL en cours...');
-                    const response = await fetch(\`/api/pv/zones/\${zoneId}/sync-from-el\`, { method: 'POST' });
+                    const response = await fetch(\`/api/pv/plants/\${plantId}/zones/\${zoneId}/sync-from-el\`, { method: 'POST' });
                     const data = await response.json();
                     
                     if (data.success) {
