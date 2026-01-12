@@ -297,20 +297,21 @@ auditsRouter.get('/:token', async (c) => {
         SELECT 
           z.id AS zone_id,
           z.zone_name,
-          z.layout_type,
+          z.zone_type AS layout_type,
           z.azimuth,
           z.tilt,
           (SELECT COUNT(*) FROM pv_modules pm WHERE pm.zone_id = z.id) AS module_count,
-          (SELECT SUM(power_wp) FROM pv_modules pm WHERE pm.zone_id = z.id) AS total_power_wp
+          (SELECT SUM(pm.power_wp) FROM pv_modules pm WHERE pm.zone_id = z.id) AS total_power_wp
         FROM pv_cartography_audit_links pcal
         JOIN pv_zones z ON pcal.pv_zone_id = z.id
         WHERE pcal.el_audit_token = ?
         ORDER BY z.zone_name
       `).bind(token).all()
+      console.log('Zones query result:', JSON.stringify(zonesResult))
       linkedZones = zonesResult.results || []
     }
-  } catch (e) {
-    console.warn('Error fetching linked plant:', e)
+  } catch (e: any) {
+    console.error('Error fetching linked plant/zones:', e.message)
   }
   
   return c.json({
@@ -711,6 +712,47 @@ auditsRouter.get('/:token/report', async (c) => {
     
     const completion_rate = ((stats.total - stats.pending) / stats.total * 100).toFixed(1)
     
+    // Récupérer la centrale PV liée pour le rapport
+    let linkedPlant: any = null
+    let linkedZones: any[] = []
+    try {
+      linkedPlant = await env.DB.prepare(`
+        SELECT DISTINCT
+          p.id AS plant_id,
+          p.plant_name,
+          p.address,
+          p.city,
+          p.total_power_kwp,
+          c.company_name AS client_company
+        FROM pv_cartography_audit_links pcal
+        JOIN pv_plants p ON pcal.pv_plant_id = p.id
+        LEFT JOIN crm_clients c ON p.client_id = c.id
+        WHERE pcal.el_audit_token = ?
+        LIMIT 1
+      `).bind(token).first()
+      
+      if (linkedPlant) {
+        const zonesResult = await env.DB.prepare(`
+          SELECT 
+            z.id AS zone_id,
+            z.zone_name,
+            z.zone_type,
+            (SELECT COUNT(*) FROM pv_modules pm WHERE pm.zone_id = z.id) AS module_count,
+            (SELECT SUM(pm.power_wp) FROM pv_modules pm WHERE pm.zone_id = z.id) AS total_power_wp
+          FROM pv_cartography_audit_links pcal
+          JOIN pv_zones z ON pcal.pv_zone_id = z.id
+          WHERE pcal.el_audit_token = ?
+          ORDER BY z.zone_name
+        `).bind(token).all()
+        linkedZones = zonesResult.results || []
+      }
+    } catch (e) {
+      console.warn('Error fetching linked plant for report:', e)
+    }
+    
+    // Calculer la puissance totale depuis les zones liées
+    const totalPowerKw = linkedZones.reduce((sum, z) => sum + (z.total_power_wp || 0), 0) / 1000
+    
     // Fonction génération grille physique
     const generatePhysicalGrid = (modules: ELModule[]) => {
       if (!modules || modules.length === 0) {
@@ -827,11 +869,12 @@ auditsRouter.get('/:token/report', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapport EL - ${audit.project_name}</title>
+    <title>Rapport EL - ${audit.project_name} | Diagnostic Photovoltaïque</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #fff; color: #000; }
-        h1 { color: #ea580c; border-bottom: 3px solid #facc15; padding-bottom: 10px; }
-        h2 { color: #ea580c; margin-top: 30px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', Arial, sans-serif; margin: 40px; background: #fff; color: #1f2937; line-height: 1.6; }
+        h1 { color: #ea580c; border-bottom: 3px solid #facc15; padding-bottom: 15px; font-size: 28px; margin-bottom: 25px; }
+        h2 { color: #ea580c; margin-top: 35px; font-size: 20px; border-left: 4px solid #facc15; padding-left: 12px; }
         .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
         .info-box { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
         .info-row { display: flex; margin: 10px 0; }
@@ -966,33 +1009,55 @@ auditsRouter.get('/:token/report', async (c) => {
         </div>
         <div class="info-row">
             <div class="info-label">Client :</div>
-            <div>${audit.client_name}</div>
+            <div>${linkedPlant?.client_company || audit.client_name}</div>
         </div>
+        ${linkedPlant ? `
+        <div class="info-row">
+            <div class="info-label">Centrale PV :</div>
+            <div><strong>${linkedPlant.plant_name}</strong></div>
+        </div>
+        ` : ''}
         <div class="info-row">
             <div class="info-label">Localisation :</div>
-            <div>${audit.location || 'N/A'}</div>
+            <div>${linkedPlant ? `${linkedPlant.address || ''} ${linkedPlant.city || ''}` : audit.location || 'N/A'}</div>
+        </div>
+        ${linkedPlant ? `
+        <div class="info-row">
+            <div class="info-label">Configuration :</div>
+            <div>${linkedZones.length} strings × ${linkedZones[0]?.module_count || 0} modules = ${stats.total} modules</div>
         </div>
         <div class="info-row">
-            <div class="info-label">Date d'installation :</div>
-            <div>${audit.installation_date || 'N/A'}</div>
+            <div class="info-label">Puissance totale :</div>
+            <div><strong>${totalPowerKw.toFixed(2)} kWc</strong></div>
         </div>
-        <div class="info-row">
-            <div class="info-label">Type d'installation :</div>
-            <div>${audit.installation_type || 'N/A'}</div>
-        </div>
+        ` : `
         <div class="info-row">
             <div class="info-label">Puissance panneaux :</div>
             <div>${audit.panel_power || 'N/A'} Wc</div>
         </div>
+        `}
         <div class="info-row">
             <div class="info-label">Date d'audit :</div>
             <div>${new Date(audit.created_at).toLocaleDateString('fr-FR')}</div>
         </div>
         <div class="info-row">
             <div class="info-label">Token audit :</div>
-            <div>${audit.audit_token}</div>
+            <div style="font-size: 11px;">${audit.audit_token}</div>
         </div>
     </div>
+    
+    ${linkedZones.length > 0 ? `
+    <h2>📍 ZONES / STRINGS DE LA CENTRALE</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 15px 0;">
+        ${linkedZones.map(z => `
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; text-align: center; border-left: 4px solid #ea580c;">
+            <div style="font-weight: bold; color: #ea580c;">${z.zone_name}</div>
+            <div style="font-size: 12px; color: #666;">${z.module_count} modules</div>
+            <div style="font-size: 11px; color: #999;">${((z.total_power_wp || 0) / 1000).toFixed(2)} kWc</div>
+        </div>
+        `).join('')}
+    </div>
+    ` : ''}
 
     <h2>📊 STATISTIQUES</h2>
     <div class="stats">
@@ -1057,8 +1122,17 @@ auditsRouter.get('/:token/report', async (c) => {
     </div>
 
     <div class="footer">
-        <p><strong>Diagnostic Photovoltaïque - Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</strong></p>
-        <p>Ce document a été généré automatiquement par le système DiagPV Audit EL</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+            <div>
+                <strong style="color: #ea580c;">DIAGNOSTIC PHOTOVOLTAÏQUE</strong><br>
+                <span style="font-size: 11px;">Expertise indépendante depuis 2012</span><br>
+                <span style="font-size: 10px; color: #9ca3af;">3 rue d'Apollo, 31240 L'Union • 05.81.10.16.59</span>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 11px;">Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</span><br>
+                <span style="font-size: 10px; color: #9ca3af;">Document confidentiel - Usage interne client</span>
+            </div>
+        </div>
     </div>
 </body>
 </html>
