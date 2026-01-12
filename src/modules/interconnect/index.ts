@@ -108,8 +108,29 @@ interconnectModule.get('/audit/:token/plant', async (c) => {
       LIMIT 1
     `).bind(token).first()
     
-    // Méthode 2: Via el_audit_plants (nouveau workflow PV → EL)
-    // Graceful fallback si la table n'existe pas encore
+    // Méthode 2: Via pv_cartography_audit_links (liaison PV zones → audit EL)
+    if (!result) {
+      try {
+        result = await env.DB.prepare(`
+          SELECT DISTINCT
+            p.id AS plant_id,
+            p.plant_name,
+            p.address || ', ' || p.city AS location,
+            p.total_power_kwp,
+            (SELECT COUNT(*) FROM pv_modules pm JOIN pv_zones pz ON pm.zone_id = pz.id WHERE pz.plant_id = p.id) AS total_modules,
+            p.latitude,
+            p.longitude
+          FROM pv_cartography_audit_links pcal
+          JOIN pv_plants p ON pcal.pv_plant_id = p.id
+          WHERE pcal.el_audit_token = ?
+          LIMIT 1
+        `).bind(token).first()
+      } catch (e) {
+        console.warn('pv_cartography_audit_links query failed:', e)
+      }
+    }
+    
+    // Méthode 3: Via el_audit_plants (ancien workflow)
     if (!result) {
       try {
         result = await env.DB.prepare(`

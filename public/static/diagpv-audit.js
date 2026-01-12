@@ -57,6 +57,8 @@ class DiagPVAudit {
 
         const data = await response.json()
         this.auditData = data.audit
+        this.linkedPlant = data.linkedPlant || null
+        this.linkedZones = data.linkedZones || []
         
         // Construction Map modules pour accès rapide
         data.modules.forEach(module => {
@@ -64,17 +66,65 @@ class DiagPVAudit {
         })
 
         logAudit('✅ Audit chargé:', this.auditData.project_name, 'Modules:', this.modules.size)
+        if (this.linkedPlant) {
+            logAudit('🔗 Centrale liée:', this.linkedPlant.plant_name, 'Zones:', this.linkedZones.length)
+        }
     }
 
     setupInterface() {
-        // Mise à jour titre et informations
-        document.getElementById('projectTitle').textContent = this.auditData.project_name
+        // Mise à jour titre et informations avec données centrale
+        const titleEl = document.getElementById('projectTitle')
+        if (this.linkedPlant) {
+            titleEl.innerHTML = `${this.auditData.project_name} <span class="text-purple-400 text-sm ml-2"><i class="fas fa-link"></i> ${this.linkedPlant.plant_name}</span>`
+        } else {
+            titleEl.textContent = this.auditData.project_name
+        }
+        
         this.updateProgress()
+        this.renderPlantInfo()
         this.renderStringNavigation()
         this.renderModulesGrid()
         
         // Ajout du bouton micro flottant
         this.renderVoiceButton()
+    }
+    
+    renderPlantInfo() {
+        // Afficher les infos de la centrale liée si disponible
+        const pvCartoBtn = document.getElementById('pvCartoBtn')
+        if (this.linkedPlant && pvCartoBtn) {
+            pvCartoBtn.style.display = 'flex'
+            pvCartoBtn.onclick = () => {
+                window.location.href = `/pv/plant/${this.linkedPlant.plant_id}`
+            }
+            pvCartoBtn.title = `Cartographie PV: ${this.linkedPlant.plant_name}`
+            pvCartoBtn.innerHTML = `<i class="fas fa-solar-panel mr-1"></i>${this.linkedPlant.plant_name}`
+        }
+        
+        // Insérer un bandeau d'information centrale si lié
+        if (this.linkedPlant) {
+            const header = document.querySelector('header')
+            if (header && !document.getElementById('plantInfoBanner')) {
+                const banner = document.createElement('div')
+                banner.id = 'plantInfoBanner'
+                banner.className = 'bg-purple-900 border-b border-purple-400 p-2'
+                banner.innerHTML = `
+                    <div class="flex items-center justify-between max-w-screen-xl mx-auto px-4">
+                        <div class="flex items-center space-x-4 text-sm">
+                            <span class="text-purple-300"><i class="fas fa-building mr-1"></i>${this.linkedPlant.client_company || this.auditData.client_name || '-'}</span>
+                            <span class="text-purple-300"><i class="fas fa-solar-panel mr-1"></i>${this.linkedPlant.plant_name}</span>
+                            <span class="text-purple-300"><i class="fas fa-map-marker-alt mr-1"></i>${this.linkedPlant.address || ''} ${this.linkedPlant.city || ''}</span>
+                            <span class="text-purple-300"><i class="fas fa-bolt mr-1"></i>${this.linkedZones.reduce((sum, z) => sum + (z.total_power_wp || 0), 0) / 1000} kWc</span>
+                            <span class="text-purple-300"><i class="fas fa-layer-group mr-1"></i>${this.linkedZones.length} zones</span>
+                        </div>
+                        <a href="/pv/plant/${this.linkedPlant.plant_id}" class="text-purple-300 hover:text-white text-sm">
+                            <i class="fas fa-external-link-alt mr-1"></i>Voir cartographie
+                        </a>
+                    </div>
+                `
+                header.after(banner)
+            }
+        }
     }
     
     renderVoiceButton() {

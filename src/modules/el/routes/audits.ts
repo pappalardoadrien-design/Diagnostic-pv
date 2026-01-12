@@ -270,10 +270,55 @@ auditsRouter.get('/:token', async (c) => {
             m.defect_type === 'pending' ? 'pending' : m.defect_type
   }))
   
+  // Récupérer la centrale PV liée via pv_cartography_audit_links
+  let linkedPlant = null
+  let linkedZones: any[] = []
+  try {
+    linkedPlant = await env.DB.prepare(`
+      SELECT DISTINCT
+        p.id AS plant_id,
+        p.plant_name,
+        p.address,
+        p.city,
+        p.total_power_kwp,
+        p.latitude,
+        p.longitude,
+        c.company_name AS client_company
+      FROM pv_cartography_audit_links pcal
+      JOIN pv_plants p ON pcal.pv_plant_id = p.id
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      WHERE pcal.el_audit_token = ?
+      LIMIT 1
+    `).bind(token).first()
+    
+    if (linkedPlant) {
+      // Récupérer les zones liées avec modules
+      const zonesResult = await env.DB.prepare(`
+        SELECT 
+          z.id AS zone_id,
+          z.zone_name,
+          z.layout_type,
+          z.azimuth,
+          z.tilt,
+          (SELECT COUNT(*) FROM pv_modules pm WHERE pm.zone_id = z.id) AS module_count,
+          (SELECT SUM(power_wp) FROM pv_modules pm WHERE pm.zone_id = z.id) AS total_power_wp
+        FROM pv_cartography_audit_links pcal
+        JOIN pv_zones z ON pcal.pv_zone_id = z.id
+        WHERE pcal.el_audit_token = ?
+        ORDER BY z.zone_name
+      `).bind(token).all()
+      linkedZones = zonesResult.results || []
+    }
+  } catch (e) {
+    console.warn('Error fetching linked plant:', e)
+  }
+  
   return c.json({
     audit,
     modules: transformedModules,
-    progress
+    progress,
+    linkedPlant,
+    linkedZones
   })
 })
 
