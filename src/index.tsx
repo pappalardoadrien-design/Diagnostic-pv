@@ -1089,6 +1089,11 @@ app.get('/iv-curves', (c) => {
   return c.html(getIVCurvesPage())
 })
 
+// Alias /iv → /iv-curves
+app.get('/iv', (c) => {
+  return c.redirect('/iv-curves')
+})
+
 // ============================================================================
 // ROUTE /VISUAL - INTERFACE MODULE CONTRÔLES VISUELS IEC 62446-1
 // ============================================================================
