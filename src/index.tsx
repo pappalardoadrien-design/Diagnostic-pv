@@ -478,6 +478,13 @@ app.get('/admin/emergency-db-fix', async (c) => {
   await runQuery("ALTER TABLE el_modules ADD COLUMN physical_row INTEGER", "EL Modules: Ajout physical_row")
   await runQuery("ALTER TABLE el_modules ADD COLUMN physical_col INTEGER", "EL Modules: Ajout physical_col")
 
+  // 3.1 PV_PLANTS - Liaison avec CRM clients
+  await runQuery("ALTER TABLE pv_plants ADD COLUMN client_id INTEGER REFERENCES crm_clients(id)", "PV Plants: Ajout client_id")
+  await runQuery("CREATE INDEX IF NOT EXISTS idx_pv_plants_client_id ON pv_plants(client_id)", "PV Plants: Index client_id")
+  
+  // 3.2 Mise à jour ALBAGNAC 2 avec client Broussy Energie (client_id = 9)
+  await runQuery("UPDATE pv_plants SET client_id = 9 WHERE plant_name = 'ALBAGNAC 2' AND client_id IS NULL", "PV Plants: Liaison ALBAGNAC 2 → Broussy Energie")
+
   // 4. Mettre à jour les tables VISUAL et PROJECTS (Girasole & Thermal)
   await runQuery("ALTER TABLE visual_inspections ADD COLUMN checklist_type TEXT DEFAULT 'IEC_62446'", "Visual: Ajout checklist_type")
   await runQuery("ALTER TABLE visual_inspections ADD COLUMN project_id INTEGER", "Visual: Ajout project_id")
@@ -560,6 +567,67 @@ app.get('/admin/emergency-db-fix', async (c) => {
       </body>
     </html>
   `)
+})
+
+// ============================================================================
+// API DIAGNOSTIC - VÉRIFICATION INTERCONNEXION DONNÉES
+// ============================================================================
+app.get('/api/diagnostic/interconnect', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // 1. Stats CRM
+    const clients = await DB.prepare("SELECT COUNT(*) as count FROM crm_clients").first() as any
+    
+    // 2. Stats PV Plants avec liaison client
+    const plants = await DB.prepare(`
+      SELECT p.id, p.plant_name, p.client_id, c.company_name as client_name,
+             (SELECT COUNT(*) FROM pv_zones WHERE plant_id = p.id) as zone_count,
+             (SELECT COUNT(*) FROM pv_modules m JOIN pv_zones z ON m.zone_id = z.id WHERE z.plant_id = p.id) as module_count
+      FROM pv_plants p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      ORDER BY p.created_at DESC
+      LIMIT 10
+    `).all() as any
+    
+    // 3. Stats Audits EL
+    const audits = await DB.prepare(`
+      SELECT COUNT(*) as count, 
+             SUM(CASE WHEN pv_plant_id IS NOT NULL THEN 1 ELSE 0 END) as linked_to_pv
+      FROM el_audits
+    `).first() as any
+    
+    // 4. Liaisons EL ↔ PV existantes
+    const links = await DB.prepare(`
+      SELECT COUNT(*) as count FROM pv_cartography_audit_links
+    `).first() as any
+    
+    // 5. KPIs globaux
+    const kpis = {
+      clients_total: clients?.count || 0,
+      plants_total: plants?.results?.length || 0,
+      plants_linked_to_client: plants?.results?.filter((p: any) => p.client_id !== null).length || 0,
+      audits_total: audits?.count || 0,
+      audits_linked_to_pv: audits?.linked_to_pv || 0,
+      el_pv_links: links?.count || 0
+    }
+    
+    return c.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      kpis,
+      plants: plants?.results || [],
+      interconnection_status: {
+        crm_pv: kpis.plants_linked_to_client > 0 ? '✅ Actif' : '❌ Non configuré',
+        pv_el: kpis.el_pv_links > 0 ? '✅ Actif' : '❌ Non configuré',
+        recommendation: kpis.plants_linked_to_client === 0 
+          ? 'Exécuter /admin/emergency-db-fix pour ajouter client_id à pv_plants'
+          : 'Interconnexion CRM ↔ PV opérationnelle'
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
 })
 
 // ============================================================================
