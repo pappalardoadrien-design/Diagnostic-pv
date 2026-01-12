@@ -93,8 +93,12 @@ plantsRouter.get('/:id', async (c: Context) => {
   const plantId = c.req.param('id')
   
   try {
+    // Récupérer la centrale avec le nom du client (si lié)
     const plant = await env.DB.prepare(`
-      SELECT * FROM pv_plants WHERE id = ?
+      SELECT p.*, c.company_name as client_name
+      FROM pv_plants p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      WHERE p.id = ?
     `).bind(plantId).first()
     
     if (!plant) {
