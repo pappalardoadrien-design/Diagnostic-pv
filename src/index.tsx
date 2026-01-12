@@ -45,6 +45,7 @@ import crmUnifiedViewPage from './pages/crm-unified-view'
 import { getPvPlantsListPage } from './pages/pv-plants-list'
 import { getPvPlantDetailPage } from './pages/pv-plant-detail'
 import { getPvPlanImportPage } from './pages/pv-plan-import'
+import { getPvEditorV3Page } from './pages/pv-editor-v3'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -93,11 +94,19 @@ app.route('/api/pv', pvElLinksModule)
 // ============================================================================
 // Editor V2 = Interface unique pour placement modules sur carte satellite
 
-// Ancien Editor → Editor V2
+// Ancien Editor → Editor V3 (nouveau design)
 app.get('/pv/plant/:plantId/zone/:zoneId/editor', (c) => {
   const plantId = c.req.param('plantId')
   const zoneId = c.req.param('zoneId')
-  return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v2`)
+  return c.redirect(`/pv/plant/${plantId}/zone/${zoneId}/editor/v3`)
+})
+
+// Editor V3 - Nouvelle interface DiagPV OS
+app.get('/pv/plant/:plantId/zone/:zoneId/editor/v3', (c) => {
+  const plantId = c.req.param('plantId')
+  const zoneId = c.req.param('zoneId')
+  c.header('Cache-Control', 'no-store, no-cache, must-revalidate')
+  return c.html(getPvEditorV3Page(plantId, zoneId))
 })
 
 // Designer sans zone → page détail centrale
