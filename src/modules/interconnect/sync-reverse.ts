@@ -233,4 +233,147 @@ syncReverseModule.get('/plant/:plantId/can-create-audit', async (c) => {
   }
 })
 
+// ============================================================================
+// POST /plant/:plantId/create-el-audit - Créer audit EL depuis centrale PV
+// ============================================================================
+// Alias route pour compatibilité avec pv-plant-detail.ts
+syncReverseModule.post('/plant/:plantId/create-el-audit', async (c) => {
+  const { env } = c
+  const plantId = parseInt(c.req.param('plantId'))
+  const body = await c.req.json().catch(() => ({}))
+  
+  try {
+    // 1. Récupérer centrale PV
+    const plant: any = await env.DB.prepare(`
+      SELECT p.*, c.company_name as client_name 
+      FROM pv_plants p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      WHERE p.id = ?
+    `).bind(plantId).first()
+    
+    if (!plant) {
+      return c.json({ error: 'Centrale non trouvée' }, 404)
+    }
+    
+    // 2. Récupérer tous modules PV
+    const modules = await env.DB.prepare(`
+      SELECT pm.*, z.zone_name
+      FROM pv_modules pm
+      JOIN pv_zones z ON pm.zone_id = z.id
+      WHERE z.plant_id = ?
+      ORDER BY pm.string_number, pm.position_in_string
+    `).bind(plantId).all()
+    
+    if (!modules.results || modules.results.length === 0) {
+      return c.json({ error: 'Aucun module dans cette centrale. Modélisez la centrale en premier.' }, 400)
+    }
+    
+    const totalModules = modules.results.length
+    const stringNumbers = [...new Set(modules.results.map((m: any) => m.string_number).filter(Boolean))]
+    const stringCount = stringNumbers.length || 1
+    const modulesPerString = Math.round(totalModules / stringCount)
+    
+    // 3. Créer audit EL
+    const auditToken = crypto.randomUUID()
+    
+    const auditResult = await env.DB.prepare(`
+      INSERT INTO el_audits (
+        audit_token,
+        project_name,
+        client_name,
+        location,
+        string_count,
+        modules_per_string,
+        total_modules,
+        status,
+        configuration_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'created', ?)
+    `).bind(
+      auditToken,
+      body.projectName || `Audit EL - ${plant.plant_name}`,
+      body.clientName || plant.client_name || 'Client',
+      body.location || plant.address || plant.city || 'À définir',
+      stringCount,
+      modulesPerString,
+      totalModules,
+      JSON.stringify({
+        mode: 'imported_from_pv',
+        plantId,
+        stringCount,
+        modulesPerString,
+        totalModules
+      })
+    ).run()
+    
+    const auditId = auditResult.meta.last_row_id
+    
+    // 4. Créer modules EL depuis modules PV
+    for (const pvModule of modules.results as any[]) {
+      const physicalRow = Math.round((pvModule.pos_y_meters || 0) / 1.7) + 1
+      const physicalCol = Math.round((pvModule.pos_x_meters || 0) / 1.0) + 1
+      
+      await env.DB.prepare(`
+        INSERT INTO el_modules (
+          el_audit_id,
+          audit_token,
+          module_identifier,
+          string_number,
+          position_in_string,
+          defect_type,
+          severity_level,
+          physical_row,
+          physical_col
+        ) VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)
+      `).bind(
+        auditId,
+        auditToken,
+        pvModule.module_identifier || `M-${pvModule.id}`,
+        pvModule.string_number || 'A1',
+        pvModule.position_in_string || 1,
+        physicalRow,
+        physicalCol
+      ).run()
+    }
+    
+    // 5. Créer liaisons
+    try {
+      // Liaison audit → plant
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO el_audit_plants (el_audit_id, audit_token, plant_id)
+        VALUES (?, ?, ?)
+      `).bind(auditId, auditToken, plantId).run()
+      
+      // Liaison dans pv_cartography_audit_links pour chaque zone
+      const zones = await env.DB.prepare('SELECT id FROM pv_zones WHERE plant_id = ?').bind(plantId).all()
+      for (const zone of (zones.results || []) as any[]) {
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO pv_cartography_audit_links 
+          (pv_zone_id, pv_plant_id, el_audit_id, el_audit_token, link_type, sync_direction, sync_status)
+          VALUES (?, ?, ?, ?, 'auto', 'pv_to_el', 'linked')
+        `).bind(zone.id, plantId, auditId, auditToken).run()
+      }
+    } catch (e) {
+      console.warn('Liaison tables might not exist:', e)
+    }
+    
+    return c.json({
+      success: true,
+      auditToken,
+      auditId,
+      plantId,
+      modulesCreated: totalModules,
+      stringCount,
+      message: 'Audit EL créé depuis centrale PV',
+      auditUrl: `/audit/${auditToken}`
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur création audit:', error)
+    return c.json({ 
+      error: 'Erreur création audit depuis PV', 
+      details: error?.message 
+    }, 500)
+  }
+})
+
 export default syncReverseModule
