@@ -464,22 +464,22 @@ plantsRouter.post('/:plantId/zones/:zoneId/modules', async (c: Context) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         zoneId,
-        m.module_identifier,
-        m.latitude || null,
-        m.longitude || null,
-        m.string_number,
-        m.position_in_string,
-        m.pos_x_meters,
-        m.pos_y_meters,
-        m.width_meters || 1.7,
-        m.height_meters || 1.0,
-        m.rotation || 0,
-        m.power_wp || 450,
-        m.module_status || 'pending',
-        m.status_comment || null,
-        m.brand || null,
-        m.model || null,
-        m.notes || null
+        m.module_identifier || `M-${Date.now()}`,
+        m.latitude ?? null,
+        m.longitude ?? null,
+        m.string_number ?? null,
+        m.position_in_string ?? null,
+        m.pos_x_meters ?? 0,
+        m.pos_y_meters ?? 0,
+        m.width_meters ?? 1.7,
+        m.height_meters ?? 1.0,
+        m.rotation ?? 0,
+        m.power_wp ?? 450,
+        m.module_status ?? 'pending',
+        m.status_comment ?? null,
+        m.brand ?? null,
+        m.model ?? null,
+        m.notes ?? null
       ).run()
     }
     
