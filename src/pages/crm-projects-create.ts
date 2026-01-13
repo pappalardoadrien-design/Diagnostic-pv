@@ -5,7 +5,7 @@ export function getCrmProjectsCreatePage() {
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Nouveau Site</h1>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Nouvelle Centrale</h1>
             <p class="text-slate-500 mt-1 font-medium">Création d'une centrale photovoltaïque et configuration technique</p>
         </div>
 
@@ -32,7 +32,7 @@ export function getCrmProjectsCreatePage() {
                 
                 <h2 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-3">
                     <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold shadow-sm">1</span>
-                    Identité du Site
+                    Identité de la Centrale
                 </h2>
 
                 <div class="grid gap-6">
@@ -45,7 +45,7 @@ export function getCrmProjectsCreatePage() {
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nom du Site / Centrale <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Nom de la Centrale <span class="text-red-500">*</span></label>
                         <input type="text" id="project_name" required placeholder="Ex: Centrale Toiture Nord" 
                                class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 text-lg placeholder-slate-300">
                     </div>
@@ -196,7 +196,7 @@ export function getCrmProjectsCreatePage() {
                     <span class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-sm font-bold shadow-sm">5</span>
                     Notes Internes
                 </h2>
-                <textarea id="notes" rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none font-medium" placeholder="Détails d'accès, codes, contact sur site..."></textarea>
+                <textarea id="notes" rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none font-medium" placeholder="Détails d'accès, codes, contact sur place..."></textarea>
             </div>
 
             <!-- Actions -->
@@ -205,7 +205,7 @@ export function getCrmProjectsCreatePage() {
                     Annuler
                 </a>
                 <button type="submit" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-blue-200 transition-all transform hover:-translate-y-1">
-                    Créer le site
+                    Créer la centrale
                 </button>
             </div>
 
@@ -358,5 +358,5 @@ export function getCrmProjectsCreatePage() {
     </script>
   `;
 
-  return getLayout('Nouveau Site', content, 'projects');
+  return getLayout('Nouvelle Centrale', content, 'projects');
 }

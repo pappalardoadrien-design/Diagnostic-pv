@@ -7,7 +7,7 @@ export function getCrmProjectsListPage() {
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-                <h2 class="text-3xl font-black text-slate-900 tracking-tight">Sites & Centrales</h2>
+                <h2 class="text-3xl font-black text-slate-900 tracking-tight">Centrales & Centrales</h2>
                 <p class="text-slate-500 mt-1 font-medium">Parc photovoltaïque géré et projets en cours</p>
             </div>
             <div class="flex items-center gap-3">
@@ -15,7 +15,7 @@ export function getCrmProjectsListPage() {
                     <i class="fas fa-users mr-2 text-slate-400"></i>Voir les Clients
                 </a>
                 <a href="/crm/projects/create" class="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 transform hover:-translate-y-0.5 flex items-center">
-                    <i class="fas fa-plus mr-2"></i>Nouveau Site
+                    <i class="fas fa-plus mr-2"></i>Nouveau Centrale
                 </a>
             </div>
         </div>
@@ -23,7 +23,7 @@ export function getCrmProjectsListPage() {
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
             
-            <!-- Total Sites -->
+            <!-- Total Centrales -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-blue-300 transition-colors">
                 <div class="absolute right-0 top-0 h-full w-1 bg-blue-500"></div>
                 <div class="flex justify-between items-start mb-4">
@@ -32,7 +32,7 @@ export function getCrmProjectsListPage() {
                     </div>
                 </div>
                 <div class="text-3xl font-black text-slate-900 mb-1" id="stat-total">...</div>
-                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Sites</div>
+                <div class="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Centrales</div>
             </div>
 
             <!-- Puissance Totale -->
@@ -76,7 +76,7 @@ export function getCrmProjectsListPage() {
         <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-4">
             <div class="relative flex-1 w-full">
                 <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
-                <input type="text" id="search-input" placeholder="Nom du site, ville, client..." 
+                <input type="text" id="search-input" placeholder="Nom de la centrale, ville, client..." 
                        class="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 font-medium">
             </div>
             
@@ -101,7 +101,7 @@ export function getCrmProjectsListPage() {
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200">
-                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Site / Projet</th>
+                            <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Centrale / Projet</th>
                             <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Client Propriétaire</th>
                             <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Localisation</th>
                             <th class="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Technique</th>
@@ -128,11 +128,11 @@ export function getCrmProjectsListPage() {
                 <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <i class="fas fa-solar-panel text-slate-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-bold text-slate-900 mb-1">Aucun site trouvé</h3>
-                <p class="text-slate-500 max-w-sm mx-auto mb-6">Commencez par ajouter un nouveau site à la base de données.</p>
+                <h3 class="text-lg font-bold text-slate-900 mb-1">Aucune centrale trouvé</h3>
+                <p class="text-slate-500 max-w-sm mx-auto mb-6">Commencez par ajouter un nouvelle centrale à la base de données.</p>
                 <a href="/crm/projects/create" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition">
                     <i class="fas fa-plus mr-2"></i>
-                    Créer un site
+                    Créer une centrale
                 </a>
             </div>
         </div>
@@ -182,7 +182,7 @@ export function getCrmProjectsListPage() {
         }
 
         function updateStats() {
-            // Total Sites
+            // Total Centrales
             document.getElementById('stat-total').textContent = allProjects.length;
 
             // Total Power
@@ -239,7 +239,7 @@ export function getCrmProjectsListPage() {
                     <tr class="group hover:bg-blue-50/30 transition-colors cursor-pointer border-b last:border-0 border-slate-100"
                         onclick="window.location.href='/crm/projects/detail?id=\${project.id}'">
                         
-                        <!-- Nom Site -->
+                        <!-- Nom Centrale -->
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 text-lg flex-shrink-0">
@@ -338,5 +338,5 @@ export function getCrmProjectsListPage() {
     </script>
   `;
 
-  return getLayout('Sites & Projets', content, 'projects');
+  return getLayout('Centrales & Projets', content, 'projects');
 }

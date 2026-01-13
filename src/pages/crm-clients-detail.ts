@@ -315,7 +315,7 @@ export function getCrmClientsDetailPage() {
                     <div class="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
                         <i class="fas fa-solar-panel text-3xl text-slate-300 mb-3"></i>
                         <p class="text-slate-500 font-medium">Aucun site associé à ce client.</p>
-                        <a href="/crm/projects/create?client_id=\${clientId}" class="text-blue-600 font-bold hover:underline mt-2 inline-block">Créer un site</a>
+                        <a href="/crm/projects/create?client_id=\${clientId}" class="text-blue-600 font-bold hover:underline mt-2 inline-block">Créer une centrale</a>
                     </div>
                 \`;
                 return;
