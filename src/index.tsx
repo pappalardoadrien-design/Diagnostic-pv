@@ -262,6 +262,12 @@ app.get('/dashboard', (c) => c.html(getCrmDashboardPage())) // Alias
 app.get('/crm/clients', (c) => c.html(getCrmClientsListPage()))
 app.get('/crm/clients/detail', (c) => c.html(getCrmClientsDetailPage()))
 app.get('/crm/clients/create', (c) => c.html(getCrmClientsCreatePage()))
+// Route alternative /crm/clients/:id → redirige vers /crm/clients/detail?id=
+app.get('/crm/clients/:id', (c) => {
+  const id = c.req.param('id')
+  if (id === 'detail' || id === 'create') return c.notFound()
+  return c.redirect(`/crm/clients/detail?id=${id}`)
+})
 app.get('/crm/projects', (c) => c.html(getCrmProjectsListPage()))
 app.get('/crm/projects/create', (c) => c.html(getCrmProjectsCreatePage()))
 app.get('/crm/projects/detail', (c) => c.html(getCrmProjectsDetailPage()))
