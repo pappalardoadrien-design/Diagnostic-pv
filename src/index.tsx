@@ -507,6 +507,41 @@ app.get('/admin/emergency-db-fix', async (c) => {
   await runQuery("ALTER TABLE projects ADD COLUMN id_referent TEXT", "Projects: Ajout id_referent")
   await runQuery("ALTER TABLE thermal_measurements ADD COLUMN audit_token TEXT", "Thermal: Ajout audit_token")
 
+  // 4.5 Création table el_audit_notes si elle n'existe pas
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS el_audit_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      el_audit_id INTEGER NOT NULL,
+      audit_token TEXT NOT NULL,
+      note_type TEXT DEFAULT 'text' CHECK(note_type IN ('text', 'voice', 'photo')),
+      content TEXT,
+      audio_url TEXT,
+      photo_url TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (el_audit_id) REFERENCES el_audits(id) ON DELETE CASCADE
+    )
+  `, "EL Audit Notes: Création table")
+  await runQuery("CREATE INDEX IF NOT EXISTS idx_el_audit_notes_audit ON el_audit_notes(el_audit_id)", "EL Audit Notes: Index audit_id")
+  await runQuery("CREATE INDEX IF NOT EXISTS idx_el_audit_notes_token ON el_audit_notes(audit_token)", "EL Audit Notes: Index token")
+
+  // 4.6 Création table el_audit_plants si elle n'existe pas  
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS el_audit_plants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      el_audit_id INTEGER NOT NULL,
+      audit_token TEXT NOT NULL,
+      plant_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (el_audit_id) REFERENCES el_audits(id) ON DELETE CASCADE,
+      FOREIGN KEY (plant_id) REFERENCES pv_plants(id) ON DELETE CASCADE,
+      UNIQUE(el_audit_id, plant_id)
+    )
+  `, "EL Audit Plants: Création table liaison")
+  await runQuery("CREATE INDEX IF NOT EXISTS idx_el_audit_plants_audit ON el_audit_plants(el_audit_id)", "EL Audit Plants: Index audit_id")
+  await runQuery("CREATE INDEX IF NOT EXISTS idx_el_audit_plants_plant ON el_audit_plants(plant_id)", "EL Audit Plants: Index plant_id")
+
   // 5. MIGRATION DES DONNÉES JSON DANS NOTES (NOUVEAU)
   try {
     const projects = await DB.prepare("SELECT id, notes FROM projects WHERE notes LIKE '%[MIGRATION_PENDING_DATA]%'").all();
