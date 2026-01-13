@@ -671,6 +671,83 @@ auditsRouter.post('/:token/module/:moduleId', async (c) => {
 })
 
 // ============================================================================
+// POST /api/el/audit/:token/bulk-update - Mise à jour en masse des modules
+// ============================================================================
+// Permet de mettre à jour plusieurs modules en une seule requête (sélection multiple terrain)
+auditsRouter.post('/:token/bulk-update', async (c) => {
+  const { env } = c
+  const token = c.req.param('token')
+  
+  try {
+    const body = await c.req.json()
+    // Support les deux formats: 'modules' (utilisé par diagpv-audit.js) et 'moduleIds'
+    const moduleIds = body.modules || body.moduleIds
+    const { status, comment } = body
+    
+    if (!moduleIds || !Array.isArray(moduleIds) || moduleIds.length === 0) {
+      return c.json({ error: 'modules ou moduleIds requis (tableau)' }, 400)
+    }
+    
+    if (!status) {
+      return c.json({ error: 'status requis' }, 400)
+    }
+    
+    // Mapping statut → defect_type
+    const statusMap: Record<string, string> = {
+      'ok': 'none',
+      'inequality': 'luminescence_inequality',
+      'microcracks': 'microcrack',
+      'dead': 'dead_module',
+      'string_open': 'string_open',
+      'not_connected': 'not_connected',
+      'pending': 'pending',
+      'none': 'none',
+      'luminescence_inequality': 'luminescence_inequality',
+      'microcrack': 'microcrack',
+      'dead_module': 'dead_module'
+    }
+    
+    const defect_type = statusMap[status]
+    if (!defect_type) {
+      return c.json({ error: `Statut invalide: ${status}` }, 400)
+    }
+    
+    // Calculer severity
+    const severityMap: Record<string, number> = {
+      'none': 0, 'luminescence_inequality': 1, 'microcrack': 2,
+      'dead_module': 3, 'string_open': 3, 'not_connected': 2, 'pending': 0
+    }
+    const severity_level = severityMap[defect_type] || 0
+    
+    // Mise à jour en batch
+    let updatedCount = 0
+    for (const moduleId of moduleIds) {
+      const result = await env.DB.prepare(`
+        UPDATE el_modules 
+        SET defect_type = ?, severity_level = ?, comment = COALESCE(?, comment), updated_at = datetime('now')
+        WHERE audit_token = ? AND module_identifier = ?
+      `).bind(defect_type, severity_level, comment || null, token, moduleId).run()
+      
+      if (result.meta.changes > 0) {
+        updatedCount++
+      }
+    }
+    
+    return c.json({
+      success: true,
+      requested: moduleIds.length,
+      updated: updatedCount,
+      defect_type,
+      status
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur batch-update:', error)
+    return c.json({ error: 'Erreur batch-update', details: error?.message }, 500)
+  }
+})
+
+// ============================================================================
 // GET /api/el/audit/:token/report - Générer rapport PDF de l'audit
 // ============================================================================
 auditsRouter.get('/:token/report', async (c) => {
