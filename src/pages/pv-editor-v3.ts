@@ -27,6 +27,8 @@ export function getPvEditorV3Page(plantId: string, zoneId: string): string {
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     
     <!-- PDF Export -->
@@ -799,6 +801,38 @@ export function getPvEditorV3Page(plantId: string, zoneId: string): string {
         // Zoom controls
         document.getElementById('btnZoomIn').onclick = () => map.zoomIn()
         document.getElementById('btnZoomOut').onclick = () => map.zoomOut()
+        
+        // Geocoder - Recherche d'adresse
+        L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: 'Rechercher une adresse...',
+            errorMessage: 'Adresse non trouvée',
+            position: 'topleft',
+            collapsed: false
+        })
+        .on('markgeocode', function(e) {
+            const latlng = e.geocode.center
+            map.setView(latlng, 19)
+            
+            // Marqueur temporaire
+            const marker = L.marker(latlng, {
+                icon: L.divIcon({
+                    className: 'geocode-marker',
+                    html: '<div style="background: #7c3aed; color: white; padding: 10px; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 12px rgba(124,58,237,0.4);"><i class="fas fa-map-marker-alt"></i></div>',
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 44]
+                })
+            }).addTo(map)
+            
+            marker.bindPopup('<div style="text-align:center;"><strong>' + e.geocode.name + '</strong><br><small style="color:#666;">Lat: ' + latlng.lat.toFixed(6) + '<br>Lng: ' + latlng.lng.toFixed(6) + '</small></div>')
+                .openPopup()
+            
+            // Supprimer le marqueur après 10 secondes
+            setTimeout(() => map.removeLayer(marker), 10000)
+        })
+        .addTo(map)
+        
+        console.log('✅ Geocoder ajouté')
     }
     
     // ============================================================================
