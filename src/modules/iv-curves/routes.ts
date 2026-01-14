@@ -15,6 +15,8 @@ ivRoutes.post('/upload', async (c) => {
   try {
     const formData = await c.req.formData();
     const file = formData.get('file') as File;
+    const auditToken = formData.get('audit_token') as string || null;
+    const elAuditId = formData.get('el_audit_id') as string || null;
     
     if (!file) {
       return c.json({ error: 'Aucun fichier fourni' }, 400);
@@ -35,7 +37,14 @@ ivRoutes.post('/upload', async (c) => {
     const { DB } = c.env;
     
     for (const curve of parsed.curves) {
-      const curveId = await insertIVCurve(DB, curve);
+      // Ajouter audit_token et el_audit_id à la courbe
+      const curveWithAudit = {
+        ...curve,
+        auditToken: auditToken,
+        elAuditId: elAuditId ? parseInt(elAuditId) : null
+      };
+      
+      const curveId = await insertIVCurve(DB, curveWithAudit);
       
       if (curveId) {
         // Inserer points mesure
@@ -47,7 +56,8 @@ ivRoutes.post('/upload', async (c) => {
           curveType: curve.curveType,
           fillFactor: curve.fillFactor,
           calculated: curve.calculated,
-          anomalies: curve.anomalies
+          anomalies: curve.anomalies,
+          auditToken: auditToken
         });
       }
     }
@@ -56,7 +66,9 @@ ivRoutes.post('/upload', async (c) => {
       success: true,
       fileType: parsed.fileType,
       curvesCount: parsed.curves.length,
-      curves: insertedCurves
+      curves: insertedCurves,
+      linkedToAudit: auditToken ? true : false,
+      auditToken: auditToken
     });
     
   } catch (error) {
@@ -701,19 +713,22 @@ ivRoutes.delete('/:id', async (c) => {
 // ============================================================================
 
 /**
- * Inserer courbe I-V en DB
+ * Inserer courbe I-V en DB avec liaison audit optionnelle
  */
-async function insertIVCurve(DB: D1Database, curve: IVCurveData): Promise<number | null> {
+async function insertIVCurve(DB: D1Database, curve: IVCurveData & { auditToken?: string | null, elAuditId?: number | null }): Promise<number | null> {
   try {
     const result = await DB.prepare(`
       INSERT INTO iv_curves (
+        el_audit_id, audit_token,
         string_number, curve_type, device_name, serial_number,
         fill_factor, rds, uf_diodes, ur,
         isc, voc, pmax, vmpp, impp, rs, rsh,
         status, anomaly_detected, anomaly_type,
         source_filename, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
+      curve.elAuditId || null,
+      curve.auditToken || null,
       curve.stringNumber,
       curve.curveType,
       curve.deviceName || null,
@@ -731,7 +746,7 @@ async function insertIVCurve(DB: D1Database, curve: IVCurveData): Promise<number
       curve.calculated?.rsh || null,
       curve.anomalies?.severity || 'pending',
       curve.anomalies?.detected ? 1 : 0,
-      curve.anomalies?.types.join(', ') || null,
+      curve.anomalies?.types?.join(', ') || null,
       curve.sourceFilename || null,
       curve.notes || null
     ).run();
