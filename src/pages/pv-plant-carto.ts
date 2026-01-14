@@ -165,11 +165,69 @@ export function getPvPlantCartoPage(plantId: string): string {
             
             <!-- Quick Add -->
             <div class="sidebar-panel p-4">
-                <h3 class="font-bold text-slate-800 mb-3"><i class="fas fa-plus-circle mr-2 text-green-600"></i> Positionner String</h3>
+                <h3 class="font-bold text-slate-800 mb-3"><i class="fas fa-plus-circle mr-2 text-green-600"></i> Positionner Strings</h3>
                 <div class="space-y-3">
-                    <select id="stringToPlace" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
-                        <option value="">Sélectionner un string...</option>
-                    </select>
+                    <!-- Mode Selection -->
+                    <div class="flex gap-2 text-sm">
+                        <button id="btnModeSingle" onclick="setPlaceMode('single')" class="flex-1 py-2 rounded-lg font-semibold bg-purple-600 text-white">
+                            <i class="fas fa-hand-pointer mr-1"></i> 1 string
+                        </button>
+                        <button id="btnModeMulti" onclick="setPlaceMode('multi')" class="flex-1 py-2 rounded-lg font-semibold bg-slate-200 text-slate-700">
+                            <i class="fas fa-layer-group mr-1"></i> Multi
+                        </button>
+                        <button id="btnModeAll" onclick="setPlaceMode('all')" class="flex-1 py-2 rounded-lg font-semibold bg-slate-200 text-slate-700">
+                            <i class="fas fa-th mr-1"></i> Tous
+                        </button>
+                    </div>
+                    
+                    <!-- Single String Select -->
+                    <div id="singleStringSelect">
+                        <select id="stringToPlace" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+                            <option value="">Sélectionner un string...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Multi Select (checkboxes) -->
+                    <div id="multiStringSelect" class="hidden max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                        <div id="multiSelectCheckboxes" class="space-y-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <div class="flex gap-2 mt-2 pt-2 border-t">
+                            <button onclick="selectAllStrings()" class="flex-1 text-xs bg-slate-100 py-1 rounded">Tout</button>
+                            <button onclick="selectNoStrings()" class="flex-1 text-xs bg-slate-100 py-1 rounded">Aucun</button>
+                            <button onclick="selectUnplacedStrings()" class="flex-1 text-xs bg-slate-100 py-1 rounded">Non placés</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Layout Options (for multi/all) -->
+                    <div id="layoutOptions" class="hidden border border-purple-200 bg-purple-50 rounded-lg p-3">
+                        <label class="text-xs text-purple-700 font-semibold block mb-2"><i class="fas fa-th mr-1"></i> Disposition automatique</label>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <button onclick="setLayout('grid')" id="layoutGrid" class="py-2 rounded bg-purple-600 text-white font-semibold">
+                                <i class="fas fa-th mr-1"></i> Grille
+                            </button>
+                            <button onclick="setLayout('rows')" id="layoutRows" class="py-2 rounded bg-white text-purple-700 font-semibold border border-purple-300">
+                                <i class="fas fa-grip-lines mr-1"></i> Lignes
+                            </button>
+                            <button onclick="setLayout('cols')" id="layoutCols" class="py-2 rounded bg-white text-purple-700 font-semibold border border-purple-300">
+                                <i class="fas fa-grip-lines-vertical mr-1"></i> Colonnes
+                            </button>
+                            <button onclick="setLayout('manual')" id="layoutManual" class="py-2 rounded bg-white text-purple-700 font-semibold border border-purple-300">
+                                <i class="fas fa-hand-pointer mr-1"></i> Manuel
+                            </button>
+                        </div>
+                        <div id="gridConfig" class="mt-2 grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-xs text-slate-500">Colonnes</label>
+                                <input type="number" id="gridCols" value="5" min="1" max="15" class="w-full px-2 py-1 border rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Espacement (m)</label>
+                                <input type="number" id="gridSpacing" value="0.5" step="0.1" class="w-full px-2 py-1 border rounded text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="text-xs text-slate-500">Largeur (m)</label>
@@ -180,9 +238,14 @@ export function getPvPlantCartoPage(plantId: string): string {
                             <input type="number" id="rectHeight" value="1.7" class="w-full px-2 py-1 border rounded text-sm">
                         </div>
                     </div>
-                    <button onclick="placeStringOnMap()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold">
-                        <i class="fas fa-map-marker-alt mr-2"></i> Placer sur la carte
+                    
+                    <button onclick="placeStringsOnMap()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold">
+                        <i class="fas fa-map-marker-alt mr-2"></i> <span id="placeButtonText">Placer sur la carte</span>
                     </button>
+                    
+                    <div id="selectionInfo" class="text-center text-sm text-slate-500 hidden">
+                        <span id="selectedCount">0</span> string(s) sélectionné(s)
+                    </div>
                 </div>
             </div>
             
@@ -286,6 +349,13 @@ export function getPvPlantCartoPage(plantId: string): string {
     let currentTool = 'select'
     let linkedAudit = null
     
+    // Multi-selection state
+    let placeMode = 'single' // 'single', 'multi', 'all'
+    let selectedStringsToPlace = [] // Array of zone IDs
+    let currentLayout = 'grid' // 'grid', 'rows', 'cols', 'manual'
+    let placingMultipleStrings = false
+    let multiPlaceIndex = 0
+    
     // ========================================
     // INITIALIZATION
     // ========================================
@@ -342,12 +412,15 @@ export function getPvPlantCartoPage(plantId: string): string {
                 document.getElementById('clientName').textContent = plantData.client_name || 'Client non défini'
                 document.getElementById('stringsCount').textContent = zonesData.length
                 
-                // Populate string selector
+                // Populate string selector (single mode)
                 const select = document.getElementById('stringToPlace')
                 select.innerHTML = '<option value="">Sélectionner un string...</option>'
                 zonesData.forEach(z => {
                     select.innerHTML += '<option value="' + z.id + '">' + z.zone_name + ' (' + z.module_count + ' modules)</option>'
                 })
+                
+                // Populate multi-select checkboxes
+                populateMultiSelectCheckboxes()
                 
                 // Center map if coordinates available
                 if (plantData.latitude && plantData.longitude) {
@@ -523,29 +596,210 @@ export function getPvPlantCartoPage(plantId: string): string {
     }
     
     // ========================================
-    // PLACING NEW STRINGS
+    // MULTI-SELECT CONTROLS
+    // ========================================
+    
+    function setPlaceMode(mode) {
+        placeMode = mode
+        
+        // Update UI buttons
+        document.getElementById('btnModeSingle').className = mode === 'single' 
+            ? 'flex-1 py-2 rounded-lg font-semibold bg-purple-600 text-white'
+            : 'flex-1 py-2 rounded-lg font-semibold bg-slate-200 text-slate-700'
+        document.getElementById('btnModeMulti').className = mode === 'multi'
+            ? 'flex-1 py-2 rounded-lg font-semibold bg-purple-600 text-white'
+            : 'flex-1 py-2 rounded-lg font-semibold bg-slate-200 text-slate-700'
+        document.getElementById('btnModeAll').className = mode === 'all'
+            ? 'flex-1 py-2 rounded-lg font-semibold bg-purple-600 text-white'
+            : 'flex-1 py-2 rounded-lg font-semibold bg-slate-200 text-slate-700'
+        
+        // Toggle visibility
+        document.getElementById('singleStringSelect').classList.toggle('hidden', mode !== 'single')
+        document.getElementById('multiStringSelect').classList.toggle('hidden', mode === 'single')
+        document.getElementById('layoutOptions').classList.toggle('hidden', mode === 'single')
+        document.getElementById('selectionInfo').classList.toggle('hidden', mode === 'single')
+        
+        // Update button text
+        updatePlaceButtonText()
+        
+        // For 'all' mode, auto-select all strings
+        if (mode === 'all') {
+            selectAllStrings()
+        }
+    }
+    
+    function populateMultiSelectCheckboxes() {
+        const container = document.getElementById('multiSelectCheckboxes')
+        let html = ''
+        
+        zonesData.forEach(z => {
+            const isPlaced = !!stringRectangles[z.id]
+            const placedIcon = isPlaced ? '<i class="fas fa-check text-green-500 ml-1"></i>' : ''
+            
+            html += \`
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded text-sm">
+                    <input type="checkbox" class="string-checkbox" value="\${z.id}" 
+                           onchange="updateSelectedStrings()" \${isPlaced ? '' : 'checked'}>
+                    <span>\${z.zone_name} (\${z.module_count || 14}m)</span>
+                    \${placedIcon}
+                </label>
+            \`
+        })
+        
+        container.innerHTML = html
+        updateSelectedStrings()
+    }
+    
+    function updateSelectedStrings() {
+        const checkboxes = document.querySelectorAll('.string-checkbox:checked')
+        selectedStringsToPlace = Array.from(checkboxes).map(cb => parseInt(cb.value))
+        
+        document.getElementById('selectedCount').textContent = selectedStringsToPlace.length
+        updatePlaceButtonText()
+    }
+    
+    function selectAllStrings() {
+        document.querySelectorAll('.string-checkbox').forEach(cb => cb.checked = true)
+        updateSelectedStrings()
+    }
+    
+    function selectNoStrings() {
+        document.querySelectorAll('.string-checkbox').forEach(cb => cb.checked = false)
+        updateSelectedStrings()
+    }
+    
+    function selectUnplacedStrings() {
+        document.querySelectorAll('.string-checkbox').forEach(cb => {
+            const zoneId = parseInt(cb.value)
+            cb.checked = !stringRectangles[zoneId]
+        })
+        updateSelectedStrings()
+    }
+    
+    function updatePlaceButtonText() {
+        const btn = document.getElementById('placeButtonText')
+        if (placeMode === 'single') {
+            btn.textContent = 'Placer sur la carte'
+        } else {
+            const count = selectedStringsToPlace.length
+            btn.textContent = \`Placer \${count} string(s)\`
+        }
+    }
+    
+    function setLayout(layout) {
+        currentLayout = layout
+        
+        const layouts = ['grid', 'rows', 'cols', 'manual']
+        layouts.forEach(l => {
+            const btn = document.getElementById('layout' + l.charAt(0).toUpperCase() + l.slice(1))
+            if (l === layout) {
+                btn.className = 'py-2 rounded bg-purple-600 text-white font-semibold'
+            } else {
+                btn.className = 'py-2 rounded bg-white text-purple-700 font-semibold border border-purple-300'
+            }
+        })
+        
+        // Show/hide grid config
+        document.getElementById('gridConfig').classList.toggle('hidden', layout === 'manual')
+    }
+    
+    // ========================================
+    // PLACING STRINGS (Single & Multi)
     // ========================================
     
     let placingZone = null
     
-    function placeStringOnMap() {
-        const zoneId = document.getElementById('stringToPlace').value
-        if (!zoneId) {
-            alert('Sélectionnez un string à placer')
+    function placeStringsOnMap() {
+        if (placeMode === 'single') {
+            // Original single placement
+            const zoneId = document.getElementById('stringToPlace').value
+            if (!zoneId) {
+                alert('Sélectionnez un string à placer')
+                return
+            }
+            
+            placingZone = zonesData.find(z => z.id == parseInt(zoneId))
+            if (!placingZone) return
+            
+            document.getElementById('map').style.cursor = 'crosshair'
+            showNotification('Cliquez sur la carte pour placer ' + placingZone.zone_name, 'info')
+        } else {
+            // Multi placement
+            if (selectedStringsToPlace.length === 0) {
+                alert('Sélectionnez au moins un string à placer')
+                return
+            }
+            
+            if (currentLayout === 'manual') {
+                // Manual: place one by one
+                placingMultipleStrings = true
+                multiPlaceIndex = 0
+                placeNextStringManual()
+            } else {
+                // Auto layout: click once to set origin
+                document.getElementById('map').style.cursor = 'crosshair'
+                showNotification('Cliquez sur la carte pour placer les ' + selectedStringsToPlace.length + ' strings', 'info')
+                placingMultipleStrings = true
+            }
+        }
+    }
+    
+    function placeNextStringManual() {
+        if (multiPlaceIndex >= selectedStringsToPlace.length) {
+            finishMultiPlacement()
             return
         }
         
-        placingZone = zonesData.find(z => z.id == zoneId)
-        if (!placingZone) return
+        const zoneId = selectedStringsToPlace[multiPlaceIndex]
+        placingZone = zonesData.find(z => z.id === zoneId)
         
-        // Change cursor
+        if (!placingZone) {
+            multiPlaceIndex++
+            placeNextStringManual()
+            return
+        }
+        
         document.getElementById('map').style.cursor = 'crosshair'
-        showNotification('Cliquez sur la carte pour placer ' + placingZone.zone_name, 'info')
+        showNotification(\`Placez \${placingZone.zone_name} (\${multiPlaceIndex + 1}/\${selectedStringsToPlace.length})\`, 'info')
+    }
+    
+    function finishMultiPlacement() {
+        placingMultipleStrings = false
+        multiPlaceIndex = 0
+        placingZone = null
+        document.getElementById('map').style.cursor = ''
+        showNotification(\`\${selectedStringsToPlace.length} strings placés!\`, 'success')
+        renderStringsList()
+        populateMultiSelectCheckboxes()
     }
     
     function onMapClick(e) {
+        // Multi-placement with auto layout
+        if (placingMultipleStrings && placeMode !== 'single' && currentLayout !== 'manual') {
+            placeStringsAutoLayout(e.latlng)
+            return
+        }
+        
+        // Manual multi-placement (one by one)
+        if (placingMultipleStrings && currentLayout === 'manual' && placingZone) {
+            placeSingleStringAt(e.latlng, placingZone)
+            multiPlaceIndex++
+            placeNextStringManual()
+            return
+        }
+        
+        // Single placement
         if (!placingZone) return
         
+        placeSingleStringAt(e.latlng, placingZone)
+        
+        document.getElementById('map').style.cursor = ''
+        placingZone = null
+        showNotification('String placé!', 'success')
+        renderStringsList()
+    }
+    
+    function placeSingleStringAt(latlng, zone) {
         const width = parseFloat(document.getElementById('rectWidth').value) || 24
         const height = parseFloat(document.getElementById('rectHeight').value) || 1.7
         
@@ -554,22 +808,69 @@ export function getPvPlantCartoPage(plantId: string): string {
         const lngPerMeter = 0.000012
         
         const bounds = [
-            [e.latlng.lat - (height * latPerMeter / 2), e.latlng.lng - (width * lngPerMeter / 2)],
-            [e.latlng.lat + (height * latPerMeter / 2), e.latlng.lng + (width * lngPerMeter / 2)]
+            [latlng.lat - (height * latPerMeter / 2), latlng.lng - (width * lngPerMeter / 2)],
+            [latlng.lat + (height * latPerMeter / 2), latlng.lng + (width * lngPerMeter / 2)]
         ]
         
         // Remove existing if any
-        if (stringRectangles[placingZone.id]) {
-            map.removeLayer(stringRectangles[placingZone.id].rect)
-            map.removeLayer(stringRectangles[placingZone.id].marker)
+        if (stringRectangles[zone.id]) {
+            map.removeLayer(stringRectangles[zone.id].rect)
+            map.removeLayer(stringRectangles[zone.id].marker)
         }
         
-        createStringRectangle(placingZone, bounds)
-        saveZonePosition(placingZone.id, bounds)
+        createStringRectangle(zone, bounds)
+        saveZonePosition(zone.id, bounds)
+    }
+    
+    function placeStringsAutoLayout(originLatLng) {
+        const width = parseFloat(document.getElementById('rectWidth').value) || 24
+        const height = parseFloat(document.getElementById('rectHeight').value) || 1.7
+        const spacing = parseFloat(document.getElementById('gridSpacing').value) || 0.5
+        const gridCols = parseInt(document.getElementById('gridCols').value) || 5
         
-        document.getElementById('map').style.cursor = ''
-        placingZone = null
-        showNotification('String placé!', 'success')
+        const latPerMeter = 0.000009
+        const lngPerMeter = 0.000012
+        
+        const stringsToPlace = selectedStringsToPlace
+            .map(id => zonesData.find(z => z.id === id))
+            .filter(z => z)
+        
+        stringsToPlace.forEach((zone, index) => {
+            let offsetLat = 0
+            let offsetLng = 0
+            
+            if (currentLayout === 'grid') {
+                const row = Math.floor(index / gridCols)
+                const col = index % gridCols
+                offsetLat = -row * (height + spacing) * latPerMeter
+                offsetLng = col * (width + spacing) * lngPerMeter
+            } else if (currentLayout === 'rows') {
+                // All in horizontal rows
+                offsetLat = -index * (height + spacing) * latPerMeter
+            } else if (currentLayout === 'cols') {
+                // All in vertical columns
+                offsetLng = index * (width + spacing) * lngPerMeter
+            }
+            
+            const lat = originLatLng.lat + offsetLat
+            const lng = originLatLng.lng + offsetLng
+            
+            const bounds = [
+                [lat - (height * latPerMeter / 2), lng - (width * lngPerMeter / 2)],
+                [lat + (height * latPerMeter / 2), lng + (width * lngPerMeter / 2)]
+            ]
+            
+            // Remove existing
+            if (stringRectangles[zone.id]) {
+                map.removeLayer(stringRectangles[zone.id].rect)
+                map.removeLayer(stringRectangles[zone.id].marker)
+            }
+            
+            createStringRectangle(zone, bounds)
+            saveZonePosition(zone.id, bounds)
+        })
+        
+        finishMultiPlacement()
     }
     
     async function saveZonePosition(zoneId, bounds) {
