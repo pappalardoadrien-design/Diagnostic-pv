@@ -124,7 +124,7 @@ export function getCrmClientsDetailPage() {
             <div class="flex border-b border-slate-200 bg-slate-50/50">
                 <button class="tab-btn active group px-8 py-5 text-sm font-bold border-b-2 border-transparent hover:bg-white transition-all relative flex items-center gap-2" data-target="sites">
                     <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                    Sites & Projets
+                    Centrales & Projets
                     <span id="sites-count" class="ml-2 px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs">0</span>
                 </button>
                 <button class="tab-btn group px-8 py-5 text-sm font-bold border-b-2 border-transparent hover:bg-white transition-all relative flex items-center gap-2" data-target="interventions">
@@ -314,7 +314,7 @@ export function getCrmClientsDetailPage() {
                 container.innerHTML = \`
                     <div class="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
                         <i class="fas fa-solar-panel text-3xl text-slate-300 mb-3"></i>
-                        <p class="text-slate-500 font-medium">Aucun site associé à ce client.</p>
+                        <p class="text-slate-500 font-medium">Aucune centrale associée à ce client.</p>
                         <a href="/crm/projects/create?client_id=\${clientId}" class="text-blue-600 font-bold hover:underline mt-2 inline-block">Créer une centrale</a>
                     </div>
                 \`;
@@ -323,12 +323,26 @@ export function getCrmClientsDetailPage() {
 
             container.innerHTML = projectsData.map(p => {
                 const pInterventions = interventionsData.filter(i => i.project_id === p.id).length;
+                const isPvPlant = p.source_type === 'pv_plant';
+                const linkUrl = isPvPlant ? \`/pv/plant/\${p.id}\` : \`/crm/projects/detail?id=\${p.id}\`;
+                const moduleCount = isPvPlant ? (p.modules_count || 0) : (p.module_count || '?');
+                const powerKwp = isPvPlant ? (p.total_power_kwp || (p.modules_count * 0.185).toFixed(2)) : (p.total_power_kwp || '?');
+                const location = p.location || p.city || p.address_city || 'Lieu non renseigné';
+                const badgeColor = isPvPlant ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+                const badgeIcon = isPvPlant ? 'fa-solar-panel' : 'fa-folder';
+                const badgeText = isPvPlant ? 'Centrale PV' : 'Projet CRM';
+                
                 return \`
-                    <a href="/crm/projects/detail?id=\${p.id}" class="group block bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-md transition-all">
+                    <a href="\${linkUrl}" class="group block bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-md transition-all">
                         <div class="flex justify-between items-start mb-3">
                             <div>
-                                <h4 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">\${p.project_name}</h4>
-                                <p class="text-xs text-slate-500 mt-1"><i class="fas fa-map-pin mr-1"></i> \${p.address_city || 'Ville inconnue'}</p>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h4 class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">\${p.project_name}</h4>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold \${badgeColor}">
+                                        <i class="fas \${badgeIcon} mr-1"></i> \${badgeText}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1"><i class="fas fa-map-pin mr-1"></i> \${location}</p>
                             </div>
                             <span class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
                                 <i class="fas fa-chevron-right text-xs"></i>
@@ -336,14 +350,20 @@ export function getCrmClientsDetailPage() {
                         </div>
                         <div class="flex items-center gap-4 text-xs font-medium text-slate-600 border-t border-slate-100 pt-3">
                             <span class="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                <i class="fas fa-bolt text-amber-500"></i> \${p.total_power_kwp || '?'} kWp
+                                <i class="fas fa-bolt text-amber-500"></i> \${powerKwp} kWc
                             </span>
-                             <span class="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                <i class="fas fa-th text-slate-400"></i> \${p.module_count || '?'} modules
+                            <span class="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
+                                <i class="fas fa-th text-slate-400"></i> \${moduleCount} modules
                             </span>
-                             <span class="ml-auto text-slate-400">
-                                \${pInterventions} mission(s)
-                            </span>
+                            \${isPvPlant ? \`
+                                <span class="flex items-center gap-1.5 bg-green-50 px-2 py-1 rounded text-green-700">
+                                    <i class="fas fa-layer-group"></i> \${p.zones_count || 0} zones
+                                </span>
+                            \` : \`
+                                <span class="ml-auto text-slate-400">
+                                    \${pInterventions} mission(s)
+                                </span>
+                            \`}
                         </div>
                     </a>
                 \`;

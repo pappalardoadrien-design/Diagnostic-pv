@@ -265,23 +265,52 @@ crmRoutes.delete('/clients/:id', async (c) => {
 });
 
 // ============================================================================
-// GET /api/crm/clients/:id/projects - Projets du client
+// GET /api/crm/clients/:id/projects - Projets du client + Centrales PV
 // ============================================================================
 crmRoutes.get('/clients/:id/projects', async (c) => {
   try {
     const { DB } = c.env;
     const clientId = c.req.param('id');
 
+    // Récupérer les projets CRM
     const projects = await DB.prepare(`
-      SELECT * FROM projects 
+      SELECT *, 'project' as source_type FROM projects 
       WHERE client_id = ?
       ORDER BY created_at DESC
     `).bind(clientId).all();
 
+    // Récupérer les centrales PV liées au client
+    const plants = await DB.prepare(`
+      SELECT 
+        p.id,
+        p.plant_name as project_name,
+        p.address as location,
+        p.city,
+        p.total_power_kwp,
+        p.module_count,
+        p.notes,
+        p.created_at,
+        p.updated_at,
+        'pv_plant' as source_type,
+        (SELECT COUNT(*) FROM pv_zones WHERE plant_id = p.id) as zones_count,
+        (SELECT COUNT(*) FROM pv_modules m JOIN pv_zones z ON m.zone_id = z.id WHERE z.plant_id = p.id) as modules_count
+      FROM pv_plants p 
+      WHERE p.client_id = ?
+      ORDER BY p.created_at DESC
+    `).bind(clientId).all();
+
+    // Fusionner les résultats
+    const allProjects = [
+      ...(projects.results || []),
+      ...(plants.results || [])
+    ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
     return c.json({
       success: true,
-      projects: projects.results,
-      total: projects.results.length
+      projects: allProjects,
+      total: allProjects.length,
+      crm_projects: projects.results?.length || 0,
+      pv_plants: plants.results?.length || 0
     });
 
   } catch (error: any) {
