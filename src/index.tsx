@@ -46,6 +46,7 @@ import { getPvPlantsListPage } from './pages/pv-plants-list'
 import { getPvPlantDetailPage } from './pages/pv-plant-detail'
 import { getPvPlanImportPage } from './pages/pv-plan-import'
 import { getPvEditorV3Page } from './pages/pv-editor-v3'
+import { getPvPlantCartoPage } from './pages/pv-plant-carto'
 
 // Types pour l'environnement Cloudflare
 type Bindings = {
@@ -9097,6 +9098,12 @@ app.get('/pv/plant/:id', (c) => {
 app.get('/pv/plant/:id/import-plan', (c) => {
   const plantId = c.req.param('id')
   return c.html(getPvPlanImportPage(plantId))
+})
+
+// Route Cartographie Centrale - Vue complète tous strings
+app.get('/pv/plant/:id/carto', (c) => {
+  const plantId = c.req.param('id')
+  return c.html(getPvPlantCartoPage(plantId))
 })
 
 export default app

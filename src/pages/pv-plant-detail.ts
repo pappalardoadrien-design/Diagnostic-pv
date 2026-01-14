@@ -10,8 +10,12 @@ export function getPvPlantDetailPage(plantId: string): string {
         </a>
       </div>
       <div class="flex flex-wrap gap-3">
+        <a href="/pv/plant/${plantId}/carto" class="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all flex items-center gap-2">
+          <i class="fas fa-map-marked-alt"></i>
+          <span>Cartographie</span>
+        </a>
         <a href="/pv/plant/${plantId}/import-plan" class="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
-          <i class="fas fa-map"></i>
+          <i class="fas fa-file-import"></i>
           <span>Import Plan</span>
         </a>
         <button id="createAuditBtn" class="px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all flex items-center gap-2">

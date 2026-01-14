@@ -381,27 +381,59 @@ plantsRouter.put('/:plantId/zones/:zoneId', async (c: Context) => {
   const data = await c.req.json()
   
   try {
+    // Build dynamic update query based on provided fields
+    const updates: string[] = []
+    const values: any[] = []
+    
+    if (data.zone_name !== undefined) {
+      updates.push('zone_name = ?')
+      values.push(data.zone_name)
+    }
+    if (data.zone_type !== undefined) {
+      updates.push('zone_type = ?')
+      values.push(data.zone_type)
+    }
+    if (data.azimuth !== undefined) {
+      updates.push('azimuth = ?')
+      values.push(data.azimuth)
+    }
+    if (data.tilt !== undefined) {
+      updates.push('tilt = ?')
+      values.push(data.tilt)
+    }
+    if (data.outline_coordinates !== undefined) {
+      updates.push('outline_coordinates = ?')
+      values.push(JSON.stringify(data.outline_coordinates))
+    }
+    if (data.area_sqm !== undefined) {
+      updates.push('area_sqm = ?')
+      values.push(data.area_sqm)
+    }
+    if (data.notes !== undefined) {
+      updates.push('notes = ?')
+      values.push(data.notes)
+    }
+    if (data.roof_polygon !== undefined) {
+      updates.push('roof_polygon = ?')
+      values.push(data.roof_polygon)
+    }
+    if (data.roof_area_sqm !== undefined) {
+      updates.push('roof_area_sqm = ?')
+      values.push(data.roof_area_sqm)
+    }
+    
+    if (updates.length === 0) {
+      return c.json({ success: true, message: 'Aucune modification' })
+    }
+    
+    updates.push('updated_at = datetime("now")')
+    values.push(zoneId)
+    
     await env.DB.prepare(`
       UPDATE pv_zones 
-      SET zone_name = ?,
-          zone_type = ?,
-          azimuth = ?,
-          tilt = ?,
-          outline_coordinates = ?,
-          area_sqm = ?,
-          notes = ?,
-          updated_at = datetime('now')
+      SET ${updates.join(', ')}
       WHERE id = ?
-    `).bind(
-      data.zone_name || 'Zone',
-      data.zone_type || 'roof',
-      data.azimuth || 180,
-      data.tilt || 30,
-      JSON.stringify(data.outline_coordinates || []),
-      data.area_sqm || null,
-      data.notes || null,
-      zoneId
-    ).run()
+    `).bind(...values).run()
     
     return c.json({ 
       success: true,
