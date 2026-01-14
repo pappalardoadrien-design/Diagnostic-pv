@@ -441,31 +441,51 @@ auditsRouter.put('/:token/configuration', async (c) => {
       }
     }
     
-    // Gestion ajout de strings avec modules
+    // Gestion ajout de strings avec modules (ou modules supplémentaires)
     if (add_strings && Array.isArray(add_strings) && add_strings.length > 0) {
       for (const stringConfig of add_strings) {
-        const { string_number, module_count, start_position = 1 } = stringConfig
+        const { string_number, module_count, start_position, force_add = false } = stringConfig
         
         if (!string_number || !module_count) {
           continue
         }
         
-        // Vérifier que le string n'existe pas déjà
-        const existingModules = await env.DB.prepare(`
-          SELECT COUNT(*) as count 
+        // Vérifier les modules existants pour ce string
+        const existingModulesResult = await env.DB.prepare(`
+          SELECT MAX(position_in_string) as max_position, COUNT(*) as count 
           FROM el_modules 
           WHERE audit_token = ? AND string_number = ?
         `).bind(token, string_number).first()
         
-        if ((existingModules as any).count > 0) {
-          console.log(`String ${string_number} existe déjà, skip`)
+        const existingCount = (existingModulesResult as any).count || 0
+        const maxPosition = (existingModulesResult as any).max_position || 0
+        
+        // Si force_add, on ajoute les modules manquants
+        // Sinon, on skip si le string existe déjà
+        if (existingCount > 0 && !force_add) {
+          console.log(`String ${string_number} existe déjà (${existingCount} modules), skip`)
           continue
         }
         
+        // Calculer la position de départ
+        const startPos = start_position || (existingCount > 0 ? maxPosition + 1 : 1)
+        
         // Création des modules pour ce string
+        let modulesAdded = 0
         for (let i = 0; i < module_count; i++) {
-          const position = start_position + i
+          const position = startPos + i
           const moduleId = `S${string_number}-${position}`
+          
+          // Vérifier que ce module n'existe pas déjà
+          const existingModule = await env.DB.prepare(`
+            SELECT id FROM el_modules 
+            WHERE audit_token = ? AND string_number = ? AND position_in_string = ?
+          `).bind(token, string_number, position).first()
+          
+          if (existingModule) {
+            console.log(`Module ${moduleId} existe déjà, skip`)
+            continue
+          }
           
           await env.DB.prepare(`
             INSERT INTO el_modules (
@@ -488,9 +508,10 @@ auditsRouter.put('/:token/configuration', async (c) => {
             string_number,  // physical_row = string_number par défaut
             position        // physical_col = position par défaut
           ).run()
+          modulesAdded++
         }
         
-        console.log(`✅ String ${string_number} ajouté: ${module_count} modules`)
+        console.log(`✅ String ${string_number}: ${modulesAdded} modules ajoutés (positions ${startPos}-${startPos + modulesAdded - 1})`)
       }
     }
     
