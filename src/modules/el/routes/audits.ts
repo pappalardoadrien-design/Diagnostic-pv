@@ -830,6 +830,43 @@ auditsRouter.get('/:token/report', async (c) => {
     // Calculer la puissance totale depuis les zones liées
     const totalPowerKw = linkedZones.reduce((sum, z) => sum + (z.total_power_wp || 0), 0) / 1000
     
+    // Récupérer les données IV-Curves liées à l'audit
+    let ivCurvesData: any = null
+    try {
+      const ivCurves = await env.DB.prepare(`
+        SELECT 
+          string_number,
+          COUNT(*) as curves_count,
+          AVG(fill_factor) as avg_fill_factor,
+          AVG(voc) as avg_voc,
+          AVG(isc) as avg_isc,
+          AVG(pmax) as avg_pmax,
+          AVG(uf_diodes) as avg_uf_diodes,
+          AVG(rds) as avg_rds,
+          SUM(CASE WHEN anomaly_detected = 1 THEN 1 ELSE 0 END) as anomalies_count
+        FROM iv_curves 
+        WHERE audit_token = ?
+        GROUP BY string_number
+        ORDER BY string_number ASC
+      `).bind(token).all()
+      
+      if (ivCurves.results && ivCurves.results.length > 0) {
+        const totalCurves = ivCurves.results.reduce((sum: number, c: any) => sum + c.curves_count, 0)
+        const totalAnomalies = ivCurves.results.reduce((sum: number, c: any) => sum + c.anomalies_count, 0)
+        const avgFF = ivCurves.results.reduce((sum: number, c: any) => sum + (c.avg_fill_factor || 0), 0) / ivCurves.results.length
+        
+        ivCurvesData = {
+          hasData: true,
+          byString: ivCurves.results,
+          totalCurves,
+          totalAnomalies,
+          avgFillFactor: avgFF
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching IV curves for report:', e)
+    }
+    
     // Fonction génération grille physique
     const generatePhysicalGrid = (modules: ELModule[]) => {
       if (!modules || modules.length === 0) {
@@ -1180,6 +1217,75 @@ auditsRouter.get('/:token/report', async (c) => {
         ${generatePhysicalGrid(modules)}
     </div>
 
+    ${ivCurvesData?.hasData ? `
+    <h2>📈 DONNÉES COURBES I-V (DIODES & SOMBRE)</h2>
+    <div class="info-box" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 15px;">
+            <div>
+                <div style="font-size: 14px; color: #92400e;">Total courbes mesurées</div>
+                <div style="font-size: 28px; font-weight: bold; color: #d97706;">${ivCurvesData.totalCurves}</div>
+            </div>
+            <div>
+                <div style="font-size: 14px; color: #92400e;">Fill Factor moyen</div>
+                <div style="font-size: 28px; font-weight: bold; color: ${ivCurvesData.avgFillFactor >= 0.70 ? '#16a34a' : ivCurvesData.avgFillFactor >= 0.60 ? '#d97706' : '#dc2626'};">
+                    ${(ivCurvesData.avgFillFactor * 100).toFixed(1)}%
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 14px; color: #92400e;">Anomalies détectées</div>
+                <div style="font-size: 28px; font-weight: bold; color: ${ivCurvesData.totalAnomalies > 0 ? '#dc2626' : '#16a34a'};">
+                    ${ivCurvesData.totalAnomalies}
+                </div>
+            </div>
+        </div>
+        
+        <h3 style="color: #92400e; font-size: 16px; margin: 15px 0 10px 0;">Détail par String</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: #fcd34d; color: #78350f;">
+                    <th style="padding: 8px; text-align: left; border: 1px solid #d97706;">String</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Courbes</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Fill Factor</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Voc (V)</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Isc (A)</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Pmax (W)</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Uf Diodes (V)</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Rds (Ω)</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #d97706;">Anomalies</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${ivCurvesData.byString.map((s: any) => `
+                <tr style="background: ${s.anomalies_count > 0 ? '#fef2f2' : '#fff'};">
+                    <td style="padding: 8px; border: 1px solid #d97706; font-weight: bold;">String ${s.string_number}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center;">${s.curves_count}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center; color: ${(s.avg_fill_factor || 0) >= 0.70 ? '#16a34a' : (s.avg_fill_factor || 0) >= 0.60 ? '#d97706' : '#dc2626'}; font-weight: bold;">
+                        ${s.avg_fill_factor ? (s.avg_fill_factor * 100).toFixed(1) + '%' : '-'}
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center;">${s.avg_voc ? s.avg_voc.toFixed(1) : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center;">${s.avg_isc ? s.avg_isc.toFixed(2) : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center;">${s.avg_pmax ? s.avg_pmax.toFixed(1) : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center; color: ${(s.avg_uf_diodes || 0) > 2 ? '#dc2626' : '#16a34a'};">
+                        ${s.avg_uf_diodes ? s.avg_uf_diodes.toFixed(2) : '-'}
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center;">${s.avg_rds ? s.avg_rds.toFixed(3) : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #d97706; text-align: center; color: ${s.anomalies_count > 0 ? '#dc2626' : '#16a34a'}; font-weight: bold;">
+                        ${s.anomalies_count > 0 ? '⚠️ ' + s.anomalies_count : '✅ 0'}
+                    </td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 15px; padding: 10px; background: #fff7ed; border-radius: 6px; font-size: 12px; color: #78350f;">
+            <strong>Légende :</strong><br>
+            • <strong>Fill Factor</strong> : Rapport d'efficacité (≥70% = OK, 60-70% = Attention, &lt;60% = Critique)<br>
+            • <strong>Uf Diodes</strong> : Tension diodes bypass (&lt;2V = OK, ≥2V = Diode défaillante probable)<br>
+            • <strong>Rds</strong> : Résistance série dynamique (indicateur dégradation)
+        </div>
+    </div>
+    ` : ''}
+
     <h2>📋 DÉTAIL DES MODULES À REMPLACER</h2>
     <div class="module-list">
         ${modules.filter(m => m.defect_type !== 'none' && m.defect_type !== 'pending').map(module => `
@@ -1191,6 +1297,7 @@ auditsRouter.get('/:token/report', async (c) => {
                       module.defect_type === 'dead_module' ? '🔴 Module HS' :
                       module.defect_type === 'string_open' ? '🔵 String ouvert' :
                       module.defect_type === 'not_connected' ? '⚫ Non raccordé' :
+                      module.defect_type === 'bypass_diode_failure' ? '⚡ Diode bypass HS' :
                       module.defect_type}
                 </div>
                 <div class="module-comment">${module.comment || ''}</div>

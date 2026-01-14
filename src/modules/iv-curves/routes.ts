@@ -407,6 +407,269 @@ ivRoutes.get('/dashboard/overview', async (c) => {
 });
 
 /**
+ * GET /api/iv-curves/by-audit/:auditToken
+ * Récupérer toutes les courbes I-V d'un audit EL
+ */
+ivRoutes.get('/by-audit/:auditToken', async (c) => {
+  try {
+    const auditToken = c.req.param('auditToken');
+    const { DB } = c.env;
+    
+    // Récupérer courbes IV liées à l'audit
+    const curves = await DB.prepare(`
+      SELECT * FROM iv_curves 
+      WHERE audit_token = ? 
+      ORDER BY string_number ASC, measurement_date DESC
+    `).bind(auditToken).all();
+    
+    if (!curves.results || curves.results.length === 0) {
+      return c.json({
+        auditToken,
+        curves: [],
+        count: 0,
+        message: 'Aucune courbe I-V trouvée pour cet audit'
+      });
+    }
+    
+    // Calculer statistiques par string
+    const stringStats: Record<number, any> = {};
+    
+    for (const curve of curves.results as any[]) {
+      const sn = curve.string_number;
+      if (!stringStats[sn]) {
+        stringStats[sn] = {
+          stringNumber: sn,
+          curvesCount: 0,
+          avgFF: 0,
+          avgVoc: 0,
+          avgIsc: 0,
+          avgPmax: 0,
+          anomalies: { critical: 0, warning: 0 }
+        };
+      }
+      
+      stringStats[sn].curvesCount++;
+      stringStats[sn].avgFF += curve.fill_factor || 0;
+      stringStats[sn].avgVoc += curve.voc || 0;
+      stringStats[sn].avgIsc += curve.isc || 0;
+      stringStats[sn].avgPmax += curve.pmax || 0;
+      
+      if (curve.anomaly_detected) {
+        if (curve.status === 'critical') {
+          stringStats[sn].anomalies.critical++;
+        } else {
+          stringStats[sn].anomalies.warning++;
+        }
+      }
+    }
+    
+    // Calculer moyennes
+    Object.values(stringStats).forEach((s: any) => {
+      if (s.curvesCount > 0) {
+        s.avgFF = Math.round((s.avgFF / s.curvesCount) * 100) / 100;
+        s.avgVoc = Math.round((s.avgVoc / s.curvesCount) * 100) / 100;
+        s.avgIsc = Math.round((s.avgIsc / s.curvesCount) * 100) / 100;
+        s.avgPmax = Math.round((s.avgPmax / s.curvesCount) * 100) / 100;
+      }
+    });
+    
+    return c.json({
+      auditToken,
+      curves: curves.results,
+      count: curves.results.length,
+      byString: Object.values(stringStats),
+      summary: {
+        totalCurves: curves.results.length,
+        stringsWithData: Object.keys(stringStats).length,
+        totalAnomalies: Object.values(stringStats).reduce((sum: number, s: any) => 
+          sum + s.anomalies.critical + s.anomalies.warning, 0)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur get IV curves by audit:', error);
+    return c.json({ error: 'Erreur serveur' }, 500);
+  }
+});
+
+/**
+ * GET /api/iv-curves/audit/:auditToken/cross-report
+ * Rapport croisé EL + IV pour un audit
+ * Combine données électroluminescence et courbes I-V par string
+ */
+ivRoutes.get('/audit/:auditToken/cross-report', async (c) => {
+  try {
+    const auditToken = c.req.param('auditToken');
+    const { DB } = c.env;
+    
+    // 1. Récupérer infos audit EL
+    const audit = await DB.prepare(`
+      SELECT * FROM el_audits WHERE audit_token = ?
+    `).bind(auditToken).first();
+    
+    if (!audit) {
+      return c.json({ error: 'Audit non trouvé' }, 404);
+    }
+    
+    // 2. Récupérer modules EL groupés par string
+    const elModules = await DB.prepare(`
+      SELECT 
+        string_number,
+        COUNT(*) as module_count,
+        SUM(CASE WHEN defect_type = 'none' OR defect_type = 'pending' THEN 0 ELSE 1 END) as defects_count,
+        SUM(CASE WHEN defect_type = 'dead_module' THEN 1 ELSE 0 END) as dead_count,
+        SUM(CASE WHEN defect_type = 'microcrack' THEN 1 ELSE 0 END) as microcrack_count,
+        SUM(CASE WHEN defect_type = 'luminescence_inequality' THEN 1 ELSE 0 END) as inequality_count,
+        SUM(CASE WHEN defect_type = 'bypass_diode_failure' THEN 1 ELSE 0 END) as bypass_count
+      FROM el_modules 
+      WHERE audit_token = ?
+      GROUP BY string_number
+      ORDER BY string_number ASC
+    `).bind(auditToken).all();
+    
+    // 3. Récupérer courbes IV groupées par string
+    const ivCurves = await DB.prepare(`
+      SELECT 
+        string_number,
+        COUNT(*) as curves_count,
+        AVG(fill_factor) as avg_fill_factor,
+        AVG(voc) as avg_voc,
+        AVG(isc) as avg_isc,
+        AVG(pmax) as avg_pmax,
+        SUM(CASE WHEN anomaly_detected = 1 THEN 1 ELSE 0 END) as anomalies_count,
+        AVG(uf_diodes) as avg_uf_diodes,
+        AVG(rds) as avg_rds
+      FROM iv_curves 
+      WHERE audit_token = ?
+      GROUP BY string_number
+      ORDER BY string_number ASC
+    `).bind(auditToken).all();
+    
+    // 4. Fusionner données EL et IV par string
+    const elByString: Record<number, any> = {};
+    const ivByString: Record<number, any> = {};
+    
+    for (const el of (elModules.results || []) as any[]) {
+      elByString[el.string_number] = el;
+    }
+    
+    for (const iv of (ivCurves.results || []) as any[]) {
+      ivByString[iv.string_number] = iv;
+    }
+    
+    // 5. Créer rapport croisé par string
+    const allStrings = new Set([
+      ...Object.keys(elByString).map(Number),
+      ...Object.keys(ivByString).map(Number)
+    ]);
+    
+    const crossReport = Array.from(allStrings).sort((a, b) => a - b).map(stringNumber => {
+      const el = elByString[stringNumber] || {};
+      const iv = ivByString[stringNumber] || {};
+      
+      // Déterminer statut global du string
+      let status: 'ok' | 'warning' | 'critical' = 'ok';
+      let issues: string[] = [];
+      
+      // Vérifier défauts EL
+      if (el.dead_count > 0) {
+        status = 'critical';
+        issues.push(`${el.dead_count} module(s) HS`);
+      }
+      if (el.microcrack_count > 0) {
+        if (status !== 'critical') status = 'warning';
+        issues.push(`${el.microcrack_count} microfissure(s)`);
+      }
+      if (el.bypass_count > 0) {
+        status = 'critical';
+        issues.push(`${el.bypass_count} diode(s) bypass défaillante(s)`);
+      }
+      
+      // Vérifier anomalies IV
+      if (iv.anomalies_count > 0) {
+        if (status !== 'critical') status = 'warning';
+        issues.push(`${iv.anomalies_count} anomalie(s) courbe I-V`);
+      }
+      
+      // Vérifier Fill Factor faible (< 0.70 = warning, < 0.60 = critical)
+      if (iv.avg_fill_factor && iv.avg_fill_factor < 0.60) {
+        status = 'critical';
+        issues.push(`Fill Factor bas: ${(iv.avg_fill_factor * 100).toFixed(1)}%`);
+      } else if (iv.avg_fill_factor && iv.avg_fill_factor < 0.70) {
+        if (status !== 'critical') status = 'warning';
+        issues.push(`Fill Factor dégradé: ${(iv.avg_fill_factor * 100).toFixed(1)}%`);
+      }
+      
+      // Vérifier tension diodes (Uf élevé = problème)
+      if (iv.avg_uf_diodes && iv.avg_uf_diodes > 2) {
+        if (status !== 'critical') status = 'warning';
+        issues.push(`Tension diodes élevée: ${iv.avg_uf_diodes?.toFixed(2)}V`);
+      }
+      
+      return {
+        stringNumber,
+        el: {
+          moduleCount: el.module_count || 0,
+          defectsCount: el.defects_count || 0,
+          deadCount: el.dead_count || 0,
+          microcrackCount: el.microcrack_count || 0,
+          inequalityCount: el.inequality_count || 0,
+          bypassCount: el.bypass_count || 0
+        },
+        iv: {
+          curvesCount: iv.curves_count || 0,
+          avgFillFactor: iv.avg_fill_factor ? Math.round(iv.avg_fill_factor * 100) / 100 : null,
+          avgVoc: iv.avg_voc ? Math.round(iv.avg_voc * 100) / 100 : null,
+          avgIsc: iv.avg_isc ? Math.round(iv.avg_isc * 100) / 100 : null,
+          avgPmax: iv.avg_pmax ? Math.round(iv.avg_pmax * 100) / 100 : null,
+          avgUfDiodes: iv.avg_uf_diodes ? Math.round(iv.avg_uf_diodes * 100) / 100 : null,
+          avgRds: iv.avg_rds ? Math.round(iv.avg_rds * 100) / 100 : null,
+          anomaliesCount: iv.anomalies_count || 0
+        },
+        status,
+        issues
+      };
+    });
+    
+    // 6. Calculer statistiques globales
+    const totalModules = crossReport.reduce((sum, s) => sum + s.el.moduleCount, 0);
+    const totalDefects = crossReport.reduce((sum, s) => sum + s.el.defectsCount, 0);
+    const totalCurves = crossReport.reduce((sum, s) => sum + s.iv.curvesCount, 0);
+    const criticalStrings = crossReport.filter(s => s.status === 'critical').length;
+    const warningStrings = crossReport.filter(s => s.status === 'warning').length;
+    
+    return c.json({
+      success: true,
+      auditToken,
+      audit: {
+        projectName: (audit as any).project_name,
+        clientName: (audit as any).client_name,
+        location: (audit as any).location,
+        createdAt: (audit as any).created_at
+      },
+      crossReport,
+      summary: {
+        totalStrings: crossReport.length,
+        totalModulesEL: totalModules,
+        totalDefectsEL: totalDefects,
+        totalCurvesIV: totalCurves,
+        stringsWithIssues: criticalStrings + warningStrings,
+        criticalStrings,
+        warningStrings,
+        okStrings: crossReport.length - criticalStrings - warningStrings,
+        conformityRate: totalModules > 0 
+          ? Math.round(((totalModules - totalDefects) / totalModules) * 100) 
+          : 100
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur cross-report:', error);
+    return c.json({ error: 'Erreur serveur', details: (error as any).message }, 500);
+  }
+});
+
+/**
  * DELETE /api/iv-curves/:id
  * Supprimer une courbe I-V et ses mesures
  */
