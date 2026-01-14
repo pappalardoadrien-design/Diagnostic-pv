@@ -93,6 +93,39 @@ export function getPvPlantDetailPage(plantId: string): string {
         </div>
       </div>
 
+      <!-- Audits EL Section -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+          <h2 class="text-lg font-bold text-slate-800 flex items-center gap-3">
+            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+              <i class="fas fa-search text-orange-600"></i>
+            </div>
+            Audits Électroluminescence
+          </h2>
+          <button id="createAuditBtn2" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-all flex items-center gap-2">
+            <i class="fas fa-plus"></i>
+            <span>Nouvel Audit EL</span>
+          </button>
+        </div>
+        
+        <!-- Loading Audits -->
+        <div id="loadingAudits" class="p-6 text-center text-slate-400">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Chargement des audits...
+        </div>
+        
+        <!-- No Audits -->
+        <div id="noAudits" class="hidden p-8 text-center">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-search text-3xl text-slate-300"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-600 mb-2">Aucun audit EL</h3>
+          <p class="text-slate-400 text-sm mb-4">Créez un audit électroluminescence pour cette centrale</p>
+        </div>
+        
+        <!-- Audits List -->
+        <div id="auditsList" class="hidden p-6 space-y-4"></div>
+      </div>
+
       <!-- Zones Section -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -241,6 +274,7 @@ export function getPvPlantDetailPage(plantId: string): string {
     const PLANT_ID = ${plantId}
     let plant = null
     let zones = []
+    let linkedAudits = []
 
     async function loadPlantData() {
       try {
@@ -256,6 +290,9 @@ export function getPvPlantDetailPage(plantId: string): string {
         
         renderPlant()
         renderZones()
+        
+        // Charger les audits EL liés
+        loadLinkedAudits()
         
         document.getElementById('loading').classList.add('hidden')
         document.getElementById('content').classList.remove('hidden')
@@ -352,6 +389,151 @@ export function getPvPlantDetailPage(plantId: string): string {
                  class="flex-1 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:shadow-lg text-white rounded-lg font-semibold text-center text-sm transition-all">
                 <i class="fas fa-solar-panel mr-1"></i> Éditeur V3
               </a>
+            </div>
+          </div>
+        \`
+      }).join('')
+    }
+
+    // ============================================
+    // AUDITS EL LIÉS
+    // ============================================
+    
+    async function loadLinkedAudits() {
+      const loadingEl = document.getElementById('loadingAudits')
+      const noAuditsEl = document.getElementById('noAudits')
+      const listEl = document.getElementById('auditsList')
+      
+      try {
+        // Chercher les liens EL pour chaque zone
+        const auditTokens = new Set()
+        
+        for (const zone of zones) {
+          try {
+            const res = await fetch(\`/api/pv/plants/\${PLANT_ID}/zones/\${zone.id}/el-link\`)
+            const data = await res.json()
+            
+            if (data.linked && data.link?.el_audit_token) {
+              auditTokens.add(data.link.el_audit_token)
+            }
+          } catch (e) {
+            // Ignorer les erreurs de liaison
+          }
+        }
+        
+        linkedAudits = []
+        
+        // Charger les détails de chaque audit
+        for (const token of auditTokens) {
+          try {
+            const res = await fetch(\`/api/el/audit/\${token}\`)
+            const data = await res.json()
+            
+            if (data.audit) {
+              linkedAudits.push({
+                ...data.audit,
+                progress: data.progress || {}
+              })
+            }
+          } catch (e) {
+            // Ignorer
+          }
+        }
+        
+        loadingEl.classList.add('hidden')
+        
+        if (linkedAudits.length === 0) {
+          noAuditsEl.classList.remove('hidden')
+          listEl.classList.add('hidden')
+        } else {
+          noAuditsEl.classList.add('hidden')
+          listEl.classList.remove('hidden')
+          renderLinkedAudits()
+        }
+        
+      } catch (error) {
+        console.error('Erreur chargement audits:', error)
+        loadingEl.classList.add('hidden')
+        noAuditsEl.classList.remove('hidden')
+      }
+    }
+    
+    function renderLinkedAudits() {
+      const container = document.getElementById('auditsList')
+      
+      container.innerHTML = linkedAudits.map(audit => {
+        const progress = audit.progress || {}
+        const total = progress.total || audit.total_modules || 0
+        const completed = progress.completed || 0
+        const ok = progress.ok || 0
+        const microcracks = progress.microcracks || 0
+        const dead = progress.dead || 0
+        const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0
+        
+        const statusColor = dead > 0 ? 'red' : (microcracks > 0 ? 'orange' : 'green')
+        const statusIcon = dead > 0 ? 'exclamation-triangle' : (microcracks > 0 ? 'exclamation-circle' : 'check-circle')
+        
+        return \`
+          <div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200 p-5 hover:shadow-lg transition-all">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                  <i class="fas fa-\${statusIcon} text-\${statusColor}-500 text-xl"></i>
+                  <h3 class="font-bold text-slate-800 text-lg">\${audit.project_name || 'Audit EL'}</h3>
+                </div>
+                <div class="flex flex-wrap gap-4 text-sm text-slate-600">
+                  <span><i class="fas fa-user mr-1"></i> \${audit.client_name || '-'}</span>
+                  <span><i class="fas fa-map-marker-alt mr-1"></i> \${audit.location || '-'}</span>
+                  <span><i class="fas fa-calendar mr-1"></i> \${new Date(audit.created_at).toLocaleDateString('fr-FR')}</span>
+                </div>
+              </div>
+              
+              <div class="flex flex-col md:flex-row gap-3">
+                <!-- Stats rapides -->
+                <div class="flex gap-2 text-sm">
+                  <div class="bg-white rounded-lg px-3 py-2 text-center border">
+                    <div class="font-bold text-green-600">\${ok}</div>
+                    <div class="text-slate-400 text-xs">OK</div>
+                  </div>
+                  <div class="bg-white rounded-lg px-3 py-2 text-center border">
+                    <div class="font-bold text-orange-600">\${microcracks}</div>
+                    <div class="text-slate-400 text-xs">Micro</div>
+                  </div>
+                  <div class="bg-white rounded-lg px-3 py-2 text-center border">
+                    <div class="font-bold text-red-600">\${dead}</div>
+                    <div class="text-slate-400 text-xs">HS</div>
+                  </div>
+                  <div class="bg-white rounded-lg px-3 py-2 text-center border">
+                    <div class="font-bold text-purple-600">\${completionRate}%</div>
+                    <div class="text-slate-400 text-xs">Fait</div>
+                  </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex gap-2">
+                  <a href="/audit/\${audit.audit_token}" 
+                     class="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center gap-2">
+                    <i class="fas fa-edit"></i>
+                    <span>Éditer</span>
+                  </a>
+                  <a href="/api/el/audit/\${audit.audit_token}/report" target="_blank"
+                     class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 transition-all flex items-center gap-2">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Rapport</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Progress bar -->
+            <div class="mt-4">
+              <div class="flex justify-between text-xs text-slate-500 mb-1">
+                <span>\${completed} / \${total} modules analysés</span>
+                <span>\${completionRate}%</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all" style="width: \${completionRate}%"></div>
+              </div>
             </div>
           </div>
         \`
@@ -525,6 +707,7 @@ export function getPvPlantDetailPage(plantId: string): string {
     document.getElementById('editPlantForm').addEventListener('submit', savePlant)
     
     document.getElementById('createAuditBtn').addEventListener('click', createAuditFromPlant)
+    document.getElementById('createAuditBtn2')?.addEventListener('click', createAuditFromPlant)
     
     document.getElementById('zoneModal').addEventListener('click', (e) => {
       if (e.target === document.getElementById('zoneModal')) hideZoneModal()
