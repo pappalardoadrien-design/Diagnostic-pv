@@ -428,6 +428,19 @@ auditsRouter.put('/:token/configuration', async (c) => {
       `).bind(...bindings).run()
     }
     
+    // Gestion suppression de strings
+    const { delete_strings } = await c.req.json().catch(() => ({}))
+    if (delete_strings && Array.isArray(delete_strings) && delete_strings.length > 0) {
+      for (const stringNumber of delete_strings) {
+        await env.DB.prepare(`
+          DELETE FROM el_modules 
+          WHERE audit_token = ? AND string_number = ?
+        `).bind(token, stringNumber).run()
+        
+        console.log(`🗑️ String ${stringNumber} supprimé`)
+      }
+    }
+    
     // Gestion ajout de strings avec modules
     if (add_strings && Array.isArray(add_strings) && add_strings.length > 0) {
       for (const stringConfig of add_strings) {
