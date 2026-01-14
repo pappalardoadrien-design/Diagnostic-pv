@@ -428,8 +428,8 @@ auditsRouter.put('/:token/configuration', async (c) => {
       `).bind(...bindings).run()
     }
     
-    // Gestion suppression de strings
-    const { delete_strings } = await c.req.json().catch(() => ({}))
+    // Gestion suppression de strings complets
+    const { delete_strings, trim_modules_after } = await c.req.json().catch(() => ({}))
     if (delete_strings && Array.isArray(delete_strings) && delete_strings.length > 0) {
       for (const stringNumber of delete_strings) {
         await env.DB.prepare(`
@@ -438,6 +438,32 @@ auditsRouter.put('/:token/configuration', async (c) => {
         `).bind(token, stringNumber).run()
         
         console.log(`🗑️ String ${stringNumber} supprimé`)
+      }
+    }
+    
+    // Gestion suppression modules après une position (trim)
+    // Format: trim_modules_after: { strings: [1,2,3...], position: 14 }
+    if (trim_modules_after && trim_modules_after.position) {
+      const { strings: stringsToTrim, position } = trim_modules_after
+      
+      if (stringsToTrim && Array.isArray(stringsToTrim)) {
+        // Trimmer des strings spécifiques
+        for (const stringNum of stringsToTrim) {
+          const result = await env.DB.prepare(`
+            DELETE FROM el_modules 
+            WHERE audit_token = ? AND string_number = ? AND position_in_string > ?
+          `).bind(token, stringNum, position).run()
+          
+          console.log(`✂️ String ${stringNum}: modules après position ${position} supprimés`)
+        }
+      } else {
+        // Trimmer tous les strings
+        const result = await env.DB.prepare(`
+          DELETE FROM el_modules 
+          WHERE audit_token = ? AND position_in_string > ?
+        `).bind(token, position).run()
+        
+        console.log(`✂️ Tous les strings: modules après position ${position} supprimés`)
       }
     }
     
