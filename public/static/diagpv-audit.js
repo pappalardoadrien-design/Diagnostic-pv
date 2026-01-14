@@ -639,6 +639,9 @@ class DiagPVAudit {
                 this.closeModal()
             }
         })
+        
+        // Bouton micro - Reconnaissance vocale
+        this.setupVoiceRecognition()
 
         // Configuration modal édition audit
         this.setupEditModalEvents()
@@ -1012,6 +1015,122 @@ class DiagPVAudit {
         const count = 2 + Math.floor(Math.random() * 2)
         document.getElementById('technicians').textContent = `${count}/4`
         document.getElementById('technicianIcons').textContent = '👤'.repeat(count)
+    }
+
+    // =============================================
+    // RECONNAISSANCE VOCALE
+    // =============================================
+    setupVoiceRecognition() {
+        const voiceBtn = document.getElementById('voiceBtn')
+        const voiceIndicator = document.getElementById('voiceIndicator')
+        const commentInput = document.getElementById('moduleComment')
+        
+        if (!voiceBtn) return
+        
+        // Vérifier support Web Speech API
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        
+        if (!SpeechRecognition) {
+            voiceBtn.title = "Reconnaissance vocale non supportée par ce navigateur"
+            voiceBtn.classList.add('opacity-50')
+            voiceBtn.disabled = true
+            return
+        }
+        
+        this.recognition = new SpeechRecognition()
+        this.recognition.continuous = false
+        this.recognition.interimResults = true
+        this.recognition.lang = 'fr-FR'
+        this.isRecording = false
+        
+        // Événement clic sur bouton micro
+        voiceBtn.addEventListener('click', () => {
+            if (this.isRecording) {
+                this.stopVoiceRecording()
+            } else {
+                this.startVoiceRecording()
+            }
+        })
+        
+        // Résultats reconnaissance
+        this.recognition.onresult = (event) => {
+            let transcript = ''
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript
+            }
+            commentInput.value = transcript
+            logAudit('🎤 Transcription:', transcript)
+        }
+        
+        // Fin reconnaissance
+        this.recognition.onend = () => {
+            this.stopVoiceRecording()
+        }
+        
+        // Erreur
+        this.recognition.onerror = (event) => {
+            errorAudit('🎤 Erreur reconnaissance vocale:', event.error)
+            this.stopVoiceRecording()
+            
+            if (event.error === 'not-allowed') {
+                this.showAlert('Accès au microphone refusé. Autorisez le micro dans les paramètres du navigateur.', 'error')
+            } else if (event.error === 'no-speech') {
+                this.showAlert('Aucune voix détectée. Réessayez.', 'warning')
+            } else {
+                this.showAlert('Erreur reconnaissance vocale: ' + event.error, 'error')
+            }
+        }
+    }
+    
+    startVoiceRecording() {
+        const voiceBtn = document.getElementById('voiceBtn')
+        const voiceIndicator = document.getElementById('voiceIndicator')
+        
+        if (!this.recognition) return
+        
+        try {
+            this.recognition.start()
+            this.isRecording = true
+            
+            // UI état enregistrement
+            voiceBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'border-blue-400')
+            voiceBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'border-red-400', 'animate-pulse')
+            voiceBtn.innerHTML = '<i class="fas fa-stop text-xl"></i>'
+            
+            if (voiceIndicator) {
+                voiceIndicator.classList.remove('hidden')
+            }
+            
+            logAudit('🎤 Enregistrement démarré')
+        } catch (err) {
+            errorAudit('🎤 Erreur démarrage:', err)
+        }
+    }
+    
+    stopVoiceRecording() {
+        const voiceBtn = document.getElementById('voiceBtn')
+        const voiceIndicator = document.getElementById('voiceIndicator')
+        
+        if (this.recognition && this.isRecording) {
+            try {
+                this.recognition.stop()
+            } catch (e) {}
+        }
+        
+        this.isRecording = false
+        
+        // UI état normal
+        if (voiceBtn) {
+            voiceBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'border-red-400', 'animate-pulse')
+            voiceBtn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'border-blue-400')
+            voiceBtn.innerHTML = '<i class="fas fa-microphone text-xl"></i>'
+        }
+        
+        if (voiceIndicator) {
+            voiceIndicator.classList.add('hidden')
+        }
+        
+        logAudit('🎤 Enregistrement arrêté')
     }
 
     setupOfflineSupport() {

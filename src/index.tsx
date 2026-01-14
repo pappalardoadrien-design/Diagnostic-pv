@@ -1512,39 +1512,53 @@ app.get('/audit/:token', async (c) => {
                 
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <button class="module-status-btn bg-green-600 hover:bg-green-700 p-3 rounded font-bold" data-status="ok">
-                        OK OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
+                        ✅ OK<br><span class="text-sm font-normal">Aucun défaut détecté</span>
                     </button>
                     <button class="module-status-btn bg-yellow-600 hover:bg-yellow-700 p-3 rounded font-bold" data-status="inequality">
-                        Inegalite Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
+                        ⚠️ Inégalité<br><span class="text-sm font-normal">Qualité cellules</span>
                     </button>
                     <button class="module-status-btn bg-orange-600 hover:bg-orange-700 p-3 rounded font-bold" data-status="microcracks">
-                        Fissures Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
+                        🔶 Microfissures<br><span class="text-sm font-normal">Visibles EL</span>
                     </button>
                     <button class="module-status-btn bg-red-600 hover:bg-red-700 p-3 rounded font-bold" data-status="dead">
-                        HS Impact Cellulaire<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
+                        ❌ HS Impact Cell.<br><span class="text-sm font-normal">Défaut cellulaire majeur</span>
                     </button>
                     <button class="module-status-btn bg-blue-600 hover:bg-blue-700 p-3 rounded font-bold" data-status="string_open">
-                        String String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
+                        🔗 String ouvert<br><span class="text-sm font-normal">Sous-string ouvert</span>
                     </button>
-                    <button class="module-status-btn bg-gray-600 hover:bg-gray-700 p-3 rounded font-bold" data-status="not_connected">
-                        Non-connecte Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
+                    <button class="module-status-btn bg-purple-600 hover:bg-purple-700 p-3 rounded font-bold" data-status="not_connected">
+                        🚫 Non raccordé<br><span class="text-sm font-normal">Non connecté</span>
                     </button>
                 </div>
                 
                 <div class="mb-4">
                     <label class="block text-sm font-bold mb-2">Commentaire (optionnel) :</label>
-                    <input type="text" id="moduleComment" 
-                           class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 text-lg focus:border-yellow-400 focus:outline-none"
-                           placeholder="Détails du défaut...">
+                    <div class="relative">
+                        <input type="text" id="moduleComment" 
+                               class="w-full bg-black border-2 border-gray-600 rounded px-3 py-2 pr-12 text-lg focus:border-yellow-400 focus:outline-none"
+                               placeholder="Détails du défaut...">
+                    </div>
                 </div>
                 
-                <div class="flex space-x-3">
+                <div class="flex space-x-3 relative">
                     <button id="validateBtn" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded font-black">
                         VALIDER
+                    </button>
+                    <!-- Bouton microphone -->
+                    <button type="button" id="voiceBtn" class="w-14 h-14 bg-blue-600 hover:bg-blue-700 rounded-full font-black flex items-center justify-center shadow-lg border-2 border-blue-400" title="Dictée vocale">
+                        <i class="fas fa-microphone text-xl"></i>
                     </button>
                     <button id="cancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded font-black">
                         ANNULER
                     </button>
+                </div>
+                
+                <!-- Indicateur d'enregistrement vocal -->
+                <div id="voiceIndicator" class="hidden mt-3 text-center">
+                    <div class="inline-flex items-center space-x-2 bg-red-600 px-4 py-2 rounded-full animate-pulse">
+                        <i class="fas fa-circle text-xs"></i>
+                        <span class="font-bold">Écoute en cours...</span>
+                    </div>
                 </div>
             </div>
         </div>
