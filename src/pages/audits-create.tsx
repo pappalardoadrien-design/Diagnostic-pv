@@ -30,7 +30,7 @@ export function getAuditsCreatePage() {
                     </h2>
                     
                     <div class="space-y-4">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Intervention ou Projet</label>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Centrale PV, Intervention ou Projet</label>
                         <div class="relative group">
                             <i class="fas fa-search absolute left-4 top-4 text-slate-400 group-hover:text-green-500 transition-colors"></i>
                             <select id="intervention_id" class="w-full pl-12 pr-10 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-green-500 focus:bg-white outline-none font-bold text-slate-700 transition-all cursor-pointer appearance-none">
@@ -41,11 +41,10 @@ export function getAuditsCreatePage() {
                             </div>
                         </div>
                         
-                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
-                            <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
-                            <p class="text-sm text-blue-700 font-medium">
-                                Sélectionnez une intervention planifiée pour lier automatiquement le rapport au planning.
-                                Sinon, choisissez un projet pour un audit inopiné.
+                        <div class="bg-green-50 border border-green-100 rounded-xl p-4 flex items-start gap-3">
+                            <i class="fas fa-solar-panel text-green-500 mt-0.5"></i>
+                            <p class="text-sm text-green-700 font-medium">
+                                <strong>Recommandé :</strong> Sélectionnez une <strong>Centrale PV</strong> pour créer automatiquement la liaison avec le calepinage.
                             </p>
                         </div>
                     </div>
@@ -76,6 +75,12 @@ export function getAuditsCreatePage() {
                         <div id="config-warning" class="hidden mt-4 bg-amber-50 text-amber-800 text-xs font-bold p-3 rounded-lg border border-amber-200 flex items-center gap-3">
                             <i class="fas fa-exclamation-triangle text-xl"></i>
                             <span>Configuration technique incomplète. Une grille par défaut sera générée.</span>
+                        </div>
+                        
+                        <!-- PV Link Info -->
+                        <div id="pv-link-info" class="hidden mt-4 bg-green-50 text-green-800 text-xs font-bold p-3 rounded-lg border border-green-200 flex items-center gap-3">
+                            <i class="fas fa-link text-xl"></i>
+                            <span>Liaison automatique avec la cartographie PV activée</span>
                         </div>
                     </div>
                 </div>
@@ -162,24 +167,47 @@ export function getAuditsCreatePage() {
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
-        // --- LOGIC ---
+        // --- GLOBAL STATE ---
+        let selectedPlant = null;
+        let selectedProject = null;
         
+        // --- LOGIC ---
         async function loadInterventions() {
             try {
-                const [resInterventions, resProjects] = await Promise.all([
+                const [resInterventions, resProjects, resPlants] = await Promise.all([
                     axios.get('/api/planning/interventions'),
-                    axios.get('/api/crm/projects')
+                    axios.get('/api/crm/projects'),
+                    axios.get('/api/pv/plants')
                 ]);
 
                 const select = document.getElementById('intervention_id');
                 select.innerHTML = '<option value="">-- Choisir un dossier --</option>';
                 
-                // Group 1: Interventions Planifiées
-                if (resInterventions.data.interventions.length > 0) {
+                // Group 0: CENTRALES PV (RECOMMANDÉ)
+                const plants = resPlants.data.plants || [];
+                if (plants.length > 0) {
                     const optGroup = document.createElement('optgroup');
-                    optGroup.label = "📅 AGENDA (Conseillé)";
+                    optGroup.label = "🏭 CENTRALES PV (Recommandé)";
                     
-                    resInterventions.data.interventions
+                    plants
+                        .filter(p => p.module_count > 0)
+                        .sort((a,b) => (a.plant_name||'').localeCompare(b.plant_name||''))
+                        .forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = 'PLANT:' + p.id;
+                            opt.textContent = \`\${p.plant_name} • \${p.client_name || '?'} (\${p.module_count} modules)\`;
+                            optGroup.appendChild(opt);
+                        });
+                    select.appendChild(optGroup);
+                }
+                
+                // Group 1: Interventions Planifiées
+                const interventions = resInterventions.data.interventions || [];
+                if (interventions.length > 0) {
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = "📅 AGENDA";
+                    
+                    interventions
                         .sort((a,b) => new Date(b.intervention_date) - new Date(a.intervention_date))
                         .forEach(i => {
                             const date = new Date(i.intervention_date).toLocaleDateString('fr-FR');
@@ -191,17 +219,22 @@ export function getAuditsCreatePage() {
                     select.appendChild(optGroup);
                 }
 
-                // Group 2: Tous les Projets
-                if (resProjects.data.projects.length > 0) {
+                // Group 2: Tous les Projets CRM
+                const projects = resProjects.data.projects || [];
+                if (projects.length > 0) {
                     const optGroup = document.createElement('optgroup');
-                    optGroup.label = "📂 TOUS LES SITES";
+                    optGroup.label = "📂 PROJETS CRM";
                     
-                    resProjects.data.projects.sort((a,b) => (a.name||'').localeCompare(b.name||'')).forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = 'PROJ:' + p.id;
-                        opt.textContent = \`\${p.name || p.project_name} • \${p.address_city || ''}\`;
-                        optGroup.appendChild(opt);
-                    });
+                    projects
+                        .filter(p => !p.is_girasole) // Exclure GIRASOLE
+                        .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+                        .slice(0, 50) // Limiter à 50
+                        .forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = 'PROJ:' + p.id;
+                            opt.textContent = \`\${p.name || p.project_name} • \${p.client_name || '?'}\`;
+                            optGroup.appendChild(opt);
+                        });
                     select.appendChild(optGroup);
                 }
 
@@ -219,7 +252,12 @@ export function getAuditsCreatePage() {
             const details = document.getElementById('config-details');
             const icon = document.getElementById('config-icon');
             const warning = document.getElementById('config-warning');
+            const pvLinkInfo = document.getElementById('pv-link-info');
             const progress = document.getElementById('progress-bar');
+            
+            // Reset state
+            selectedPlant = null;
+            selectedProject = null;
             
             if (!value) {
                 step2.classList.add('hidden', 'opacity-0', 'translate-y-4');
@@ -247,30 +285,80 @@ export function getAuditsCreatePage() {
 
             try {
                 const [type, id] = value.split(':');
-                let project = null;
+                let displayData = {};
+                let hasConfig = false;
+                let isPVPlant = false;
 
-                if (type === 'INT') {
+                if (type === 'PLANT') {
+                    // === CENTRALE PV ===
+                    isPVPlant = true;
+                    const res = await axios.get(\`/api/pv/plants/\${id}\`);
+                    const plant = res.data.plant;
+                    const zones = res.data.zones || [];
+                    
+                    selectedPlant = { ...plant, zones };
+                    
+                    // Calculer config depuis zones
+                    const totalModules = zones.reduce((sum, z) => sum + (z.module_count || 0), 0);
+                    const stringCount = zones.length;
+                    
+                    displayData = {
+                        name: plant.plant_name,
+                        client_name: plant.client_name,
+                        location: plant.address || plant.city,
+                        total_power_kwp: (totalModules * 0.185).toFixed(2), // Estimation 185W/module
+                        module_count: totalModules,
+                        string_count: stringCount
+                    };
+                    
+                    hasConfig = totalModules > 0 && stringCount > 0;
+                    
+                } else if (type === 'INT') {
+                    // === INTERVENTION ===
                     const res = await axios.get(\`/api/planning/interventions/\${id}\`);
-                    project = res.data.intervention;
+                    const intervention = res.data.intervention;
+                    selectedProject = intervention;
+                    
+                    displayData = {
+                        name: intervention.project_name || intervention.name,
+                        client_name: intervention.client_name,
+                        location: intervention.address_city || intervention.location,
+                        total_power_kwp: intervention.total_power_kwp,
+                        module_count: intervention.module_count
+                    };
+                    
+                    hasConfig = intervention.strings_configuration || (intervention.module_count && intervention.string_count);
+                    
                 } else {
+                    // === PROJET CRM ===
                     const res = await axios.get(\`/api/crm/projects/\${id}\`);
-                    project = res.data.project;
+                    const project = res.data.project;
+                    selectedProject = project;
+                    
+                    displayData = {
+                        name: project.project_name || project.name,
+                        client_name: project.client_name,
+                        location: project.address_city,
+                        total_power_kwp: project.total_power_kwp,
+                        module_count: project.module_count
+                    };
+                    
+                    hasConfig = project.strings_configuration || (project.module_count && project.string_count);
                 }
 
                 // Render Details
-                document.getElementById('project-name-display').textContent = project.project_name || project.name;
+                document.getElementById('project-name-display').textContent = displayData.name || 'Sans nom';
                 details.innerHTML = \`
-                    <div class="flex items-center"><i class="fas fa-user-tie w-6 text-center text-slate-400"></i> \${project.client_name || 'Client inconnu'}</div>
-                    <div class="flex items-center"><i class="fas fa-map-marker-alt w-6 text-center text-slate-400"></i> \${project.address_city || project.location || 'Loc. N/A'}</div>
+                    <div class="flex items-center"><i class="fas fa-user-tie w-6 text-center text-slate-400"></i> \${displayData.client_name || 'Client inconnu'}</div>
+                    <div class="flex items-center"><i class="fas fa-map-marker-alt w-6 text-center text-slate-400"></i> \${displayData.location || 'Loc. N/A'}</div>
                     <div class="flex items-center mt-2 pt-2 border-t border-slate-200 text-xs">
-                        <span class="bg-slate-200 px-2 py-1 rounded font-bold mr-2 text-slate-600">\${project.total_power_kwp || '?'} kWc</span>
-                        <span class="bg-slate-200 px-2 py-1 rounded font-bold text-slate-600">\${project.module_count || '?'} Mods</span>
+                        <span class="bg-slate-200 px-2 py-1 rounded font-bold mr-2 text-slate-600">\${displayData.total_power_kwp || '?'} kWc</span>
+                        <span class="bg-slate-200 px-2 py-1 rounded font-bold text-slate-600">\${displayData.module_count || '?'} Modules</span>
+                        \${displayData.string_count ? \`<span class="bg-slate-200 px-2 py-1 rounded font-bold ml-2 text-slate-600">\${displayData.string_count} Strings</span>\` : ''}
                     </div>
                 \`;
 
-                // Technical Check
-                const hasConfig = project.strings_configuration || (project.module_count && project.string_count);
-                
+                // Technical Check Icons
                 if (hasConfig) {
                     icon.className = "w-14 h-14 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-2xl shadow-sm flex-shrink-0";
                     icon.innerHTML = '<i class="fas fa-check-circle"></i>';
@@ -279,6 +367,13 @@ export function getAuditsCreatePage() {
                     icon.className = "w-14 h-14 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl shadow-sm flex-shrink-0";
                     icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
                     warning.classList.remove('hidden');
+                }
+                
+                // PV Link Info
+                if (isPVPlant) {
+                    pvLinkInfo.classList.remove('hidden');
+                } else {
+                    pvLinkInfo.classList.add('hidden');
                 }
 
                 // Enable Submit
@@ -309,36 +404,102 @@ export function getAuditsCreatePage() {
                 const [type, id] = selection.split(':');
                 const modules = Array.from(document.querySelectorAll('input[name="modules"]:checked')).map(cb => cb.value);
 
-                const payload = { modules };
+                let auditToken = null;
                 
-                if (type === 'INT') {
-                    payload.intervention_id = parseInt(id);
-                } else {
-                    // Fallback Mode: Create phantom intervention or link project directly
-                    const resProj = await axios.get(\`/api/crm/projects/\${id}\`);
-                    const proj = resProj.data.project;
+                if (type === 'PLANT' && selectedPlant) {
+                    // === MODE CENTRALE PV (RECOMMANDÉ) ===
+                    const plant = selectedPlant;
+                    const zones = plant.zones || [];
                     
-                    payload.project_name = proj.name;
-                    payload.client_name = proj.client_name;
-                    payload.location = proj.address_city;
+                    // Construire configuration depuis zones PV
+                    const configuration = {
+                        mode: 'advanced',
+                        strings: zones.map((z, idx) => ({
+                            id: idx + 1,
+                            mpptNumber: idx + 1,
+                            moduleCount: z.module_count || 0,
+                            zoneName: z.zone_name,
+                            zoneId: z.id
+                        }))
+                    };
+                    
+                    const totalModules = zones.reduce((sum, z) => sum + (z.module_count || 0), 0);
+                    
+                    // 1. Créer l'audit EL
+                    const createRes = await axios.post('/api/el/audit/create', {
+                        projectName: \`Audit EL - \${plant.plant_name}\`,
+                        clientName: plant.client_name || 'Client inconnu',
+                        location: plant.address || plant.city || '',
+                        configuration
+                    });
+                    
+                    if (!createRes.data.success) {
+                        throw new Error(createRes.data.error || 'Erreur création audit');
+                    }
+                    
+                    auditToken = createRes.data.auditToken;
+                    
+                    // 2. Créer les liaisons EL ↔ PV automatiquement
+                    btn.innerHTML = '<i class="fas fa-link fa-spin mr-2"></i> LIAISON PV...';
+                    
+                    for (let i = 0; i < zones.length; i++) {
+                        const zone = zones[i];
+                        try {
+                            await axios.post(\`/api/pv/plants/\${plant.id}/zones/\${zone.id}/link-el-audit\`, {
+                                el_audit_token: auditToken
+                            });
+                        } catch (linkErr) {
+                            console.warn(\`Liaison zone \${zone.id} échouée:\`, linkErr);
+                        }
+                    }
+                    
+                } else if (type === 'INT') {
+                    // === MODE INTERVENTION ===
+                    const payload = { 
+                        modules,
+                        intervention_id: parseInt(id)
+                    };
+                    
+                    const res = await axios.post('/api/audits/create-multi-modules', payload);
+                    if (!res.data.success) {
+                        throw new Error(res.data.error || 'Erreur création');
+                    }
+                    auditToken = res.data.audit_token;
+                    
+                } else {
+                    // === MODE PROJET CRM ===
+                    const proj = selectedProject;
+                    
+                    const payload = {
+                        modules,
+                        project_name: proj.name || proj.project_name,
+                        client_name: proj.client_name,
+                        location: proj.address_city
+                    };
                     
                     if (proj.strings_configuration) {
                         try {
                             payload.configuration = JSON.parse(proj.strings_configuration);
                         } catch(e) {}
                     }
+                    
+                    const res = await axios.post('/api/audits/create-multi-modules', payload);
+                    if (!res.data.success) {
+                        throw new Error(res.data.error || 'Erreur création');
+                    }
+                    auditToken = res.data.audit_token;
                 }
-
-                const res = await axios.post('/api/audits/create-multi-modules', payload);
-                if (res.data.success) {
-                    window.location.href = \`/audit/\${res.data.audit_token}\`;
+                
+                // Redirect to audit
+                if (auditToken) {
+                    window.location.href = \`/audit/\${auditToken}\`;
                 } else {
-                    throw new Error(res.data.error || "Erreur inconnue");
+                    throw new Error('Token audit non reçu');
                 }
 
             } catch (err) {
                 console.error(err);
-                alert("Erreur: " + err.message);
+                alert("Erreur: " + (err.response?.data?.error || err.message));
                 btn.disabled = false;
                 btn.innerHTML = originalContent;
             }
@@ -347,9 +508,17 @@ export function getAuditsCreatePage() {
         // Init
         const params = new URLSearchParams(window.location.search);
         const intId = params.get('intervention_id');
+        const plantId = params.get('plant_id');
         
         loadInterventions().then(() => {
-            if (intId) {
+            if (plantId) {
+                const select = document.getElementById('intervention_id');
+                const val = 'PLANT:' + plantId;
+                if (select.querySelector(\`option[value="\${val}"]\`)) {
+                    select.value = val;
+                    loadSelectionDetails(val);
+                }
+            } else if (intId) {
                 const select = document.getElementById('intervention_id');
                 const val = 'INT:' + intId;
                 if (select.querySelector(\`option[value="\${val}"]\`)) {

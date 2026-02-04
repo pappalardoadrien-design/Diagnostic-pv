@@ -47,9 +47,14 @@ auditsRouter.post('/create', async (c) => {
   
   // Détermination du mode de configuration
   if (configuration && configuration.mode === 'advanced') {
-    // Mode configuration avancée
-    totalModules = configuration.totalModules || 0
-    stringCount = configuration.stringCount || 0
+    // Mode configuration avancée - calculer depuis strings
+    if (configuration.strings && Array.isArray(configuration.strings)) {
+      totalModules = configuration.strings.reduce((sum: number, s: any) => sum + (s.moduleCount || 0), 0)
+      stringCount = configuration.strings.length
+    } else {
+      totalModules = configuration.totalModules || 0
+      stringCount = configuration.stringCount || 0
+    }
     modulesPerString = 0 // Variable en mode avancé
     configJson = JSON.stringify(configuration)
   } else if (configuration && configuration.mode === 'simple') {
