@@ -56,6 +56,8 @@ dashboardRouter.get('/audits', async (c) => {
         : 0
         
       return {
+        id: audit.audit_id,
+        token: audit.audit_token,
         ...audit,
         defauts_total: defauts,
         progression_pct: progressionPct,

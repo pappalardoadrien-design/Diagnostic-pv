@@ -216,6 +216,7 @@ plantsRouter.put('/:id', async (c: Context) => {
           latitude = ?, 
           longitude = ?,
           notes = ?,
+          client_id = ?,
           updated_at = datetime('now')
       WHERE id = ?
     `).bind(
@@ -228,6 +229,7 @@ plantsRouter.put('/:id', async (c: Context) => {
       data.latitude,
       data.longitude,
       data.notes,
+      data.client_id || null,
       plantId
     ).run()
     
