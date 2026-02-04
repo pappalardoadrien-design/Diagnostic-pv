@@ -483,10 +483,16 @@ export function getPvPlantCartoPage(plantId: string): string {
                         <i class="fas fa-check-circle"></i> Audit EL lié
                     </div>
                     <p class="text-slate-600 text-xs mb-2">\${linkedAudit.project_name || 'Audit EL'}</p>
-                    <a href="/audit/\${linkedAudit.el_audit_token}" target="_blank" 
-                       class="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold text-sm">
-                        <i class="fas fa-external-link-alt"></i> Ouvrir Audit EL
-                    </a>
+                    <div class="flex flex-col gap-2 mt-2">
+                        <a href="/audit/\${linkedAudit.el_audit_token}" target="_blank" 
+                           class="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold text-sm">
+                            <i class="fas fa-external-link-alt"></i> Ouvrir Audit EL
+                        </a>
+                        <button onclick="importELModules('\${linkedAudit.el_audit_token}')" 
+                                class="inline-flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded font-semibold">
+                            <i class="fas fa-download"></i> Importer modules
+                        </button>
+                    </div>
                 </div>
             \`
         } else {
@@ -1274,6 +1280,58 @@ export function getPvPlantCartoPage(plantId: string): string {
         } catch (err) {
             console.error('GPS calculation error:', err)
             showNotification('Erreur réseau', 'error')
+        }
+    }
+    
+    // Importer les modules depuis l'audit EL lié vers toutes les zones PV
+    async function importELModules(auditToken) {
+        if (!zonesData || zonesData.length === 0) {
+            showNotification('Aucune zone disponible', 'error')
+            return
+        }
+        
+        showNotification('Import des modules EL en cours...', 'info')
+        
+        let totalImported = 0
+        let errors = []
+        
+        for (const zone of zonesData) {
+            try {
+                const res = await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zone.id + '/import-el-modules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                const data = await res.json()
+                
+                if (data.success) {
+                    totalImported += data.imported || 0
+                } else if (data.existing_count) {
+                    // Modules existent déjà, synchroniser les statuts
+                    const syncRes = await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zone.id + '/sync-from-el', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    const syncData = await syncRes.json()
+                    if (syncData.success) {
+                        totalImported += syncData.stats?.synced || 0
+                    }
+                }
+            } catch (err) {
+                errors.push(zone.zone_name)
+            }
+        }
+        
+        if (totalImported > 0) {
+            showNotification(totalImported + ' modules importés/synchronisés', 'success')
+            // Recalculer le GPS
+            await calculateAllGPS()
+            // Recharger les modules
+            await loadAllModules()
+            updateStats()
+        } else if (errors.length > 0) {
+            showNotification('Erreurs: ' + errors.join(', '), 'error')
+        } else {
+            showNotification('Aucun module à importer', 'info')
         }
     }
     

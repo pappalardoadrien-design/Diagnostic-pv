@@ -976,21 +976,13 @@ plantsRouter.post('/:plantId/zones/:zoneId/calculate-gps', async (c: Context) =>
       updated++
     }
     
-    // Mettre à jour les coordonnées de la zone
-    await env.DB.prepare(`
-      UPDATE pv_zones
-      SET latitude = ?, longitude = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(centerLat, centerLng, zoneId).run()
-    
     // Mettre à jour les coordonnées de la centrale si pas encore définies
-    if (!zone.plant_lat || !zone.plant_lng) {
-      await env.DB.prepare(`
-        UPDATE pv_plants
-        SET latitude = ?, longitude = ?, updated_at = datetime('now')
-        WHERE id = ? AND (latitude IS NULL OR longitude IS NULL)
-      `).bind(centerLat, centerLng, plantId).run()
-    }
+    // Note: pv_zones n'a pas de colonnes latitude/longitude, on stocke seulement dans pv_plants
+    await env.DB.prepare(`
+      UPDATE pv_plants
+      SET latitude = ?, longitude = ?, updated_at = datetime('now')
+      WHERE id = ? AND (latitude IS NULL OR longitude IS NULL)
+    `).bind(centerLat, centerLng, plantId).run()
     
     return c.json({
       success: true,

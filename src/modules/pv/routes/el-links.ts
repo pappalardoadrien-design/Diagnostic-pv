@@ -309,6 +309,111 @@ app.post('/plants/:plantId/zones/:zoneId/sync-from-el', async (c) => {
 })
 
 // ============================================================================
+// POST /api/pv/plants/:plantId/zones/:zoneId/import-el-modules
+// Importer les modules depuis l'audit EL lié vers la zone PV
+// Crée les modules PV s'ils n'existent pas
+// ============================================================================
+app.post('/plants/:plantId/zones/:zoneId/import-el-modules', async (c) => {
+  const { plantId, zoneId } = c.req.param()
+  
+  try {
+    const { DB } = c.env
+    
+    // Récupérer la liaison
+    const link = await DB.prepare('SELECT * FROM pv_cartography_audit_links WHERE pv_zone_id = ? AND pv_plant_id = ?')
+      .bind(zoneId, plantId)
+      .first()
+    
+    if (!link) {
+      return c.json({ error: 'Aucune liaison trouvée. Liez d\'abord un audit EL.' }, 404)
+    }
+    
+    // Récupérer modules EL
+    const elModules = await DB.prepare('SELECT * FROM el_modules WHERE el_audit_id = ? ORDER BY string_number, position_in_string')
+      .bind(link.el_audit_id)
+      .all()
+    
+    if (!elModules.results || elModules.results.length === 0) {
+      return c.json({ error: 'Aucun module dans l\'audit EL' }, 404)
+    }
+    
+    // Vérifier si modules PV existent déjà
+    const existingPV = await DB.prepare('SELECT COUNT(*) as count FROM pv_modules WHERE zone_id = ?')
+      .bind(zoneId)
+      .first()
+    
+    if (existingPV && (existingPV as any).count > 0) {
+      return c.json({ 
+        error: 'Des modules PV existent déjà dans cette zone',
+        message: 'Utilisez la synchronisation pour mettre à jour les statuts',
+        existing_count: (existingPV as any).count
+      }, 400)
+    }
+    
+    // Créer les modules PV depuis EL
+    // Disposition automatique en grille basée sur string_number et position_in_string
+    let created = 0
+    const moduleWidth = 1.7  // mètres
+    const moduleHeight = 1.0 // mètres
+    const gapX = 0.1 // mètres entre modules
+    const gapY = 0.5 // mètres entre strings
+    
+    for (const elMod of elModules.results as any[]) {
+      // Calculer position x/y basée sur string et position
+      const stringStr = String(elMod.string_number || '1')
+      const stringNum = parseInt(stringStr.replace(/\D/g, '') || '1') || 1
+      const posInString = elMod.position_in_string || 1
+      
+      const posX = (posInString - 1) * (moduleWidth + gapX)
+      const posY = (stringNum - 1) * (moduleHeight + gapY)
+      
+      await DB.prepare(`
+        INSERT INTO pv_modules (
+          zone_id, module_identifier, string_number, position_in_string,
+          pos_x_meters, pos_y_meters, width_meters, height_meters,
+          power_wp, module_status, el_defect_type, el_severity_level, el_notes,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `).bind(
+        zoneId,
+        elMod.module_identifier,
+        elMod.string_number,
+        elMod.position_in_string,
+        posX,
+        posY,
+        moduleWidth,
+        moduleHeight,
+        0, // power_wp à renseigner plus tard
+        elMod.defect_type === 'none' || elMod.defect_type === 'ok' ? 'ok' : 
+          elMod.defect_type === 'pending' ? 'pending' : elMod.defect_type,
+        elMod.defect_type,
+        elMod.severity_level || 0,
+        elMod.comment
+      ).run()
+      created++
+    }
+    
+    // Mettre à jour la liaison
+    await DB.prepare(`
+      UPDATE pv_cartography_audit_links
+      SET sync_status = 'imported', last_sync_at = CURRENT_TIMESTAMP, total_modules_synced = ?
+      WHERE id = ?
+    `).bind(created, link.id).run()
+    
+    return c.json({
+      success: true,
+      message: `${created} modules importés depuis l'audit EL`,
+      imported: created,
+      audit_token: link.el_audit_token
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur import modules EL:', error)
+    return c.json({ error: 'Erreur serveur', details: error.message }, 500)
+  }
+})
+
+// ============================================================================
 // GET /api/pv/el-audit/:auditToken/quick-map
 // Workflow rapide: Créer centrale + zone et rediriger vers Canvas V2
 // ============================================================================
