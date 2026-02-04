@@ -485,7 +485,13 @@ crmRoutes.get('/projects', async (c) => {
     const { DB } = c.env;
     
     const result = await DB.prepare(`
-      SELECT *, name as project_name FROM projects ORDER BY created_at DESC
+      SELECT 
+        p.*,
+        p.name as project_name,
+        c.company_name as client_name
+      FROM projects p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      ORDER BY p.created_at DESC
     `).all();
 
     return c.json({
@@ -506,7 +512,13 @@ crmRoutes.get('/projects/:id', async (c) => {
     const projectId = c.req.param('id');
 
     const project = await DB.prepare(`
-      SELECT *, name as project_name FROM projects WHERE id = ?
+      SELECT 
+        p.*,
+        p.name as project_name,
+        c.company_name as client_name
+      FROM projects p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      WHERE p.id = ?
     `).bind(projectId).first();
 
     if (!project) {
