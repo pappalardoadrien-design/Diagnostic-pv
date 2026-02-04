@@ -139,6 +139,9 @@ export function getPvPlantCartoPage(plantId: string): string {
                 <button onclick="saveLayout()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-save mr-2"></i> Sauvegarder
                 </button>
+                <button onclick="calculateAllGPS()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold" title="Calculer les coordonnées GPS de tous les modules">
+                    <i class="fas fa-map-marker-alt mr-2"></i> Géolocaliser
+                </button>
                 <button onclick="exportPlan()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-file-pdf mr-2"></i> Export Plan
                 </button>
@@ -875,6 +878,7 @@ export function getPvPlantCartoPage(plantId: string): string {
     
     async function saveZonePosition(zoneId, bounds) {
         try {
+            // 1. Sauvegarder la position du rectangle
             await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zoneId, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -882,6 +886,17 @@ export function getPvPlantCartoPage(plantId: string): string {
                     roof_polygon: JSON.stringify(bounds)
                 })
             })
+            
+            // 2. Calculer automatiquement les coordonnées GPS des modules
+            const gpsRes = await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zoneId + '/calculate-gps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            const gpsData = await gpsRes.json()
+            
+            if (gpsData.success) {
+                showNotification(gpsData.message || 'GPS calculé', 'success')
+            }
         } catch (err) {
             console.error('Error saving zone position:', err)
         }
@@ -1139,6 +1154,32 @@ export function getPvPlantCartoPage(plantId: string): string {
         
         // Save is automatic when moving strings
         showNotification('Layout sauvegardé!', 'success')
+    }
+    
+    async function calculateAllGPS() {
+        showNotification('Calcul GPS en cours...', 'info')
+        
+        try {
+            const res = await fetch('/api/pv/plants/' + PLANT_ID + '/calculate-all-gps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            const data = await res.json()
+            
+            if (data.success) {
+                showNotification(data.zones_processed + ' zones, ' + data.total_modules + ' modules géolocalisés', 'success')
+                
+                // Recentrer la carte sur le nouveau centre
+                if (data.plant_center) {
+                    map.setView([data.plant_center.lat, data.plant_center.lng], map.getZoom())
+                }
+            } else {
+                showNotification('Erreur: ' + (data.error || 'Calcul GPS échoué'), 'error')
+            }
+        } catch (err) {
+            console.error('GPS calculation error:', err)
+            showNotification('Erreur réseau', 'error')
+        }
     }
     
     async function exportPlan() {

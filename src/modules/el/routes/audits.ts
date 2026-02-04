@@ -895,6 +895,61 @@ auditsRouter.get('/:token/report', async (c) => {
     // Calculer la puissance totale depuis les zones liées
     const totalPowerKw = linkedZones.reduce((sum, z) => sum + (z.total_power_wp || 0), 0) / 1000
     
+    // Récupérer les modules PV avec coordonnées GPS pour la carte
+    let gpsModules: any[] = []
+    let plantCenter: { lat: number, lng: number } | null = null
+    try {
+      if (linkedPlant) {
+        const gpsResult = await env.DB.prepare(`
+          SELECT 
+            pm.id,
+            pm.module_identifier,
+            pm.latitude,
+            pm.longitude,
+            pm.module_status,
+            z.zone_name as string_name,
+            z.id as zone_id
+          FROM pv_modules pm
+          JOIN pv_zones z ON pm.zone_id = z.id
+          JOIN pv_cartography_audit_links pcal ON pcal.pv_zone_id = z.id
+          WHERE pcal.el_audit_token = ? AND pm.latitude IS NOT NULL AND pm.longitude IS NOT NULL
+          ORDER BY z.zone_name, pm.position_in_string
+        `).bind(token).all()
+        
+        gpsModules = gpsResult.results || []
+        
+        // Calcul du centre pour la carte
+        if (gpsModules.length > 0) {
+          const sumLat = gpsModules.reduce((s, m) => s + m.latitude, 0)
+          const sumLng = gpsModules.reduce((s, m) => s + m.longitude, 0)
+          plantCenter = {
+            lat: sumLat / gpsModules.length,
+            lng: sumLng / gpsModules.length
+          }
+        }
+        
+        // Fallback: coordonnées de la centrale
+        if (!plantCenter) {
+          const plantCoords = await env.DB.prepare(`
+            SELECT latitude, longitude FROM pv_plants WHERE id = ?
+          `).bind(linkedPlant.plant_id).first()
+          
+          if (plantCoords?.latitude && plantCoords?.longitude) {
+            plantCenter = { lat: plantCoords.latitude as number, lng: plantCoords.longitude as number }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching GPS modules for report:', e)
+    }
+    
+    // Mapper les statuts EL aux modules GPS
+    const elStatusMap = new Map(modules.map(m => [m.module_identifier, m.defect_type]))
+    const gpsModulesWithStatus = gpsModules.map(m => ({
+      ...m,
+      el_status: elStatusMap.get(m.module_identifier) || 'pending'
+    }))
+    
     // Récupérer les données IV-Curves liées à l'audit
     let ivCurvesData: any = null
     try {
@@ -1281,6 +1336,92 @@ auditsRouter.get('/:token/report', async (c) => {
         </p>
         ${generatePhysicalGrid(modules)}
     </div>
+
+    ${plantCenter ? `
+    <h2>📍 CARTE GÉOLOCALISATION - MODULES IMPACTÉS</h2>
+    <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        
+        <div id="gps-map" style="height: 400px; border-radius: 8px; margin-bottom: 15px;"></div>
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+            <div style="font-size: 12px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 50%; margin-right: 5px;"></span> OK
+            </div>
+            <div style="font-size: 12px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #eab308; border-radius: 50%; margin-right: 5px;"></span> Inégalité
+            </div>
+            <div style="font-size: 12px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #f97316; border-radius: 50%; margin-right: 5px;"></span> Microfissures
+            </div>
+            <div style="font-size: 12px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #ef4444; border-radius: 50%; margin-right: 5px;"></span> Module HS
+            </div>
+            <div style="font-size: 12px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: #94a3b8; border-radius: 50%; margin-right: 5px;"></span> Non diagnostiqué
+            </div>
+        </div>
+        
+        <p style="margin-top: 15px; font-size: 11px; color: #6b7280;">
+            Centre: ${plantCenter.lat.toFixed(6)}, ${plantCenter.lng.toFixed(6)} | 
+            Modules géolocalisés: ${gpsModulesWithStatus.length}
+        </p>
+        
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modules = ${JSON.stringify(gpsModulesWithStatus)};
+            const center = [${plantCenter.lat}, ${plantCenter.lng}];
+            
+            const map = L.map('gps-map').setView(center, 19);
+            
+            // Fond satellite Esri
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 22,
+                attribution: 'Esri'
+            }).addTo(map);
+            
+            // Couleurs par statut
+            const colors = {
+                'none': '#22c55e',      // OK - Vert
+                'luminescence_inequality': '#eab308', // Jaune
+                'microcrack': '#f97316', // Orange
+                'dead_module': '#ef4444', // Rouge
+                'string_open': '#60a5fa', // Bleu
+                'not_connected': '#6b7280', // Gris
+                'pending': '#94a3b8'      // Gris clair
+            };
+            
+            // Ajouter les modules
+            modules.forEach(m => {
+                const color = colors[m.el_status] || '#94a3b8';
+                L.circleMarker([m.latitude, m.longitude], {
+                    radius: 6,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).bindPopup('<strong>' + m.module_identifier + '</strong><br>' + m.string_name + '<br>Statut: ' + m.el_status)
+                  .addTo(map);
+            });
+            
+            // Ajuster la vue sur tous les modules
+            if (modules.length > 0) {
+                const bounds = L.latLngBounds(modules.map(m => [m.latitude, m.longitude]));
+                map.fitBounds(bounds, { padding: [20, 20] });
+            }
+        });
+        </script>
+    </div>
+    ` : `
+    <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+        <p style="margin: 0; color: #92400e;">
+            <strong>📍 Carte GPS non disponible</strong><br>
+            <span style="font-size: 12px;">Positionnez la centrale sur la carte via la page cartographie pour générer les coordonnées GPS des modules.</span>
+        </p>
+    </div>
+    `}
 
     ${ivCurvesData?.hasData ? `
     <h2>📈 DONNÉES COURBES I-V (DIODES & SOMBRE)</h2>

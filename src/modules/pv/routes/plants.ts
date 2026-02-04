@@ -888,4 +888,288 @@ plantsRouter.put('/:plantId/zones/:zoneId/roof', async (c: Context) => {
   }
 })
 
+// ============================================================================
+// GPS GEOLOCATION - Calcul automatique des coordonnées modules
+// ============================================================================
+
+// POST /api/pv/plants/:plantId/zones/:zoneId/calculate-gps - Calculer GPS modules depuis bounds zone
+plantsRouter.post('/:plantId/zones/:zoneId/calculate-gps', async (c: Context) => {
+  const { env } = c
+  const plantId = c.req.param('plantId')
+  const zoneId = c.req.param('zoneId')
+  
+  try {
+    // Récupérer la zone et ses bounds
+    const zone = await env.DB.prepare(`
+      SELECT z.*, p.latitude as plant_lat, p.longitude as plant_lng
+      FROM pv_zones z
+      LEFT JOIN pv_plants p ON z.plant_id = p.id
+      WHERE z.id = ? AND z.plant_id = ?
+    `).bind(zoneId, plantId).first()
+    
+    if (!zone) {
+      return c.json({ error: 'Zone non trouvée' }, 404)
+    }
+    
+    // Vérifier que roof_polygon existe
+    if (!zone.roof_polygon) {
+      return c.json({ 
+        error: 'Position non définie', 
+        message: 'Positionnez d\'abord la zone sur la carte' 
+      }, 400)
+    }
+    
+    // Parser les bounds (format: [[lat1,lng1],[lat2,lng2]] ou [sw,ne])
+    let bounds
+    try {
+      bounds = JSON.parse(zone.roof_polygon as string)
+    } catch (e) {
+      return c.json({ error: 'Format bounds invalide' }, 400)
+    }
+    
+    // Récupérer les modules de la zone
+    const modules = await env.DB.prepare(`
+      SELECT id, module_identifier, position_in_string
+      FROM pv_modules
+      WHERE zone_id = ?
+      ORDER BY position_in_string ASC
+    `).bind(zoneId).all()
+    
+    if (!modules.results || modules.results.length === 0) {
+      return c.json({ 
+        success: true, 
+        message: 'Aucun module à géolocaliser',
+        updated: 0
+      })
+    }
+    
+    // Calculer les coordonnées de chaque module
+    // Bounds format: [[swLat, swLng], [neLat, neLng]]
+    const swLat = bounds[0][0]
+    const swLng = bounds[0][1]
+    const neLat = bounds[1][0]
+    const neLng = bounds[1][1]
+    
+    // Calculer le centre de la zone (pour mise à jour plant si nécessaire)
+    const centerLat = (swLat + neLat) / 2
+    const centerLng = (swLng + neLng) / 2
+    
+    const moduleCount = modules.results.length
+    let updated = 0
+    
+    // Distribuer les modules linéairement dans le rectangle
+    // On les aligne horizontalement pour un string
+    for (let i = 0; i < moduleCount; i++) {
+      const m = modules.results[i] as any
+      const ratio = moduleCount > 1 ? i / (moduleCount - 1) : 0.5
+      
+      // Interpolation linéaire entre SW et NE
+      const lat = swLat + (neLat - swLat) * ratio
+      const lng = swLng + (neLng - swLng) * ratio
+      
+      await env.DB.prepare(`
+        UPDATE pv_modules
+        SET latitude = ?, longitude = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(lat, lng, m.id).run()
+      
+      updated++
+    }
+    
+    // Mettre à jour les coordonnées de la zone
+    await env.DB.prepare(`
+      UPDATE pv_zones
+      SET latitude = ?, longitude = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(centerLat, centerLng, zoneId).run()
+    
+    // Mettre à jour les coordonnées de la centrale si pas encore définies
+    if (!zone.plant_lat || !zone.plant_lng) {
+      await env.DB.prepare(`
+        UPDATE pv_plants
+        SET latitude = ?, longitude = ?, updated_at = datetime('now')
+        WHERE id = ? AND (latitude IS NULL OR longitude IS NULL)
+      `).bind(centerLat, centerLng, plantId).run()
+    }
+    
+    return c.json({
+      success: true,
+      message: `${updated} modules géolocalisés`,
+      updated,
+      zone_center: { lat: centerLat, lng: centerLng },
+      bounds: { sw: [swLat, swLng], ne: [neLat, neLng] }
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur calcul GPS:', error)
+    return c.json({ 
+      error: 'Erreur calcul GPS',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// POST /api/pv/plants/:plantId/calculate-all-gps - Calculer GPS de toutes les zones
+plantsRouter.post('/:plantId/calculate-all-gps', async (c: Context) => {
+  const { env } = c
+  const plantId = c.req.param('plantId')
+  
+  try {
+    // Récupérer toutes les zones avec roof_polygon défini
+    const zones = await env.DB.prepare(`
+      SELECT id, zone_name, roof_polygon
+      FROM pv_zones
+      WHERE plant_id = ? AND roof_polygon IS NOT NULL
+    `).bind(plantId).all()
+    
+    if (!zones.results || zones.results.length === 0) {
+      return c.json({ 
+        success: true, 
+        message: 'Aucune zone positionnée',
+        zones_processed: 0,
+        total_modules: 0
+      })
+    }
+    
+    let totalModules = 0
+    let zonesProcessed = 0
+    let plantCenterLat = 0
+    let plantCenterLng = 0
+    
+    for (const zone of zones.results as any[]) {
+      try {
+        const bounds = JSON.parse(zone.roof_polygon)
+        const swLat = bounds[0][0]
+        const swLng = bounds[0][1]
+        const neLat = bounds[1][0]
+        const neLng = bounds[1][1]
+        
+        const centerLat = (swLat + neLat) / 2
+        const centerLng = (swLng + neLng) / 2
+        
+        plantCenterLat += centerLat
+        plantCenterLng += centerLng
+        
+        // Récupérer et géolocaliser les modules
+        const modules = await env.DB.prepare(`
+          SELECT id, position_in_string FROM pv_modules WHERE zone_id = ?
+          ORDER BY position_in_string ASC
+        `).bind(zone.id).all()
+        
+        if (modules.results && modules.results.length > 0) {
+          const moduleCount = modules.results.length
+          
+          for (let i = 0; i < moduleCount; i++) {
+            const m = modules.results[i] as any
+            const ratio = moduleCount > 1 ? i / (moduleCount - 1) : 0.5
+            const lat = swLat + (neLat - swLat) * ratio
+            const lng = swLng + (neLng - swLng) * ratio
+            
+            await env.DB.prepare(`
+              UPDATE pv_modules SET latitude = ?, longitude = ?, updated_at = datetime('now')
+              WHERE id = ?
+            `).bind(lat, lng, m.id).run()
+            
+            totalModules++
+          }
+        }
+        
+        // Mettre à jour zone center
+        await env.DB.prepare(`
+          UPDATE pv_zones SET latitude = ?, longitude = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `).bind(centerLat, centerLng, zone.id).run()
+        
+        zonesProcessed++
+      } catch (e) {
+        console.warn(`Zone ${zone.id} GPS calc error:`, e)
+      }
+    }
+    
+    // Mettre à jour centrale avec le centre moyen de toutes les zones
+    if (zonesProcessed > 0) {
+      plantCenterLat /= zonesProcessed
+      plantCenterLng /= zonesProcessed
+      
+      await env.DB.prepare(`
+        UPDATE pv_plants SET latitude = ?, longitude = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(plantCenterLat, plantCenterLng, plantId).run()
+    }
+    
+    return c.json({
+      success: true,
+      message: `${totalModules} modules géolocalisés dans ${zonesProcessed} zones`,
+      zones_processed: zonesProcessed,
+      total_modules: totalModules,
+      plant_center: zonesProcessed > 0 ? { lat: plantCenterLat, lng: plantCenterLng } : null
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur calcul GPS global:', error)
+    return c.json({ 
+      error: 'Erreur calcul GPS',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// GET /api/pv/plants/:plantId/gps-modules - Export modules avec coordonnées GPS
+plantsRouter.get('/:plantId/gps-modules', async (c: Context) => {
+  const { env } = c
+  const plantId = c.req.param('plantId')
+  
+  try {
+    const modules = await env.DB.prepare(`
+      SELECT 
+        m.id,
+        m.module_identifier,
+        m.latitude,
+        m.longitude,
+        m.power_wp,
+        m.module_status,
+        z.zone_name as string_name,
+        z.id as zone_id
+      FROM pv_modules m
+      JOIN pv_zones z ON m.zone_id = z.id
+      WHERE z.plant_id = ? AND m.latitude IS NOT NULL
+      ORDER BY z.zone_name, m.position_in_string
+    `).bind(plantId).all()
+    
+    // Construire GeoJSON FeatureCollection
+    const geojson = {
+      type: 'FeatureCollection',
+      features: (modules.results || []).map((m: any) => ({
+        type: 'Feature',
+        properties: {
+          id: m.id,
+          module_identifier: m.module_identifier,
+          power_wp: m.power_wp,
+          status: m.module_status,
+          string_name: m.string_name
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [m.longitude, m.latitude]
+        }
+      }))
+    }
+    
+    return c.json({
+      success: true,
+      modules: modules.results || [],
+      geojson,
+      total: (modules.results || []).length,
+      geolocated: (modules.results || []).filter((m: any) => m.latitude && m.longitude).length
+    })
+    
+  } catch (error: any) {
+    console.error('Erreur export GPS modules:', error)
+    return c.json({ 
+      error: 'Erreur export GPS',
+      details: error.message 
+    }, 500)
+  }
+})
+
 export default plantsRouter
