@@ -365,6 +365,7 @@ export function getPvPlantCartoPage(plantId: string): string {
     
     async function init() {
         initMap()
+        initDrawTool()
         await loadPlantData()
         await loadAllModules()
         await checkELAudit()
@@ -542,11 +543,17 @@ export function getPvPlantCartoPage(plantId: string): string {
         // Click to select
         rect.on('click', () => selectZone(zone))
         
-        // Make draggable
-        rect.on('mousedown', function() {
-            if (currentTool === 'move') {
+        // Make draggable - toujours actif (drag & drop direct)
+        rect.on('mousedown', function(e) {
+            // Shift+click pour drag, ou outil move sélectionné
+            if (e.originalEvent.shiftKey || currentTool === 'move') {
                 enableDragging(rect, zone, marker)
             }
+        })
+        
+        // Double-click pour activer le drag temporairement
+        rect.on('dblclick', function() {
+            enableDragging(rect, zone, marker)
         })
         
         stringRectangles[zone.id] = { rect, marker }
@@ -1133,6 +1140,9 @@ export function getPvPlantCartoPage(plantId: string): string {
     // TOOLS
     // ========================================
     
+    let drawStartPoint = null
+    let drawRect = null
+    
     function setTool(tool) {
         currentTool = tool
         document.querySelectorAll('.btn-tool').forEach(btn => btn.classList.remove('active'))
@@ -1140,9 +1150,94 @@ export function getPvPlantCartoPage(plantId: string): string {
         
         if (tool === 'move') {
             document.getElementById('map').style.cursor = 'move'
+        } else if (tool === 'draw') {
+            document.getElementById('map').style.cursor = 'crosshair'
+            showNotification('Cliquez et glissez pour dessiner un rectangle', 'info')
         } else {
             document.getElementById('map').style.cursor = ''
         }
+        
+        // Annuler le dessin en cours si on change d'outil
+        if (tool !== 'draw' && drawRect) {
+            map.removeLayer(drawRect)
+            drawRect = null
+            drawStartPoint = null
+        }
+    }
+    
+    // Dessin de rectangle pour positionner une zone
+    function initDrawTool() {
+        map.on('mousedown', function(e) {
+            if (currentTool !== 'draw') return
+            if (!selectedZone) {
+                showNotification('Sélectionnez d\\'abord une zone dans la liste', 'error')
+                return
+            }
+            
+            drawStartPoint = e.latlng
+            map.dragging.disable()
+        })
+        
+        map.on('mousemove', function(e) {
+            if (currentTool !== 'draw' || !drawStartPoint) return
+            
+            const bounds = [
+                [Math.min(drawStartPoint.lat, e.latlng.lat), Math.min(drawStartPoint.lng, e.latlng.lng)],
+                [Math.max(drawStartPoint.lat, e.latlng.lat), Math.max(drawStartPoint.lng, e.latlng.lng)]
+            ]
+            
+            if (drawRect) {
+                drawRect.setBounds(bounds)
+            } else {
+                drawRect = L.rectangle(bounds, {
+                    color: '#7c3aed',
+                    weight: 2,
+                    fillColor: '#7c3aed',
+                    fillOpacity: 0.3,
+                    dashArray: '5,5'
+                }).addTo(map)
+            }
+        })
+        
+        map.on('mouseup', async function(e) {
+            if (currentTool !== 'draw' || !drawStartPoint) return
+            
+            map.dragging.enable()
+            
+            if (!drawRect) {
+                drawStartPoint = null
+                return
+            }
+            
+            const bounds = drawRect.getBounds()
+            const boundsArray = [
+                [bounds.getSouth(), bounds.getWest()],
+                [bounds.getNorth(), bounds.getEast()]
+            ]
+            
+            // Supprimer l'ancien rectangle de la zone si existe
+            if (stringRectangles[selectedZone.id]) {
+                map.removeLayer(stringRectangles[selectedZone.id].rect)
+                map.removeLayer(stringRectangles[selectedZone.id].marker)
+                delete stringRectangles[selectedZone.id]
+            }
+            
+            // Supprimer le rectangle de dessin temporaire
+            map.removeLayer(drawRect)
+            drawRect = null
+            drawStartPoint = null
+            
+            // Créer le rectangle permanent
+            createStringRectangle(selectedZone, boundsArray)
+            
+            // Sauvegarder + calculer GPS
+            await saveZonePosition(selectedZone.id, boundsArray)
+            
+            showNotification('Zone "' + selectedZone.zone_name + '" positionnée!', 'success')
+            
+            // Passer en mode sélection
+            setTool('select')
+        })
     }
     
     // ========================================
