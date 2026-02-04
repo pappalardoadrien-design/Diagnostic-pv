@@ -1170,14 +1170,6 @@ app.get('/thermal/:token', (c) => {
 })
 
 // ============================================================================
-// ROUTE /AUDIT/:TOKEN/PHOTOS - INTERFACE UPLOAD PHOTOS EL + IA PICSELLIA
-// ============================================================================
-app.get('/audit/:token/photos', (c) => {
-  const token = c.req.param('token')
-  return c.html(getAuditPhotosPage(token))
-})
-
-// ============================================================================
 // ROUTE MODULE EL - ACCÈS DIRECT CRÉATION
 // ============================================================================
 app.get('/el', (c) => {
