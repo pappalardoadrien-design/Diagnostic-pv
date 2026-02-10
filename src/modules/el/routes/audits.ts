@@ -895,6 +895,19 @@ auditsRouter.get('/:token/report', async (c) => {
     // Calculer la puissance totale depuis les zones liées
     const totalPowerKw = linkedZones.reduce((sum, z) => sum + (z.total_power_wp || 0), 0) / 1000
     
+    // Récupérer les notes vocales/écrites de l'audit
+    let auditNotes: any[] = []
+    try {
+      const notesResult = await env.DB.prepare(`
+        SELECT * FROM el_audit_notes 
+        WHERE audit_token = ?
+        ORDER BY created_at ASC
+      `).bind(token).all()
+      auditNotes = notesResult.results || []
+    } catch (e) {
+      console.warn('Error fetching notes for report:', e)
+    }
+    
     // Récupérer les modules PV avec coordonnées GPS pour la carte
     let gpsModules: any[] = []
     let plantCenter: { lat: number, lng: number } | null = null
@@ -1511,6 +1524,22 @@ auditsRouter.get('/:token/report', async (c) => {
         `).join('')}
     </div>
 
+    ${auditNotes.length > 0 ? `
+    <h2>📝 NOTES & OBSERVATIONS TERRAIN</h2>
+    <div style="background: #1f2937; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+        ${auditNotes.map((note: any) => `
+            <div style="background: #374151; border-radius: 6px; padding: 15px; margin-bottom: 12px; border-left: 4px solid #3b82f6;">
+                <p style="color: #f3f4f6; font-size: 14px; margin: 0 0 8px 0;">${note.content}</p>
+                <div style="color: #9ca3af; font-size: 11px;">
+                    <i class="fas fa-clock" style="margin-right: 4px;"></i>
+                    ${new Date(note.created_at).toLocaleString('fr-FR')}
+                    ${note.created_by ? ` • Tech: ${note.created_by.substring(0, 8)}` : ''}
+                </div>
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
+
     <div class="footer">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
             <div>
@@ -1545,17 +1574,28 @@ auditsRouter.get('/:token/report', async (c) => {
 auditsRouter.post('/:token/notes', async (c) => {
   const { env } = c
   const token = c.req.param('token')
-  const { content, technicianId } = await c.req.json()
+  const { content, technicianId, noteType } = await c.req.json()
 
   if (!content) {
     return c.json({ error: 'Contenu note requis' }, 400)
   }
 
   try {
+    // Récupérer l'audit_id depuis le token
+    const audit = await env.DB.prepare('SELECT id FROM el_audits WHERE audit_token = ?')
+      .bind(token).first()
+    
+    if (!audit) {
+      return c.json({ error: 'Audit non trouvé' }, 404)
+    }
+    
+    const auditId = (audit as any).id
+    
+    // Insérer avec toutes les colonnes requises
     const result = await env.DB.prepare(`
-      INSERT INTO el_audit_notes (audit_token, content, technician_id)
-      VALUES (?, ?, ?)
-    `).bind(token, content, technicianId || null).run()
+      INSERT INTO el_audit_notes (el_audit_id, audit_token, content, note_type, created_by)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(auditId, token, content, noteType || 'voice', technicianId || null).run()
 
     return c.json({
       success: true,
@@ -1593,6 +1633,62 @@ auditsRouter.get('/:token/notes', async (c) => {
     console.error('Erreur récupération notes:', error)
     return c.json({ 
       error: 'Erreur récupération notes',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
+// PUT /api/el/audit/:token/notes/:noteId - Modifier une note
+// ============================================================================
+auditsRouter.put('/:token/notes/:noteId', async (c) => {
+  const { env } = c
+  const noteId = c.req.param('noteId')
+  const { content } = await c.req.json()
+
+  if (!content) {
+    return c.json({ error: 'Contenu requis' }, 400)
+  }
+
+  try {
+    await env.DB.prepare(`
+      UPDATE el_audit_notes 
+      SET content = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(content, noteId).run()
+
+    return c.json({
+      success: true,
+      message: 'Note modifiée'
+    })
+  } catch (error: any) {
+    console.error('Erreur modification note:', error)
+    return c.json({ 
+      error: 'Erreur modification note',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// ============================================================================
+// DELETE /api/el/audit/:token/notes/:noteId - Supprimer une note
+// ============================================================================
+auditsRouter.delete('/:token/notes/:noteId', async (c) => {
+  const { env } = c
+  const noteId = c.req.param('noteId')
+
+  try {
+    await env.DB.prepare('DELETE FROM el_audit_notes WHERE id = ?')
+      .bind(noteId).run()
+
+    return c.json({
+      success: true,
+      message: 'Note supprimée'
+    })
+  } catch (error: any) {
+    console.error('Erreur suppression note:', error)
+    return c.json({ 
+      error: 'Erreur suppression note',
       details: error.message 
     }, 500)
   }

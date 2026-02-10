@@ -87,6 +87,9 @@ class DiagPVAudit {
         
         // Ajout du bouton micro flottant
         this.renderVoiceButton()
+        
+        // Ajout du panneau notes
+        this.renderNotesPanel()
     }
     
     renderPlantInfo() {
@@ -572,6 +575,212 @@ class DiagPVAudit {
 
     // ============================================================================
     // FIN ASSISTANT VOCAL
+    // ============================================================================
+
+    // ============================================================================
+    // PANNEAU NOTES VOCALES
+    // ============================================================================
+    
+    renderNotesPanel() {
+        // Créer le panneau notes s'il n'existe pas
+        if (document.getElementById('notesPanel')) return
+        
+        const panel = document.createElement('div')
+        panel.id = 'notesPanel'
+        panel.className = 'fixed top-20 right-4 w-80 max-h-96 bg-gray-900 border-2 border-blue-400 rounded-lg shadow-2xl z-40 hidden'
+        panel.innerHTML = `
+            <div class="bg-blue-600 px-4 py-2 rounded-t-lg flex items-center justify-between">
+                <h3 class="font-bold text-white"><i class="fas fa-sticky-note mr-2"></i>Notes vocales</h3>
+                <div class="flex items-center gap-2">
+                    <span id="notesCount" class="bg-blue-800 px-2 py-0.5 rounded text-xs">0</span>
+                    <button id="closeNotesPanel" class="text-white hover:text-gray-300">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="notesList" class="p-3 overflow-y-auto max-h-72 space-y-2">
+                <p class="text-gray-500 text-center text-sm">Aucune note</p>
+            </div>
+            <div class="p-3 border-t border-gray-700">
+                <div class="flex gap-2">
+                    <input type="text" id="newNoteInput" placeholder="Ajouter une note..." 
+                           class="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none">
+                    <button id="addNoteBtn" class="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-white">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        `
+        document.body.appendChild(panel)
+        
+        // Event listeners
+        document.getElementById('closeNotesPanel').addEventListener('click', () => this.toggleNotesPanel(false))
+        document.getElementById('addNoteBtn').addEventListener('click', () => this.addManualNote())
+        document.getElementById('newNoteInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.addManualNote()
+        })
+        
+        // Bouton pour ouvrir le panneau (ajouté à côté du micro)
+        this.renderNotesToggleButton()
+    }
+    
+    renderNotesToggleButton() {
+        const btn = document.createElement('button')
+        btn.id = 'notesToggleBtn'
+        btn.className = 'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-purple-600 text-white shadow-xl flex items-center justify-center transition-all hover:bg-purple-700 border-2 border-white'
+        btn.innerHTML = '<i class="fas fa-sticky-note text-xl"></i>'
+        btn.title = "Voir les notes"
+        btn.addEventListener('click', () => this.toggleNotesPanel())
+        document.body.appendChild(btn)
+    }
+    
+    toggleNotesPanel(forceState) {
+        const panel = document.getElementById('notesPanel')
+        if (!panel) return
+        
+        const isHidden = panel.classList.contains('hidden')
+        const shouldShow = forceState !== undefined ? forceState : isHidden
+        
+        if (shouldShow) {
+            panel.classList.remove('hidden')
+            this.loadNotes()
+        } else {
+            panel.classList.add('hidden')
+        }
+    }
+    
+    async loadNotes() {
+        try {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/notes`)
+            const data = await response.json()
+            
+            this.notes = data.notes || []
+            
+            // Ajouter notes hors-ligne non synchronisées
+            const offlineNotes = JSON.parse(localStorage.getItem(`voice_notes_${this.auditToken}`) || '[]')
+            offlineNotes.forEach(n => {
+                if (!n.synced) {
+                    this.notes.unshift({ ...n, content: n.text, offline: true })
+                }
+            })
+            
+            this.renderNotesList()
+        } catch (err) {
+            errorAudit('Erreur chargement notes:', err)
+        }
+    }
+    
+    renderNotesList() {
+        const container = document.getElementById('notesList')
+        const countEl = document.getElementById('notesCount')
+        
+        if (!this.notes || this.notes.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Aucune note</p>'
+            countEl.textContent = '0'
+            return
+        }
+        
+        countEl.textContent = this.notes.length
+        
+        container.innerHTML = this.notes.map((note, index) => `
+            <div class="bg-gray-800 rounded p-3 group relative ${note.offline ? 'border-l-4 border-yellow-500' : ''}">
+                <div class="flex items-start justify-between gap-2">
+                    <p class="text-sm text-white flex-1">${this.escapeHtml(note.content)}</p>
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button class="text-blue-400 hover:text-blue-300 text-xs p-1" onclick="window.diagpvAudit.editNote(${note.id || index}, '${this.escapeHtml(note.content).replace(/'/g, "\\'")}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="text-red-400 hover:text-red-300 text-xs p-1" onclick="window.diagpvAudit.deleteNote(${note.id || index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                    <span>${note.created_at ? new Date(note.created_at).toLocaleString('fr-FR') : 'Non sync'}</span>
+                    ${note.offline ? '<span class="text-yellow-500"><i class="fas fa-wifi-slash mr-1"></i>Hors-ligne</span>' : ''}
+                </div>
+            </div>
+        `).join('')
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div')
+        div.textContent = text
+        return div.innerHTML
+    }
+    
+    async addManualNote() {
+        const input = document.getElementById('newNoteInput')
+        const content = input.value.trim()
+        
+        if (!content) return
+        
+        try {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: content,
+                    technicianId: this.technicianId
+                })
+            })
+            
+            if (!response.ok) throw new Error('Erreur sauvegarde')
+            
+            input.value = ''
+            this.showAlert('📝 Note ajoutée', 'success')
+            await this.loadNotes()
+            
+        } catch (err) {
+            errorAudit('Erreur ajout note:', err)
+            this.showAlert('Erreur ajout note', 'error')
+        }
+    }
+    
+    async editNote(noteId, currentContent) {
+        const newContent = prompt('Modifier la note:', currentContent)
+        
+        if (newContent === null || newContent === currentContent) return
+        
+        try {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/notes/${noteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: newContent })
+            })
+            
+            if (!response.ok) throw new Error('Erreur modification')
+            
+            this.showAlert('📝 Note modifiée', 'success')
+            await this.loadNotes()
+            
+        } catch (err) {
+            errorAudit('Erreur modification note:', err)
+            this.showAlert('Erreur modification', 'error')
+        }
+    }
+    
+    async deleteNote(noteId) {
+        if (!confirm('Supprimer cette note ?')) return
+        
+        try {
+            const response = await fetch(`/api/el/audit/${this.auditToken}/notes/${noteId}`, {
+                method: 'DELETE'
+            })
+            
+            if (!response.ok) throw new Error('Erreur suppression')
+            
+            this.showAlert('🗑️ Note supprimée', 'success')
+            await this.loadNotes()
+            
+        } catch (err) {
+            errorAudit('Erreur suppression note:', err)
+            this.showAlert('Erreur suppression', 'error')
+        }
+    }
+    
+    // ============================================================================
+    // FIN PANNEAU NOTES
     // ============================================================================
 
     openModuleModal(moduleId) {

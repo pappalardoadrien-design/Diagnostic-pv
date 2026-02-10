@@ -448,8 +448,13 @@ export function getAuditsCreatePage() {
                             await axios.post(\`/api/pv/plants/\${plant.id}/zones/\${zone.id}/link-el-audit\`, {
                                 el_audit_token: auditToken
                             });
-                        } catch (linkErr) {
-                            console.warn(\`Liaison zone \${zone.id} échouée:\`, linkErr);
+                        } catch (linkErr: any) {
+                            // 409 = liaison déjà existante (normal si reliaison)
+                            if (linkErr?.response?.status === 409) {
+                                console.log(\`Zone \${zone.id}: liaison existante (OK)\`);
+                            } else {
+                                console.warn(\`Liaison zone \${zone.id} échouée:\`, linkErr);
+                            }
                         }
                     }
                     
