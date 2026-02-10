@@ -34,20 +34,79 @@ export function getPvPlantCartoPage(plantId: string): string {
             filter: brightness(1.1);
         }
         
-        /* Rotation handle */
+        /* Rotation handle - Main rotation control */
         .rotation-handle {
-            width: 16px;
-            height: 16px;
-            background: #7c3aed;
-            border: 2px solid white;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #7c3aed, #5b21b6);
+            border: 3px solid white;
             border-radius: 50%;
             cursor: grab;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(124,58,237,0.5);
             z-index: 1000;
+            transition: all 0.15s;
+        }
+        .rotation-handle:hover {
+            transform: scale(1.2);
+            box-shadow: 0 6px 16px rgba(124,58,237,0.7);
         }
         .rotation-handle:active {
             cursor: grabbing;
-            background: #5b21b6;
+            background: linear-gradient(135deg, #5b21b6, #4c1d95);
+            transform: scale(1.1);
+        }
+        
+        /* Corner handles for direct rotation */
+        .corner-handle {
+            width: 14px;
+            height: 14px;
+            background: #f97316;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: crosshair;
+            box-shadow: 0 2px 8px rgba(249,115,22,0.5);
+            z-index: 999;
+            transition: all 0.15s;
+        }
+        .corner-handle:hover {
+            background: #ea580c;
+            transform: scale(1.3);
+        }
+        
+        /* Resize handles */
+        .resize-handle {
+            width: 12px;
+            height: 12px;
+            background: #22c55e;
+            border: 2px solid white;
+            border-radius: 2px;
+            cursor: nwse-resize;
+            box-shadow: 0 2px 6px rgba(34,197,94,0.5);
+            z-index: 999;
+        }
+        .resize-handle:hover {
+            background: #16a34a;
+            transform: scale(1.2);
+        }
+        
+        /* Rotation indicator */
+        .rotation-indicator {
+            background: rgba(124,58,237,0.9);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1001;
+        }
+        
+        /* Guide line for rotation */
+        .rotation-guide-line {
+            stroke: #7c3aed;
+            stroke-width: 2;
+            stroke-dasharray: 8,4;
         }
         
         /* Rotation panel */
@@ -402,6 +461,9 @@ export function getPvPlantCartoPage(plantId: string): string {
     let rotationPanel = null
     let isRotating = false
     let zoneRotations = {} // zone_id -> angle in degrees
+    let cornerHandles = [] // Array of corner handle markers
+    let rotationIndicator = null // Shows current angle
+    let rotationGuideLine = null // Line from center to rotation handle
     
     // Multi-selection state
     let placeMode = 'single' // 'single', 'multi', 'all'
@@ -1269,24 +1331,29 @@ export function getPvPlantCartoPage(plantId: string): string {
         document.querySelectorAll('.btn-tool').forEach(btn => btn.classList.remove('active'))
         document.getElementById('btn' + tool.charAt(0).toUpperCase() + tool.slice(1)).classList.add('active')
         
-        // Hide rotation controls when changing tools
-        hideRotationControls()
+        // Hide rotation controls when changing tools (but not when switching to rotate)
+        if (tool !== 'rotate') {
+            hideRotationControls()
+        }
         
         if (tool === 'move') {
             document.getElementById('map').style.cursor = 'move'
+            showNotification('Mode déplacement: Cliquez-glissez sur une zone pour la déplacer', 'info')
         } else if (tool === 'draw') {
             document.getElementById('map').style.cursor = 'crosshair'
-            showNotification('Cliquez et glissez pour dessiner un rectangle', 'info')
+            showNotification('Mode dessin: Cliquez et glissez pour dessiner un rectangle', 'info')
         } else if (tool === 'rotate') {
             document.getElementById('map').style.cursor = 'crosshair'
             if (!selectedZone) {
-                showNotification('Sélectionnez d\\'abord une zone à faire pivoter', 'info')
+                showNotification('⚠️ Sélectionnez d\\'abord une zone dans la liste à gauche, puis utilisez l\\'outil Rotation', 'warning')
+            } else if (!stringRectangles[selectedZone.id]) {
+                showNotification('⚠️ Cette zone n\\'est pas positionnée sur la carte. Utilisez l\\'outil Dessiner d\\'abord.', 'warning')
             } else {
                 showRotationControls(selectedZone)
-                showNotification('Faites glisser la poignée ou utilisez le slider pour pivoter "' + selectedZone.zone_name + '"', 'info')
             }
-        } else {
+        } else if (tool === 'select') {
             document.getElementById('map').style.cursor = ''
+            showNotification('Mode sélection: Cliquez sur une zone pour la sélectionner', 'info')
         }
         
         // Annuler le dessin en cours si on change d'outil
@@ -1298,12 +1365,12 @@ export function getPvPlantCartoPage(plantId: string): string {
     }
     
     // ========================================
-    // ROTATION TOOL
+    // ROTATION TOOL - Enhanced Version
     // ========================================
     
     function showRotationControls(zone) {
         if (!zone || !stringRectangles[zone.id]) {
-            showNotification('Zone non positionnée sur la carte', 'error')
+            showNotification('Zone non positionnée sur la carte. Dessinez d\\'abord le rectangle.', 'error')
             return
         }
         
@@ -1311,48 +1378,69 @@ export function getPvPlantCartoPage(plantId: string): string {
         const center = sr.center
         const currentRotation = zoneRotations[zone.id] || 0
         
-        // Create rotation panel on screen
-        if (rotationPanel) {
-            rotationPanel.remove()
-        }
+        // Remove existing controls first
+        hideRotationControls()
         
+        // Create rotation panel on screen
         rotationPanel = L.control({ position: 'bottomleft' })
         rotationPanel.onAdd = function() {
             const div = L.DomUtil.create('div', 'rotation-panel')
+            div.style.cssText = 'background:white; border-radius:12px; padding:16px; box-shadow:0 4px 20px rgba(0,0,0,0.2); min-width:280px;'
             div.innerHTML = \`
-                <div class="mb-2 font-bold text-slate-800">
-                    <i class="fas fa-sync-alt mr-2 text-purple-600"></i>Rotation: \${zone.zone_name}
+                <div class="mb-3 flex items-center justify-between">
+                    <div class="font-bold text-slate-800">
+                        <i class="fas fa-sync-alt mr-2 text-purple-600"></i>Rotation: \${zone.zone_name}
+                    </div>
+                    <span id="rotationDisplay" class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold">\${Math.round(currentRotation)}°</span>
                 </div>
-                <div class="flex items-center gap-3 mb-3">
-                    <input type="range" id="rotationSlider" class="rotation-slider flex-1" 
-                           min="0" max="360" step="1" value="\${currentRotation}">
-                    <input type="number" id="rotationInput" class="w-16 px-2 py-1 border rounded text-center font-bold" 
-                           min="0" max="360" step="1" value="\${currentRotation}">
-                    <span class="text-slate-500">°</span>
+                
+                <div class="mb-4">
+                    <input type="range" id="rotationSlider" class="rotation-slider w-full" 
+                           min="-180" max="180" step="1" value="\${currentRotation > 180 ? currentRotation - 360 : currentRotation}">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>-180°</span>
+                        <span>0°</span>
+                        <span>180°</span>
+                    </div>
                 </div>
-                <div class="flex gap-2 mb-2">
-                    <button onclick="setRotationAngle(0)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">0°</button>
-                    <button onclick="setRotationAngle(45)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">45°</button>
-                    <button onclick="setRotationAngle(90)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">90°</button>
-                    <button onclick="setRotationAngle(135)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">135°</button>
-                    <button onclick="setRotationAngle(180)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">180°</button>
+                
+                <div class="mb-3">
+                    <div class="text-xs text-slate-500 mb-2 font-semibold">⚡ ANGLES RAPIDES</div>
+                    <div class="grid grid-cols-6 gap-1">
+                        <button onclick="setRotationAngle(0)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">0°</button>
+                        <button onclick="setRotationAngle(30)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">30°</button>
+                        <button onclick="setRotationAngle(45)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">45°</button>
+                        <button onclick="setRotationAngle(90)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">90°</button>
+                        <button onclick="setRotationAngle(135)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">135°</button>
+                        <button onclick="setRotationAngle(180)" class="py-2 bg-slate-100 rounded text-xs font-bold hover:bg-purple-100">180°</button>
+                    </div>
                 </div>
+                
+                <div class="mb-3">
+                    <div class="text-xs text-slate-500 mb-2 font-semibold">🔧 AJUSTEMENT FIN</div>
+                    <div class="flex gap-1">
+                        <button onclick="rotateByDelta(-10)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">-10°</button>
+                        <button onclick="rotateByDelta(-5)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">-5°</button>
+                        <button onclick="rotateByDelta(-1)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">-1°</button>
+                        <button onclick="rotateByDelta(1)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">+1°</button>
+                        <button onclick="rotateByDelta(5)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">+5°</button>
+                        <button onclick="rotateByDelta(10)" class="flex-1 py-2 bg-purple-100 text-purple-700 rounded text-xs font-bold hover:bg-purple-200">+10°</button>
+                    </div>
+                </div>
+                
+                <div class="mb-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
+                    <div class="text-xs text-orange-700">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>Astuce:</strong> Glissez la <span class="bg-purple-600 text-white px-1 rounded">poignée violette</span> sur la carte pour faire pivoter librement.
+                    </div>
+                </div>
+                
                 <div class="flex gap-2">
-                    <button onclick="rotateByDelta(-5)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">
-                        <i class="fas fa-undo mr-1"></i>-5°
+                    <button onclick="applyRotation()" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-all">
+                        <i class="fas fa-check mr-1"></i> Appliquer & Sauvegarder
                     </button>
-                    <button onclick="rotateByDelta(-1)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">-1°</button>
-                    <button onclick="rotateByDelta(1)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">+1°</button>
-                    <button onclick="rotateByDelta(5)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">
-                        <i class="fas fa-redo mr-1"></i>+5°
-                    </button>
-                </div>
-                <div class="mt-3 pt-3 border-t flex gap-2">
-                    <button onclick="applyRotation()" class="flex-1 bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">
-                        <i class="fas fa-check mr-1"></i>Appliquer
-                    </button>
-                    <button onclick="hideRotationControls()" class="flex-1 bg-slate-500 text-white py-2 rounded font-semibold hover:bg-slate-600">
-                        <i class="fas fa-times mr-1"></i>Fermer
+                    <button onclick="hideRotationControls(); setTool('select')" class="bg-slate-400 text-white px-4 py-3 rounded-lg font-bold hover:bg-slate-500 transition-all">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             \`
@@ -1368,27 +1456,68 @@ export function getPvPlantCartoPage(plantId: string): string {
         // Setup slider and input listeners
         setTimeout(() => {
             const slider = document.getElementById('rotationSlider')
-            const input = document.getElementById('rotationInput')
             
-            if (slider && input) {
+            if (slider) {
                 slider.addEventListener('input', (e) => {
-                    const angle = parseInt(e.target.value)
-                    input.value = angle
-                    updateZoneRotation(zone.id, angle)
-                })
-                
-                input.addEventListener('change', (e) => {
-                    let angle = parseInt(e.target.value) || 0
-                    angle = Math.max(0, Math.min(360, angle))
-                    e.target.value = angle
-                    slider.value = angle
-                    updateZoneRotation(zone.id, angle)
+                    let angle = parseInt(e.target.value)
+                    if (angle < 0) angle += 360
+                    updateZoneRotationWithDisplay(zone.id, angle)
                 })
             }
         }, 100)
         
         // Create rotation handle on map
         createRotationHandle(zone)
+        
+        // Create guide line from center to handle
+        createRotationGuideLine(zone)
+        
+        // Highlight the zone being rotated
+        sr.polygon.setStyle({ weight: 4, dashArray: '8,4' })
+    }
+    
+    function updateZoneRotationWithDisplay(zoneId, angle) {
+        updateZoneRotation(zoneId, angle)
+        
+        // Update display
+        const display = document.getElementById('rotationDisplay')
+        if (display) display.textContent = Math.round(angle) + '°'
+        
+        // Update slider
+        const slider = document.getElementById('rotationSlider')
+        if (slider) slider.value = angle > 180 ? angle - 360 : angle
+        
+        // Update handle position
+        if (selectedZone && selectedZone.id === zoneId) {
+            createRotationHandle(selectedZone)
+            createRotationGuideLine(selectedZone)
+        }
+    }
+    
+    function createRotationGuideLine(zone) {
+        if (rotationGuideLine) {
+            map.removeLayer(rotationGuideLine)
+        }
+        
+        const sr = stringRectangles[zone.id]
+        if (!sr) return
+        
+        const currentRotation = zoneRotations[zone.id] || 0
+        const handleDistance = Math.max(sr.halfWidth, sr.halfHeight) * 1.8
+        const handleAngle = currentRotation * Math.PI / 180
+        
+        const handleLat = sr.center.lat + handleDistance * Math.cos(handleAngle)
+        const handleLng = sr.center.lng + handleDistance * Math.sin(handleAngle)
+        
+        rotationGuideLine = L.polyline([
+            [sr.center.lat, sr.center.lng],
+            [handleLat, handleLng]
+        ], {
+            color: '#7c3aed',
+            weight: 2,
+            dashArray: '8,4',
+            opacity: 0.7
+        }).addTo(map)
     }
     
     function hideRotationControls() {
@@ -1399,6 +1528,22 @@ export function getPvPlantCartoPage(plantId: string): string {
         if (rotationHandle) {
             map.removeLayer(rotationHandle)
             rotationHandle = null
+        }
+        if (rotationGuideLine) {
+            map.removeLayer(rotationGuideLine)
+            rotationGuideLine = null
+        }
+        if (rotationIndicator) {
+            map.removeLayer(rotationIndicator)
+            rotationIndicator = null
+        }
+        // Remove corner handles
+        cornerHandles.forEach(h => map.removeLayer(h))
+        cornerHandles = []
+        
+        // Reset zone style if it was highlighted
+        if (selectedZone && stringRectangles[selectedZone.id]) {
+            stringRectangles[selectedZone.id].polygon.setStyle({ weight: 2, dashArray: null })
         }
     }
     
@@ -1411,22 +1556,33 @@ export function getPvPlantCartoPage(plantId: string): string {
         if (!sr) return
         
         const currentRotation = zoneRotations[zone.id] || 0
-        const handleDistance = Math.max(sr.halfWidth, sr.halfHeight) * 1.5
+        const handleDistance = Math.max(sr.halfWidth, sr.halfHeight) * 1.8
         const handleAngle = currentRotation * Math.PI / 180
         
         const handleLat = sr.center.lat + handleDistance * Math.cos(handleAngle)
         const handleLng = sr.center.lng + handleDistance * Math.sin(handleAngle)
         
+        // Create a more visible handle with rotation icon
         const handleIcon = L.divIcon({
-            className: 'rotation-handle',
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
+            className: '',
+            html: '<div class="rotation-handle" style="display:flex;align-items:center;justify-content:center;"><i class="fas fa-sync-alt" style="font-size:10px;color:white;"></i></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
         })
         
         rotationHandle = L.marker([handleLat, handleLng], {
             icon: handleIcon,
-            draggable: true
+            draggable: true,
+            zIndexOffset: 1000
         }).addTo(map)
+        
+        // Bind tooltip to show angle during drag
+        rotationHandle.bindTooltip(Math.round(currentRotation) + '°', {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -15],
+            className: 'rotation-indicator'
+        })
         
         rotationHandle.on('drag', (e) => {
             const handlePos = e.target.getLatLng()
@@ -1435,33 +1591,47 @@ export function getPvPlantCartoPage(plantId: string): string {
                 handlePos.lat - sr.center.lat
             ) * 180 / Math.PI
             
-            const normalizedAngle = ((angle % 360) + 360) % 360
+            let normalizedAngle = ((angle % 360) + 360) % 360
             
-            // Update slider and input
-            const slider = document.getElementById('rotationSlider')
-            const input = document.getElementById('rotationInput')
-            if (slider) slider.value = Math.round(normalizedAngle)
-            if (input) input.value = Math.round(normalizedAngle)
+            // Snapping to common angles (hold Shift to disable)
+            if (!window.event?.shiftKey) {
+                const snapAngles = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]
+                const snapTolerance = 3
+                for (const snap of snapAngles) {
+                    if (Math.abs(normalizedAngle - snap) < snapTolerance) {
+                        normalizedAngle = snap
+                        break
+                    }
+                }
+            }
             
-            updateZoneRotation(zone.id, normalizedAngle)
+            // Update tooltip
+            rotationHandle.setTooltipContent(Math.round(normalizedAngle) + '°')
+            
+            // Update guide line in real-time
+            if (rotationGuideLine) {
+                rotationGuideLine.setLatLngs([
+                    [sr.center.lat, sr.center.lng],
+                    [handlePos.lat, handlePos.lng]
+                ])
+            }
+            
+            updateZoneRotationWithDisplay(zone.id, normalizedAngle)
         })
         
         rotationHandle.on('dragend', () => {
             // Re-position handle at correct distance
             createRotationHandle(zone)
+            createRotationGuideLine(zone)
         })
     }
     
     function setRotationAngle(angle) {
         if (!selectedZone) return
         
-        const slider = document.getElementById('rotationSlider')
-        const input = document.getElementById('rotationInput')
-        if (slider) slider.value = angle
-        if (input) input.value = angle
-        
-        updateZoneRotation(selectedZone.id, angle)
+        updateZoneRotationWithDisplay(selectedZone.id, angle)
         createRotationHandle(selectedZone)
+        createRotationGuideLine(selectedZone)
     }
     
     function rotateByDelta(delta) {
