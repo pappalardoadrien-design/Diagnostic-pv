@@ -919,12 +919,43 @@ plantsRouter.post('/:plantId/zones/:zoneId/calculate-gps', async (c: Context) =>
       }, 400)
     }
     
-    // Parser les bounds (format: [[lat1,lng1],[lat2,lng2]] ou [sw,ne])
-    let bounds
+    // Parser les bounds (format: [[lat1,lng1],[lat2,lng2]] ou {bounds, rotation, ...})
+    let bounds: number[][]
+    let rotation = 0
+    let centerLat: number
+    let centerLng: number
+    let halfWidth: number
+    let halfHeight: number
+    
     try {
-      bounds = JSON.parse(zone.roof_polygon as string)
+      const polygonData = JSON.parse(zone.roof_polygon as string)
+      
+      // Support new format with rotation
+      if (polygonData.bounds && polygonData.rotation !== undefined) {
+        bounds = polygonData.bounds
+        rotation = polygonData.rotation || 0
+        centerLat = polygonData.center?.lat || (bounds[0][0] + bounds[1][0]) / 2
+        centerLng = polygonData.center?.lng || (bounds[0][1] + bounds[1][1]) / 2
+        halfHeight = (bounds[1][0] - bounds[0][0]) / 2
+        halfWidth = (bounds[1][1] - bounds[0][1]) / 2
+      } else if (Array.isArray(polygonData) && polygonData.length >= 2) {
+        // Old format
+        bounds = polygonData
+        centerLat = (bounds[0][0] + bounds[1][0]) / 2
+        centerLng = (bounds[0][1] + bounds[1][1]) / 2
+        halfHeight = (bounds[1][0] - bounds[0][0]) / 2
+        halfWidth = (bounds[1][1] - bounds[0][1]) / 2
+      } else {
+        return c.json({ error: 'Format bounds invalide' }, 400)
+      }
     } catch (e) {
       return c.json({ error: 'Format bounds invalide' }, 400)
+    }
+    
+    // Check for rotation in request body (override saved rotation)
+    const body = await c.req.json().catch(() => ({}))
+    if (body.rotation !== undefined) {
+      rotation = body.rotation
     }
     
     // Récupérer les modules de la zone
@@ -943,29 +974,30 @@ plantsRouter.post('/:plantId/zones/:zoneId/calculate-gps', async (c: Context) =>
       })
     }
     
-    // Calculer les coordonnées de chaque module
-    // Bounds format: [[swLat, swLng], [neLat, neLng]]
-    const swLat = bounds[0][0]
-    const swLng = bounds[0][1]
-    const neLat = bounds[1][0]
-    const neLng = bounds[1][1]
-    
-    // Calculer le centre de la zone (pour mise à jour plant si nécessaire)
-    const centerLat = (swLat + neLat) / 2
-    const centerLng = (swLng + neLng) / 2
-    
     const moduleCount = modules.results.length
     let updated = 0
     
-    // Distribuer les modules linéairement dans le rectangle
-    // On les aligne horizontalement pour un string
+    // Convert rotation to radians
+    const angleRad = rotation * Math.PI / 180
+    const cos = Math.cos(angleRad)
+    const sin = Math.sin(angleRad)
+    
+    // Distribuer les modules linéairement avec rotation
     for (let i = 0; i < moduleCount; i++) {
       const m = modules.results[i] as any
       const ratio = moduleCount > 1 ? i / (moduleCount - 1) : 0.5
       
-      // Interpolation linéaire entre SW et NE
-      const lat = swLat + (neLat - swLat) * ratio
-      const lng = swLng + (neLng - swLng) * ratio
+      // Position relative to center (unrotated, along the width axis)
+      const relLng = -halfWidth + (halfWidth * 2) * ratio
+      const relLat = 0 // Modules are centered vertically in the string
+      
+      // Apply rotation around center
+      const rotLat = relLat * cos - relLng * sin
+      const rotLng = relLat * sin + relLng * cos
+      
+      // Final coordinates
+      const lat = centerLat + rotLat
+      const lng = centerLng + rotLng
       
       await env.DB.prepare(`
         UPDATE pv_modules
@@ -989,7 +1021,8 @@ plantsRouter.post('/:plantId/zones/:zoneId/calculate-gps', async (c: Context) =>
       message: `${updated} modules géolocalisés`,
       updated,
       zone_center: { lat: centerLat, lng: centerLng },
-      bounds: { sw: [swLat, swLng], ne: [neLat, neLng] }
+      rotation,
+      bounds: { sw: bounds[0], ne: bounds[1] }
     })
     
   } catch (error: any) {
@@ -1030,14 +1063,32 @@ plantsRouter.post('/:plantId/calculate-all-gps', async (c: Context) => {
     
     for (const zone of zones.results as any[]) {
       try {
-        const bounds = JSON.parse(zone.roof_polygon)
-        const swLat = bounds[0][0]
-        const swLng = bounds[0][1]
-        const neLat = bounds[1][0]
-        const neLng = bounds[1][1]
+        const polygonData = JSON.parse(zone.roof_polygon)
         
-        const centerLat = (swLat + neLat) / 2
-        const centerLng = (swLng + neLng) / 2
+        // Support both old and new format
+        let bounds: number[][]
+        let rotation = 0
+        let centerLat: number
+        let centerLng: number
+        let halfWidth: number
+        let halfHeight: number
+        
+        if (polygonData.bounds && polygonData.rotation !== undefined) {
+          bounds = polygonData.bounds
+          rotation = polygonData.rotation || 0
+          centerLat = polygonData.center?.lat || (bounds[0][0] + bounds[1][0]) / 2
+          centerLng = polygonData.center?.lng || (bounds[0][1] + bounds[1][1]) / 2
+          halfHeight = (bounds[1][0] - bounds[0][0]) / 2
+          halfWidth = (bounds[1][1] - bounds[0][1]) / 2
+        } else if (Array.isArray(polygonData) && polygonData.length >= 2) {
+          bounds = polygonData
+          centerLat = (bounds[0][0] + bounds[1][0]) / 2
+          centerLng = (bounds[0][1] + bounds[1][1]) / 2
+          halfHeight = (bounds[1][0] - bounds[0][0]) / 2
+          halfWidth = (bounds[1][1] - bounds[0][1]) / 2
+        } else {
+          continue // Skip invalid zones
+        }
         
         plantCenterLat += centerLat
         plantCenterLng += centerLng
@@ -1050,12 +1101,24 @@ plantsRouter.post('/:plantId/calculate-all-gps', async (c: Context) => {
         
         if (modules.results && modules.results.length > 0) {
           const moduleCount = modules.results.length
+          const angleRad = rotation * Math.PI / 180
+          const cos = Math.cos(angleRad)
+          const sin = Math.sin(angleRad)
           
           for (let i = 0; i < moduleCount; i++) {
             const m = modules.results[i] as any
             const ratio = moduleCount > 1 ? i / (moduleCount - 1) : 0.5
-            const lat = swLat + (neLat - swLat) * ratio
-            const lng = swLng + (neLng - swLng) * ratio
+            
+            // Position relative to center (unrotated)
+            const relLng = -halfWidth + (halfWidth * 2) * ratio
+            const relLat = 0
+            
+            // Apply rotation
+            const rotLat = relLat * cos - relLng * sin
+            const rotLng = relLat * sin + relLng * cos
+            
+            const lat = centerLat + rotLat
+            const lng = centerLng + rotLng
             
             await env.DB.prepare(`
               UPDATE pv_modules SET latitude = ?, longitude = ?, updated_at = datetime('now')

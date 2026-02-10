@@ -33,6 +33,48 @@ export function getPvPlantCartoPage(plantId: string): string {
         .string-rect:hover {
             filter: brightness(1.1);
         }
+        
+        /* Rotation handle */
+        .rotation-handle {
+            width: 16px;
+            height: 16px;
+            background: #7c3aed;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .rotation-handle:active {
+            cursor: grabbing;
+            background: #5b21b6;
+        }
+        
+        /* Rotation panel */
+        .rotation-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 12px;
+            min-width: 200px;
+        }
+        .rotation-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            outline: none;
+        }
+        .rotation-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #7c3aed;
+            cursor: pointer;
+        }
+        
         .string-rect.selected {
             outline: 3px solid #7c3aed;
             outline-offset: 2px;
@@ -133,6 +175,9 @@ export function getPvPlantCartoPage(plantId: string): string {
                     </button>
                     <button id="btnDraw" class="btn-tool" onclick="setTool('draw')">
                         <i class="fas fa-draw-polygon mr-1"></i> Dessiner
+                    </button>
+                    <button id="btnRotate" class="btn-tool" onclick="setTool('rotate')">
+                        <i class="fas fa-sync-alt mr-1"></i> Rotation
                     </button>
                 </div>
                 
@@ -347,10 +392,16 @@ export function getPvPlantCartoPage(plantId: string): string {
 <script>
     const PLANT_ID = ${plantId}
     let map, plantData, zonesData = [], elModules = {}
-    let stringRectangles = {} // zone_id -> L.Rectangle
+    let stringRectangles = {} // zone_id -> { polygon, marker, rotation, center }
     let selectedZone = null
     let currentTool = 'select'
     let linkedAudit = null
+    
+    // Rotation state
+    let rotationHandle = null
+    let rotationPanel = null
+    let isRotating = false
+    let zoneRotations = {} // zone_id -> angle in degrees
     
     // Multi-selection state
     let placeMode = 'single' // 'single', 'multi', 'all'
@@ -514,21 +565,45 @@ export function getPvPlantCartoPage(plantId: string): string {
             // Check if zone has saved rectangle coordinates
             if (zone.roof_polygon) {
                 try {
-                    const coords = JSON.parse(zone.roof_polygon)
-                    if (coords && coords.length >= 2) {
-                        createStringRectangle(zone, coords)
+                    const data = JSON.parse(zone.roof_polygon)
+                    
+                    // Support both old format (array) and new format (object with rotation)
+                    if (data.bounds && data.rotation !== undefined) {
+                        // New format with rotation
+                        zoneRotations[zone.id] = data.rotation
+                        createStringRectangle(zone, data.bounds, data.rotation)
+                    } else if (Array.isArray(data) && data.length >= 2) {
+                        // Old format (simple bounds array)
+                        createStringRectangle(zone, data, 0)
                     }
                 } catch (e) {
                     // No saved position
+                    console.warn('Could not parse roof_polygon for zone', zone.id, e)
                 }
             }
         })
     }
     
-    function createStringRectangle(zone, bounds) {
+    function createStringRectangle(zone, bounds, rotation = 0) {
         const color = getZoneColor(zone)
         
-        const rect = L.rectangle(bounds, {
+        // Calculate center and dimensions from bounds
+        const sw = bounds[0]
+        const ne = bounds[1]
+        const centerLat = (sw[0] + ne[0]) / 2
+        const centerLng = (sw[1] + ne[1]) / 2
+        const center = L.latLng(centerLat, centerLng)
+        const halfWidth = (ne[1] - sw[1]) / 2
+        const halfHeight = (ne[0] - sw[0]) / 2
+        
+        // Get saved rotation or use provided
+        const savedRotation = zoneRotations[zone.id] !== undefined ? zoneRotations[zone.id] : rotation
+        zoneRotations[zone.id] = savedRotation
+        
+        // Create rotated polygon corners
+        const corners = getRotatedCorners(center, halfWidth, halfHeight, savedRotation)
+        
+        const polygon = L.polygon(corners, {
             color: color,
             weight: 2,
             fillColor: color,
@@ -536,8 +611,7 @@ export function getPvPlantCartoPage(plantId: string): string {
             className: 'string-rect'
         }).addTo(map)
         
-        // Label
-        const center = rect.getBounds().getCenter()
+        // Label at center
         const label = L.divIcon({
             className: 'string-label',
             html: '<div style="background:' + color + '; color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; white-space:nowrap;">' + zone.zone_name + '</div>',
@@ -547,22 +621,51 @@ export function getPvPlantCartoPage(plantId: string): string {
         const marker = L.marker(center, { icon: label }).addTo(map)
         
         // Click to select
-        rect.on('click', () => selectZone(zone))
+        polygon.on('click', () => selectZone(zone))
         
         // Make draggable - toujours actif (drag & drop direct)
-        rect.on('mousedown', function(e) {
+        polygon.on('mousedown', function(e) {
             // Shift+click pour drag, ou outil move sélectionné
             if (e.originalEvent.shiftKey || currentTool === 'move') {
-                enableDragging(rect, zone, marker)
+                enableDragging(polygon, zone, marker)
             }
         })
         
         // Double-click pour activer le drag temporairement
-        rect.on('dblclick', function() {
-            enableDragging(rect, zone, marker)
+        polygon.on('dblclick', function() {
+            enableDragging(polygon, zone, marker)
         })
         
-        stringRectangles[zone.id] = { rect, marker }
+        stringRectangles[zone.id] = { 
+            polygon, 
+            marker, 
+            rotation: savedRotation, 
+            center: center,
+            halfWidth,
+            halfHeight
+        }
+    }
+    
+    // Calculate rotated rectangle corners
+    function getRotatedCorners(center, halfWidth, halfHeight, angleDeg) {
+        const angleRad = angleDeg * Math.PI / 180
+        const cos = Math.cos(angleRad)
+        const sin = Math.sin(angleRad)
+        
+        // Corner offsets (unrotated)
+        const corners = [
+            [-halfHeight, -halfWidth], // SW
+            [-halfHeight, halfWidth],  // SE
+            [halfHeight, halfWidth],   // NE
+            [halfHeight, -halfWidth]   // NW
+        ]
+        
+        // Rotate each corner around center
+        return corners.map(([dLat, dLng]) => {
+            const rotLat = dLat * cos - dLng * sin
+            const rotLng = dLat * sin + dLng * cos
+            return [center.lat + rotLat, center.lng + rotLng]
+        })
     }
     
     function getZoneColor(zone) {
@@ -577,21 +680,29 @@ export function getPvPlantCartoPage(plantId: string): string {
         return '#22c55e'
     }
     
-    function enableDragging(rect, zone, marker) {
+    function enableDragging(polygon, zone, marker) {
         map.dragging.disable()
+        hideRotationControls()
+        
+        const sr = stringRectangles[zone.id]
+        let lastLatLng = polygon.getBounds().getCenter()
         
         const onMove = (e) => {
-            const bounds = rect.getBounds()
-            const latDiff = e.latlng.lat - bounds.getCenter().lat
-            const lngDiff = e.latlng.lng - bounds.getCenter().lng
+            const latDiff = e.latlng.lat - lastLatLng.lat
+            const lngDiff = e.latlng.lng - lastLatLng.lng
             
-            const newBounds = [
-                [bounds.getSouth() + latDiff, bounds.getWest() + lngDiff],
-                [bounds.getNorth() + latDiff, bounds.getEast() + lngDiff]
-            ]
+            // Move all polygon points
+            const latlngs = polygon.getLatLngs()[0]
+            const newLatLngs = latlngs.map(ll => L.latLng(ll.lat + latDiff, ll.lng + lngDiff))
+            polygon.setLatLngs(newLatLngs)
             
-            rect.setBounds(newBounds)
-            marker.setLatLng(rect.getBounds().getCenter())
+            // Update center
+            const newCenter = polygon.getBounds().getCenter()
+            marker.setLatLng(newCenter)
+            lastLatLng = newCenter
+            
+            // Update stored center
+            if (sr) sr.center = newCenter
         }
         
         const onUp = () => {
@@ -599,12 +710,11 @@ export function getPvPlantCartoPage(plantId: string): string {
             map.off('mouseup', onUp)
             map.dragging.enable()
             
-            // Save new position
-            const bounds = rect.getBounds()
-            saveZonePosition(zone.id, [
-                [bounds.getSouth(), bounds.getWest()],
-                [bounds.getNorth(), bounds.getEast()]
-            ])
+            // Save new position with rotation
+            const newCenter = polygon.getBounds().getCenter()
+            const rotation = zoneRotations[zone.id] || 0
+            
+            saveZonePositionWithRotation(zone.id, newCenter, sr.halfWidth, sr.halfHeight, rotation)
         }
         
         map.on('mousemove', onMove)
@@ -830,7 +940,7 @@ export function getPvPlantCartoPage(plantId: string): string {
         
         // Remove existing if any
         if (stringRectangles[zone.id]) {
-            map.removeLayer(stringRectangles[zone.id].rect)
+            map.removeLayer(stringRectangles[zone.id].polygon)
             map.removeLayer(stringRectangles[zone.id].marker)
         }
         
@@ -878,7 +988,7 @@ export function getPvPlantCartoPage(plantId: string): string {
             
             // Remove existing
             if (stringRectangles[zone.id]) {
-                map.removeLayer(stringRectangles[zone.id].rect)
+                map.removeLayer(stringRectangles[zone.id].polygon)
                 map.removeLayer(stringRectangles[zone.id].marker)
             }
             
@@ -929,13 +1039,18 @@ export function getPvPlantCartoPage(plantId: string): string {
         
         // Update rectangle styles
         Object.keys(stringRectangles).forEach(id => {
-            const r = stringRectangles[id].rect
+            const r = stringRectangles[id].polygon
             if (parseInt(id) === zone.id) {
                 r.setStyle({ weight: 4, dashArray: '5,5' })
             } else {
                 r.setStyle({ weight: 2, dashArray: null })
             }
         })
+        
+        // Show rotation controls if rotation tool is active
+        if (currentTool === 'rotate' && stringRectangles[zone.id]) {
+            showRotationControls(zone)
+        }
         
         // Show string details
         document.getElementById('selectedStringName').textContent = zone.zone_name
@@ -1138,7 +1253,7 @@ export function getPvPlantCartoPage(plantId: string): string {
     function focusOnString(zoneId) {
         const sr = stringRectangles[zoneId]
         if (sr) {
-            map.fitBounds(sr.rect.getBounds(), { padding: [50, 50] })
+            map.fitBounds(sr.polygon.getBounds(), { padding: [50, 50] })
         }
     }
     
@@ -1154,11 +1269,22 @@ export function getPvPlantCartoPage(plantId: string): string {
         document.querySelectorAll('.btn-tool').forEach(btn => btn.classList.remove('active'))
         document.getElementById('btn' + tool.charAt(0).toUpperCase() + tool.slice(1)).classList.add('active')
         
+        // Hide rotation controls when changing tools
+        hideRotationControls()
+        
         if (tool === 'move') {
             document.getElementById('map').style.cursor = 'move'
         } else if (tool === 'draw') {
             document.getElementById('map').style.cursor = 'crosshair'
             showNotification('Cliquez et glissez pour dessiner un rectangle', 'info')
+        } else if (tool === 'rotate') {
+            document.getElementById('map').style.cursor = 'crosshair'
+            if (!selectedZone) {
+                showNotification('Sélectionnez d\\'abord une zone à faire pivoter', 'info')
+            } else {
+                showRotationControls(selectedZone)
+                showNotification('Faites glisser la poignée ou utilisez le slider pour pivoter "' + selectedZone.zone_name + '"', 'info')
+            }
         } else {
             document.getElementById('map').style.cursor = ''
         }
@@ -1168,6 +1294,259 @@ export function getPvPlantCartoPage(plantId: string): string {
             map.removeLayer(drawRect)
             drawRect = null
             drawStartPoint = null
+        }
+    }
+    
+    // ========================================
+    // ROTATION TOOL
+    // ========================================
+    
+    function showRotationControls(zone) {
+        if (!zone || !stringRectangles[zone.id]) {
+            showNotification('Zone non positionnée sur la carte', 'error')
+            return
+        }
+        
+        const sr = stringRectangles[zone.id]
+        const center = sr.center
+        const currentRotation = zoneRotations[zone.id] || 0
+        
+        // Create rotation panel on screen
+        if (rotationPanel) {
+            rotationPanel.remove()
+        }
+        
+        rotationPanel = L.control({ position: 'bottomleft' })
+        rotationPanel.onAdd = function() {
+            const div = L.DomUtil.create('div', 'rotation-panel')
+            div.innerHTML = \`
+                <div class="mb-2 font-bold text-slate-800">
+                    <i class="fas fa-sync-alt mr-2 text-purple-600"></i>Rotation: \${zone.zone_name}
+                </div>
+                <div class="flex items-center gap-3 mb-3">
+                    <input type="range" id="rotationSlider" class="rotation-slider flex-1" 
+                           min="0" max="360" step="1" value="\${currentRotation}">
+                    <input type="number" id="rotationInput" class="w-16 px-2 py-1 border rounded text-center font-bold" 
+                           min="0" max="360" step="1" value="\${currentRotation}">
+                    <span class="text-slate-500">°</span>
+                </div>
+                <div class="flex gap-2 mb-2">
+                    <button onclick="setRotationAngle(0)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">0°</button>
+                    <button onclick="setRotationAngle(45)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">45°</button>
+                    <button onclick="setRotationAngle(90)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">90°</button>
+                    <button onclick="setRotationAngle(135)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">135°</button>
+                    <button onclick="setRotationAngle(180)" class="flex-1 px-2 py-1 bg-slate-100 rounded text-xs font-semibold hover:bg-slate-200">180°</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="rotateByDelta(-5)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">
+                        <i class="fas fa-undo mr-1"></i>-5°
+                    </button>
+                    <button onclick="rotateByDelta(-1)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">-1°</button>
+                    <button onclick="rotateByDelta(1)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">+1°</button>
+                    <button onclick="rotateByDelta(5)" class="flex-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold hover:bg-purple-200">
+                        <i class="fas fa-redo mr-1"></i>+5°
+                    </button>
+                </div>
+                <div class="mt-3 pt-3 border-t flex gap-2">
+                    <button onclick="applyRotation()" class="flex-1 bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">
+                        <i class="fas fa-check mr-1"></i>Appliquer
+                    </button>
+                    <button onclick="hideRotationControls()" class="flex-1 bg-slate-500 text-white py-2 rounded font-semibold hover:bg-slate-600">
+                        <i class="fas fa-times mr-1"></i>Fermer
+                    </button>
+                </div>
+            \`
+            
+            // Prevent map interactions on panel
+            L.DomEvent.disableClickPropagation(div)
+            L.DomEvent.disableScrollPropagation(div)
+            
+            return div
+        }
+        rotationPanel.addTo(map)
+        
+        // Setup slider and input listeners
+        setTimeout(() => {
+            const slider = document.getElementById('rotationSlider')
+            const input = document.getElementById('rotationInput')
+            
+            if (slider && input) {
+                slider.addEventListener('input', (e) => {
+                    const angle = parseInt(e.target.value)
+                    input.value = angle
+                    updateZoneRotation(zone.id, angle)
+                })
+                
+                input.addEventListener('change', (e) => {
+                    let angle = parseInt(e.target.value) || 0
+                    angle = Math.max(0, Math.min(360, angle))
+                    e.target.value = angle
+                    slider.value = angle
+                    updateZoneRotation(zone.id, angle)
+                })
+            }
+        }, 100)
+        
+        // Create rotation handle on map
+        createRotationHandle(zone)
+    }
+    
+    function hideRotationControls() {
+        if (rotationPanel) {
+            map.removeControl(rotationPanel)
+            rotationPanel = null
+        }
+        if (rotationHandle) {
+            map.removeLayer(rotationHandle)
+            rotationHandle = null
+        }
+    }
+    
+    function createRotationHandle(zone) {
+        if (rotationHandle) {
+            map.removeLayer(rotationHandle)
+        }
+        
+        const sr = stringRectangles[zone.id]
+        if (!sr) return
+        
+        const currentRotation = zoneRotations[zone.id] || 0
+        const handleDistance = Math.max(sr.halfWidth, sr.halfHeight) * 1.5
+        const handleAngle = currentRotation * Math.PI / 180
+        
+        const handleLat = sr.center.lat + handleDistance * Math.cos(handleAngle)
+        const handleLng = sr.center.lng + handleDistance * Math.sin(handleAngle)
+        
+        const handleIcon = L.divIcon({
+            className: 'rotation-handle',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        })
+        
+        rotationHandle = L.marker([handleLat, handleLng], {
+            icon: handleIcon,
+            draggable: true
+        }).addTo(map)
+        
+        rotationHandle.on('drag', (e) => {
+            const handlePos = e.target.getLatLng()
+            const angle = Math.atan2(
+                handlePos.lng - sr.center.lng,
+                handlePos.lat - sr.center.lat
+            ) * 180 / Math.PI
+            
+            const normalizedAngle = ((angle % 360) + 360) % 360
+            
+            // Update slider and input
+            const slider = document.getElementById('rotationSlider')
+            const input = document.getElementById('rotationInput')
+            if (slider) slider.value = Math.round(normalizedAngle)
+            if (input) input.value = Math.round(normalizedAngle)
+            
+            updateZoneRotation(zone.id, normalizedAngle)
+        })
+        
+        rotationHandle.on('dragend', () => {
+            // Re-position handle at correct distance
+            createRotationHandle(zone)
+        })
+    }
+    
+    function setRotationAngle(angle) {
+        if (!selectedZone) return
+        
+        const slider = document.getElementById('rotationSlider')
+        const input = document.getElementById('rotationInput')
+        if (slider) slider.value = angle
+        if (input) input.value = angle
+        
+        updateZoneRotation(selectedZone.id, angle)
+        createRotationHandle(selectedZone)
+    }
+    
+    function rotateByDelta(delta) {
+        if (!selectedZone) return
+        
+        const currentAngle = zoneRotations[selectedZone.id] || 0
+        let newAngle = (currentAngle + delta) % 360
+        if (newAngle < 0) newAngle += 360
+        
+        setRotationAngle(Math.round(newAngle))
+    }
+    
+    function updateZoneRotation(zoneId, angle) {
+        const sr = stringRectangles[zoneId]
+        if (!sr) return
+        
+        zoneRotations[zoneId] = angle
+        sr.rotation = angle
+        
+        // Recalculate corners with new rotation
+        const corners = getRotatedCorners(sr.center, sr.halfWidth, sr.halfHeight, angle)
+        sr.polygon.setLatLngs(corners)
+    }
+    
+    async function applyRotation() {
+        if (!selectedZone) return
+        
+        const sr = stringRectangles[selectedZone.id]
+        if (!sr) return
+        
+        showNotification('Sauvegarde de la rotation...', 'info')
+        
+        try {
+            await saveZonePositionWithRotation(
+                selectedZone.id, 
+                sr.center, 
+                sr.halfWidth, 
+                sr.halfHeight, 
+                sr.rotation
+            )
+            
+            showNotification('Rotation sauvegardée et GPS recalculé!', 'success')
+            hideRotationControls()
+            setTool('select')
+        } catch (err) {
+            console.error('Error saving rotation:', err)
+            showNotification('Erreur lors de la sauvegarde', 'error')
+        }
+    }
+    
+    async function saveZonePositionWithRotation(zoneId, center, halfWidth, halfHeight, rotation) {
+        // Calculate bounds for storage (unrotated for compatibility)
+        const bounds = [
+            [center.lat - halfHeight, center.lng - halfWidth],
+            [center.lat + halfHeight, center.lng + halfWidth]
+        ]
+        
+        // Store rotation angle and polygon data
+        const polygonData = {
+            bounds: bounds,
+            rotation: rotation,
+            center: { lat: center.lat, lng: center.lng },
+            halfWidth: halfWidth,
+            halfHeight: halfHeight
+        }
+        
+        // 1. Save zone position with rotation data
+        await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zoneId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roof_polygon: JSON.stringify(polygonData)
+            })
+        })
+        
+        // 2. Calculate GPS coordinates for modules
+        const gpsRes = await fetch('/api/pv/plants/' + PLANT_ID + '/zones/' + zoneId + '/calculate-gps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rotation: rotation })
+        })
+        const gpsData = await gpsRes.json()
+        
+        if (gpsData.success) {
+            showNotification(gpsData.message || 'GPS calculé', 'success')
         }
     }
     
@@ -1223,7 +1602,7 @@ export function getPvPlantCartoPage(plantId: string): string {
             
             // Supprimer l'ancien rectangle de la zone si existe
             if (stringRectangles[selectedZone.id]) {
-                map.removeLayer(stringRectangles[selectedZone.id].rect)
+                map.removeLayer(stringRectangles[selectedZone.id].polygon)
                 map.removeLayer(stringRectangles[selectedZone.id].marker)
                 delete stringRectangles[selectedZone.id]
             }
