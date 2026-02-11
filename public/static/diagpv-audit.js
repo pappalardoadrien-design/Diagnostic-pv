@@ -25,6 +25,10 @@ class DiagPVAudit {
         // Propriétés affichage
         this.viewMode = 'string' // 'string' ou 'physical'
         
+        // Propriétés sens câblage par string
+        // Directions: 'ltr' (gauche→droite), 'rtl' (droite→gauche), 'ttb' (haut→bas), 'btt' (bas→haut)
+        this.cableDirections = this.loadCableDirections()
+        
         // Propriétés Assistant Vocal
         this.isListening = false
         this.recognition = null
@@ -223,33 +227,174 @@ class DiagPVAudit {
 
         const completed = stringModules.filter(m => m.status !== 'pending').length
         const total = stringModules.length
+        
+        // Récupérer le sens de câblage actuel
+        const currentDirection = this.cableDirections[stringNumber] || null
+        const directionLabel = currentDirection ? this.getDirectionLabel(currentDirection) : 'Définir sens câblage'
+        const directionArrow = currentDirection ? this.getDirectionArrow(currentDirection) : '?'
+        const directionClass = currentDirection ? 'bg-green-600' : 'bg-orange-600'
 
         let html = `
             <div class="string-container" data-string="${stringNumber}">
                 <div class="string-header">
                     <h3>
                         <i class="fas fa-solar-panel mr-2"></i>
-                        STRING ${stringNumber} (Modules ${stringModules[0]?.module_id} - ${stringModules[stringModules.length - 1]?.module_id})
+                        STRING ${stringNumber}
                     </h3>
                     <div class="string-progress">
-                        ${completed}/${total} complétés
+                        ${completed}/${total}
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${(completed/total)*100}%"></div>
                         </div>
                     </div>
                 </div>
-                <div class="modules-grid">
+                
+                <!-- SENS DE CÂBLAGE -->
+                <div class="cable-direction-panel" style="
+                    display: flex; 
+                    flex-wrap: wrap;
+                    gap: 8px; 
+                    padding: 10px; 
+                    background: #1a1a2e; 
+                    border-radius: 8px; 
+                    margin-bottom: 10px;
+                    align-items: center;
+                ">
+                    <span style="font-size: 12px; color: #9ca3af; margin-right: 5px;">
+                        <i class="fas fa-route"></i> Câblage:
+                    </span>
+                    <button onclick="window.diagpvAudit.setCableDirection(${stringNumber}, 'ltr')" 
+                            class="cable-btn ${currentDirection === 'ltr' ? 'active' : ''}"
+                            style="
+                                padding: 6px 12px; 
+                                border-radius: 6px; 
+                                font-size: 11px; 
+                                font-weight: bold;
+                                border: 2px solid ${currentDirection === 'ltr' ? '#22c55e' : '#4b5563'};
+                                background: ${currentDirection === 'ltr' ? '#22c55e' : '#374151'};
+                                color: white;
+                            ">
+                        <i class="fas fa-arrow-right"></i> G→D
+                    </button>
+                    <button onclick="window.diagpvAudit.setCableDirection(${stringNumber}, 'rtl')"
+                            class="cable-btn ${currentDirection === 'rtl' ? 'active' : ''}"
+                            style="
+                                padding: 6px 12px; 
+                                border-radius: 6px; 
+                                font-size: 11px; 
+                                font-weight: bold;
+                                border: 2px solid ${currentDirection === 'rtl' ? '#22c55e' : '#4b5563'};
+                                background: ${currentDirection === 'rtl' ? '#22c55e' : '#374151'};
+                                color: white;
+                            ">
+                        <i class="fas fa-arrow-left"></i> D→G
+                    </button>
+                    <button onclick="window.diagpvAudit.setCableDirection(${stringNumber}, 'ttb')"
+                            class="cable-btn ${currentDirection === 'ttb' ? 'active' : ''}"
+                            style="
+                                padding: 6px 12px; 
+                                border-radius: 6px; 
+                                font-size: 11px; 
+                                font-weight: bold;
+                                border: 2px solid ${currentDirection === 'ttb' ? '#22c55e' : '#4b5563'};
+                                background: ${currentDirection === 'ttb' ? '#22c55e' : '#374151'};
+                                color: white;
+                            ">
+                        <i class="fas fa-arrow-down"></i> H→B
+                    </button>
+                    <button onclick="window.diagpvAudit.setCableDirection(${stringNumber}, 'btt')"
+                            class="cable-btn ${currentDirection === 'btt' ? 'active' : ''}"
+                            style="
+                                padding: 6px 12px; 
+                                border-radius: 6px; 
+                                font-size: 11px; 
+                                font-weight: bold;
+                                border: 2px solid ${currentDirection === 'btt' ? '#22c55e' : '#4b5563'};
+                                background: ${currentDirection === 'btt' ? '#22c55e' : '#374151'};
+                                color: white;
+                            ">
+                        <i class="fas fa-arrow-up"></i> B→H
+                    </button>
+                    ${currentDirection ? `
+                        <span style="
+                            margin-left: auto;
+                            padding: 4px 10px;
+                            background: #22c55e;
+                            border-radius: 20px;
+                            font-size: 11px;
+                            font-weight: bold;
+                            color: white;
+                        ">
+                            <i class="fas fa-check"></i> ${directionArrow} Module 1 ${currentDirection === 'ltr' ? 'à GAUCHE' : currentDirection === 'rtl' ? 'à DROITE' : currentDirection === 'ttb' ? 'en HAUT' : 'en BAS'}
+                        </span>
+                    ` : `
+                        <span style="
+                            margin-left: auto;
+                            padding: 4px 10px;
+                            background: #f97316;
+                            border-radius: 20px;
+                            font-size: 11px;
+                            font-weight: bold;
+                            color: white;
+                        ">
+                            <i class="fas fa-exclamation-triangle"></i> Définir le sens !
+                        </span>
+                    `}
+                </div>
+                
+                <!-- INDICATEUR VISUEL DU SENS -->
+                <div class="cable-visual-indicator" style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 5px 10px;
+                    background: ${currentDirection ? '#1e3a1e' : '#3a2a1e'};
+                    border-radius: 6px;
+                    margin-bottom: 8px;
+                    font-size: 12px;
+                ">
+                    ${currentDirection === 'ltr' || currentDirection === 'rtl' ? `
+                        <span style="color: ${currentDirection === 'ltr' ? '#4ade80' : '#9ca3af'}; font-weight: bold;">
+                            ${currentDirection === 'ltr' ? '🟢 M1' : 'M${total}'}
+                        </span>
+                        <span style="color: #6b7280; flex-grow: 1; text-align: center;">
+                            ${currentDirection === 'ltr' ? '━━━━━━━━━━━━━━━━━━━━━━━━━━▶' : '◀━━━━━━━━━━━━━━━━━━━━━━━━━━'}
+                        </span>
+                        <span style="color: ${currentDirection === 'rtl' ? '#4ade80' : '#9ca3af'}; font-weight: bold;">
+                            ${currentDirection === 'rtl' ? '🟢 M1' : 'M${total}'}
+                        </span>
+                    ` : currentDirection === 'ttb' || currentDirection === 'btt' ? `
+                        <span style="color: #6b7280; width: 100%; text-align: center;">
+                            ${currentDirection === 'ttb' ? '🟢 M1 en HAUT ↓↓↓ M' + total + ' en BAS' : '🟢 M1 en BAS ↑↑↑ M' + total + ' en HAUT'}
+                        </span>
+                    ` : `
+                        <span style="color: #f97316; width: 100%; text-align: center;">
+                            ⚠️ Cliquez sur un sens de câblage ci-dessus
+                        </span>
+                    `}
+                </div>
+                
+                <div class="modules-grid" style="${currentDirection === 'rtl' ? 'direction: rtl;' : ''}">
         `
 
-        // Modules de la string
-        stringModules.forEach(module => {
+        // Modules de la string (inversés si rtl)
+        const displayModules = currentDirection === 'rtl' ? [...stringModules].reverse() : stringModules
+        
+        displayModules.forEach((module, index) => {
             const statusClass = `module-${module.status}`
+            const isFirst = (currentDirection === 'rtl') ? (index === stringModules.length - 1) : (index === 0)
+            const isLast = (currentDirection === 'rtl') ? (index === 0) : (index === stringModules.length - 1)
+            
+            // Indicateur de position pour le premier et dernier module
+            const posIndicator = isFirst ? '🟢' : (isLast ? '🔴' : '')
+            
             html += `
                 <button class="module-btn ${statusClass} touch-optimized" 
                         data-module-id="${module.module_id}"
                         data-string="${module.string_number}"
-                        title="${module.module_id} - ${this.getStatusLabel(module.status)}${module.comment ? ' - ' + module.comment : ''}">
-                    ${module.module_id.includes('-') ? module.module_id.split('-')[1] : module.module_id.substring(1)}
+                        style="${isFirst ? 'box-shadow: 0 0 0 3px #22c55e;' : ''} ${isLast ? 'box-shadow: 0 0 0 3px #ef4444;' : ''}"
+                        title="${module.module_id} - ${this.getStatusLabel(module.status)}${module.comment ? ' - ' + module.comment : ''}${isFirst ? ' (DÉBUT STRING)' : ''}${isLast ? ' (FIN STRING)' : ''}">
+                    ${posIndicator}${module.module_id.includes('-') ? module.module_id.split('-')[1] : module.module_id.substring(1)}
                 </button>
             `
         })
@@ -2125,6 +2270,64 @@ class DiagPVAudit {
             this.exitMultiSelectMode()
             this.closeBulkModal()
         }
+    }
+
+    // ============================================================================
+    // SENS DE CÂBLAGE PAR STRING
+    // ============================================================================
+    
+    loadCableDirections() {
+        try {
+            const saved = localStorage.getItem(`diagpv_cable_${this.auditToken}`)
+            return saved ? JSON.parse(saved) : {}
+        } catch (e) {
+            return {}
+        }
+    }
+    
+    saveCableDirections() {
+        try {
+            localStorage.setItem(`diagpv_cable_${this.auditToken}`, JSON.stringify(this.cableDirections))
+        } catch (e) {
+            errorAudit('Erreur sauvegarde sens câblage:', e)
+        }
+    }
+    
+    setCableDirection(stringNumber, direction) {
+        this.cableDirections[stringNumber] = direction
+        this.saveCableDirections()
+        this.renderModulesGrid()
+        this.showAlert(`String ${stringNumber}: ${this.getDirectionLabel(direction)}`, 'success')
+    }
+    
+    getDirectionLabel(direction) {
+        const labels = {
+            'ltr': '← Module 1 à GAUCHE →',
+            'rtl': '→ Module 1 à DROITE ←',
+            'ttb': '↓ Module 1 en HAUT ↓',
+            'btt': '↑ Module 1 en BAS ↑'
+        }
+        return labels[direction] || 'Non défini'
+    }
+    
+    getDirectionArrow(direction) {
+        const arrows = {
+            'ltr': '→',
+            'rtl': '←',
+            'ttb': '↓',
+            'btt': '↑'
+        }
+        return arrows[direction] || '?'
+    }
+    
+    getDirectionIcon(direction) {
+        const icons = {
+            'ltr': 'fa-arrow-right',
+            'rtl': 'fa-arrow-left',
+            'ttb': 'fa-arrow-down',
+            'btt': 'fa-arrow-up'
+        }
+        return icons[direction] || 'fa-question'
     }
 
 
