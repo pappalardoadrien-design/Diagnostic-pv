@@ -33,6 +33,7 @@ import auditsRouter from './modules/audits/routes'
 import pvservLegacyRoutes from './modules/el/routes/pvserv-legacy'
 import adminRoutes from './modules/admin/routes'
 import diagnosticRoutes from './modules/admin/diagnostic-routes'
+import auditQualiteRoutes from './modules/audit-qualite/routes'
 
 // === PAGES (frontend HTML) ===
 import { getRapportsPage } from './pages/rapports.js'
@@ -64,6 +65,8 @@ import { getPvPlantCartoPage } from './pages/pv-plant-carto'
 import { getPvEditorV2Page } from './pages/pv-editor-v2'
 import { getElAuditTerrainPage } from './pages/el-audit-terrain'
 import { getToolsPage } from './pages/tools'
+import { getAuditQualitePage, getAuditQualitePhotosPage } from './pages/audit-qualite'
+import { getRapportQualitePage } from './pages/rapport-qualite'
 
 // ============================================================================
 // APP SETUP
@@ -109,6 +112,7 @@ app.route('/api/audits', auditsRouter)
 app.route('/api/picsellia', picselliaRoutes)
 app.route('/api/audit', pvservLegacyRoutes)
 app.route('/api/diagnostic', diagnosticRoutes)
+app.route('/api/audit-qualite', auditQualiteRoutes)
 app.route('/admin', adminRoutes)
 app.route('/', designerModule)
 app.route('/crm/unified', crmUnifiedViewPage)
@@ -147,6 +151,11 @@ app.get('/audit/:token/photos', (c) => c.html(getAuditPhotosPage(c.req.param('to
 app.get('/audit/:token', async (c) => c.html(getElAuditTerrainPage(c.req.param('token'))))
 app.get('/audit/create', (c) => c.redirect('/audits/create'))
 app.get('/el', (c) => c.redirect('/audits/create?type=EL'))
+
+// --- Audit Qualité Terrain ---
+app.get('/audit-qualite/:missionId', (c) => c.html(getAuditQualitePage(c.req.param('missionId'))))
+app.get('/audit-qualite/:missionId/photos', (c) => c.html(getAuditQualitePhotosPage(c.req.param('missionId'))))
+app.get('/rapport-qualite/:rapportId', (c) => c.html(getRapportQualitePage(c.req.param('rapportId'))))
 
 // --- GIRASOLE ---
 app.get('/girasole/dashboard', (c) => c.html(getGirasoleDashboardPage()))

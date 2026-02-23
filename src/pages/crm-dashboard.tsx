@@ -97,6 +97,39 @@ export function getCrmDashboardPage() {
                 </div>
             </div>
 
+            <!-- Audit Qualité KPI Section -->
+            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl shadow-sm border border-emerald-200 overflow-hidden">
+                <div class="p-6 border-b border-emerald-100 flex justify-between items-center">
+                    <h2 class="text-lg font-black text-emerald-800 flex items-center gap-2">
+                        <i class="fas fa-clipboard-check text-emerald-500"></i> Audit Qualité Terrain
+                    </h2>
+                    <a href="/crm/projects" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors">NOUVELLE MISSION</a>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-black text-emerald-700" id="aq-total">-</div>
+                            <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Missions</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-black text-blue-600" id="aq-actives">-</div>
+                            <div class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Actives</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-black text-green-600" id="aq-terminees">-</div>
+                            <div class="text-[10px] font-bold text-green-400 uppercase tracking-widest">Terminées</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-black" id="aq-score" style="color: #22c55e">-</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Score Moyen</div>
+                        </div>
+                    </div>
+                    <div id="aq-recentes" class="space-y-2">
+                        <div class="text-center py-3 text-xs text-emerald-400">Chargement...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Recent Activity Feed -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -279,8 +312,53 @@ export function getCrmDashboardPage() {
             window.requestAnimationFrame(step);
         }
 
+        // === Audit Qualité KPI ===
+        async function loadAuditQualiteKPI() {
+            try {
+                const res = await axios.get('/api/audit-qualite/stats/kpi');
+                if (!res.data.success) return;
+                const { kpi, recentes } = res.data;
+                
+                document.getElementById('aq-total').textContent = kpi?.total_missions || 0;
+                document.getElementById('aq-actives').textContent = kpi?.missions_actives || 0;
+                document.getElementById('aq-terminees').textContent = kpi?.missions_terminees || 0;
+                
+                const score = kpi?.score_moyen;
+                const scoreEl = document.getElementById('aq-score');
+                if (score !== null && score !== undefined) {
+                    scoreEl.textContent = Math.round(score) + '%';
+                    scoreEl.style.color = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+                } else {
+                    scoreEl.textContent = '-';
+                }
+                
+                const container = document.getElementById('aq-recentes');
+                if (recentes && recentes.length > 0) {
+                    container.innerHTML = recentes.map(m => {
+                        const statusColors = { planifie: 'bg-blue-100 text-blue-700', en_cours: 'bg-amber-100 text-amber-700', termine: 'bg-green-100 text-green-700', valide: 'bg-emerald-100 text-emerald-700' };
+                        const statusLabels = { planifie: 'Planifie', en_cours: 'En cours', termine: 'Termine', valide: 'Valide' };
+                        return '<a href="/audit-qualite/' + m.id + '" class="flex items-center justify-between p-3 bg-white rounded-xl border border-emerald-100 hover:border-emerald-300 transition-colors group cursor-pointer">'
+                            + '<div class="flex items-center gap-3">'
+                            + '<div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">' + (m.type_audit || 'SOL') + '</div>'
+                            + '<div><h4 class="text-sm font-bold text-slate-700 group-hover:text-emerald-600">' + (m.project_name || 'Centrale') + '</h4>'
+                            + '<p class="text-[10px] text-slate-400">' + (m.reference || '') + ' - ' + (m.client_name || '') + '</p></div></div>'
+                            + '<div class="text-right"><span class="text-[10px] font-black px-2 py-0.5 rounded-full ' + (statusColors[m.statut] || 'bg-slate-100 text-slate-500') + '">' + (statusLabels[m.statut] || m.statut) + '</span>'
+                            + (m.score_global !== null && m.score_global !== undefined ? '<div class="text-xs font-black mt-1" style="color: ' + (m.score_global >= 80 ? '#22c55e' : m.score_global >= 60 ? '#f59e0b' : '#ef4444') + '">' + m.score_global + '%</div>' : '')
+                            + '</div></a>';
+                    }).join('');
+                } else {
+                    container.innerHTML = '<div class="text-center py-3 text-xs text-emerald-400">Aucune mission</div>';
+                }
+            } catch (err) {
+                console.log('Audit Qualit\u00e9 KPI non disponible:', err.message);
+            }
+        }
+
         // Start
-        document.addEventListener('DOMContentLoaded', loadDashboardData);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboardData();
+            loadAuditQualiteKPI();
+        });
     </script>
   `;
 
