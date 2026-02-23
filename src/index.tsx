@@ -34,6 +34,7 @@ import pvservLegacyRoutes from './modules/el/routes/pvserv-legacy'
 import adminRoutes from './modules/admin/routes'
 import diagnosticRoutes from './modules/admin/diagnostic-routes'
 import auditQualiteRoutes from './modules/audit-qualite/routes'
+import diodeTestRoutes from './modules/diode-tests/routes'
 
 // === PAGES (frontend HTML) ===
 import { getRapportsPage } from './pages/rapports.js'
@@ -113,6 +114,7 @@ app.route('/api/picsellia', picselliaRoutes)
 app.route('/api/audit', pvservLegacyRoutes)
 app.route('/api/diagnostic', diagnosticRoutes)
 app.route('/api/audit-qualite', auditQualiteRoutes)
+app.route('/api/diode-tests', diodeTestRoutes)
 app.route('/admin', adminRoutes)
 app.route('/', designerModule)
 app.route('/crm/unified', crmUnifiedViewPage)

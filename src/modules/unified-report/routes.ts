@@ -29,10 +29,10 @@ unifiedReportRoutes.post('/generate', async (c) => {
     const request: GenerateUnifiedReportRequest = await c.req.json();
     
     // Validation
-    if (!request.plantId && !request.auditElToken && !request.inspectionToken) {
+    if (!request.plantId && !request.auditElToken && !request.inspectionToken && !request.missionQualiteId && !request.diodeSessionToken) {
       return c.json({
         success: false,
-        error: 'Au moins un identifiant requis (plantId, auditElToken, ou inspectionToken)'
+        error: 'Au moins un identifiant requis (plantId, auditElToken, inspectionToken, missionQualiteId, ou diodeSessionToken)'
       }, 400);
     }
     
@@ -44,7 +44,9 @@ unifiedReportRoutes.post('/generate', async (c) => {
                        reportData.ivModule.hasData || 
                        reportData.visualModule.hasData || 
                        reportData.isolationModule.hasData || 
-                       reportData.thermalModule.hasData;
+                       reportData.thermalModule.hasData ||
+                       reportData.auditQualiteModule.hasData ||
+                       reportData.diodeTestModule.hasData;
     
     if (!hasAnyData) {
       return c.json({
@@ -63,6 +65,8 @@ unifiedReportRoutes.post('/generate', async (c) => {
     if (reportData.visualModule.hasData) modulesIncluded.push('visual');
     if (reportData.isolationModule.hasData) modulesIncluded.push('isolation');
     if (reportData.thermalModule.hasData) modulesIncluded.push('thermal');
+    if (reportData.auditQualiteModule.hasData) modulesIncluded.push('audit_qualite');
+    if (reportData.diodeTestModule.hasData) modulesIncluded.push('diodes');
     
     await DB.prepare(`
       INSERT INTO unified_reports (
@@ -151,7 +155,7 @@ unifiedReportRoutes.get('/preview', async (c) => {
     }
     
     // Compter données disponibles par module
-    let elCount = 0, ivCount = 0, visualCount = 0, isolationCount = 0, thermalCount = 0;
+    let elCount = 0, ivCount = 0, visualCount = 0, isolationCount = 0, thermalCount = 0, auditQualiteCount = 0, diodeSessionsCount = 0;
     let plantName = null;
     
     // Module EL
@@ -253,6 +257,27 @@ unifiedReportRoutes.get('/preview', async (c) => {
       thermalCount = (thermalMeasurements as any)?.count || 0;
     }
     
+    // Module Audit Qualité
+    if (plantId) {
+      const aqMissions = await DB.prepare(`
+        SELECT COUNT(*) as count FROM ordres_mission_qualite WHERE project_id = ?
+      `).bind(plantId).first();
+      auditQualiteCount = (aqMissions as any)?.count || 0;
+    }
+    
+    // Module Test Diodes
+    if (plantId) {
+      const diodeSessions = await DB.prepare(`
+        SELECT COUNT(*) as count FROM diode_test_sessions WHERE (plant_id = ? OR project_id = ?)
+      `).bind(plantId, plantId).first();
+      diodeSessionsCount = (diodeSessions as any)?.count || 0;
+    } else if (auditElToken) {
+      const diodeSessions = await DB.prepare(`
+        SELECT COUNT(*) as count FROM diode_test_sessions WHERE audit_token = ?
+      `).bind(auditElToken).first();
+      diodeSessionsCount = (diodeSessions as any)?.count || 0;
+    }
+    
     const response: PreviewAvailableDataResponse = {
       success: true,
       plantId: plantId || null,
@@ -262,14 +287,18 @@ unifiedReportRoutes.get('/preview', async (c) => {
         iv: ivCount > 0,
         visual: visualCount > 0,
         isolation: isolationCount > 0,
-        thermal: thermalCount > 0
+        thermal: thermalCount > 0,
+        audit_qualite: auditQualiteCount > 0,
+        diodes: diodeSessionsCount > 0
       },
       dataSummary: {
         elAuditsCount: elCount,
         ivCurvesCount: ivCount,
         visualInspectionsCount: visualCount,
         isolationTestsCount: isolationCount,
-        thermalReportsCount: thermalCount
+        thermalReportsCount: thermalCount,
+        auditQualiteCount,
+        diodeSessionsCount
       }
     };
     

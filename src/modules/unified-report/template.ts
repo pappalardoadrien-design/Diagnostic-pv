@@ -470,6 +470,190 @@ export function generateReportHTML(data: UnifiedReportData): string {
     </div>
     ` : ''}
 
+    <!-- MODULE TEST DIODES BYPASS -->
+    ${data.diodeTestModule.hasData ? `
+    <div class="page">
+        <h2 class="numbered-section text-2xl font-bold mb-8 text-gray-900 flex items-center">
+            <span class="w-8 h-8 bg-amber-600 text-white rounded flex items-center justify-center text-sm mr-3 shadow-lg">
+                <i class="fas fa-microchip"></i>
+            </span>
+            TEST DIODES BYPASS
+        </h2>
+
+        <div class="grid grid-cols-2 gap-8 mb-8">
+            <div class="bg-gray-50 rounded-xl p-6">
+                <h3 class="font-bold text-gray-700 mb-4">Détails de la session</h3>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Méthode</td><td class="py-2 font-bold text-right">${data.diodeTestModule.method === 'thermal' ? 'Thermographie IR' : data.diodeTestModule.method === 'iv_curve' ? 'Courbe I-V' : 'Combinée (IR + I-V)'}</td></tr>
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Date</td><td class="py-2 font-mono text-right">${new Date(data.diodeTestModule.testDate).toLocaleDateString('fr-FR')}</td></tr>
+                    ${data.diodeTestModule.technicianName ? `<tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Technicien</td><td class="py-2 text-right">${data.diodeTestModule.technicianName}</td></tr>` : ''}
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Diodes testées</td><td class="py-2 font-mono font-bold text-right">${data.diodeTestModule.totalDiodesTested}</td></tr>
+                    <tr><td class="py-2 text-gray-500">Conformité</td><td class="py-2 font-bold text-right ${data.diodeTestModule.conformityRate >= 90 ? 'text-green-600' : 'text-orange-600'}">${data.diodeTestModule.conformityRate}%</td></tr>
+                </table>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="stat-card">
+                    <div class="priority-border bg-green-500"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">OK</span>
+                        <span class="text-2xl font-black text-green-600">${data.diodeTestModule.diodesOk}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="priority-border bg-red-500"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Défectueuses</span>
+                        <span class="text-2xl font-black text-red-600">${data.diodeTestModule.diodesDefective}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="priority-border bg-yellow-500"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Suspectes</span>
+                        <span class="text-2xl font-black text-yellow-600">${data.diodeTestModule.diodesSuspect}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        ${data.diodeTestModule.criticalDefects.length > 0 ? `
+        <h3 class="font-bold text-lg mb-4 text-gray-800">Défauts Identifiés</h3>
+        <table class="pro-table mb-6">
+            <thead>
+                <tr>
+                    <th>Module</th>
+                    <th>Diode</th>
+                    <th>Type</th>
+                    <th>Sévérité</th>
+                    <th>T° / ΔT</th>
+                    <th>Observation</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.diodeTestModule.criticalDefects.map(d => `
+                <tr>
+                    <td class="font-mono font-bold">${d.moduleIdentifier}</td>
+                    <td>${d.diodePosition}</td>
+                    <td><span class="px-2 py-1 rounded text-xs font-bold uppercase ${d.defectType === 'short_circuit' || d.defectType === 'thermal_runaway' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}">${d.defectType.replace(/_/g, ' ')}</span></td>
+                    <td><span class="px-2 py-1 rounded text-xs font-bold uppercase ${d.severity === 'critical' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}">${d.severity}</span></td>
+                    <td class="font-mono">${d.temperatureDiode ? d.temperatureDiode + '°C' : '-'}${d.deltaT ? ' / Δ' + d.deltaT + '°C' : ''}</td>
+                    <td class="text-sm">${d.observation || '-'}</td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        ` : `
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+            <p class="text-green-800 text-sm"><i class="fas fa-check-circle mr-2"></i>Toutes les diodes bypass testées sont fonctionnelles.</p>
+        </div>
+        `}
+        
+        ${data.diodeTestModule.maxTemperature ? `
+        <div class="mt-6 bg-amber-50 p-4 rounded-lg border border-amber-200">
+            <p class="text-sm text-amber-900"><i class="fas fa-thermometer-half mr-2"></i>T° max mesurée : <strong>${data.diodeTestModule.maxTemperature}°C</strong> | ΔT max : <strong>${data.diodeTestModule.maxDeltaT}°C</strong></p>
+        </div>
+        ` : ''}
+    </div>
+    ` : ''}
+
+    <!-- MODULE AUDIT QUALITÉ TERRAIN -->
+    ${data.auditQualiteModule.hasData ? `
+    <div class="page">
+        <h2 class="numbered-section text-2xl font-bold mb-8 text-gray-900 flex items-center">
+            <span class="w-8 h-8 bg-indigo-600 text-white rounded flex items-center justify-center text-sm mr-3 shadow-lg">
+                <i class="fas fa-clipboard-check"></i>
+            </span>
+            CONTRÔLE QUALITÉ TERRAIN
+        </h2>
+
+        <div class="grid grid-cols-2 gap-8 mb-8">
+            <div class="bg-gray-50 rounded-xl p-6">
+                <h3 class="font-bold text-gray-700 mb-4">Informations Mission</h3>
+                <table class="w-full text-sm">
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Référence</td><td class="py-2 font-mono font-bold text-right">${data.auditQualiteModule.reference}</td></tr>
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Type</td><td class="py-2 font-bold text-right">${data.auditQualiteModule.typeAudit}</td></tr>
+                    <tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Date</td><td class="py-2 font-mono text-right">${new Date(data.auditQualiteModule.missionDate).toLocaleDateString('fr-FR')}</td></tr>
+                    ${data.auditQualiteModule.technicianName ? `<tr class="border-b border-gray-200"><td class="py-2 text-gray-500">Technicien</td><td class="py-2 text-right">${data.auditQualiteModule.technicianName}</td></tr>` : ''}
+                    <tr><td class="py-2 text-gray-500">Score Global</td><td class="py-2 font-bold text-right ${data.auditQualiteModule.scoreGlobal >= 80 ? 'text-green-600' : 'text-orange-600'}">${data.auditQualiteModule.scoreGlobal}%</td></tr>
+                </table>
+            </div>
+            
+            <div class="space-y-4">
+                ${data.auditQualiteModule.solChecklist.totalItems > 0 ? `
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-bold text-sm text-gray-600 mb-3 uppercase tracking-wider">SOL (NF C 15-100)</h4>
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-green-600 font-bold">${data.auditQualiteModule.solChecklist.conformes} C</span>
+                        <span class="text-red-600 font-bold">${data.auditQualiteModule.solChecklist.nonConformes} NC</span>
+                        <span class="text-yellow-600">${data.auditQualiteModule.solChecklist.observations} Obs</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-full bg-green-500 rounded-full" style="width: ${data.auditQualiteModule.solChecklist.conformityRate}%"></div>
+                    </div>
+                    <div class="text-right text-xs text-gray-500 mt-1">${data.auditQualiteModule.solChecklist.conformityRate}% (${data.auditQualiteModule.solChecklist.totalItems} pts)</div>
+                </div>
+                ` : ''}
+                
+                ${data.auditQualiteModule.toitureChecklist.totalItems > 0 ? `
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-bold text-sm text-gray-600 mb-3 uppercase tracking-wider">TOITURE (DTU 40.35)</h4>
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-green-600 font-bold">${data.auditQualiteModule.toitureChecklist.conformes} C</span>
+                        <span class="text-red-600 font-bold">${data.auditQualiteModule.toitureChecklist.nonConformes} NC</span>
+                        <span class="text-yellow-600">${data.auditQualiteModule.toitureChecklist.observations} Obs</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-full bg-green-500 rounded-full" style="width: ${data.auditQualiteModule.toitureChecklist.conformityRate}%"></div>
+                    </div>
+                    <div class="text-right text-xs text-gray-500 mt-1">${data.auditQualiteModule.toitureChecklist.conformityRate}% (${data.auditQualiteModule.toitureChecklist.totalItems} pts)</div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        ${data.auditQualiteModule.criticalItems.length > 0 ? `
+        <h3 class="font-bold text-lg mb-4 text-red-800"><i class="fas fa-exclamation-triangle mr-2"></i>Non-Conformités Critiques</h3>
+        <table class="pro-table mb-6">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Catégorie</th>
+                    <th>Libellé</th>
+                    <th>Norme</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.auditQualiteModule.criticalItems.map(item => `
+                <tr>
+                    <td class="font-mono font-bold text-red-700">${item.code}</td>
+                    <td><span class="px-2 py-1 rounded text-xs font-bold uppercase bg-gray-100">${item.type}</span></td>
+                    <td class="capitalize">${item.categorie.replace(/_/g, ' ')}</td>
+                    <td class="text-sm">${item.libelle}</td>
+                    <td class="text-xs text-gray-500 font-mono">${item.norme}</td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        ` : ''}
+
+        ${data.auditQualiteModule.conclusion ? `
+        <div class="bg-gray-50 border-l-4 border-indigo-500 p-4 rounded-r-lg mt-6">
+            <h4 class="font-bold text-gray-800 mb-2">Conclusion Terrain</h4>
+            <p class="text-sm text-gray-700 italic">${data.auditQualiteModule.conclusion}</p>
+        </div>
+        ` : ''}
+        
+        ${data.auditQualiteModule.recommendations ? `
+        <div class="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded-r-lg mt-4">
+            <h4 class="font-bold text-indigo-800 mb-2">Recommandations Terrain</h4>
+            <p class="text-sm text-indigo-700">${data.auditQualiteModule.recommendations}</p>
+        </div>
+        ` : ''}
+    </div>
+    ` : ''}
+
     <!-- PLAN D'ACTION -->
     ${data.recommendations.length > 0 ? `
     <div class="page">

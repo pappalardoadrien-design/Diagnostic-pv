@@ -1,6 +1,6 @@
 /**
  * Types TypeScript - Module Rapport Unifié
- * Agrégation multi-modules: EL + IV + Visuels + Isolation + Thermique
+ * Agrégation multi-modules: EL + IV + Visuels + Isolation + Thermique + Audit Qualité + Diodes
  */
 
 // ============================================================================
@@ -133,6 +133,80 @@ export interface PhotosModuleData {
 }
 
 // ============================================================================
+// MODULE AUDIT QUALITÉ TERRAIN (NF C 15-100 / DTU 40.35)
+// ============================================================================
+
+export interface AuditQualiteModuleData {
+  hasData: boolean;
+  missionId: number | null;
+  reference: string;
+  typeAudit: string; // 'SOL', 'TOITURE', 'DOUBLE'
+  missionDate: string;
+  technicianName: string | null;
+  // Stats SOL
+  solChecklist: {
+    totalItems: number;
+    conformes: number;
+    nonConformes: number;
+    observations: number;
+    conformityRate: number;
+  };
+  // Stats TOITURE
+  toitureChecklist: {
+    totalItems: number;
+    conformes: number;
+    nonConformes: number;
+    observations: number;
+    conformityRate: number;
+  };
+  // Global
+  scoreGlobal: number;
+  nbNonConformites: number;
+  nbObservations: number;
+  // Détails non-conformités critiques
+  criticalItems: Array<{
+    code: string;
+    libelle: string;
+    categorie: string;
+    severite: string;
+    norme: string;
+    type: 'sol' | 'toiture';
+  }>;
+  // Commentaires finaux
+  conclusion: string | null;
+  recommendations: string | null;
+}
+
+// ============================================================================
+// MODULE TEST DIODES BYPASS
+// ============================================================================
+
+export interface DiodeTestModuleData {
+  hasData: boolean;
+  sessionToken: string;
+  method: string; // 'thermal', 'iv_curve', 'combined'
+  testDate: string;
+  technicianName: string | null;
+  totalDiodesTested: number;
+  diodesOk: number;
+  diodesDefective: number;
+  diodesSuspect: number;
+  conformityRate: number;
+  // Défauts critiques
+  criticalDefects: Array<{
+    moduleIdentifier: string;
+    diodePosition: string;
+    defectType: string;
+    severity: string;
+    temperatureDiode: number | null;
+    deltaT: number | null;
+    observation: string | null;
+  }>;
+  maxTemperature: number | null;
+  maxDeltaT: number | null;
+}
+
+// ============================================================================
 // RAPPORT UNIFIÉ - AGRÉGATION
 // ============================================================================
 
@@ -152,6 +226,8 @@ export interface UnifiedReportData {
   visualModule: VisualModuleData;
   isolationModule: IsolationModuleData;
   thermalModule: ThermalModuleData;
+  auditQualiteModule: AuditQualiteModuleData;
+  diodeTestModule: DiodeTestModuleData;
   modules: { // Structure flexible pour extension
       photos?: { enabled: boolean; count: number; data: PhotosModuleData };
   };
@@ -193,9 +269,15 @@ export interface GenerateUnifiedReportRequest {
   plantId?: number;
   auditElToken?: string; // Si rapport basé sur audit EL spécifique
   inspectionToken?: string; // Si rapport basé sur inspection visuelle
-  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal' | 'photos')[];
+  missionQualiteId?: number; // Si rapport basé sur mission audit qualité
+  diodeSessionToken?: string; // Si rapport basé sur session test diodes
+  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal' | 'photos' | 'audit_qualite' | 'diodes')[];
   generatedBy?: string;
   additionalNotes?: string;
+  // Extra fields used by route handler
+  reportTitle?: string;
+  auditDate?: string;
+  auditorName?: string;
 }
 
 export interface GenerateUnifiedReportResponse {
@@ -227,6 +309,8 @@ export interface PreviewAvailableDataResponse {
     visual: boolean;
     isolation: boolean;
     thermal: boolean;
+    audit_qualite: boolean;
+    diodes: boolean;
   };
   dataSummary: {
     elAuditsCount: number;
@@ -234,6 +318,8 @@ export interface PreviewAvailableDataResponse {
     visualInspectionsCount: number;
     isolationTestsCount: number;
     thermalReportsCount: number;
+    auditQualiteCount: number;
+    diodeSessionsCount: number;
   };
 }
 
@@ -243,34 +329,47 @@ export interface PreviewAvailableDataResponse {
 
 /**
  * Calcule conformité globale (moyenne pondérée modules disponibles)
+ * Pondérations: EL=25, Visual=20, Isolation=15, IV=15, AuditQualité=15, Diodes=10
  */
 export function calculateOverallConformity(report: UnifiedReportData): number {
   let totalWeight = 0;
   let weightedSum = 0;
   
-  // Module EL: poids 30%
+  // Module EL: poids 25
   if (report.elModule.hasData) {
-    totalWeight += 30;
-    weightedSum += report.elModule.conformityRate * 30;
+    totalWeight += 25;
+    weightedSum += report.elModule.conformityRate * 25;
   }
   
-  // Module Visuels: poids 30%
+  // Module Visuels: poids 20
   if (report.visualModule.hasData) {
-    totalWeight += 30;
-    weightedSum += report.visualModule.checklist.conformityRate * 30;
-  }
-  
-  // Module Isolation: poids 20%
-  if (report.isolationModule.hasData) {
     totalWeight += 20;
-    weightedSum += report.isolationModule.conformityRate * 20;
+    weightedSum += report.visualModule.checklist.conformityRate * 20;
   }
   
-  // Module IV: poids 20%
+  // Module Isolation: poids 15
+  if (report.isolationModule.hasData) {
+    totalWeight += 15;
+    weightedSum += report.isolationModule.conformityRate * 15;
+  }
+  
+  // Module IV: poids 15
   if (report.ivModule.hasData) {
     const ivConformity = ((report.ivModule.totalCurves - report.ivModule.outOfToleranceCount) / report.ivModule.totalCurves) * 100;
-    totalWeight += 20;
-    weightedSum += ivConformity * 20;
+    totalWeight += 15;
+    weightedSum += ivConformity * 15;
+  }
+  
+  // Module Audit Qualité: poids 15
+  if (report.auditQualiteModule.hasData) {
+    totalWeight += 15;
+    weightedSum += report.auditQualiteModule.scoreGlobal * 15;
+  }
+  
+  // Module Test Diodes: poids 10
+  if (report.diodeTestModule.hasData) {
+    totalWeight += 10;
+    weightedSum += report.diodeTestModule.conformityRate * 10;
   }
   
   if (totalWeight === 0) return 0;
@@ -308,6 +407,12 @@ export function requiresUrgentAction(report: UnifiedReportData): boolean {
     );
     if (minValue < 0.5) return true;
   }
+  
+  // Audit Qualité critiques
+  if (report.auditQualiteModule.hasData && report.auditQualiteModule.criticalItems.length > 0) return true;
+  
+  // Diodes défectueuses critiques
+  if (report.diodeTestModule.hasData && report.diodeTestModule.criticalDefects.length > 0) return true;
   
   return false;
 }

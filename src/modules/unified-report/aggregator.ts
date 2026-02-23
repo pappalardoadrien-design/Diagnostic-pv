@@ -1,6 +1,6 @@
 /**
  * Aggregator - Logique agrégation données multi-modules
- * Collecte données EL, IV, Visuels, Isolation, Thermique, Photos, Notes
+ * Collecte données EL, IV, Visuels, Isolation, Thermique, Photos, Notes, Audit Qualité, Diodes
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -12,6 +12,8 @@ import type {
   IsolationModuleData,
   ThermalModuleData,
   PhotosModuleData,
+  AuditQualiteModuleData,
+  DiodeTestModuleData,
   GenerateUnifiedReportRequest
 } from './types/index.js';
 import {
@@ -29,24 +31,26 @@ export async function aggregateUnifiedReportData(
 ): Promise<UnifiedReportData> {
   
   const reportToken = generateReportToken();
-  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos'];
+  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos', 'audit_qualite', 'diodes'];
   
   // Agrégation parallèle
-  const [elData, ivData, visualData, isolationData, thermalData, photosData, fieldNotes] = await Promise.all([
+  const [elData, ivData, visualData, isolationData, thermalData, photosData, fieldNotes, auditQualiteData, diodeTestData] = await Promise.all([
     includeModules.includes('el') ? aggregateELModule(DB, request) : createEmptyELData(),
     includeModules.includes('iv') ? aggregateIVModule(DB, request) : createEmptyIVData(),
     includeModules.includes('visual') ? aggregateVisualModule(DB, request) : createEmptyVisualData(),
     includeModules.includes('isolation') ? aggregateIsolationModule(DB, request) : createEmptyIsolationData(),
     includeModules.includes('thermal') ? aggregateThermalModule(DB, request) : createEmptyThermalData(),
     includeModules.includes('photos') ? aggregatePhotosModule(DB, request) : createEmptyPhotosData(),
-    getAuditNotes(DB, request)
+    getAuditNotes(DB, request),
+    includeModules.includes('audit_qualite') ? aggregateAuditQualiteModule(DB, request) : createEmptyAuditQualiteData(),
+    includeModules.includes('diodes') ? aggregateDiodeTestModule(DB, request) : createEmptyDiodeTestData()
   ]);
   
   // Calcul synthèse globale
   const totalModules = elData.hasData ? elData.totalModules : 0;
-  const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0);
-  const majorCount = visualData.defects?.filter(d => d.severity === 'major').length || 0;
-  const minorCount = visualData.defects?.filter(d => d.severity === 'minor').length || 0;
+  const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0) + (auditQualiteData.criticalItems?.length || 0) + (diodeTestData.criticalDefects?.length || 0);
+  const majorCount = (visualData.defects?.filter(d => d.severity === 'major').length || 0) + (auditQualiteData.nbNonConformites || 0);
+  const minorCount = (visualData.defects?.filter(d => d.severity === 'minor').length || 0) + (auditQualiteData.nbObservations || 0);
   
   const report: UnifiedReportData = {
     reportToken,
@@ -63,6 +67,8 @@ export async function aggregateUnifiedReportData(
     visualModule: visualData,
     isolationModule: isolationData,
     thermalModule: thermalData,
+    auditQualiteModule: auditQualiteData,
+    diodeTestModule: diodeTestData,
 
     modules: {
         photos: {
@@ -786,6 +792,30 @@ function generateRecommendations(report: UnifiedReportData) {
     });
   }
   
+  // Recommandations Audit Qualité
+  if (report.auditQualiteModule.hasData && report.auditQualiteModule.criticalItems.length > 0) {
+    recommendations.push({
+      priority: 'urgent',
+      category: 'safety',
+      title: `${report.auditQualiteModule.criticalItems.length} non-conformité(s) critique(s) NF C 15-100`,
+      description: `${report.auditQualiteModule.criticalItems.map(i => i.code).join(', ')} - Points critiques identifiés lors du contrôle qualité terrain. Intervention corrective immédiate requise.`,
+      estimatedImpact: null,
+      deadline: '1 semaine'
+    });
+  }
+  
+  // Recommandations Diodes
+  if (report.diodeTestModule.hasData && report.diodeTestModule.diodesDefective > 0) {
+    recommendations.push({
+      priority: report.diodeTestModule.criticalDefects.length > 0 ? 'urgent' : 'high',
+      category: 'safety',
+      title: `Remplacement ${report.diodeTestModule.diodesDefective} diode(s) bypass défectueuse(s)`,
+      description: `${report.diodeTestModule.diodesDefective} diode(s) bypass identifiée(s) comme défectueuse(s). Risque de hotspot, arc électrique et incendie.`,
+      estimatedImpact: `~${report.diodeTestModule.diodesDefective * 200}kWh/an`,
+      deadline: '2 semaines'
+    });
+  }
+  
   // Recommandation générale maintenance
   if (report.summary.overallConformityRate < 80) {
     recommendations.push({
@@ -799,4 +829,260 @@ function generateRecommendations(report: UnifiedReportData) {
   }
   
   return recommendations;
+}
+
+// ============================================================================
+// MODULE AUDIT QUALITÉ TERRAIN (NF C 15-100 / DTU 40.35)
+// ============================================================================
+
+async function aggregateAuditQualiteModule(
+  DB: D1Database,
+  request: GenerateUnifiedReportRequest
+): Promise<AuditQualiteModuleData> {
+  
+  try {
+    // Trouver mission via missionQualiteId ou plantId (= project_id)
+    let mission;
+    if (request.missionQualiteId) {
+      mission = await DB.prepare(`
+        SELECT omq.*, p.name as project_name, t.nom as technicien_nom, t.prenom as technicien_prenom
+        FROM ordres_mission_qualite omq
+        LEFT JOIN projects p ON omq.project_id = p.id
+        LEFT JOIN techniciens t ON omq.technicien_id = t.id
+        WHERE omq.id = ?
+      `).bind(request.missionQualiteId).first();
+    } else if (request.plantId) {
+      // Dernière mission pour ce projet
+      mission = await DB.prepare(`
+        SELECT omq.*, p.name as project_name, t.nom as technicien_nom, t.prenom as technicien_prenom
+        FROM ordres_mission_qualite omq
+        LEFT JOIN projects p ON omq.project_id = p.id
+        LEFT JOIN techniciens t ON omq.technicien_id = t.id
+        WHERE omq.project_id = ?
+        ORDER BY omq.created_at DESC LIMIT 1
+      `).bind(request.plantId).first();
+    }
+    
+    if (!mission) return createEmptyAuditQualiteData();
+    
+    const missionId = (mission as any).id;
+    
+    // Stats SOL
+    const solStats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN conformite = 'conforme' THEN 1 ELSE 0 END) as conformes,
+        SUM(CASE WHEN conformite = 'non_conforme' THEN 1 ELSE 0 END) as non_conformes,
+        SUM(CASE WHEN conformite = 'observation' THEN 1 ELSE 0 END) as observations
+      FROM aq_checklist_items WHERE mission_id = ?
+    `).bind(missionId).first();
+    
+    // Stats TOITURE
+    const toitureStats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN conformite = 'conforme' THEN 1 ELSE 0 END) as conformes,
+        SUM(CASE WHEN conformite = 'non_conforme' THEN 1 ELSE 0 END) as non_conformes,
+        SUM(CASE WHEN conformite = 'observation' THEN 1 ELSE 0 END) as observations
+      FROM aq_checklist_items_toiture WHERE mission_id = ?
+    `).bind(missionId).first();
+    
+    // Items critiques non-conformes
+    const criticalSol = await DB.prepare(`
+      SELECT code_item, libelle, categorie, severite, norme_reference
+      FROM aq_checklist_items 
+      WHERE mission_id = ? AND conformite = 'non_conforme' AND severite = 'critique'
+      ORDER BY ordre_affichage
+    `).bind(missionId).all();
+    
+    const criticalToiture = await DB.prepare(`
+      SELECT code_item, libelle, categorie, severite, norme_reference
+      FROM aq_checklist_items_toiture
+      WHERE mission_id = ? AND conformite = 'non_conforme' AND severite = 'critique'
+      ORDER BY ordre_affichage
+    `).bind(missionId).all();
+    
+    // Commentaires finaux
+    const commentaire = await DB.prepare(`
+      SELECT conclusion_generale, recommandations FROM aq_commentaires_finaux WHERE mission_id = ?
+    `).bind(missionId).first();
+    
+    const solTotal = (solStats?.total as number) || 0;
+    const solConformes = (solStats?.conformes as number) || 0;
+    const solNc = (solStats?.non_conformes as number) || 0;
+    const solObs = (solStats?.observations as number) || 0;
+    
+    const toitureTotal = (toitureStats?.total as number) || 0;
+    const toitureConformes = (toitureStats?.conformes as number) || 0;
+    const toitureNc = (toitureStats?.non_conformes as number) || 0;
+    const toitureObs = (toitureStats?.observations as number) || 0;
+    
+    const totalAll = solTotal + toitureTotal;
+    const conformesAll = solConformes + toitureConformes;
+    const scoreGlobal = totalAll > 0 ? Math.round((conformesAll / totalAll) * 10000) / 100 : 0;
+    
+    const techName = (mission as any).technicien_prenom && (mission as any).technicien_nom
+      ? `${(mission as any).technicien_prenom} ${(mission as any).technicien_nom}`
+      : null;
+    
+    const criticalItems = [
+      ...criticalSol.results.map((i: any) => ({ code: i.code_item, libelle: i.libelle, categorie: i.categorie, severite: i.severite, norme: i.norme_reference, type: 'sol' as const })),
+      ...criticalToiture.results.map((i: any) => ({ code: i.code_item, libelle: i.libelle, categorie: i.categorie, severite: i.severite, norme: i.norme_reference, type: 'toiture' as const }))
+    ];
+    
+    return {
+      hasData: solTotal > 0 || toitureTotal > 0,
+      missionId,
+      reference: (mission as any).reference || '',
+      typeAudit: (mission as any).type_audit || 'SOL',
+      missionDate: (mission as any).date_planifiee || (mission as any).created_at,
+      technicianName: techName,
+      solChecklist: {
+        totalItems: solTotal,
+        conformes: solConformes,
+        nonConformes: solNc,
+        observations: solObs,
+        conformityRate: solTotal > 0 ? Math.round((solConformes / solTotal) * 10000) / 100 : 0
+      },
+      toitureChecklist: {
+        totalItems: toitureTotal,
+        conformes: toitureConformes,
+        nonConformes: toitureNc,
+        observations: toitureObs,
+        conformityRate: toitureTotal > 0 ? Math.round((toitureConformes / toitureTotal) * 10000) / 100 : 0
+      },
+      scoreGlobal,
+      nbNonConformites: solNc + toitureNc,
+      nbObservations: solObs + toitureObs,
+      criticalItems,
+      conclusion: (commentaire as any)?.conclusion_generale || null,
+      recommendations: (commentaire as any)?.recommandations || null
+    };
+    
+  } catch (error) {
+    console.error('Erreur agrégation Audit Qualité:', error);
+    return createEmptyAuditQualiteData();
+  }
+}
+
+function createEmptyAuditQualiteData(): AuditQualiteModuleData {
+  return {
+    hasData: false,
+    missionId: null,
+    reference: '',
+    typeAudit: '',
+    missionDate: '',
+    technicianName: null,
+    solChecklist: { totalItems: 0, conformes: 0, nonConformes: 0, observations: 0, conformityRate: 0 },
+    toitureChecklist: { totalItems: 0, conformes: 0, nonConformes: 0, observations: 0, conformityRate: 0 },
+    scoreGlobal: 0,
+    nbNonConformites: 0,
+    nbObservations: 0,
+    criticalItems: [],
+    conclusion: null,
+    recommendations: null
+  };
+}
+
+// ============================================================================
+// MODULE TEST DIODES BYPASS
+// ============================================================================
+
+async function aggregateDiodeTestModule(
+  DB: D1Database,
+  request: GenerateUnifiedReportRequest
+): Promise<DiodeTestModuleData> {
+  
+  try {
+    let session;
+    if (request.diodeSessionToken) {
+      session = await DB.prepare(`
+        SELECT * FROM diode_test_sessions WHERE session_token = ?
+      `).bind(request.diodeSessionToken).first();
+    } else if (request.auditElToken) {
+      session = await DB.prepare(`
+        SELECT * FROM diode_test_sessions WHERE audit_token = ? ORDER BY created_at DESC LIMIT 1
+      `).bind(request.auditElToken).first();
+    } else if (request.plantId) {
+      session = await DB.prepare(`
+        SELECT * FROM diode_test_sessions WHERE (plant_id = ? OR project_id = ?) ORDER BY created_at DESC LIMIT 1
+      `).bind(request.plantId, request.plantId).first();
+    }
+    
+    if (!session) return createEmptyDiodeTestData();
+    
+    const sessionId = (session as any).id;
+    
+    // Stats
+    const stats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'ok' THEN 1 ELSE 0 END) as ok,
+        SUM(CASE WHEN status = 'defective' THEN 1 ELSE 0 END) as defective,
+        SUM(CASE WHEN status = 'suspect' THEN 1 ELSE 0 END) as suspect,
+        MAX(temperature_diode) as max_temp,
+        MAX(delta_t) as max_delta_t
+      FROM diode_test_results WHERE session_id = ?
+    `).bind(sessionId).first();
+    
+    // Défauts critiques
+    const criticalDefects = await DB.prepare(`
+      SELECT module_identifier, diode_position, defect_type, severity, temperature_diode, delta_t, observation
+      FROM diode_test_results 
+      WHERE session_id = ? AND (status = 'defective' AND severity IN ('critical', 'major'))
+      ORDER BY severity, module_identifier LIMIT 20
+    `).bind(sessionId).all();
+    
+    const total = (stats?.total as number) || 0;
+    const ok = (stats?.ok as number) || 0;
+    const defective = (stats?.defective as number) || 0;
+    const suspect = (stats?.suspect as number) || 0;
+    const conformityRate = total > 0 ? Math.round((ok / total) * 10000) / 100 : 0;
+    
+    return {
+      hasData: total > 0,
+      sessionToken: (session as any).session_token,
+      method: (session as any).method || 'thermal',
+      testDate: (session as any).test_date || (session as any).created_at,
+      technicianName: (session as any).technician_name || null,
+      totalDiodesTested: total,
+      diodesOk: ok,
+      diodesDefective: defective,
+      diodesSuspect: suspect,
+      conformityRate,
+      criticalDefects: criticalDefects.results.map((d: any) => ({
+        moduleIdentifier: d.module_identifier || '?',
+        diodePosition: d.diode_position || 'D?',
+        defectType: d.defect_type || 'unknown',
+        severity: d.severity,
+        temperatureDiode: d.temperature_diode,
+        deltaT: d.delta_t,
+        observation: d.observation
+      })),
+      maxTemperature: (stats?.max_temp as number) || null,
+      maxDeltaT: (stats?.max_delta_t as number) || null
+    };
+    
+  } catch (error) {
+    console.error('Erreur agrégation Diodes:', error);
+    return createEmptyDiodeTestData();
+  }
+}
+
+function createEmptyDiodeTestData(): DiodeTestModuleData {
+  return {
+    hasData: false,
+    sessionToken: '',
+    method: '',
+    testDate: '',
+    technicianName: null,
+    totalDiodesTested: 0,
+    diodesOk: 0,
+    diodesDefective: 0,
+    diodesSuspect: 0,
+    conformityRate: 0,
+    criticalDefects: [],
+    maxTemperature: null,
+    maxDeltaT: null
+  };
 }
