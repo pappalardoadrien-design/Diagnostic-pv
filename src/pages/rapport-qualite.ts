@@ -134,7 +134,6 @@ export function getRapportQualitePage(rapportId: string) {
         html += '<tr><td class="py-1 text-slate-500 font-medium">Reference</td><td class="py-1 font-bold text-slate-800">' + (mission?.reference || '-') + '</td></tr>';
         html += '<tr><td class="py-1 text-slate-500 font-medium">Date planifiee</td><td class="py-1 font-bold text-slate-800">' + (mission?.date_planifiee ? new Date(mission.date_planifiee).toLocaleDateString('fr-FR') : '-') + '</td></tr>';
         html += '<tr><td class="py-1 text-slate-500 font-medium">Technicien</td><td class="py-1 font-bold text-slate-800">' + (mission?.technicien_name || 'Adrien PAPPALARDO') + '</td></tr>';
-        html += '<tr><td class="py-1 text-slate-500 font-medium">Sous-traitant</td><td class="py-1 font-bold text-slate-800">' + (mission?.sous_traitant_name || 'DiagPV (interne)') + '</td></tr>';
         html += '</table></div>';
         
         html += '<div class="bg-slate-50 rounded-lg p-4">';

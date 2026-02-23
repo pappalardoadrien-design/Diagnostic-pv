@@ -46,10 +46,7 @@
  * GET    /stats                          - Stats globales audit qualité
  * GET    /stats/kpi                      - KPI pour dashboard CRM
  * 
- * --- Sous-traitants & Techniciens ---
- * GET    /sous-traitants                 - Liste sous-traitants
- * POST   /sous-traitants                 - Créer sous-traitant
- * PUT    /sous-traitants/:id             - Modifier sous-traitant
+ * --- Techniciens ---
  * GET    /techniciens                    - Liste techniciens
  * POST   /techniciens                    - Créer technicien
  * PUT    /techniciens/:id                - Modifier technicien
@@ -177,7 +174,7 @@ auditQualiteRoutes.post('/missions', async (c) => {
     const { DB } = c.env;
     const body = await c.req.json();
     
-    const { project_id, client_id, technicien_id, sous_traitant_id, type_audit, priorite, date_planifiee, meteo, temperature_ambiante, irradiance, commentaire_general, notes_internes } = body;
+    const { project_id, client_id, technicien_id, type_audit, priorite, date_planifiee, meteo, temperature_ambiante, irradiance, commentaire_general, notes_internes } = body;
     
     if (!project_id) return c.json({ error: 'project_id requis' }, 400);
     
@@ -190,10 +187,10 @@ auditQualiteRoutes.post('/missions', async (c) => {
     
     const result = await DB.prepare(`
       INSERT INTO ordres_mission_qualite 
-        (project_id, client_id, technicien_id, sous_traitant_id, type_audit, priorite, date_planifiee, meteo, temperature_ambiante, irradiance, commentaire_general, notes_internes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (project_id, client_id, technicien_id, type_audit, priorite, date_planifiee, meteo, temperature_ambiante, irradiance, commentaire_general, notes_internes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      project_id, finalClientId, technicien_id || null, sous_traitant_id || null,
+      project_id, finalClientId, technicien_id || null,
       type_audit || 'SOL', priorite || 'normale', date_planifiee || null,
       meteo || null, temperature_ambiante || null, irradiance || null,
       commentaire_general || null, notes_internes || null
@@ -259,7 +256,7 @@ auditQualiteRoutes.put('/missions/:id', async (c) => {
     const fields: string[] = [];
     const values: any[] = [];
     
-    const allowedFields = ['technicien_id', 'sous_traitant_id', 'type_audit', 'priorite', 'date_planifiee', 'meteo', 'temperature_ambiante', 'irradiance', 'commentaire_general', 'notes_internes', 'score_global'];
+    const allowedFields = ['technicien_id', 'type_audit', 'priorite', 'date_planifiee', 'meteo', 'temperature_ambiante', 'irradiance', 'commentaire_general', 'notes_internes', 'score_global'];
     
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
@@ -939,76 +936,16 @@ auditQualiteRoutes.get('/stats/kpi', async (c) => {
 });
 
 // ============================================================================
-// SOUS-TRAITANTS
-// ============================================================================
-
-auditQualiteRoutes.get('/sous-traitants', async (c) => {
-  try {
-    const { DB } = c.env;
-    const { statut } = c.req.query();
-    let query = 'SELECT * FROM sous_traitants';
-    const params: any[] = [];
-    if (statut) { query += ' WHERE statut = ?'; params.push(statut); }
-    query += ' ORDER BY nom';
-    const result = params.length ? await DB.prepare(query).bind(...params).all() : await DB.prepare(query).all();
-    return c.json({ success: true, sous_traitants: result.results });
-  } catch (error: any) {
-    return c.json({ error: 'Erreur sous-traitants', details: error.message }, 500);
-  }
-});
-
-auditQualiteRoutes.post('/sous-traitants', async (c) => {
-  try {
-    const { DB } = c.env;
-    const body = await c.req.json();
-    const { nom, siret, contact_nom, contact_email, contact_telephone, specialite, zone_intervention, notes } = body;
-    if (!nom) return c.json({ error: 'nom requis' }, 400);
-    
-    const result = await DB.prepare(`
-      INSERT INTO sous_traitants (nom, siret, contact_nom, contact_email, contact_telephone, specialite, zone_intervention, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(nom, siret || null, contact_nom || null, contact_email || null, contact_telephone || null, specialite || null, zone_intervention || null, notes || null).run();
-    
-    return c.json({ success: true, id: result.meta.last_row_id }, 201);
-  } catch (error: any) {
-    return c.json({ error: 'Erreur création sous-traitant', details: error.message }, 500);
-  }
-});
-
-auditQualiteRoutes.put('/sous-traitants/:id', async (c) => {
-  try {
-    const { DB } = c.env;
-    const id = c.req.param('id');
-    const body = await c.req.json();
-    const fields: string[] = [];
-    const values: any[] = [];
-    
-    for (const key of ['nom', 'siret', 'contact_nom', 'contact_email', 'contact_telephone', 'specialite', 'zone_intervention', 'statut', 'notes']) {
-      if (body[key] !== undefined) { fields.push(`${key} = ?`); values.push(body[key]); }
-    }
-    if (!fields.length) return c.json({ error: 'Aucun champ' }, 400);
-    
-    fields.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(id);
-    await DB.prepare(`UPDATE sous_traitants SET ${fields.join(', ')} WHERE id = ?`).bind(...values).run();
-    return c.json({ success: true });
-  } catch (error: any) {
-    return c.json({ error: 'Erreur modification', details: error.message }, 500);
-  }
-});
-
-// ============================================================================
 // TECHNICIENS
 // ============================================================================
 
 auditQualiteRoutes.get('/techniciens', async (c) => {
   try {
     const { DB } = c.env;
-    const { statut, sous_traitant_id } = c.req.query();
-    let query = `SELECT t.*, COALESCE(st.nom, 'DiagPV (interne)') as sous_traitant_name FROM techniciens t LEFT JOIN sous_traitants st ON t.sous_traitant_id = st.id WHERE 1=1`;
+    const { statut } = c.req.query();
+    let query = `SELECT t.* FROM techniciens t WHERE 1=1`;
     const params: any[] = [];
     if (statut) { query += ' AND t.statut = ?'; params.push(statut); }
-    if (sous_traitant_id) { query += ' AND t.sous_traitant_id = ?'; params.push(sous_traitant_id); }
     query += ' ORDER BY t.nom, t.prenom';
     const result = params.length ? await DB.prepare(query).bind(...params).all() : await DB.prepare(query).all();
     return c.json({ success: true, techniciens: result.results });
@@ -1021,14 +958,14 @@ auditQualiteRoutes.post('/techniciens', async (c) => {
   try {
     const { DB } = c.env;
     const body = await c.req.json();
-    const { sous_traitant_id, nom, prenom, email, telephone, qualification, certifications, notes } = body;
+    const { nom, prenom, email, telephone, qualification, certifications, notes } = body;
     if (!nom || !prenom) return c.json({ error: 'nom et prenom requis' }, 400);
     
     const result = await DB.prepare(`
-      INSERT INTO techniciens (sous_traitant_id, nom, prenom, email, telephone, qualification, certifications, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO techniciens (nom, prenom, email, telephone, qualification, certifications, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      sous_traitant_id || null, nom, prenom, email || null, telephone || null, 
+      nom, prenom, email || null, telephone || null, 
       qualification || null, Array.isArray(certifications) ? JSON.stringify(certifications) : certifications || null, 
       notes || null
     ).run();
@@ -1047,7 +984,7 @@ auditQualiteRoutes.put('/techniciens/:id', async (c) => {
     const fields: string[] = [];
     const values: any[] = [];
     
-    for (const key of ['sous_traitant_id', 'nom', 'prenom', 'email', 'telephone', 'qualification', 'certifications', 'statut', 'notes']) {
+    for (const key of ['nom', 'prenom', 'email', 'telephone', 'qualification', 'certifications', 'statut', 'notes']) {
       if (body[key] !== undefined) { 
         fields.push(`${key} = ?`); 
         values.push(key === 'certifications' && Array.isArray(body[key]) ? JSON.stringify(body[key]) : body[key]); 
