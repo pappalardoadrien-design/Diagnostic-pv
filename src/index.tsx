@@ -35,6 +35,7 @@ import adminRoutes from './modules/admin/routes'
 import diagnosticRoutes from './modules/admin/diagnostic-routes'
 import auditQualiteRoutes from './modules/audit-qualite/routes'
 import diodeTestRoutes from './modules/diode-tests/routes'
+import pvservDarkRoutes from './modules/iv-curves/pvserv-dark-routes'
 
 // === PAGES (frontend HTML) ===
 import { getRapportsPage } from './pages/rapports.js'
@@ -68,6 +69,7 @@ import { getElAuditTerrainPage } from './pages/el-audit-terrain'
 import { getToolsPage } from './pages/tools'
 import { getAuditQualitePage, getAuditQualitePhotosPage } from './pages/audit-qualite'
 import { getRapportQualitePage } from './pages/rapport-qualite'
+import { getPvservDarkPage } from './pages/pvserv-dark'
 
 // ============================================================================
 // APP SETUP
@@ -115,6 +117,7 @@ app.route('/api/audit', pvservLegacyRoutes)
 app.route('/api/diagnostic', diagnosticRoutes)
 app.route('/api/audit-qualite', auditQualiteRoutes)
 app.route('/api/diode-tests', diodeTestRoutes)
+app.route('/api/pvserv', pvservDarkRoutes)
 app.route('/admin', adminRoutes)
 app.route('/', designerModule)
 app.route('/crm/unified', crmUnifiedViewPage)
@@ -169,6 +172,8 @@ app.get('/rapports', (c) => c.html(getRapportsPage()))
 app.get('/rapports/custom', (c) => c.html(getRapportsCustomPage()))
 app.get('/iv-curves', (c) => c.html(getIVCurvesPage()))
 app.get('/iv', (c) => c.redirect('/iv-curves'))
+app.get('/pvserv-dark', (c) => c.html(getPvservDarkPage()))
+app.get('/dark-iv', (c) => c.redirect('/pvserv-dark'))
 app.get('/visual', (c) => c.html(getVisualPage()))
 app.get('/isolation', (c) => c.html(getIsolationPage()))
 app.get('/thermal', (c) => c.html(getThermalPage()))

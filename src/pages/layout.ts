@@ -108,6 +108,10 @@ export const getLayout = (title: string, content: string, activeMenu: string = '
                 <i class="fas fa-wave-square w-6 text-center text-slate-500"></i>
                 <span class="font-medium">Courbes I-V</span>
             </a>
+            <a href="/pvserv-dark" class="sidebar-link flex items-center px-4 py-2.5 rounded-lg text-sm ${activeMenu === 'pvserv-dark' ? 'active' : ''}">
+                <i class="fas fa-sd-card w-6 text-center ${activeMenu === 'pvserv-dark' ? 'text-purple-400' : 'text-slate-500'}"></i>
+                <span class="font-medium">Courbes Sombres</span>
+            </a>
             <a href="/thermal" class="sidebar-link flex items-center px-4 py-2.5 rounded-lg text-sm ${activeMenu === 'audit-thermal' ? 'active' : ''}">
                 <i class="fas fa-temperature-high w-6 text-center text-slate-500"></i>
                 <span class="font-medium">Thermographie</span>
