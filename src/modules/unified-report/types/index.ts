@@ -178,6 +178,47 @@ export interface AuditQualiteModuleData {
 }
 
 // ============================================================================
+// MODULE PVSERV DARK IV (COURBES SOMBRES)
+// ============================================================================
+
+export interface PVServDarkModuleData {
+  hasData: boolean;
+  sessionToken: string;
+  sourceFilename: string;
+  deviceName: string | null;
+  serialNumber: string | null;
+  technicianName: string | null;
+  importDate: string;
+  // Strings
+  stringCount: number;
+  avgFF_strings: number;
+  avgRds_strings: number;
+  avgUf_strings: number;
+  minFF_strings: number;
+  maxFF_strings: number;
+  // Diodes
+  diodeCount: number;
+  avgFF_diodes: number;
+  avgRds_diodes: number;
+  avgUf_diodes: number;
+  minFF_diodes: number;
+  maxFF_diodes: number;
+  // Anomalies
+  anomalyCount: number;
+  criticalCount: number;
+  warningCount: number;
+  anomalies: Array<{
+    measurementNumber: number;
+    curveType: string;
+    anomalyType: string;
+    severity: string;
+    message: string;
+    fillFactor: number;
+    rds: number;
+  }>;
+}
+
+// ============================================================================
 // MODULE TEST DIODES BYPASS
 // ============================================================================
 
@@ -228,6 +269,7 @@ export interface UnifiedReportData {
   thermalModule: ThermalModuleData;
   auditQualiteModule: AuditQualiteModuleData;
   diodeTestModule: DiodeTestModuleData;
+  pvservDarkModule: PVServDarkModuleData;
   modules: { // Structure flexible pour extension
       photos?: { enabled: boolean; count: number; data: PhotosModuleData };
   };
@@ -271,7 +313,8 @@ export interface GenerateUnifiedReportRequest {
   inspectionToken?: string; // Si rapport basé sur inspection visuelle
   missionQualiteId?: number; // Si rapport basé sur mission audit qualité
   diodeSessionToken?: string; // Si rapport basé sur session test diodes
-  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal' | 'photos' | 'audit_qualite' | 'diodes')[];
+  pvservSessionToken?: string; // Si rapport basé sur session PVServ Dark
+  includeModules?: ('el' | 'iv' | 'visual' | 'isolation' | 'thermal' | 'photos' | 'audit_qualite' | 'diodes' | 'pvserv_dark')[];
   generatedBy?: string;
   additionalNotes?: string;
   // Extra fields used by route handler
@@ -311,6 +354,7 @@ export interface PreviewAvailableDataResponse {
     thermal: boolean;
     audit_qualite: boolean;
     diodes: boolean;
+    pvserv_dark: boolean;
   };
   dataSummary: {
     elAuditsCount: number;
@@ -320,6 +364,7 @@ export interface PreviewAvailableDataResponse {
     thermalReportsCount: number;
     auditQualiteCount: number;
     diodeSessionsCount: number;
+    pvservDarkCount: number;
   };
 }
 
@@ -329,7 +374,7 @@ export interface PreviewAvailableDataResponse {
 
 /**
  * Calcule conformité globale (moyenne pondérée modules disponibles)
- * Pondérations: EL=25, Visual=20, Isolation=15, IV=15, AuditQualité=15, Diodes=10
+ * Pondérations: EL=25, Visual=20, Isolation=15, IV=10, AuditQualité=15, Diodes=5, PVServDark=10
  */
 export function calculateOverallConformity(report: UnifiedReportData): number {
   let totalWeight = 0;
@@ -353,11 +398,11 @@ export function calculateOverallConformity(report: UnifiedReportData): number {
     weightedSum += report.isolationModule.conformityRate * 15;
   }
   
-  // Module IV: poids 15
+  // Module IV: poids 10
   if (report.ivModule.hasData) {
     const ivConformity = ((report.ivModule.totalCurves - report.ivModule.outOfToleranceCount) / report.ivModule.totalCurves) * 100;
-    totalWeight += 15;
-    weightedSum += ivConformity * 15;
+    totalWeight += 10;
+    weightedSum += ivConformity * 10;
   }
   
   // Module Audit Qualité: poids 15
@@ -366,10 +411,21 @@ export function calculateOverallConformity(report: UnifiedReportData): number {
     weightedSum += report.auditQualiteModule.scoreGlobal * 15;
   }
   
-  // Module Test Diodes: poids 10
+  // Module Test Diodes: poids 5
   if (report.diodeTestModule.hasData) {
+    totalWeight += 5;
+    weightedSum += report.diodeTestModule.conformityRate * 5;
+  }
+  
+  // Module PVServ Dark: poids 10
+  if (report.pvservDarkModule.hasData) {
+    // Conformité basée sur % de courbes sans anomalie
+    const totalCurves = report.pvservDarkModule.stringCount + report.pvservDarkModule.diodeCount;
+    const pvservConformity = totalCurves > 0 
+      ? ((totalCurves - report.pvservDarkModule.anomalyCount) / totalCurves) * 100 
+      : 100;
     totalWeight += 10;
-    weightedSum += report.diodeTestModule.conformityRate * 10;
+    weightedSum += pvservConformity * 10;
   }
   
   if (totalWeight === 0) return 0;
@@ -413,6 +469,9 @@ export function requiresUrgentAction(report: UnifiedReportData): boolean {
   
   // Diodes défectueuses critiques
   if (report.diodeTestModule.hasData && report.diodeTestModule.criticalDefects.length > 0) return true;
+  
+  // Anomalies critiques PVServ Dark
+  if (report.pvservDarkModule.hasData && report.pvservDarkModule.criticalCount > 0) return true;
   
   return false;
 }

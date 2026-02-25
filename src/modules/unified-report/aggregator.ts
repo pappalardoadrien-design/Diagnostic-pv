@@ -31,10 +31,10 @@ export async function aggregateUnifiedReportData(
 ): Promise<UnifiedReportData> {
   
   const reportToken = generateReportToken();
-  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos', 'audit_qualite', 'diodes'];
+  const includeModules = request.includeModules || ['el', 'iv', 'visual', 'isolation', 'thermal', 'photos', 'audit_qualite', 'diodes', 'pvserv_dark'];
   
   // Agrégation parallèle
-  const [elData, ivData, visualData, isolationData, thermalData, photosData, fieldNotes, auditQualiteData, diodeTestData] = await Promise.all([
+  const [elData, ivData, visualData, isolationData, thermalData, photosData, fieldNotes, auditQualiteData, diodeTestData, pvservDarkData] = await Promise.all([
     includeModules.includes('el') ? aggregateELModule(DB, request) : createEmptyELData(),
     includeModules.includes('iv') ? aggregateIVModule(DB, request) : createEmptyIVData(),
     includeModules.includes('visual') ? aggregateVisualModule(DB, request) : createEmptyVisualData(),
@@ -43,12 +43,13 @@ export async function aggregateUnifiedReportData(
     includeModules.includes('photos') ? aggregatePhotosModule(DB, request) : createEmptyPhotosData(),
     getAuditNotes(DB, request),
     includeModules.includes('audit_qualite') ? aggregateAuditQualiteModule(DB, request) : createEmptyAuditQualiteData(),
-    includeModules.includes('diodes') ? aggregateDiodeTestModule(DB, request) : createEmptyDiodeTestData()
+    includeModules.includes('diodes') ? aggregateDiodeTestModule(DB, request) : createEmptyDiodeTestData(),
+    includeModules.includes('pvserv_dark') ? aggregatePVServDarkModule(DB, request) : createEmptyPVServDarkData()
   ]);
   
   // Calcul synthèse globale
   const totalModules = elData.hasData ? elData.totalModules : 0;
-  const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0) + (auditQualiteData.criticalItems?.length || 0) + (diodeTestData.criticalDefects?.length || 0);
+  const criticalCount = (elData.criticalDefects?.length || 0) + (visualData.criticalDefectsCount || 0) + (auditQualiteData.criticalItems?.length || 0) + (diodeTestData.criticalDefects?.length || 0) + (pvservDarkData.criticalCount || 0);
   const majorCount = (visualData.defects?.filter(d => d.severity === 'major').length || 0) + (auditQualiteData.nbNonConformites || 0);
   const minorCount = (visualData.defects?.filter(d => d.severity === 'minor').length || 0) + (auditQualiteData.nbObservations || 0);
   
@@ -69,6 +70,7 @@ export async function aggregateUnifiedReportData(
     thermalModule: thermalData,
     auditQualiteModule: auditQualiteData,
     diodeTestModule: diodeTestData,
+    pvservDarkModule: pvservDarkData,
 
     modules: {
         photos: {
@@ -816,6 +818,21 @@ function generateRecommendations(report: UnifiedReportData) {
     });
   }
   
+  // Recommandations PVServ Dark (Courbes Sombres)
+  if (report.pvservDarkModule.hasData && report.pvservDarkModule.anomalyCount > 0) {
+    const anomalyDetails = report.pvservDarkModule.anomalies
+      .map(a => `${a.curveType} Nr.${a.measurementNumber}: ${a.message}`)
+      .join('; ');
+    recommendations.push({
+      priority: report.pvservDarkModule.criticalCount > 0 ? 'urgent' : 'high',
+      category: 'performance',
+      title: `${report.pvservDarkModule.anomalyCount} anomalie(s) sur courbes sombres PVServ`,
+      description: `Analyse de ${report.pvservDarkModule.stringCount} strings et ${report.pvservDarkModule.diodeCount} diodes bypass: ${anomalyDetails}`,
+      estimatedImpact: null,
+      deadline: report.pvservDarkModule.criticalCount > 0 ? '2 semaines' : '1 mois'
+    });
+  }
+  
   // Recommandation générale maintenance
   if (report.summary.overallConformityRate < 80) {
     recommendations.push({
@@ -1084,5 +1101,132 @@ function createEmptyDiodeTestData(): DiodeTestModuleData {
     criticalDefects: [],
     maxTemperature: null,
     maxDeltaT: null
+  };
+}
+
+// ============================================================================
+// MODULE PVSERV DARK IV (COURBES SOMBRES)
+// ============================================================================
+
+async function aggregatePVServDarkModule(
+  DB: D1Database,
+  request: GenerateUnifiedReportRequest
+): Promise<PVServDarkModuleData> {
+  
+  try {
+    let session;
+    
+    // Priorité 1 : Token de session PVServ direct
+    if (request.pvservSessionToken) {
+      session = await DB.prepare(`
+        SELECT * FROM pvserv_import_sessions WHERE session_token = ?
+      `).bind(request.pvservSessionToken).first();
+    }
+    // Priorité 2 : Via audit_token (liaison EL)
+    else if (request.auditElToken) {
+      session = await DB.prepare(`
+        SELECT * FROM pvserv_import_sessions WHERE audit_token = ? ORDER BY created_at DESC LIMIT 1
+      `).bind(request.auditElToken).first();
+    }
+    // Priorité 3 : Via plantId (= project_id)
+    else if (request.plantId) {
+      session = await DB.prepare(`
+        SELECT * FROM pvserv_import_sessions WHERE project_id = ? ORDER BY created_at DESC LIMIT 1
+      `).bind(request.plantId).first();
+    }
+    
+    if (!session) return createEmptyPVServDarkData();
+    
+    const s = session as any;
+    
+    // Récupérer les anomalies détaillées
+    const anomalies = await DB.prepare(`
+      SELECT measurement_number, curve_type, fill_factor, rds, uf,
+             anomaly_type, anomaly_severity, anomaly_message
+      FROM pvserv_dark_curves 
+      WHERE session_id = ? AND anomaly_detected = 1
+      ORDER BY anomaly_severity DESC, curve_type, measurement_number
+    `).bind(s.id).all();
+    
+    // Stats FF min/max strings
+    const stringStats = await DB.prepare(`
+      SELECT MIN(fill_factor) as min_ff, MAX(fill_factor) as max_ff
+      FROM pvserv_dark_curves WHERE session_id = ? AND curve_type = 'string'
+    `).bind(s.id).first();
+    
+    // Stats FF min/max diodes
+    const diodeStats = await DB.prepare(`
+      SELECT MIN(fill_factor) as min_ff, MAX(fill_factor) as max_ff
+      FROM pvserv_dark_curves WHERE session_id = ? AND curve_type = 'diode'
+    `).bind(s.id).first();
+    
+    return {
+      hasData: true,
+      sessionToken: s.session_token,
+      sourceFilename: s.source_filename || '',
+      deviceName: s.device_name || null,
+      serialNumber: s.serial_number || null,
+      technicianName: s.technician_name || null,
+      importDate: s.created_at,
+      // Strings
+      stringCount: s.string_count || 0,
+      avgFF_strings: s.avg_ff_strings || 0,
+      avgRds_strings: s.avg_rds_strings || 0,
+      avgUf_strings: s.avg_uf_strings || 0,
+      minFF_strings: (stringStats as any)?.min_ff || 0,
+      maxFF_strings: (stringStats as any)?.max_ff || 0,
+      // Diodes
+      diodeCount: s.diode_count || 0,
+      avgFF_diodes: s.avg_ff_diodes || 0,
+      avgRds_diodes: s.avg_rds_diodes || 0,
+      avgUf_diodes: s.avg_uf_diodes || 0,
+      minFF_diodes: (diodeStats as any)?.min_ff || 0,
+      maxFF_diodes: (diodeStats as any)?.max_ff || 0,
+      // Anomalies
+      anomalyCount: s.anomaly_count || 0,
+      criticalCount: s.critical_count || 0,
+      warningCount: s.warning_count || 0,
+      anomalies: (anomalies.results || []).map((a: any) => ({
+        measurementNumber: a.measurement_number,
+        curveType: a.curve_type,
+        anomalyType: a.anomaly_type || 'unknown',
+        severity: a.anomaly_severity || 'warning',
+        message: a.anomaly_message || 'Anomalie détectée',
+        fillFactor: a.fill_factor,
+        rds: a.rds,
+      }))
+    };
+    
+  } catch (error) {
+    console.error('Erreur agrégation PVServ Dark:', error);
+    return createEmptyPVServDarkData();
+  }
+}
+
+function createEmptyPVServDarkData(): PVServDarkModuleData {
+  return {
+    hasData: false,
+    sessionToken: '',
+    sourceFilename: '',
+    deviceName: null,
+    serialNumber: null,
+    technicianName: null,
+    importDate: '',
+    stringCount: 0,
+    avgFF_strings: 0,
+    avgRds_strings: 0,
+    avgUf_strings: 0,
+    minFF_strings: 0,
+    maxFF_strings: 0,
+    diodeCount: 0,
+    avgFF_diodes: 0,
+    avgRds_diodes: 0,
+    avgUf_diodes: 0,
+    minFF_diodes: 0,
+    maxFF_diodes: 0,
+    anomalyCount: 0,
+    criticalCount: 0,
+    warningCount: 0,
+    anomalies: []
   };
 }

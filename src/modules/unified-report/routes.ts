@@ -29,10 +29,10 @@ unifiedReportRoutes.post('/generate', async (c) => {
     const request: GenerateUnifiedReportRequest = await c.req.json();
     
     // Validation
-    if (!request.plantId && !request.auditElToken && !request.inspectionToken && !request.missionQualiteId && !request.diodeSessionToken) {
+    if (!request.plantId && !request.auditElToken && !request.inspectionToken && !request.missionQualiteId && !request.diodeSessionToken && !request.pvservSessionToken) {
       return c.json({
         success: false,
-        error: 'Au moins un identifiant requis (plantId, auditElToken, inspectionToken, missionQualiteId, ou diodeSessionToken)'
+        error: 'Au moins un identifiant requis (plantId, auditElToken, inspectionToken, missionQualiteId, diodeSessionToken, ou pvservSessionToken)'
       }, 400);
     }
     
@@ -46,7 +46,8 @@ unifiedReportRoutes.post('/generate', async (c) => {
                        reportData.isolationModule.hasData || 
                        reportData.thermalModule.hasData ||
                        reportData.auditQualiteModule.hasData ||
-                       reportData.diodeTestModule.hasData;
+                       reportData.diodeTestModule.hasData ||
+                       reportData.pvservDarkModule.hasData;
     
     if (!hasAnyData) {
       return c.json({
@@ -67,6 +68,7 @@ unifiedReportRoutes.post('/generate', async (c) => {
     if (reportData.thermalModule.hasData) modulesIncluded.push('thermal');
     if (reportData.auditQualiteModule.hasData) modulesIncluded.push('audit_qualite');
     if (reportData.diodeTestModule.hasData) modulesIncluded.push('diodes');
+    if (reportData.pvservDarkModule.hasData) modulesIncluded.push('pvserv_dark');
     
     await DB.prepare(`
       INSERT INTO unified_reports (
@@ -155,128 +157,124 @@ unifiedReportRoutes.get('/preview', async (c) => {
     }
     
     // Compter données disponibles par module
-    let elCount = 0, ivCount = 0, visualCount = 0, isolationCount = 0, thermalCount = 0, auditQualiteCount = 0, diodeSessionsCount = 0;
+    let elCount = 0, ivCount = 0, visualCount = 0, isolationCount = 0, thermalCount = 0, auditQualiteCount = 0, diodeSessionsCount = 0, pvservDarkCount = 0;
     let plantName = null;
     
     // Module EL
     if (auditElToken) {
-      const elAudit = await DB.prepare(`
-        SELECT project_name FROM el_audits WHERE audit_token = ?
-      `).bind(auditElToken).first();
-      
-      if (elAudit) {
-        elCount = 1;
-        plantName = (elAudit as any).project_name;
-      }
+      try {
+        const elAudit = await DB.prepare(`
+          SELECT project_name FROM el_audits WHERE audit_token = ?
+        `).bind(auditElToken).first();
+        
+        if (elAudit) {
+          elCount = 1;
+          plantName = (elAudit as any).project_name;
+        }
+      } catch (e) { /* table may not exist */ }
     } else if (plantId) {
-      const elAudits = await DB.prepare(`
-        SELECT COUNT(*) as count, ea.project_name 
-        FROM el_audits ea
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ? 
-        GROUP BY ea.project_name
-      `).bind(plantId).first();
-      
-      if (elAudits) {
-        elCount = (elAudits as any).count || 0;
-        plantName = (elAudits as any).project_name;
-      }
+      try {
+        // Try direct plant_id lookup first (simpler, no join table needed)
+        const elAudits = await DB.prepare(`
+          SELECT COUNT(*) as count, project_name 
+          FROM el_audits 
+          WHERE plant_id = ?
+          GROUP BY project_name
+        `).bind(plantId).first();
+        
+        if (elAudits) {
+          elCount = (elAudits as any).count || 0;
+          plantName = (elAudits as any).project_name;
+        }
+      } catch (e) { /* table or column may not exist */ }
     }
     
     // Module IV
-    if (plantId || auditElToken) {
-      let ivCurves;
-      if (auditElToken) {
-        ivCurves = await DB.prepare(`
-          SELECT COUNT(*) as count FROM iv_curves WHERE audit_token = ?
-        `).bind(auditElToken).first();
-      } else {
-        // Via el_audits linkage
-        ivCurves = await DB.prepare(`
-          SELECT COUNT(*) as count 
-          FROM iv_curves ic
-          JOIN el_audits ea ON ic.audit_token = ea.audit_token
-          JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-          WHERE pcal.pv_plant_id = ?
-        `).bind(plantId).first();
+    try {
+      if (plantId || auditElToken) {
+        let ivCurves;
+        if (auditElToken) {
+          ivCurves = await DB.prepare(`
+            SELECT COUNT(*) as count FROM iv_curves WHERE audit_token = ?
+          `).bind(auditElToken).first();
+        } else {
+          ivCurves = await DB.prepare(`
+            SELECT COUNT(*) as count FROM iv_curves WHERE el_audit_id IN (SELECT id FROM el_audits WHERE plant_id = ?)
+          `).bind(plantId).first();
+        }
+        ivCount = (ivCurves as any)?.count || 0;
       }
-      ivCount = (ivCurves as any)?.count || 0;
-    }
+    } catch (e) { /* table may not exist */ }
     
-    // Module Visuels - Maintenant lié via plant_id
-    if (plantId) {
-      const visualInspections = await DB.prepare(`
-        SELECT COUNT(*) as count FROM visual_inspections WHERE plant_id = ?
-      `).bind(plantId).first();
-      visualCount = (visualInspections as any)?.count || 0;
-    }
+    // Module Visuels
+    try {
+      if (plantId) {
+        const visualInspections = await DB.prepare(`
+          SELECT COUNT(*) as count FROM visual_inspections WHERE plant_id = ?
+        `).bind(plantId).first();
+        visualCount = (visualInspections as any)?.count || 0;
+      }
+    } catch (e) { /* table may not exist */ }
     
     // Module Isolation
-    if (plantId) {
-      const isolationTests = await DB.prepare(`
-        SELECT COUNT(*) as count FROM isolation_tests WHERE plant_id = ?
-      `).bind(plantId).first();
-      isolationCount = (isolationTests as any)?.count || 0;
-    }
+    try {
+      if (plantId) {
+        const isolationTests = await DB.prepare(`
+          SELECT COUNT(*) as count FROM isolation_tests WHERE plant_id = ?
+        `).bind(plantId).first();
+        isolationCount = (isolationTests as any)?.count || 0;
+      }
+    } catch (e) { /* table may not exist */ }
     
     // Module Thermique
-    if (auditElToken) {
-      // Via audit token
-      const thermalMeasurements = await DB.prepare(`
-        SELECT COUNT(*) as count 
-        FROM thermal_measurements tm
-        JOIN interventions i ON tm.intervention_id = i.id
-        JOIN audits a ON a.intervention_id = i.id
-        WHERE a.audit_token = ?
-      `).bind(auditElToken).first();
-      
-      thermalCount = (thermalMeasurements as any)?.count || 0;
-      
-      // Fallback si count 0 (migration audit_token direct)
-      if (thermalCount === 0) {
-        const directThermal = await DB.prepare(`
+    try {
+      if (auditElToken) {
+        const thermalMeasurements = await DB.prepare(`
           SELECT COUNT(*) as count FROM thermal_measurements WHERE audit_token = ?
         `).bind(auditElToken).first();
-        if ((directThermal as any)?.count > 0) {
-          thermalCount = (directThermal as any).count;
-        }
+        thermalCount = (thermalMeasurements as any)?.count || 0;
       }
-      
-    } else if (plantId) {
-      // Via plantId -> EL Audits -> Interventions
-      const thermalMeasurements = await DB.prepare(`
-        SELECT COUNT(*) as count 
-        FROM thermal_measurements tm
-        JOIN interventions i ON tm.intervention_id = i.id
-        JOIN audits a ON a.intervention_id = i.id
-        JOIN el_audits ea ON ea.audit_token = a.audit_token
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ?
-      `).bind(plantId).first();
-      
-      thermalCount = (thermalMeasurements as any)?.count || 0;
-    }
+    } catch (e) { /* table may not exist */ }
     
     // Module Audit Qualité
-    if (plantId) {
-      const aqMissions = await DB.prepare(`
-        SELECT COUNT(*) as count FROM ordres_mission_qualite WHERE project_id = ?
-      `).bind(plantId).first();
-      auditQualiteCount = (aqMissions as any)?.count || 0;
-    }
+    try {
+      if (plantId) {
+        const aqMissions = await DB.prepare(`
+          SELECT COUNT(*) as count FROM ordres_mission_qualite WHERE project_id = ?
+        `).bind(plantId).first();
+        auditQualiteCount = (aqMissions as any)?.count || 0;
+      }
+    } catch (e) { /* table may not exist */ }
     
     // Module Test Diodes
-    if (plantId) {
-      const diodeSessions = await DB.prepare(`
-        SELECT COUNT(*) as count FROM diode_test_sessions WHERE (plant_id = ? OR project_id = ?)
-      `).bind(plantId, plantId).first();
-      diodeSessionsCount = (diodeSessions as any)?.count || 0;
-    } else if (auditElToken) {
-      const diodeSessions = await DB.prepare(`
-        SELECT COUNT(*) as count FROM diode_test_sessions WHERE audit_token = ?
-      `).bind(auditElToken).first();
-      diodeSessionsCount = (diodeSessions as any)?.count || 0;
-    }
+    try {
+      if (plantId) {
+        const diodeSessions = await DB.prepare(`
+          SELECT COUNT(*) as count FROM diode_test_sessions WHERE (plant_id = ? OR project_id = ?)
+        `).bind(plantId, plantId).first();
+        diodeSessionsCount = (diodeSessions as any)?.count || 0;
+      } else if (auditElToken) {
+        const diodeSessions = await DB.prepare(`
+          SELECT COUNT(*) as count FROM diode_test_sessions WHERE audit_token = ?
+        `).bind(auditElToken).first();
+        diodeSessionsCount = (diodeSessions as any)?.count || 0;
+      }
+    } catch (e) { /* table may not exist */ }
+    
+    // Module PVServ Dark
+    try {
+      if (plantId) {
+        const pvservSessions = await DB.prepare(`
+          SELECT COUNT(*) as count FROM pvserv_import_sessions WHERE project_id = ?
+        `).bind(plantId).first();
+        pvservDarkCount = (pvservSessions as any)?.count || 0;
+      } else if (auditElToken) {
+        const pvservSessions = await DB.prepare(`
+          SELECT COUNT(*) as count FROM pvserv_import_sessions WHERE audit_token = ?
+        `).bind(auditElToken).first();
+        pvservDarkCount = (pvservSessions as any)?.count || 0;
+      }
+    } catch (e) { /* table may not exist */ }
     
     const response: PreviewAvailableDataResponse = {
       success: true,
@@ -289,7 +287,8 @@ unifiedReportRoutes.get('/preview', async (c) => {
         isolation: isolationCount > 0,
         thermal: thermalCount > 0,
         audit_qualite: auditQualiteCount > 0,
-        diodes: diodeSessionsCount > 0
+        diodes: diodeSessionsCount > 0,
+        pvserv_dark: pvservDarkCount > 0
       },
       dataSummary: {
         elAuditsCount: elCount,
@@ -298,7 +297,8 @@ unifiedReportRoutes.get('/preview', async (c) => {
         isolationTestsCount: isolationCount,
         thermalReportsCount: thermalCount,
         auditQualiteCount,
-        diodeSessionsCount
+        diodeSessionsCount,
+        pvservDarkCount
       }
     };
     

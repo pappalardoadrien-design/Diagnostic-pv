@@ -470,6 +470,122 @@ export function generateReportHTML(data: UnifiedReportData): string {
     </div>
     ` : ''}
 
+    <!-- MODULE PVSERV DARK - COURBES SOMBRES (DUNKELKENNLINIEN) -->
+    ${data.pvservDarkModule.hasData ? `
+    <div class="page">
+        <h2 class="numbered-section text-2xl font-bold mb-8 text-gray-900 flex items-center">
+            <span class="w-8 h-8 bg-violet-600 text-white rounded flex items-center justify-center text-sm mr-3 shadow-lg">
+                <i class="fas fa-wave-square"></i>
+            </span>
+            COURBES SOMBRES (DUNKELKENNLINIEN)
+        </h2>
+
+        <div class="bg-gray-50 rounded-xl p-6 mb-8">
+            <h3 class="font-bold text-gray-700 mb-4">Informations de la mesure PVServ</h3>
+            <div class="grid grid-cols-2 gap-x-12 gap-y-2 text-sm">
+                <div class="flex justify-between border-b border-gray-200 py-2">
+                    <span class="text-gray-500">Fichier source</span>
+                    <span class="font-mono font-bold">${data.pvservDarkModule.sourceFilename}</span>
+                </div>
+                <div class="flex justify-between border-b border-gray-200 py-2">
+                    <span class="text-gray-500">Appareil</span>
+                    <span class="font-mono">${data.pvservDarkModule.deviceName || '-'}</span>
+                </div>
+                <div class="flex justify-between border-b border-gray-200 py-2">
+                    <span class="text-gray-500">N&deg; s&eacute;rie</span>
+                    <span class="font-mono">${data.pvservDarkModule.serialNumber || '-'}</span>
+                </div>
+                <div class="flex justify-between border-b border-gray-200 py-2">
+                    <span class="text-gray-500">Date import</span>
+                    <span class="font-mono">${new Date(data.pvservDarkModule.importDate).toLocaleDateString('fr-FR')}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-8 mb-8">
+            <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h4 class="font-bold text-blue-900 mb-4 uppercase tracking-wider text-sm">
+                    <i class="fas fa-bolt mr-2"></i>Strings (${data.pvservDarkModule.stringCount})
+                </h4>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-2xl font-black text-blue-800">${data.pvservDarkModule.avgFF_strings.toFixed(3)}</div>
+                        <div class="text-xs text-blue-600">FF moyen</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-black text-blue-800">${data.pvservDarkModule.avgRds_strings.toFixed(1)}</div>
+                        <div class="text-xs text-blue-600">Rds moy. (&Omega;)</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-black text-blue-800">${Math.round(data.pvservDarkModule.avgUf_strings)}</div>
+                        <div class="text-xs text-blue-600">Uf moy. (V)</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-blue-700 text-center">
+                    FF : ${data.pvservDarkModule.minFF_strings.toFixed(3)} &rarr; ${data.pvservDarkModule.maxFF_strings.toFixed(3)}
+                </div>
+            </div>
+            <div class="bg-amber-50 rounded-xl p-6 border border-amber-200">
+                <h4 class="font-bold text-amber-900 mb-4 uppercase tracking-wider text-sm">
+                    <i class="fas fa-microchip mr-2"></i>Diodes Bypass (${data.pvservDarkModule.diodeCount})
+                </h4>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-2xl font-black text-amber-800">${data.pvservDarkModule.avgFF_diodes.toFixed(3)}</div>
+                        <div class="text-xs text-amber-600">FF moyen</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-black text-amber-800">${data.pvservDarkModule.avgRds_diodes.toFixed(1)}</div>
+                        <div class="text-xs text-amber-600">Rds moy. (&Omega;)</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-black text-amber-800">${Math.round(data.pvservDarkModule.avgUf_diodes)}</div>
+                        <div class="text-xs text-amber-600">Uf moy. (V)</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-amber-700 text-center">
+                    FF : ${data.pvservDarkModule.minFF_diodes.toFixed(3)} &rarr; ${data.pvservDarkModule.maxFF_diodes.toFixed(3)}
+                </div>
+            </div>
+        </div>
+
+        ${data.pvservDarkModule.anomalyCount > 0 ? `
+        <h3 class="font-bold text-lg mb-4 text-red-800"><i class="fas fa-exclamation-triangle mr-2"></i>Anomalies (${data.pvservDarkModule.anomalyCount})</h3>
+        <table class="pro-table mb-6">
+            <thead><tr><th>Nr.</th><th>Type</th><th>Anomalie</th><th>S&eacute;v&eacute;rit&eacute;</th><th>FF</th><th>Rds</th><th>D&eacute;tail</th></tr></thead>
+            <tbody>
+                ${data.pvservDarkModule.anomalies.map(a => `
+                <tr>
+                    <td class="font-mono font-bold">${a.measurementNumber}</td>
+                    <td><span class="px-2 py-1 rounded text-xs font-bold uppercase ${a.curveType === 'string' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${a.curveType}</span></td>
+                    <td class="text-sm">${a.anomalyType.replace(/_/g, ' ')}</td>
+                    <td><span class="px-2 py-1 rounded text-xs font-bold uppercase ${a.severity === 'critical' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}">${a.severity}</span></td>
+                    <td class="font-mono">${a.fillFactor.toFixed(3)}</td>
+                    <td class="font-mono">${a.rds.toFixed(2)}</td>
+                    <td class="text-sm text-gray-600">${a.message}</td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        ` : `
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+            <p class="text-green-800 text-sm"><i class="fas fa-check-circle mr-2"></i>Aucune anomalie. Toutes les mesures sont nominales.</p>
+        </div>
+        `}
+
+        <div class="mt-6 bg-violet-50 p-4 rounded-lg border border-violet-200">
+            <h4 class="font-bold text-violet-900 mb-2"><i class="fas fa-info-circle mr-2"></i>Interpr&eacute;tation</h4>
+            <p class="text-sm text-violet-800">
+                La mesure Dunkelkennlinien permet d'&eacute;valuer l'&eacute;tat des strings et diodes bypass sans irradiance solaire.
+                Un FF &eacute;lev&eacute; (&gt;0.90 strings) indique un comportement &eacute;lectrique sain. Rds homog&egrave;ne = absence de d&eacute;s&eacute;quilibre.
+                ${data.pvservDarkModule.anomalyCount > 0 ?
+                    `${data.pvservDarkModule.anomalyCount} anomalie(s) identifi&eacute;e(s) n&eacute;cessitant investigation.` :
+                    `Mesures conformes aux valeurs attendues.`}
+            </p>
+        </div>
+    </div>
+    ` : ''}
+
     <!-- MODULE TEST DIODES BYPASS -->
     ${data.diodeTestModule.hasData ? `
     <div class="page">
