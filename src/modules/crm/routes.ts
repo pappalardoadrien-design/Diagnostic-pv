@@ -35,16 +35,16 @@ crmRoutes.get('/clients', async (c) => {
     const { DB } = c.env;
     const { status, search } = c.req.query();
 
+    // Requête principale : clients + stats via sous-requêtes corrélées
+    // el_audits.client_name matche crm_clients.company_name (seul lien fiable)
+    // crm_contacts a client_id vers crm_clients.id
     let query = `
       SELECT 
         c.*,
-        COUNT(DISTINCT ea.id) as total_audits,
-        MAX(ea.created_at) as last_audit_date,
-        COUNT(DISTINCT ct.id) as contacts_count
+        COALESCE((SELECT COUNT(*) FROM el_audits ea WHERE ea.client_name = c.company_name), 0) as total_audits,
+        (SELECT MAX(ea2.created_at) FROM el_audits ea2 WHERE ea2.client_name = c.company_name) as last_audit_date,
+        COALESCE((SELECT COUNT(*) FROM crm_contacts ct WHERE ct.client_id = c.id), 0) as contacts_count
       FROM crm_clients c
-      LEFT JOIN projects p ON p.client_id = c.id
-      LEFT JOIN el_audits ea ON ea.plant_id = p.id
-      LEFT JOIN crm_contacts ct ON ct.client_id = c.id
     `;
 
     const conditions: string[] = [];
@@ -64,7 +64,7 @@ crmRoutes.get('/clients', async (c) => {
       query += ' WHERE ' + conditions.join(' AND ');
     }
 
-    query += ' GROUP BY c.id ORDER BY c.company_name ASC';
+    query += ' ORDER BY c.company_name ASC';
 
     const stmt = DB.prepare(query);
     const result = await stmt.bind(...params).all();
@@ -76,8 +76,8 @@ crmRoutes.get('/clients', async (c) => {
     });
 
   } catch (error: any) {
-    console.error('GET /clients error:', error);
-    return c.json({ success: false, message: 'Erreur serveur' }, 500);
+    console.error('GET /clients error:', error.message || error);
+    return c.json({ success: false, message: 'Erreur serveur', detail: error.message }, 500);
   }
 });
 
@@ -151,15 +151,15 @@ crmRoutes.get('/clients/:id', async (c) => {
       .bind(clientId)
       .all();
 
-    // Stats audits (via projects -> el_audits)
+    // Stats audits via client_name match (el_audits.client_name = crm_clients.company_name)
+    const clientName = (client as any).company_name;
     const stats = await DB.prepare(`
       SELECT 
-        COUNT(ea.id) as total_audits,
-        MAX(ea.created_at) as last_audit_date
-      FROM projects p
-      LEFT JOIN el_audits ea ON ea.plant_id = p.id
-      WHERE p.client_id = ?
-    `).bind(clientId).first();
+        COUNT(id) as total_audits,
+        MAX(created_at) as last_audit_date
+      FROM el_audits
+      WHERE client_name = ?
+    `).bind(clientName).first();
 
     return c.json({
       success: true,
@@ -329,6 +329,12 @@ crmRoutes.get('/clients/:id/audits', async (c) => {
     const { DB } = c.env;
     const clientId = c.req.param('id');
 
+    // Récupérer le nom du client pour matcher via el_audits.client_name
+    const client = await DB.prepare('SELECT company_name FROM crm_clients WHERE id = ?')
+      .bind(clientId).first() as any;
+    
+    const clientName = client?.company_name || '';
+    
     const audits = await DB.prepare(`
       SELECT 
         ea.id as audit_id,
@@ -340,10 +346,9 @@ crmRoutes.get('/clients/:id/audits', async (c) => {
         ea.updated_at,
         ea.total_modules
       FROM el_audits ea
-      JOIN projects p ON ea.plant_id = p.id
-      WHERE p.client_id = ?
+      WHERE ea.client_name = ?
       ORDER BY ea.created_at DESC
-    `).bind(clientId).all();
+    `).bind(clientName).all();
 
     return c.json({
       success: true,
