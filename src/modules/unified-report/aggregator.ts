@@ -563,12 +563,24 @@ async function aggregateThermalModule(
     }
 
     if (!auditToken) {
+      // Essayer aussi via plant_id directement sur el_audits
+      if (request.plantId) {
+        const audit = await DB.prepare(`
+          SELECT audit_token FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1
+        `).bind(request.plantId).first();
+        if (audit) {
+          auditToken = (audit as any).audit_token;
+        }
+      }
+    }
+
+    if (!auditToken) {
       return createEmptyThermalData();
     }
 
-    // 2. Récupérer mesures thermiques (via Jointure Interventions ou directement audit_token)
-    // On privilégie la jointure standard utilisée dans le module thermique
-    const measurements = await DB.prepare(`
+    // 2. Récupérer mesures thermiques
+    // Chemin principal: el_audits.intervention_id → interventions → thermal_measurements
+    let measurements = await DB.prepare(`
       SELECT tm.*
       FROM thermal_measurements tm
       JOIN interventions i ON tm.intervention_id = i.id
@@ -577,8 +589,8 @@ async function aggregateThermalModule(
     `).bind(auditToken).all();
 
     if (!measurements.results || measurements.results.length === 0) {
-      // Fallback: Essayer via intervention_id directement si el_audits n'a pas intervention_id
-      const fallback = await DB.prepare(`
+      // Fallback 1: via pv_cartography_audit_links → projects → interventions
+      measurements = await DB.prepare(`
         SELECT tm.* FROM thermal_measurements tm
         WHERE tm.intervention_id IN (
           SELECT i.id FROM interventions i 
@@ -587,11 +599,24 @@ async function aggregateThermalModule(
           WHERE pcal.el_audit_token = ?
         )
       `).bind(auditToken).all();
+    }
 
-      if (!fallback.results || fallback.results.length === 0) {
-        return createEmptyThermalData();
+    if (!measurements.results || measurements.results.length === 0) {
+      // Fallback 2: via plantId → projects → interventions (quand el_audits.intervention_id est NULL)
+      if (request.plantId) {
+        measurements = await DB.prepare(`
+          SELECT tm.* FROM thermal_measurements tm
+          WHERE tm.intervention_id IN (
+            SELECT i.id FROM interventions i WHERE i.project_id IN (
+              SELECT p.id FROM projects p WHERE p.id = ?
+            )
+          )
+        `).bind(request.plantId).all();
       }
-      measurements.results = fallback.results;
+    }
+
+    if (!measurements.results || measurements.results.length === 0) {
+      return createEmptyThermalData();
     }
 
     // 3. Calculs statistiques

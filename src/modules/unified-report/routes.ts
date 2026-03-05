@@ -226,13 +226,40 @@ unifiedReportRoutes.get('/preview', async (c) => {
       }
     } catch (e) { /* table may not exist */ }
     
-    // Module Thermique
+    // Module Thermique — thermal_measurements est lié via intervention_id
     try {
       if (auditElToken) {
+        // Chemin: auditElToken → el_audits.intervention_id → thermal_measurements
         const thermalMeasurements = await DB.prepare(`
-          SELECT COUNT(*) as count FROM thermal_measurements WHERE audit_token = ?
+          SELECT COUNT(*) as count FROM thermal_measurements tm
+          WHERE tm.intervention_id IN (
+            SELECT ea.intervention_id FROM el_audits ea WHERE ea.audit_token = ? AND ea.intervention_id IS NOT NULL
+          )
         `).bind(auditElToken).first();
         thermalCount = (thermalMeasurements as any)?.count || 0;
+      }
+      if (thermalCount === 0 && plantId) {
+        // Fallback: plantId → projects → interventions → thermal_measurements
+        const thermalMeasurements = await DB.prepare(`
+          SELECT COUNT(*) as count FROM thermal_measurements tm
+          WHERE tm.intervention_id IN (
+            SELECT i.id FROM interventions i 
+            JOIN projects p ON i.project_id = p.id
+            WHERE p.id = ? OR p.client_id IN (
+              SELECT pp.client_id FROM pv_plants pp 
+              JOIN projects pr ON pr.client_id = pp.client_id 
+              WHERE pp.id = ?
+            )
+          )
+        `).bind(plantId, plantId).first();
+        thermalCount = (thermalMeasurements as any)?.count || 0;
+      }
+      if (thermalCount === 0 && plantId) {
+        // Dernier fallback: compter toutes les mesures thermiques liées aux interventions du projet
+        const thermalMeasurements = await DB.prepare(`
+          SELECT COUNT(*) as count FROM thermal_measurements
+        `).first();
+        // Ne pas utiliser ce fallback global - trop large. On garde 0.
       }
     } catch (e) { /* table may not exist */ }
     
