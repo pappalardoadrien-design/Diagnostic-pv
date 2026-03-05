@@ -348,22 +348,19 @@ planningRoutes.post('/interventions', async (c) => {
           projectInfo.address_city
         ].filter(Boolean).join(', ');
 
-        // Créer l'audit
+        // Créer l'audit dans el_audits
         await DB.prepare(`
-          INSERT INTO audits (
-            audit_token, intervention_id, client_id, project_id,
+          INSERT INTO el_audits (
+            audit_token, intervention_id,
             project_name, client_name, location,
-            modules_enabled, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
+            status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, 'created', datetime('now'), datetime('now'))
         `).bind(
           auditToken,
           interventionId,
-          projectInfo.client_id,
-          body.project_id,
           projectInfo.name || 'Projet sans nom',
           projectInfo.company_name || 'Client sans nom',
-          location,
-          JSON.stringify(modulesEnabled)
+          location
         ).run();
 
         console.log(`✅ Audit auto-créé pour intervention #${interventionId} (Token: ${auditToken})`);

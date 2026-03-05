@@ -26,7 +26,6 @@ import thermiqueRoutes from './modules/thermique/routes.js'
 import { unifiedReportRoutes } from './modules/unified-report/routes.js'
 import customReportRoutes from './modules/custom-report/routes.js'
 import picselliaRoutes from './modules/picsellia-integration/routes.js'
-import girasoleRoutes from './modules/girasole/routes'
 import crmRoutes from './modules/crm/routes'
 import planningRoutes from './modules/planning/routes'
 import auditsRouter from './modules/audits/routes'
@@ -45,8 +44,6 @@ import { getVisualPage } from './pages/visual.js'
 import { getIsolationPage } from './pages/isolation.js'
 import { getThermalPage } from './pages/thermal.js'
 import { getAuditPhotosPage } from './pages/audit-photos.js'
-import { getGirasoleDashboardPage } from './pages/girasole-dashboard.js'
-import { getGirasoleChecklistPage } from './pages/girasole-checklist.js'
 import { getAuditsCreatePage } from './pages/audits-create'
 import { getCrmDashboardPage } from './pages/crm-dashboard'
 import { getCrmClientsCreatePage } from './pages/crm-clients-create'
@@ -108,7 +105,6 @@ app.route('/api/thermique', thermiqueRoutes)
 app.route('/api/isolation', isolationRoutes)
 app.route('/api/report/unified', unifiedReportRoutes)
 app.route('/api/report/custom', customReportRoutes)
-app.route('/api/girasole', girasoleRoutes)
 app.route('/api/crm', crmRoutes)
 app.route('/api/planning', planningRoutes)
 app.route('/api/audits', auditsRouter)
@@ -162,10 +158,6 @@ app.get('/audit-qualite/:missionId', (c) => c.html(getAuditQualitePage(c.req.par
 app.get('/audit-qualite/:missionId/photos', (c) => c.html(getAuditQualitePhotosPage(c.req.param('missionId'))))
 app.get('/rapport-qualite/:rapportId', (c) => c.html(getRapportQualitePage(c.req.param('rapportId'))))
 
-// --- GIRASOLE ---
-app.get('/girasole/dashboard', (c) => c.html(getGirasoleDashboardPage()))
-app.get('/girasole/checklist/conformite/:projectId', (c) => c.html(getGirasoleChecklistPage(c.req.param('projectId'), 'CONFORMITE')))
-app.get('/girasole/checklist/toiture/:projectId', (c) => c.html(getGirasoleChecklistPage(c.req.param('projectId'), 'TOITURE')))
 
 // --- Modules metier (pages) ---
 app.get('/rapports', (c) => c.html(getRapportsPage()))

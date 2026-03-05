@@ -572,20 +572,26 @@ async function aggregateThermalModule(
       SELECT tm.*
       FROM thermal_measurements tm
       JOIN interventions i ON tm.intervention_id = i.id
-      JOIN audits a ON a.intervention_id = i.id
-      WHERE a.audit_token = ?
+      JOIN el_audits ea ON ea.intervention_id = i.id
+      WHERE ea.audit_token = ?
     `).bind(auditToken).all();
 
     if (!measurements.results || measurements.results.length === 0) {
-      // Fallback: Essayer via audit_token direct (si migration effectuée)
-      const directMeasurements = await DB.prepare(`
-        SELECT * FROM thermal_measurements WHERE audit_token = ?
+      // Fallback: Essayer via intervention_id directement si el_audits n'a pas intervention_id
+      const fallback = await DB.prepare(`
+        SELECT tm.* FROM thermal_measurements tm
+        WHERE tm.intervention_id IN (
+          SELECT i.id FROM interventions i 
+          JOIN projects p ON i.project_id = p.id
+          JOIN pv_cartography_audit_links pcal ON pcal.pv_plant_id = p.id
+          WHERE pcal.el_audit_token = ?
+        )
       `).bind(auditToken).all();
 
-      if (!directMeasurements.results || directMeasurements.results.length === 0) {
+      if (!fallback.results || fallback.results.length === 0) {
         return createEmptyThermalData();
       }
-      measurements.results = directMeasurements.results;
+      measurements.results = fallback.results;
     }
 
     // 3. Calculs statistiques

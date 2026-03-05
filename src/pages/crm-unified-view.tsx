@@ -37,7 +37,7 @@ crmUnifiedViewPage.get('/', async (c) => {
     FROM crm_clients c
     LEFT JOIN projects p ON p.client_id = c.id
     LEFT JOIN interventions i ON i.project_id = p.id
-    LEFT JOIN audits a ON a.client_id = c.id
+    LEFT JOIN el_audits a ON a.plant_id = p.id
     WHERE c.status = 'active'
     GROUP BY c.id
     ORDER BY c.company_name ASC
@@ -396,7 +396,7 @@ crmUnifiedViewPage.get('/project/:id/interventions', async (c) => {
       i.id, i.intervention_type, i.intervention_date, i.status,
       COUNT(DISTINCT a.id) as audit_count
     FROM interventions i
-    LEFT JOIN audits a ON a.intervention_id = i.id
+    LEFT JOIN el_audits a ON a.intervention_id = i.id
     WHERE i.project_id = ?
     GROUP BY i.id
     ORDER BY i.intervention_date DESC

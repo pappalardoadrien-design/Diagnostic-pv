@@ -123,8 +123,8 @@ thermiqueRoutes.get('/measurements/:audit_token', async (c) => {
         i.intervention_date
       FROM thermal_measurements tm
       JOIN interventions i ON tm.intervention_id = i.id
-      JOIN audits a ON a.intervention_id = i.id
-      WHERE a.audit_token = ?
+      JOIN el_audits ea ON ea.intervention_id = i.id
+      WHERE ea.audit_token = ?
       ORDER BY tm.string_number, tm.module_number, tm.created_at DESC
     `).bind(audit_token).all();
     
@@ -160,8 +160,8 @@ thermiqueRoutes.get('/hotspots/:audit_token', async (c) => {
         i.intervention_date
       FROM thermal_measurements tm
       JOIN interventions i ON tm.intervention_id = i.id
-      JOIN audits a ON a.intervention_id = i.id
-      WHERE a.audit_token = ?
+      JOIN el_audits ea ON ea.intervention_id = i.id
+      WHERE ea.audit_token = ?
         AND tm.defect_type != 'ok'
         AND tm.severity_level >= 3
       ORDER BY tm.severity_level DESC, tm.delta_t_max DESC
@@ -247,8 +247,8 @@ thermiqueRoutes.get('/stats/:audit_token', async (c) => {
         SUM(CASE WHEN severity_level >= 4 THEN 1 ELSE 0 END) as critical_defects
       FROM thermal_measurements tm
       JOIN interventions i ON tm.intervention_id = i.id
-      JOIN audits a ON a.intervention_id = i.id
-      WHERE a.audit_token = ?
+      JOIN el_audits ea ON ea.intervention_id = i.id
+      WHERE ea.audit_token = ?
     `).bind(audit_token).first();
     
     return c.json({

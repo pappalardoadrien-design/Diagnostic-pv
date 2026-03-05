@@ -4,8 +4,12 @@
 -- Conforme norme IEC 62446-1 pour inspections visuelles terrain
 -- Categories: Mecanique, Electrique, Documentation, Securite
 
--- Table principale inspections visuelles
-CREATE TABLE IF NOT EXISTS visual_inspections (
+-- Table principale inspections visuelles (DROP old 0004 schema, CREATE new IEC schema)
+DROP TABLE IF EXISTS visual_inspection_photos;
+DROP TABLE IF EXISTS visual_defects;
+DROP TABLE IF EXISTS visual_inspection_items;
+DROP TABLE IF EXISTS visual_inspections;
+CREATE TABLE visual_inspections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   inspection_token TEXT UNIQUE NOT NULL,
   project_name TEXT NOT NULL,
@@ -33,7 +37,7 @@ CREATE TABLE IF NOT EXISTS visual_inspections (
 );
 
 -- Table items checklist IEC
-CREATE TABLE IF NOT EXISTS visual_inspection_items (
+CREATE TABLE visual_inspection_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   inspection_id INTEGER NOT NULL,
   inspection_token TEXT NOT NULL,
@@ -67,7 +71,7 @@ CREATE TABLE IF NOT EXISTS visual_inspection_items (
 );
 
 -- Table defauts mecaniques identifies
-CREATE TABLE IF NOT EXISTS visual_defects (
+CREATE TABLE visual_defects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   inspection_id INTEGER NOT NULL,
   inspection_token TEXT NOT NULL,
@@ -109,7 +113,7 @@ CREATE TABLE IF NOT EXISTS visual_defects (
 );
 
 -- Table photos inspection
-CREATE TABLE IF NOT EXISTS visual_inspection_photos (
+CREATE TABLE visual_inspection_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   inspection_id INTEGER NOT NULL,
   inspection_token TEXT NOT NULL,

@@ -1,6 +1,6 @@
 /**
  * Page Audit Qualité Terrain - Interface Mobile Checklist
- * Adapté de GIRASOLE pour DiagPV CRM
+ * Page Audit Qualité Terrain - DiagPV
  * 
  * Routes:
  * - /audit-qualite/:mission_id          → Checklist principale (SOL + TOITURE)

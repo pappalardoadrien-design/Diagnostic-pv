@@ -113,7 +113,7 @@ pvservLegacy.get('/:token/report', async (c) => {
   
   // Récupération données complètes audit
   const audit = await env.DB.prepare(
-    'SELECT * FROM audits WHERE token = ?'
+    'SELECT * FROM el_audits WHERE audit_token = ?'
   ).bind(token).first()
   
   if (!audit) {
@@ -121,7 +121,7 @@ pvservLegacy.get('/:token/report', async (c) => {
   }
   
   const modules = await env.DB.prepare(
-    'SELECT * FROM modules WHERE audit_token = ? ORDER BY string_number, position_in_string'
+    'SELECT * FROM el_modules WHERE audit_token = ? ORDER BY string_number, position_in_string'
   ).bind(token).all()
   
   const stats = await env.DB.prepare(`

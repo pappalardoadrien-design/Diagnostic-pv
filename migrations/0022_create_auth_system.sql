@@ -6,25 +6,23 @@
 -- Architecture : Support 20+ sous-traitants avec isolation complète des données
 
 -- ============================================================================
--- TABLE : users
+-- TABLE : users (UPGRADE from 0004 basic schema)
 -- Description : Utilisateurs de la plateforme (admins, sous-traitants, clients)
+-- Strategy : DROP old basic users table (empty in dev), CREATE full auth schema
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS users (
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   
   -- Identification
   email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  full_name TEXT NOT NULL,
-  company TEXT,  -- "Diagnostic Photovoltaïque", "pvControl", "MBJ Lab", etc.
+  password_hash TEXT NOT NULL DEFAULT '',
+  full_name TEXT NOT NULL DEFAULT '',
+  company TEXT,
   phone TEXT,
   
   -- Rôle et permissions
-  role TEXT NOT NULL CHECK(role IN ('admin', 'subcontractor', 'client', 'auditor')),
-  -- admin: Adrien, Fabien (accès total)
-  -- subcontractor: pvControl, MBJ Lab (voit uniquement audits assignés)
-  -- client: Clients finaux (lecture seule, leurs audits uniquement)
-  -- auditor: Futurs employés DiagPV (comme subcontractor mais interne)
+  role TEXT NOT NULL DEFAULT 'auditor' CHECK(role IN ('admin', 'subcontractor', 'client', 'auditor')),
   
   -- État
   is_active BOOLEAN DEFAULT 1,
@@ -32,20 +30,20 @@ CREATE TABLE IF NOT EXISTS users (
   
   -- Métadonnées
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  created_by INTEGER,  -- Admin qui a créé l'utilisateur
+  created_by INTEGER,
   last_login_at DATETIME,
   last_login_ip TEXT,
   
   -- Notes admin
-  notes TEXT,  -- Ex: "Sous-traitant EL + Thermal, tarif négocié 2024"
+  notes TEXT,
   
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_active ON users(is_active);
-CREATE INDEX idx_users_company ON users(company);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_company ON users(company);
 
 -- ============================================================================
 -- TABLE : sessions
@@ -70,9 +68,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_sessions_token ON sessions(session_token);
-CREATE INDEX idx_sessions_user ON sessions(user_id);
-CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
 -- ============================================================================
 -- TABLE : audit_assignments
@@ -116,10 +114,10 @@ CREATE TABLE IF NOT EXISTS audit_assignments (
   UNIQUE(audit_token, user_id)
 );
 
-CREATE INDEX idx_assignments_user ON audit_assignments(user_id);
-CREATE INDEX idx_assignments_audit ON audit_assignments(audit_token);
-CREATE INDEX idx_assignments_status ON audit_assignments(status);
-CREATE INDEX idx_assignments_expires ON audit_assignments(expires_at);
+CREATE INDEX IF NOT EXISTS idx_assignments_user ON audit_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_audit ON audit_assignments(audit_token);
+CREATE INDEX IF NOT EXISTS idx_assignments_status ON audit_assignments(status);
+CREATE INDEX IF NOT EXISTS idx_assignments_expires ON audit_assignments(expires_at);
 
 -- ============================================================================
 -- TABLE : activity_logs
@@ -149,10 +147,10 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_activity_user ON activity_logs(user_id);
-CREATE INDEX idx_activity_action ON activity_logs(action);
-CREATE INDEX idx_activity_created ON activity_logs(created_at);
-CREATE INDEX idx_activity_entity ON activity_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_action ON activity_logs(action);
+CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_logs(entity_type, entity_id);
 
 -- ============================================================================
 -- TABLE : password_reset_tokens
@@ -170,8 +168,8 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_reset_token ON password_reset_tokens(token);
-CREATE INDEX idx_reset_user ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens(user_id);
 
 -- ============================================================================
 -- INSERTION COMPTE ADMIN INITIAL

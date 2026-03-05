@@ -1,35 +1,39 @@
 -- ============================================================================
--- MIGRATION 0013: Table liaison PV Cartography ↔ Audits EL
+-- MIGRATION 0013: Table liaison PV Cartography <-> Audits EL (version corrigée)
 -- ============================================================================
--- Date: 2025-11-10
--- Objectif: Synchronisation bidirectionnelle Canvas V2 ↔ Module EL
--- Cas d'usage: Importer audit EL dans zone PV, sync statuts modules
--- ============================================================================
-
--- ============================================================================
--- ÉTAPE 1: TABLE DE LIAISON
+-- Date: 2025-11-10 (corrigée 2026-03-05)
+-- Objectif: Synchronisation bidirectionnelle Canvas V2 <-> Module EL
+-- NOTE: DROP+CREATE car migration 0006 crée une version simplifiée
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS pv_cartography_audit_links (
+-- ============================================================================
+-- ÉTAPE 1: DROP ancien schéma (créé par 0006) et recréer
+-- ============================================================================
+
+DROP VIEW IF EXISTS v_pv_el_links_stats;
+DROP TRIGGER IF EXISTS update_pv_cartography_audit_links_timestamp;
+DROP TABLE IF EXISTS pv_cartography_audit_links;
+
+CREATE TABLE pv_cartography_audit_links (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   
   -- Référence zone PV (Canvas V2)
-  pv_zone_id INTEGER NOT NULL,
+  pv_zone_id INTEGER,
   pv_plant_id INTEGER NOT NULL,
   
   -- Référence audit EL
-  el_audit_id INTEGER NOT NULL,
+  el_audit_id INTEGER,
   el_audit_token TEXT NOT NULL,
   
   -- Métadonnées liaison
-  link_type TEXT DEFAULT 'manual', -- 'manual', 'auto', 'import'
-  sync_direction TEXT DEFAULT 'el_to_pv', -- 'el_to_pv', 'pv_to_el', 'bidirectional'
-  sync_status TEXT DEFAULT 'linked', -- 'linked', 'syncing', 'synced', 'error'
+  link_type TEXT DEFAULT 'manual',
+  sync_direction TEXT DEFAULT 'el_to_pv',
+  sync_status TEXT DEFAULT 'linked',
   last_sync_at DATETIME,
   sync_error_message TEXT,
   
   -- Mapping modules (JSON)
-  module_mapping TEXT, -- Format: [{"el_module_id": 123, "pv_module_id": 456}]
+  module_mapping TEXT,
   
   -- Stats sync
   total_modules_synced INTEGER DEFAULT 0,
@@ -38,15 +42,6 @@ CREATE TABLE IF NOT EXISTS pv_cartography_audit_links (
   -- Timestamps
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  
-  -- Contraintes (vérifiées manuellement car SQLite n'applique pas toujours FK)
-  -- FOREIGN KEY (pv_zone_id) REFERENCES pv_zones(id) ON DELETE CASCADE,
-  -- FOREIGN KEY (pv_plant_id) REFERENCES pv_plants(id) ON DELETE CASCADE,
-  -- FOREIGN KEY (el_audit_id) REFERENCES el_audits(id) ON DELETE CASCADE,
-  -- FOREIGN KEY (el_audit_token) REFERENCES el_audits(audit_token) ON DELETE CASCADE
-  
-  -- Une zone PV ne peut être liée qu'à un seul audit EL (contrainte unicité)
-  -- UNIQUE(pv_zone_id) -- Appliqué manuellement dans l'application
 );
 
 -- ============================================================================
@@ -54,6 +49,7 @@ CREATE TABLE IF NOT EXISTS pv_cartography_audit_links (
 -- ============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_links_pv_zone ON pv_cartography_audit_links(pv_zone_id);
+CREATE INDEX IF NOT EXISTS idx_links_pv_plant ON pv_cartography_audit_links(pv_plant_id);
 CREATE INDEX IF NOT EXISTS idx_links_el_audit ON pv_cartography_audit_links(el_audit_id);
 CREATE INDEX IF NOT EXISTS idx_links_el_token ON pv_cartography_audit_links(el_audit_token);
 CREATE INDEX IF NOT EXISTS idx_links_sync_status ON pv_cartography_audit_links(sync_status);
@@ -69,14 +65,16 @@ BEGIN
 END;
 
 -- ============================================================================
--- ÉTAPE 4: VUE STATISTIQUES LIAISON
+-- ÉTAPE 4: VUE STATISTIQUES LIAISON (alignée sur schéma réel)
 -- ============================================================================
 
 CREATE VIEW IF NOT EXISTS v_pv_el_links_stats AS
 SELECT 
   l.id AS link_id,
   l.pv_zone_id,
+  l.pv_plant_id,
   l.el_audit_id,
+  l.el_audit_token,
   l.sync_status,
   l.last_sync_at,
   

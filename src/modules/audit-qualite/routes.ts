@@ -1,6 +1,6 @@
 /**
  * Module Audit Qualité Terrain - Routes API
- * Intégration GIRASOLE → DiagPV CRM
+ * Audit Qualité Terrain - DiagPV CRM
  * 
  * Préfixe: /api/audit-qualite
  * 

@@ -147,12 +147,12 @@ unifiedReportRoutes.get('/preview', async (c) => {
   
   try {
     const plantId = c.req.query('plantId') ? parseInt(c.req.query('plantId')!) : undefined;
-    const auditElToken = c.req.query('auditElToken');
+    const auditElToken = c.req.query('auditElToken') || c.req.query('auditToken');
     
     if (!plantId && !auditElToken) {
       return c.json({
         success: false,
-        error: 'plantId ou auditElToken requis'
+        error: 'plantId ou auditElToken requis (alias: auditToken)'
       }, 400);
     }
     

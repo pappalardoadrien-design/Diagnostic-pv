@@ -16,6 +16,22 @@ type Bindings = {
 
 const diagnosticRoutes = new Hono<{ Bindings: Bindings }>()
 
+// GET /api/diagnostic/health - Health check
+diagnosticRoutes.get('/health', async (c) => {
+  try {
+    const { DB } = c.env
+    const check = await DB.prepare("SELECT 1 as ok").first() as any
+    return c.json({
+      status: 'ok',
+      database: check?.ok === 1 ? 'connected' : 'error',
+      timestamp: new Date().toISOString(),
+      version: '2.0.0'
+    })
+  } catch (error: any) {
+    return c.json({ status: 'error', database: 'disconnected', error: error.message }, 500)
+  }
+})
+
 diagnosticRoutes.get('/interconnect', async (c) => {
   const { DB } = c.env
   

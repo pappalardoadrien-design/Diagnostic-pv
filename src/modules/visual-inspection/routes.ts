@@ -22,6 +22,21 @@ visualRoutes.post('/inspection/create', async (c) => {
     const body: CreateInspectionRequest = await c.req.json();
     const { DB } = c.env;
     
+    // Normaliser: accepter camelCase ET snake_case
+    const projectName = (body as any).project_name || body.projectName;
+    const clientName = (body as any).client_name || body.clientName;
+    const loc = (body as any).location || body.location;
+    const inspectionDate = (body as any).inspection_date || body.inspectionDate;
+    const inspectorName = (body as any).inspector_name || body.inspectorName;
+    const systemPowerKwp = (body as any).system_power_kwp || body.systemPowerKwp;
+    const moduleCount = (body as any).module_count || body.moduleCount;
+    const inverterCount = (body as any).inverter_count || body.inverterCount;
+    const installationYear = (body as any).installation_year || body.installationYear;
+    
+    if (!projectName || !clientName || !loc || !inspectionDate) {
+      return c.json({ error: 'project_name, client_name, location et inspection_date requis' }, 400);
+    }
+    
     // Génération token unique
     const token = `VIS-${Date.now()}-${Math.random().toString(36).substring(7)}`.toUpperCase();
     
@@ -33,15 +48,15 @@ visualRoutes.post('/inspection/create', async (c) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       token,
-      body.projectName,
-      body.clientName,
-      body.location,
-      body.inspectionDate,
-      body.inspectorName || null,
-      body.systemPowerKwp || null,
-      body.moduleCount || null,
-      body.inverterCount || null,
-      body.installationYear || null
+      projectName,
+      clientName,
+      loc,
+      inspectionDate,
+      inspectorName || null,
+      systemPowerKwp || null,
+      moduleCount || null,
+      inverterCount || null,
+      installationYear || null
     ).run();
     
     const inspectionId = inspectionResult.meta.last_row_id as number;

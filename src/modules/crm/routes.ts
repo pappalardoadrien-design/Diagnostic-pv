@@ -38,11 +38,12 @@ crmRoutes.get('/clients', async (c) => {
     let query = `
       SELECT 
         c.*,
-        COUNT(DISTINCT a.id) as total_audits,
-        MAX(a.created_at) as last_audit_date,
+        COUNT(DISTINCT ea.id) as total_audits,
+        MAX(ea.created_at) as last_audit_date,
         COUNT(DISTINCT ct.id) as contacts_count
       FROM crm_clients c
-      LEFT JOIN audits a ON a.client_id = c.id
+      LEFT JOIN projects p ON p.client_id = c.id
+      LEFT JOIN el_audits ea ON ea.plant_id = p.id
       LEFT JOIN crm_contacts ct ON ct.client_id = c.id
     `;
 
@@ -150,13 +151,14 @@ crmRoutes.get('/clients/:id', async (c) => {
       .bind(clientId)
       .all();
 
-    // Stats audits
+    // Stats audits (via projects -> el_audits)
     const stats = await DB.prepare(`
       SELECT 
-        COUNT(*) as total_audits,
-        MAX(created_at) as last_audit_date
-      FROM audits 
-      WHERE client_id = ?
+        COUNT(ea.id) as total_audits,
+        MAX(ea.created_at) as last_audit_date
+      FROM projects p
+      LEFT JOIN el_audits ea ON ea.plant_id = p.id
+      WHERE p.client_id = ?
     `).bind(clientId).first();
 
     return c.json({
@@ -240,15 +242,15 @@ crmRoutes.delete('/clients/:id', async (c) => {
     const { DB } = c.env;
     const clientId = c.req.param('id');
 
-    // Vérifier si audits liés
-    const audits = await DB.prepare('SELECT COUNT(*) as count FROM audits WHERE client_id = ?')
+    // Vérifier si projets/audits liés
+    const linkedProjects = await DB.prepare('SELECT COUNT(*) as count FROM projects WHERE client_id = ?')
       .bind(clientId)
       .first() as any;
 
-    if (audits.count > 0) {
+    if (linkedProjects && linkedProjects.count > 0) {
       return c.json({ 
         success: false, 
-        message: `Impossible de supprimer : ${audits.count} audit(s) lié(s)` 
+        message: `Impossible de supprimer : ${linkedProjects.count} projet(s) lié(s)` 
       }, 400);
     }
 
@@ -329,19 +331,18 @@ crmRoutes.get('/clients/:id/audits', async (c) => {
 
     const audits = await DB.prepare(`
       SELECT 
-        a.id as audit_id,
-        a.audit_token,
-        a.project_name,
-        a.location,
-        a.modules_enabled,
-        a.status,
-        a.created_at,
-        a.updated_at,
-        e.total_modules
-      FROM audits a
-      LEFT JOIN el_audits e ON a.id = e.audit_id
-      WHERE a.client_id = ?
-      ORDER BY a.created_at DESC
+        ea.id as audit_id,
+        ea.audit_token,
+        ea.project_name,
+        ea.location,
+        ea.status,
+        ea.created_at,
+        ea.updated_at,
+        ea.total_modules
+      FROM el_audits ea
+      JOIN projects p ON ea.plant_id = p.id
+      WHERE p.client_id = ?
+      ORDER BY ea.created_at DESC
     `).bind(clientId).all();
 
     return c.json({
@@ -994,7 +995,7 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
     const pvPlantsCount = await safeCount('SELECT COUNT(*) as count FROM pv_plants');
     const projectsCount = pvPlantsCount > 0 ? pvPlantsCount : await safeCount('SELECT COUNT(*) as count FROM projects WHERE status = "active"');
     
-    const auditsCount = await safeCount('SELECT COUNT(*) as count FROM audits WHERE status = "in_progress"');
+    const auditsCount = await safeCount('SELECT COUNT(*) as count FROM el_audits WHERE status = "in_progress"');
     
     // Interventions cette semaine
     const today = new Date().toISOString().split('T')[0];
@@ -1011,11 +1012,12 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
     let recentAudits = [];
     try {
       const res = await DB.prepare(`
-        SELECT a.*, c.company_name as client_company
-        FROM audits a
-        LEFT JOIN crm_clients c ON a.client_id = c.id
-        WHERE a.status = "in_progress"
-        ORDER BY a.updated_at DESC
+        SELECT ea.*, c.company_name as client_company
+        FROM el_audits ea
+        LEFT JOIN projects p ON ea.plant_id = p.id
+        LEFT JOIN crm_clients c ON p.client_id = c.id
+        WHERE ea.status = 'in_progress'
+        ORDER BY ea.updated_at DESC
         LIMIT 5
       `).all();
       recentAudits = res.results || [];
@@ -1028,7 +1030,7 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
         SELECT i.*, p.name as project_name, c.company_name as client_name, i.intervention_date as date_souhaitee, i.status as statut
         FROM interventions i
         LEFT JOIN projects p ON i.project_id = p.id
-        LEFT JOIN crm_clients c ON i.client_id = c.id
+        LEFT JOIN crm_clients c ON p.client_id = c.id
         WHERE i.intervention_date >= ?
         ORDER BY i.intervention_date ASC
         LIMIT 5
@@ -1055,6 +1057,14 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
     console.error('GET /dashboard/unified/summary error:', error);
     return c.json({ success: false, error: 'Erreur serveur' }, 500);
   }
+});
+
+// Alias: /api/crm/dashboard redirige vers /api/crm/dashboard/unified/summary
+crmRoutes.get('/dashboard', async (c) => {
+  // Réexécuter la même logique que /dashboard/unified/summary
+  const url = new URL(c.req.url);
+  url.pathname = url.pathname.replace('/dashboard', '/dashboard/unified/summary');
+  return c.redirect(url.pathname + url.search, 307);
 });
 
 export default crmRoutes;
