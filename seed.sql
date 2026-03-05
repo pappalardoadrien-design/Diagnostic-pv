@@ -1,6 +1,6 @@
 -- ============================================================================
 -- SEED DATA - Diagnostic PV Hub
--- Base de test professionnelle pour toutes les modules
+-- Base de test professionnelle pour tous les modules
 -- ============================================================================
 
 -- Desactiver FK temporairement pour le seeding
@@ -8,7 +8,7 @@ PRAGMA foreign_keys = OFF;
 
 -- 1. Clients legacy (table clients - FK pour projects)
 INSERT OR IGNORE INTO clients (id, name, contact_email, siret, notes) VALUES
-(1, 'GIRASOLE SAS', 'jean.dupont@girasole.fr', '12345678901234', 'Client historique - 52 centrales PV');
+(1, 'SolarTest SAS', 'contact@solartest.fr', '98765432100012', 'Client de test - Plateforme DiagPV');
 
 -- 1b. CRM : Client de test (table crm_clients - nouveau CRM)
 INSERT OR IGNORE INTO crm_clients (
@@ -16,10 +16,10 @@ INSERT OR IGNORE INTO crm_clients (
   main_contact_name, main_contact_email, main_contact_phone,
   status, acquisition_source, notes
 ) VALUES (
-  1, 'GIRASOLE SAS', 'professional', '12345678901234',
-  '15 Rue des Panneaux Solaires', '31000', 'Toulouse', 'France',
-  'Jean Dupont', 'jean.dupont@girasole.fr', '05 61 00 00 00',
-  'active', 'direct', 'Client historique - 52 centrales PV'
+  1, 'SolarTest SAS', 'professional', '98765432100012',
+  '3 Rue Apollo', '31240', 'L''Union', 'France',
+  'Thomas Martin', 'contact@solartest.fr', '05 61 00 00 00',
+  'active', 'direct', 'Client de test - Plateforme DiagPV'
 );
 
 -- 2. Projet de test
@@ -50,7 +50,7 @@ INSERT OR IGNORE INTO el_audits (
   string_count, modules_per_string, total_modules,
   status, completion_rate, plant_id, audit_date
 ) VALUES (
-  1, 'EL-JALIBAT-2026', 'Centrale PV JALIBAT', 'GIRASOLE SAS', 'Toulouse - ZI Jalibat',
+  1, 'EL-JALIBAT-2026', 'Centrale PV JALIBAT', 'SolarTest SAS', 'Toulouse - ZI Jalibat',
   12, 20, 240,
   'in_progress', 45.5, 1, '2026-03-01'
 );
@@ -155,7 +155,7 @@ INSERT OR IGNORE INTO diode_test_sessions (
   95.83, 'completed', 'Test diodes bypass - 72 diodes testees sur 24 modules'
 );
 
--- 11. Diode Test Results
+-- 11b. Diode Test Results
 INSERT OR IGNORE INTO diode_test_results (
   session_id, module_identifier, diode_position, status,
   defect_type, severity, temperature_diode, delta_t, observation
