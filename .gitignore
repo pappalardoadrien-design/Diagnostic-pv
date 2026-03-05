@@ -32,3 +32,5 @@ lerna-debug.log*
 # misc
 .DS_Store
 restore-complete.sql
+core
+*.core
