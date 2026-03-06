@@ -62,6 +62,113 @@ const auditQualiteRoutes = new Hono<{ Bindings: Bindings }>();
 // HELPERS
 // ============================================================================
 
+// Auto-création de la vue v_aq_missions_stats si manquante en production
+async function ensureAQView(DB: D1Database): Promise<void> {
+  try {
+    await DB.prepare('SELECT 1 FROM v_aq_missions_stats LIMIT 0').run();
+  } catch {
+    // Vue manquante — créer les tables de base si nécessaires + la vue
+    const createStatements = [
+      `CREATE TABLE IF NOT EXISTS techniciens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT NOT NULL, prenom TEXT, email TEXT, telephone TEXT,
+        specialite TEXT, statut TEXT DEFAULT 'actif',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS ordres_mission_qualite (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference TEXT UNIQUE, project_id INTEGER, client_id INTEGER, technicien_id INTEGER,
+        type_audit TEXT DEFAULT 'SOL', statut TEXT DEFAULT 'planifie', priorite TEXT DEFAULT 'normale',
+        date_planifiee DATE, date_debut DATETIME, date_fin DATETIME,
+        meteo TEXT, temperature_ambiante REAL, irradiance REAL,
+        score_global REAL, nb_non_conformites INTEGER DEFAULT 0,
+        nb_observations INTEGER DEFAULT 0, nb_conformes INTEGER DEFAULT 0,
+        commentaire_general TEXT, notes_internes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_checklist_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL, categorie TEXT NOT NULL, code TEXT, libelle TEXT NOT NULL,
+        norme TEXT, severite TEXT DEFAULT 'mineur', conformite TEXT DEFAULT 'non_verifie',
+        observation TEXT, recommandation TEXT, checked_by TEXT, checked_at DATETIME,
+        ordre_affichage INTEGER DEFAULT 0,
+        FOREIGN KEY (mission_id) REFERENCES ordres_mission_qualite(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_checklist_items_toiture (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL, categorie TEXT NOT NULL, code TEXT, libelle TEXT NOT NULL,
+        norme TEXT, severite TEXT DEFAULT 'mineur', conformite TEXT DEFAULT 'non_verifie',
+        observation TEXT, recommandation TEXT, checked_by TEXT, checked_at DATETIME,
+        ordre_affichage INTEGER DEFAULT 0,
+        FOREIGN KEY (mission_id) REFERENCES ordres_mission_qualite(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_item_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL, item_id INTEGER, item_type TEXT DEFAULT 'sol',
+        photo_url TEXT NOT NULL, legende TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_photos_generales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL, photo_url TEXT NOT NULL, legende TEXT, categorie TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_commentaires_finaux (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL UNIQUE, commentaire TEXT, recommandations TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_rapports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL, reference TEXT, titre TEXT, statut TEXT DEFAULT 'brouillon',
+        version INTEGER DEFAULT 1, score_conformite REAL, nb_non_conformites INTEGER DEFAULT 0,
+        nb_observations INTEGER DEFAULT 0, valide_par TEXT, valide_at DATETIME, html_content TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (mission_id) REFERENCES ordres_mission_qualite(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS aq_checklist_toiture_template (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categorie TEXT NOT NULL, code TEXT, libelle TEXT NOT NULL,
+        norme TEXT, severite TEXT DEFAULT 'mineur', ordre_affichage INTEGER DEFAULT 0, actif INTEGER DEFAULT 1
+      )`,
+    ];
+    for (const sql of createStatements) {
+      try { await DB.prepare(sql).run(); } catch {}
+    }
+    // Créer la vue
+    await DB.prepare(`
+      CREATE VIEW IF NOT EXISTS v_aq_missions_stats AS
+      SELECT
+        omq.id, omq.reference, omq.type_audit, omq.statut, omq.priorite,
+        omq.date_planifiee, omq.date_debut, omq.date_fin,
+        omq.meteo, omq.temperature_ambiante, omq.irradiance,
+        omq.score_global, omq.nb_non_conformites, omq.nb_observations, omq.nb_conformes,
+        omq.commentaire_general, omq.notes_internes, omq.created_at, omq.updated_at,
+        omq.project_id,
+        COALESCE(pp.plant_name, '') AS project_name,
+        COALESCE(pp.address, '') AS project_location,
+        COALESCE(pp.total_power_kwp, 0) AS power_kwc,
+        omq.client_id,
+        COALESCE(cc.company_name, '') AS client_name,
+        omq.technicien_id,
+        COALESCE(t.nom || ' ' || t.prenom, '') AS technicien_name,
+        (SELECT COUNT(*) FROM aq_checklist_items ci WHERE ci.mission_id = omq.id) AS total_items_sol,
+        (SELECT COUNT(*) FROM aq_checklist_items ci WHERE ci.mission_id = omq.id AND ci.conformite = 'conforme') AS conformes_sol,
+        (SELECT COUNT(*) FROM aq_checklist_items ci WHERE ci.mission_id = omq.id AND ci.conformite = 'non_conforme') AS nc_sol,
+        (SELECT COUNT(*) FROM aq_checklist_items_toiture ct WHERE ct.mission_id = omq.id) AS total_items_toiture,
+        (SELECT COUNT(*) FROM aq_checklist_items_toiture ct WHERE ct.mission_id = omq.id AND ct.conformite = 'conforme') AS conformes_toiture,
+        (SELECT COUNT(*) FROM aq_checklist_items_toiture ct WHERE ct.mission_id = omq.id AND ct.conformite = 'non_conforme') AS nc_toiture,
+        (SELECT COUNT(*) FROM aq_item_photos ip WHERE ip.mission_id = omq.id) AS total_photos,
+        (SELECT COUNT(*) FROM aq_photos_generales pg WHERE pg.mission_id = omq.id) AS total_photos_generales
+      FROM ordres_mission_qualite omq
+      LEFT JOIN pv_plants pp ON omq.project_id = pp.id
+      LEFT JOIN crm_clients cc ON omq.client_id = cc.id
+      LEFT JOIN techniciens t ON omq.technicien_id = t.id
+    `).run();
+  }
+}
+
 function generateReference(prefix: string, id: number): string {
   const year = new Date().getFullYear();
   return `${prefix}-${year}-${String(id).padStart(3, '0')}`;
@@ -191,6 +298,7 @@ auditQualiteRoutes.get('/templates/toiture', async (c) => {
 auditQualiteRoutes.get('/missions', async (c) => {
   try {
     const { DB } = c.env;
+    await ensureAQView(DB);
     const { statut, client_id, project_id, type_audit, limit: limitStr, offset: offsetStr } = c.req.query();
     
     let query = `SELECT * FROM v_aq_missions_stats WHERE 1=1`;
@@ -280,6 +388,7 @@ auditQualiteRoutes.get('/missions/:id', async (c) => {
     const { DB } = c.env;
     const id = c.req.param('id');
     
+    await ensureAQView(DB);
     const mission = await DB.prepare('SELECT * FROM v_aq_missions_stats WHERE id = ?').bind(id).first();
     if (!mission) return c.json({ error: 'Mission introuvable' }, 404);
     
@@ -818,6 +927,7 @@ auditQualiteRoutes.post('/missions/:id/rapport/generer', async (c) => {
     const missionId = c.req.param('id');
     
     // Charger toutes les données
+    await ensureAQView(DB);
     const mission = await DB.prepare('SELECT * FROM v_aq_missions_stats WHERE id = ?').bind(missionId).first();
     if (!mission) return c.json({ error: 'Mission introuvable' }, 404);
     

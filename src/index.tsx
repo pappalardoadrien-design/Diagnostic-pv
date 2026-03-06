@@ -102,6 +102,7 @@ app.route('/api/opensolar', openSolarModule)
 app.route('/api/iv-curves', ivCurvesModule)
 app.route('/api/visual', visualInspectionModule)
 app.route('/api/thermique', thermiqueRoutes)
+app.route('/api/thermal', thermiqueRoutes)  // Alias anglais
 app.route('/api/isolation', isolationRoutes)
 app.route('/api/report/unified', unifiedReportRoutes)
 app.route('/api/report/custom', customReportRoutes)

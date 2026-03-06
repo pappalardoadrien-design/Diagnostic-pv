@@ -1066,9 +1066,15 @@ crmRoutes.get('/dashboard/unified/summary', async (c) => {
 
 // Alias: /api/crm/dashboard redirige vers /api/crm/dashboard/unified/summary
 crmRoutes.get('/dashboard', async (c) => {
-  // Réexécuter la même logique que /dashboard/unified/summary
   const url = new URL(c.req.url);
   url.pathname = url.pathname.replace('/dashboard', '/dashboard/unified/summary');
+  return c.redirect(url.pathname + url.search, 307);
+});
+
+// Alias: /api/crm/dashboard/summary → /api/crm/dashboard/unified/summary
+crmRoutes.get('/dashboard/summary', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = url.pathname.replace('/dashboard/summary', '/dashboard/unified/summary');
   return c.redirect(url.pathname + url.search, 307);
 });
 
