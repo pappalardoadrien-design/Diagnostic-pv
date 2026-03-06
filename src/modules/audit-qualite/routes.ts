@@ -121,6 +121,69 @@ const CHECKLIST_SOL_TEMPLATE = [
 ];
 
 // ============================================================================
+// TEMPLATES - Référentiels checklist disponibles
+// ============================================================================
+
+// GET /templates - Liste des templates de checklist disponibles
+auditQualiteRoutes.get('/templates', async (c) => {
+  const solCategories = [...new Set(CHECKLIST_SOL_TEMPLATE.map(t => t.categorie))];
+  
+  return c.json({
+    success: true,
+    templates: [
+      {
+        type: 'sol',
+        label: 'Checklist Sol (NF C 15-100)',
+        norme: 'NF C 15-100 / IEC 62446-1',
+        description: 'Contrôle qualité installations au sol - 36 items, 7 catégories',
+        total_items: CHECKLIST_SOL_TEMPLATE.length,
+        categories: solCategories.map(cat => ({
+          categorie: cat,
+          items_count: CHECKLIST_SOL_TEMPLATE.filter(t => t.categorie === cat).length
+        }))
+      },
+      {
+        type: 'toiture',
+        label: 'Checklist Toiture (DTU 40.35)',
+        norme: 'DTU 40.35 / NF EN 62446',
+        description: 'Contrôle qualité installations en toiture - template en base',
+        total_items: null // Depuis la table aq_checklist_toiture_template
+      }
+    ]
+  });
+});
+
+// GET /templates/sol - Détail template SOL avec tous les items
+auditQualiteRoutes.get('/templates/sol', async (c) => {
+  return c.json({
+    success: true,
+    type: 'sol',
+    norme: 'NF C 15-100 / IEC 62446-1',
+    total_items: CHECKLIST_SOL_TEMPLATE.length,
+    items: CHECKLIST_SOL_TEMPLATE
+  });
+});
+
+// GET /templates/toiture - Détail template TOITURE depuis la base
+auditQualiteRoutes.get('/templates/toiture', async (c) => {
+  try {
+    const { DB } = c.env;
+    const templates = await DB.prepare(
+      'SELECT * FROM aq_checklist_toiture_template WHERE actif = 1 ORDER BY ordre_affichage'
+    ).all();
+    return c.json({
+      success: true,
+      type: 'toiture',
+      norme: 'DTU 40.35',
+      total_items: templates.results?.length || 0,
+      items: templates.results || []
+    });
+  } catch (e: any) {
+    return c.json({ success: true, type: 'toiture', total_items: 0, items: [], note: 'Table template toiture non initialisée' });
+  }
+});
+
+// ============================================================================
 // MISSIONS CRUD
 // ============================================================================
 
