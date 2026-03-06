@@ -94,6 +94,27 @@ export function getCrmDashboardPage() {
                         </div>
                         <span class="text-sm font-bold text-slate-700 group-hover:text-orange-700">Planning</span>
                     </a>
+
+                    <a href="/crm/pipeline" class="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-xl hover:bg-blue-50 hover:shadow-md transition-all group cursor-pointer border border-transparent hover:border-blue-200">
+                        <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-500 mb-3 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-chart-line text-lg"></i>
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 group-hover:text-blue-700">Pipeline</span>
+                    </a>
+
+                    <a href="/repowering" class="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-xl hover:bg-amber-50 hover:shadow-md transition-all group cursor-pointer border border-transparent hover:border-amber-200">
+                        <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-amber-500 mb-3 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-solar-panel text-lg"></i>
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 group-hover:text-amber-700">Repowering</span>
+                    </a>
+
+                    <a href="/amo" class="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-xl hover:bg-purple-50 hover:shadow-md transition-all group cursor-pointer border border-transparent hover:border-purple-200">
+                        <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-purple-500 mb-3 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-hard-hat text-lg"></i>
+                        </div>
+                        <span class="text-sm font-bold text-slate-700 group-hover:text-purple-700">AMO</span>
+                    </a>
                 </div>
             </div>
 

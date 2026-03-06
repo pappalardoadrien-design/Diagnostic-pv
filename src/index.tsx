@@ -35,6 +35,9 @@ import diagnosticRoutes from './modules/admin/diagnostic-routes'
 import auditQualiteRoutes from './modules/audit-qualite/routes'
 import diodeTestRoutes from './modules/diode-tests/routes'
 import pvservDarkRoutes from './modules/iv-curves/pvserv-dark-routes'
+import pipelineRoutes from './modules/crm/pipeline-routes'
+import repoweringRoutes from './modules/repowering/routes'
+import amoRoutes from './modules/amo/routes'
 
 // === PAGES (frontend HTML) ===
 import { getRapportsPage } from './pages/rapports.js'
@@ -66,6 +69,9 @@ import { getElAuditTerrainPage } from './pages/el-audit-terrain'
 import { getToolsPage } from './pages/tools'
 import { getAuditQualitePage, getAuditQualitePhotosPage } from './pages/audit-qualite'
 import { getRapportQualitePage } from './pages/rapport-qualite'
+import { getPipelinePage } from './pages/pipeline'
+import { getRepoweringPage } from './pages/repowering'
+import { getAmoPage } from './pages/amo'
 import { getPvservDarkPage } from './pages/pvserv-dark'
 
 // ============================================================================
@@ -115,6 +121,9 @@ app.route('/api/diagnostic', diagnosticRoutes)
 app.route('/api/audit-qualite', auditQualiteRoutes)
 app.route('/api/diode-tests', diodeTestRoutes)
 app.route('/api/pvserv', pvservDarkRoutes)
+app.route('/api/crm/pipeline', pipelineRoutes)
+app.route('/api/repowering', repoweringRoutes)
+app.route('/api/amo', amoRoutes)
 app.route('/admin', adminRoutes)
 app.route('/', designerModule)
 app.route('/crm/unified', crmUnifiedViewPage)
@@ -142,6 +151,15 @@ app.get('/crm/clients/:id', (c) => {
 app.get('/crm/projects', (c) => c.html(getCrmProjectsListPage()))
 app.get('/crm/projects/create', (c) => c.html(getCrmProjectsCreatePage()))
 app.get('/crm/projects/detail', (c) => c.html(getCrmProjectsDetailPage()))
+
+// --- Pipeline Commercial ---
+app.get('/crm/pipeline', (c) => c.html(getPipelinePage()))
+
+// --- Repowering ---
+app.get('/repowering', (c) => c.html(getRepoweringPage()))
+
+// --- AMO ---
+app.get('/amo', (c) => c.html(getAmoPage()))
 
 // --- Planning ---
 app.get('/planning', (c) => c.html(getPlanningDashboardUnifiedPage()))

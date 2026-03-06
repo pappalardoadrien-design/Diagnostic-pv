@@ -443,3 +443,133 @@ unifiedReportRoutes.get('/plant/:plantId', async (c) => {
     }, 500);
   }
 });
+
+// ============================================================================
+// GET /api/report/unified/:token/pdf - Servir le HTML prêt pour export PDF
+// ============================================================================
+unifiedReportRoutes.get('/:token/pdf', async (c) => {
+  const { DB } = c.env;
+  const token = c.req.param('token');
+  
+  try {
+    const report = await DB.prepare(
+      'SELECT html_content, report_title, client_name FROM unified_reports WHERE report_token = ?'
+    ).bind(token).first() as any;
+    
+    if (!report || !report.html_content) {
+      return c.html(`
+        <!DOCTYPE html><html><head><title>Rapport introuvable</title></head>
+        <body style="font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+          <div style="text-align:center;">
+            <h1 style="color:#ef4444;">Rapport introuvable</h1>
+            <p>Le token <code>${token}</code> ne correspond à aucun rapport.</p>
+            <a href="/rapports" style="color:#2563eb;">← Retour aux rapports</a>
+          </div>
+        </body></html>
+      `, 404);
+    }
+
+    // Injecter le bouton PDF + barre d'outils dans le HTML
+    const pdfToolbar = `
+      <div id="pdf-toolbar" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#1e3a5f,#0f766e);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.3);font-family:Inter,sans-serif;" class="no-print">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjZjBmOWZmIi8+PHRleHQgeD0iNSIgeT0iMjIiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzBlNzQ5MCI+UFY8L3RleHQ+PC9zdmc+" style="height:32px;width:32px;border-radius:6px;">
+          <div>
+            <div style="color:#fff;font-weight:700;font-size:14px;">Diagnostic Photovoltaïque</div>
+            <div style="color:rgba(255,255,255,.7);font-size:11px;">${report.report_title || 'Rapport Audit'} — ${report.client_name || ''}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="window.print()" style="background:#f59e0b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+            Exporter PDF
+          </button>
+          <a href="/rapports" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px;">
+            ← Retour
+          </a>
+        </div>
+      </div>
+      <style>
+        @media print {
+          #pdf-toolbar { display: none !important; }
+          body { padding-top: 0 !important; }
+        }
+        @media screen {
+          body { padding-top: 60px !important; }
+        }
+        #pdf-toolbar button:hover { background: #d97706 !important; transform: scale(1.03); }
+      </style>
+    `;
+
+    // Injecter la toolbar après <body>
+    let html = report.html_content;
+    if (html.includes('<body')) {
+      html = html.replace(/(<body[^>]*>)/, `$1${pdfToolbar}`);
+    } else {
+      html = pdfToolbar + html;
+    }
+
+    return c.html(html);
+  } catch (error) {
+    console.error('Erreur export PDF:', error);
+    return c.html(`
+      <!DOCTYPE html><html><head><title>Erreur</title></head>
+      <body style="font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;">
+          <h1 style="color:#ef4444;">Erreur serveur</h1>
+          <p>${error instanceof Error ? error.message : 'Erreur inconnue'}</p>
+          <a href="/rapports" style="color:#2563eb;">← Retour</a>
+        </div>
+      </body></html>
+    `, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/report/unified/list/all - Liste de tous les rapports générés
+// ============================================================================
+unifiedReportRoutes.get('/list/all', async (c) => {
+  const { DB } = c.env;
+  const { limit: limitStr, offset: offsetStr } = c.req.query();
+  const limit = parseInt(limitStr || '50');
+  const offset = parseInt(offsetStr || '0');
+
+  try {
+    const reports = await DB.prepare(`
+      SELECT 
+        id, report_token, report_title, client_name, audit_date,
+        overall_conformity_rate, critical_issues_count, major_issues_count, minor_issues_count,
+        modules_included, created_at, auditor_name, plant_id
+      FROM unified_reports 
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
+
+    const total = await DB.prepare('SELECT COUNT(*) as count FROM unified_reports').first<{count: number}>();
+
+    return c.json({
+      success: true,
+      reports: (reports.results || []).map((r: any) => ({
+        id: r.id,
+        reportToken: r.report_token,
+        reportTitle: r.report_title,
+        clientName: r.client_name,
+        auditDate: r.audit_date,
+        overallConformityRate: r.overall_conformity_rate,
+        criticalIssuesCount: r.critical_issues_count,
+        majorIssuesCount: r.major_issues_count,
+        minorIssuesCount: r.minor_issues_count,
+        modulesIncluded: JSON.parse(r.modules_included || '[]'),
+        createdAt: r.created_at,
+        auditorName: r.auditor_name,
+        plantId: r.plant_id,
+        pdfUrl: `/api/report/unified/${r.report_token}/pdf`
+      })),
+      total: total?.count || 0,
+      limit, offset
+    });
+  } catch (error) {
+    console.error('Erreur liste rapports:', error);
+    return c.json({ success: true, reports: [], total: 0, limit, offset });
+  }
+});
