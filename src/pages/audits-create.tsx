@@ -226,7 +226,6 @@ export function getAuditsCreatePage() {
                     optGroup.label = "📂 PROJETS CRM";
                     
                     projects
-                        .filter(p => !p.is_girasole) // Exclure GIRASOLE
                         .sort((a,b) => (a.name||'').localeCompare(b.name||''))
                         .slice(0, 50) // Limiter à 50
                         .forEach(p => {

@@ -62,7 +62,7 @@ export function getPipelinePage(): string {
       <form id="opp-form" class="p-6 space-y-4" onsubmit="saveOpportunity(event)">
         <input type="hidden" id="opp-id">
         <div class="grid grid-cols-2 gap-4">
-          <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Titre *</label><input id="opp-title" required class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Audit 52 centrales GIRASOLE"></div>
+          <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Titre *</label><input id="opp-title" required class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Audit centrale 500kWc"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">Client *</label><select id="opp-client" required class="w-full border rounded-lg px-3 py-2 text-sm"></select></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select id="opp-type" class="w-full border rounded-lg px-3 py-2 text-sm">

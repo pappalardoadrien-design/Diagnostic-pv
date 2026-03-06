@@ -1,4 +1,4 @@
--- Migration 0024: Add GIRASOLE specific fields to visual_inspections
+-- Migration 0024: Add checklist fields to visual_inspections
 -- Date: 2025-11-20
 -- Support CONFORMITE and TOITURE checklist types
 

@@ -326,7 +326,6 @@ diagnostic-hub/
 - **Dashboard Unifié**: https://diagnostic-hub.pages.dev/dashboard
 - **CRM Clients**: https://diagnostic-hub.pages.dev/crm/clients
 - **Planning**: https://diagnostic-hub.pages.dev/planning
-- **GIRASOLE Mission**: https://diagnostic-hub.pages.dev/girasole/dashboard
 - **Création Audit**: https://diagnostic-hub.pages.dev/audits/create
 - **GitHub**: https://github.com/pappalardoadrien-design/Diagnostic-pv
 - **Database**: diagnostic-hub-production (ID: 72be68d4-c5c5-4854-9ead-3bbcc131d199)
@@ -348,9 +347,8 @@ diagnostic-hub/
 
 ### Statistiques Production (08/01/2026)
 - ✅ **7 clients actifs** dans le CRM
-- ✅ **54 projets GIRASOLE** (40 SOL + 14 DOUBLE) - Mission Janvier-Mars 2025
 - ✅ **184 défauts critiques** suivis dans le système
-- ✅ **Modules fonctionnels**: Dashboard, CRM, Planning, GIRASOLE, Audits, EL, PV Carto
+- ✅ **Modules fonctionnels**: Dashboard, CRM, Planning, Audits, EL, PV Carto, Repowering, AMO, Pipeline
 - ✅ **Tailwind CSS v4** installé avec plugin Vite
 - ✅ **Documentation organisée** - 43 fichiers MD dans docs/ (archive, guides, architecture, roadmap)
 

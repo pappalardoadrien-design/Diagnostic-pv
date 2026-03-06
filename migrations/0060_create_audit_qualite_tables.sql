@@ -1,5 +1,5 @@
 -- Migration 0060: Module Audit Qualite Terrain
--- Intégration GIRASOLE → DiagPV CRM
+-- Intégration Audit Qualité dans DiagPV CRM
 -- 11 nouvelles tables avec FK vers crm_clients et projects
 -- Date: 2026-02-23
 

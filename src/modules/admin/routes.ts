@@ -67,10 +67,9 @@ adminRoutes.get('/emergency-db-fix', async (c) => {
   // 3.2 Mise à jour ALBAGNAC 2 avec client Broussy Energie (client_id = 9)
   await runQuery("UPDATE pv_plants SET client_id = 9 WHERE plant_name = 'ALBAGNAC 2' AND client_id IS NULL", "PV Plants: Liaison ALBAGNAC 2 → Broussy Energie")
 
-  // 4. Mettre à jour les tables VISUAL et PROJECTS (Girasole & Thermal)
+  // 4. Mettre à jour les tables VISUAL et PROJECTS
   await runQuery("ALTER TABLE visual_inspections ADD COLUMN checklist_type TEXT DEFAULT 'IEC_62446'", "Visual: Ajout checklist_type")
   await runQuery("ALTER TABLE visual_inspections ADD COLUMN project_id INTEGER", "Visual: Ajout project_id")
-  await runQuery("ALTER TABLE projects ADD COLUMN is_girasole INTEGER DEFAULT 0", "Projects: Ajout is_girasole")
   await runQuery("ALTER TABLE projects ADD COLUMN id_referent TEXT", "Projects: Ajout id_referent")
   await runQuery("ALTER TABLE thermal_measurements ADD COLUMN audit_token TEXT", "Thermal: Ajout audit_token")
 
