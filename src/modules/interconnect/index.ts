@@ -304,6 +304,18 @@ interconnectModule.post('/auto-link', async (c) => {
   };
 
   try {
+    // 0. S'assurer que la colonne plant_id existe sur el_audits
+    try {
+      await env.DB.prepare(`SELECT plant_id FROM el_audits LIMIT 1`).first();
+    } catch {
+      await env.DB.prepare(`ALTER TABLE el_audits ADD COLUMN plant_id INTEGER REFERENCES pv_plants(id) ON DELETE SET NULL`).run();
+      try { await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_el_audits_plant_id ON el_audits(plant_id)`).run(); } catch {}
+    }
+    try {
+      await env.DB.prepare(`SELECT audit_date FROM el_audits LIMIT 1`).first();
+    } catch {
+      await env.DB.prepare(`ALTER TABLE el_audits ADD COLUMN audit_date DATE`).run();
+    }
     // 1. Récupérer tous les audits EL
     const audits = await env.DB.prepare(`
       SELECT id, audit_token, project_name, client_name, plant_id, created_at 
@@ -423,16 +435,26 @@ interconnectModule.post('/auto-link', async (c) => {
 interconnectModule.get('/status', async (c) => {
   const { env } = c;
   try {
-    const audits = await env.DB.prepare(`SELECT COUNT(*) as total, SUM(CASE WHEN plant_id IS NOT NULL THEN 1 ELSE 0 END) as linked FROM el_audits`).first<any>();
-    const links = await env.DB.prepare(`SELECT COUNT(*) as total FROM pv_cartography_audit_links`).first<any>();
+    let auditsTotal = 0, auditsLinked = 0;
+    try {
+      const audits = await env.DB.prepare(`SELECT COUNT(*) as total, SUM(CASE WHEN plant_id IS NOT NULL THEN 1 ELSE 0 END) as linked FROM el_audits`).first<any>();
+      auditsTotal = audits?.total || 0;
+      auditsLinked = audits?.linked || 0;
+    } catch {
+      // plant_id column may not exist yet
+      const audits = await env.DB.prepare(`SELECT COUNT(*) as total FROM el_audits`).first<any>();
+      auditsTotal = audits?.total || 0;
+    }
+    let linksCount = 0;
+    try { const links = await env.DB.prepare(`SELECT COUNT(*) as total FROM pv_cartography_audit_links`).first<any>(); linksCount = links?.total || 0; } catch {}
     const plants = await env.DB.prepare(`SELECT COUNT(*) as total FROM pv_plants`).first<any>();
     const clients = await env.DB.prepare(`SELECT COUNT(*) as total FROM crm_clients`).first<any>();
     
     return c.json({
       success: true,
       interconnection: {
-        el_audits: { total: audits?.total || 0, linked_to_plant: audits?.linked || 0, unlinked: (audits?.total || 0) - (audits?.linked || 0) },
-        pv_cartography_links: links?.total || 0,
+        el_audits: { total: auditsTotal, linked_to_plant: auditsLinked, unlinked: auditsTotal - auditsLinked },
+        pv_cartography_links: linksCount,
         pv_plants: plants?.total || 0,
         crm_clients: clients?.total || 0
       }
