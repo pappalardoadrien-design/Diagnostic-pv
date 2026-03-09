@@ -173,6 +173,7 @@ app.get('/audit/create', (c) => c.redirect('/audits/create'))
 app.get('/el', (c) => c.redirect('/audits/create?type=EL'))
 
 // --- Audit Qualité Terrain ---
+app.get('/audit-qualite', (c) => c.html(getAuditQualitePage('list')))
 app.get('/audit-qualite/:missionId', (c) => c.html(getAuditQualitePage(c.req.param('missionId'))))
 app.get('/audit-qualite/:missionId/photos', (c) => c.html(getAuditQualitePhotosPage(c.req.param('missionId'))))
 app.get('/rapport-qualite/:rapportId', (c) => c.html(getRapportQualitePage(c.req.param('rapportId'))))

@@ -18,6 +18,33 @@ type Bindings = {
 
 const elModule = new Hono<{ Bindings: Bindings }>()
 
+// GET /api/el - Index module EL
+elModule.get('/', async (c) => {
+  try {
+    const { DB } = c.env;
+    const audits = await DB.prepare(`
+      SELECT COUNT(*) as total, 
+        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+      FROM el_audits
+    `).first<any>();
+    const modules = await DB.prepare(`SELECT COUNT(*) as total FROM el_modules`).first<any>();
+    return c.json({
+      success: true,
+      module: 'Électroluminescence (EL)',
+      stats: {
+        audits_total: audits?.total || 0,
+        audits_in_progress: audits?.in_progress || 0,
+        audits_completed: audits?.completed || 0,
+        modules_total: modules?.total || 0
+      },
+      endpoints: ['/api/el/audit', '/api/el/dashboard', '/api/el/audit/zone/:zoneId']
+    });
+  } catch (error: any) {
+    return c.json({ success: true, module: 'EL', error: error.message, endpoints: ['/api/el/audit', '/api/el/dashboard'] });
+  }
+})
+
 // ============================================================================
 // ROUTE VIEW : Interface Audit EL par zone (interconnexion Canvas V2)
 // ============================================================================

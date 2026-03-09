@@ -23,6 +23,29 @@ import {
 } from './types/index.js';
 
 /**
+ * Helper: Trouver l'audit_token lié à un plantId (multi-fallback)
+ */
+async function findAuditTokenForPlant(DB: D1Database, plantId: number): Promise<string | null> {
+  // Fallback 1: plant_id direct sur el_audits
+  try {
+    const a1 = await DB.prepare(`SELECT audit_token FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1`).bind(plantId).first();
+    if (a1) return (a1 as any).audit_token;
+  } catch { /* column may not exist */ }
+
+  // Fallback 2: via pv_cartography_audit_links
+  try {
+    const a2 = await DB.prepare(`
+      SELECT ea.audit_token FROM el_audits ea
+      JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+      WHERE pcal.pv_plant_id = ? ORDER BY ea.created_at DESC LIMIT 1
+    `).bind(plantId).first();
+    if (a2) return (a2 as any).audit_token;
+  } catch { /* table may not exist */ }
+
+  return null;
+}
+
+/**
  * Agrège toutes les données modules pour rapport unifié
  */
 export async function aggregateUnifiedReportData(
@@ -145,15 +168,24 @@ async function aggregateELModule(
         SELECT * FROM el_audits WHERE audit_token = ?
       `).bind(request.auditElToken).first();
     } else {
-      // Dernier audit pour cette centrale via table de liaison
+      // Fallback 1: Chercher par plant_id direct sur el_audits
       audit = await DB.prepare(`
-        SELECT ea.* 
-        FROM el_audits ea
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ? 
-        ORDER BY ea.created_at DESC 
-        LIMIT 1
+        SELECT * FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1
       `).bind(request.plantId).first();
+      
+      // Fallback 2: Via table de liaison pv_cartography_audit_links
+      if (!audit) {
+        try {
+          audit = await DB.prepare(`
+            SELECT ea.* 
+            FROM el_audits ea
+            JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+            WHERE pcal.pv_plant_id = ? 
+            ORDER BY ea.created_at DESC 
+            LIMIT 1
+          `).bind(request.plantId).first();
+        } catch { /* table may not exist */ }
+      }
     }
     
     if (!audit) return createEmptyELData();
@@ -243,18 +275,26 @@ async function aggregateIVModule(
     let auditToken = request.auditElToken;
     
     if (!auditToken && request.plantId) {
-      // Trouver audit EL via table de liaison
+      // Fallback 1: plant_id direct
       const audit = await DB.prepare(`
-        SELECT ea.audit_token 
-        FROM el_audits ea
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ? 
-        ORDER BY ea.created_at DESC 
-        LIMIT 1
+        SELECT audit_token FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1
       `).bind(request.plantId).first();
       
       if (audit) {
         auditToken = (audit as any).audit_token;
+      } else {
+        // Fallback 2: via table de liaison
+        try {
+          const audit2 = await DB.prepare(`
+            SELECT ea.audit_token 
+            FROM el_audits ea
+            JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+            WHERE pcal.pv_plant_id = ? 
+            ORDER BY ea.created_at DESC 
+            LIMIT 1
+          `).bind(request.plantId).first();
+          if (audit2) auditToken = (audit2 as any).audit_token;
+        } catch { /* table may not exist */ }
       }
     }
     
@@ -547,31 +587,7 @@ async function aggregateThermalModule(
     let auditToken = request.auditElToken;
 
     if (!auditToken && request.plantId) {
-      // Tenter de retrouver le dernier audit EL lié à cette centrale
-      const audit = await DB.prepare(`
-        SELECT ea.audit_token 
-        FROM el_audits ea
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ? 
-        ORDER BY ea.created_at DESC 
-        LIMIT 1
-      `).bind(request.plantId).first();
-      
-      if (audit) {
-        auditToken = (audit as any).audit_token;
-      }
-    }
-
-    if (!auditToken) {
-      // Essayer aussi via plant_id directement sur el_audits
-      if (request.plantId) {
-        const audit = await DB.prepare(`
-          SELECT audit_token FROM el_audits WHERE plant_id = ? ORDER BY created_at DESC LIMIT 1
-        `).bind(request.plantId).first();
-        if (audit) {
-          auditToken = (audit as any).audit_token;
-        }
-      }
+      auditToken = await findAuditTokenForPlant(DB, request.plantId);
     }
 
     if (!auditToken) {
@@ -590,15 +606,17 @@ async function aggregateThermalModule(
 
     if (!measurements.results || measurements.results.length === 0) {
       // Fallback 1: via pv_cartography_audit_links → projects → interventions
-      measurements = await DB.prepare(`
-        SELECT tm.* FROM thermal_measurements tm
-        WHERE tm.intervention_id IN (
-          SELECT i.id FROM interventions i 
-          JOIN projects p ON i.project_id = p.id
-          JOIN pv_cartography_audit_links pcal ON pcal.pv_plant_id = p.id
-          WHERE pcal.el_audit_token = ?
-        )
-      `).bind(auditToken).all();
+      try {
+        measurements = await DB.prepare(`
+          SELECT tm.* FROM thermal_measurements tm
+          WHERE tm.intervention_id IN (
+            SELECT i.id FROM interventions i 
+            JOIN projects p ON i.project_id = p.id
+            JOIN pv_cartography_audit_links pcal ON pcal.pv_plant_id = p.id
+            WHERE pcal.el_audit_token = ?
+          )
+        `).bind(auditToken).all();
+      } catch { /* table may not exist */ }
     }
 
     if (!measurements.results || measurements.results.length === 0) {
@@ -678,19 +696,7 @@ async function aggregatePhotosModule(
      let auditToken = request.auditElToken;
 
     if (!auditToken && request.plantId) {
-      // Tenter de retrouver le dernier audit EL lié à cette centrale
-      const audit = await DB.prepare(`
-        SELECT ea.audit_token 
-        FROM el_audits ea
-        JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-        WHERE pcal.pv_plant_id = ? 
-        ORDER BY ea.created_at DESC 
-        LIMIT 1
-      `).bind(request.plantId).first();
-      
-      if (audit) {
-        auditToken = (audit as any).audit_token;
-      }
+      auditToken = await findAuditTokenForPlant(DB, request.plantId);
     }
 
     if (!auditToken) {
@@ -746,18 +752,7 @@ async function getAuditNotes(
     
     // Si pas de token direct, on cherche le dernier audit de la centrale
     if (!auditToken && request.plantId) {
-        const audit = await DB.prepare(`
-            SELECT ea.audit_token 
-            FROM el_audits ea
-            JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
-            WHERE pcal.pv_plant_id = ? 
-            ORDER BY ea.created_at DESC 
-            LIMIT 1
-        `).bind(request.plantId).first();
-        
-        if (audit) {
-            auditToken = (audit as any).audit_token;
-        }
+        auditToken = await findAuditTokenForPlant(DB, request.plantId);
     }
 
     if (!auditToken) return [];

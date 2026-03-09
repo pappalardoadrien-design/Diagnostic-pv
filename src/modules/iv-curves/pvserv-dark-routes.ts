@@ -23,6 +23,60 @@ type Bindings = { DB: D1Database; KV: KVNamespace; R2: R2Bucket };
 
 const pvservDarkRoutes = new Hono<{ Bindings: Bindings }>();
 
+// Auto-create tables si manquantes en prod
+async function ensurePvservTables(DB: D1Database): Promise<void> {
+  try {
+    await DB.prepare(`SELECT 1 FROM pvserv_import_sessions LIMIT 1`).first();
+  } catch {
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pvserv_import_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_token TEXT UNIQUE NOT NULL,
+        project_id INTEGER,
+        audit_token TEXT,
+        source_filename TEXT,
+        device_name TEXT,
+        serial_number TEXT,
+        total_blocks INTEGER DEFAULT 0,
+        string_count INTEGER DEFAULT 0,
+        diode_count INTEGER DEFAULT 0,
+        technician_name TEXT,
+        import_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        status TEXT DEFAULT 'imported',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pvserv_dark_curves (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER REFERENCES pvserv_import_sessions(id),
+        session_token TEXT,
+        block_index INTEGER,
+        curve_type TEXT DEFAULT 'string',
+        label TEXT,
+        ff REAL,
+        uf REAL,
+        rds REAL,
+        status TEXT DEFAULT 'ok',
+        anomaly_type TEXT,
+        anomaly_detail TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pvserv_curve_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        curve_id INTEGER REFERENCES pvserv_dark_curves(id),
+        point_index INTEGER,
+        voltage REAL,
+        current REAL
+      )
+    `).run();
+  }
+}
+
 function generateSessionToken(): string {
   const ts = Date.now();
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -43,6 +97,7 @@ const CHART_COLORS = [
 pvservDarkRoutes.post('/upload', async (c) => {
   try {
     const { DB } = c.env;
+    await ensurePvservTables(DB);
     const formData = await c.req.formData();
     const file = formData.get('file') as File;
     const projectId = formData.get('project_id') as string || null;
@@ -160,6 +215,7 @@ pvservDarkRoutes.post('/upload', async (c) => {
 pvservDarkRoutes.get('/sessions', async (c) => {
   try {
     const { DB } = c.env;
+    await ensurePvservTables(DB);
     const { project_id, audit_token } = c.req.query();
     
     let query = 'SELECT * FROM pvserv_import_sessions WHERE 1=1';

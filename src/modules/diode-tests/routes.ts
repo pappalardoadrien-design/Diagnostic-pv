@@ -23,6 +23,56 @@ type Bindings = { DB: D1Database; KV: KVNamespace; R2: R2Bucket };
 
 const diodeTestRoutes = new Hono<{ Bindings: Bindings }>();
 
+// Auto-create tables si manquantes en prod
+async function ensureDiodeTestTables(DB: D1Database): Promise<void> {
+  try {
+    await DB.prepare(`SELECT 1 FROM diode_test_sessions LIMIT 1`).first();
+  } catch {
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS diode_test_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        audit_token TEXT,
+        plant_id INTEGER,
+        project_id INTEGER,
+        session_token TEXT UNIQUE,
+        technician_name TEXT,
+        test_date DATE,
+        method TEXT DEFAULT 'thermal',
+        equipment TEXT,
+        ambient_temperature REAL,
+        irradiance REAL,
+        notes TEXT,
+        total_diodes_tested INTEGER DEFAULT 0,
+        total_defects INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'in_progress',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS diode_test_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER REFERENCES diode_test_sessions(id),
+        session_token TEXT,
+        module_identifier TEXT,
+        string_number INTEGER,
+        position_in_string INTEGER,
+        diode_number INTEGER DEFAULT 1,
+        test_method TEXT DEFAULT 'thermal',
+        delta_t REAL,
+        vf_measured REAL,
+        vf_expected REAL,
+        ir_measured REAL,
+        status TEXT DEFAULT 'ok',
+        severity TEXT DEFAULT 'none',
+        photo_url TEXT,
+        comment TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+  }
+}
+
 function generateDiodeToken(): string {
   const ts = Date.now();
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -37,6 +87,7 @@ function generateDiodeToken(): string {
 diodeTestRoutes.get('/sessions', async (c) => {
   try {
     const { DB } = c.env;
+    await ensureDiodeTestTables(DB);
     const { plant_id, audit_token, status } = c.req.query();
     
     let query = `SELECT * FROM diode_test_sessions WHERE 1=1`;

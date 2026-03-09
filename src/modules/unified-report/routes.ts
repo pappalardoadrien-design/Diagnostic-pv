@@ -187,6 +187,36 @@ unifiedReportRoutes.get('/preview', async (c) => {
           plantName = (elAudits as any).project_name;
         }
       } catch (e) { /* table or column may not exist */ }
+      
+      // Fallback: via pv_cartography_audit_links
+      if (elCount === 0) {
+        try {
+          const elViaLinks = await DB.prepare(`
+            SELECT COUNT(*) as count, ea.project_name
+            FROM el_audits ea
+            JOIN pv_cartography_audit_links pcal ON ea.audit_token = pcal.el_audit_token
+            WHERE pcal.pv_plant_id = ?
+            GROUP BY ea.project_name
+          `).bind(plantId).first();
+          if (elViaLinks) {
+            elCount = (elViaLinks as any).count || 0;
+            plantName = plantName || (elViaLinks as any).project_name;
+          }
+        } catch (e) { /* table may not exist */ }
+      }
+
+      // Fallback: get plantName from pv_plants + CRM
+      if (!plantName) {
+        try {
+          const pn = await DB.prepare(`
+            SELECT p.plant_name, c.company_name 
+            FROM pv_plants p 
+            LEFT JOIN crm_clients c ON p.client_id = c.id
+            WHERE p.id = ?
+          `).bind(plantId).first();
+          if (pn) plantName = (pn as any).plant_name || (pn as any).company_name;
+        } catch (e) { /* */ }
+      }
     }
     
     // Module IV

@@ -1455,4 +1455,9 @@ planningRoutes.get('/interventions/:id/ordre-mission', async (c) => {
   }
 });
 
+// Alias /stats → /dashboard pour compatibilité
+planningRoutes.get('/stats', async (c) => {
+  return c.redirect('/api/planning/dashboard', 307);
+});
+
 export default planningRoutes;

@@ -293,4 +293,153 @@ interconnectModule.get('/audit/:token/zones', async (c) => {
   }
 })
 
+// ============================================================================
+// POST /auto-link - Auto-liaison intelligente audits ↔ plants
+// Match par client_name, project_name, et mise à jour plant_id + pv_cartography_audit_links
+// ============================================================================
+interconnectModule.post('/auto-link', async (c) => {
+  const { env } = c;
+  const results: { linked: any[]; already_linked: any[]; no_match: any[]; errors: string[] } = {
+    linked: [], already_linked: [], no_match: [], errors: []
+  };
+
+  try {
+    // 1. Récupérer tous les audits EL
+    const audits = await env.DB.prepare(`
+      SELECT id, audit_token, project_name, client_name, plant_id, created_at 
+      FROM el_audits ORDER BY created_at DESC
+    `).all();
+
+    // 2. Récupérer toutes les centrales PV avec client info
+    const plants = await env.DB.prepare(`
+      SELECT p.id as plant_id, p.plant_name, p.client_id, c.company_name as client_name
+      FROM pv_plants p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+    `).all();
+
+    // 3. Récupérer les zones de chaque plant
+    const zones = await env.DB.prepare(`
+      SELECT id as zone_id, plant_id FROM pv_zones
+    `).all();
+
+    const zonesByPlant: Record<number, number[]> = {};
+    for (const z of (zones.results || [])) {
+      const pid = (z as any).plant_id;
+      if (!zonesByPlant[pid]) zonesByPlant[pid] = [];
+      zonesByPlant[pid].push((z as any).zone_id);
+    }
+
+    // 4. Pour chaque audit, essayer de trouver une correspondance
+    for (const audit of (audits.results || [])) {
+      const a = audit as any;
+      
+      // Déjà lié ?
+      if (a.plant_id) {
+        results.already_linked.push({ audit_id: a.id, audit_token: a.audit_token, project_name: a.project_name, plant_id: a.plant_id });
+        continue;
+      }
+
+      // Chercher correspondance par client_name
+      let bestMatch: any = null;
+      let matchType = '';
+
+      for (const plant of (plants.results || [])) {
+        const p = plant as any;
+        const auditClient = (a.client_name || '').toLowerCase().trim();
+        const auditProject = (a.project_name || '').toLowerCase().trim();
+        const plantName = (p.plant_name || '').toLowerCase().trim();
+        const plantClient = (p.client_name || '').toLowerCase().trim();
+
+        // Match exact client_name
+        if (auditClient && plantClient && auditClient === plantClient) {
+          // Si plusieurs plants pour même client, matcher par nom projet contenant nom plant
+          if (auditProject.includes(plantName.split(' ')[0]) || plantName.includes(auditProject.split(' ')[0])) {
+            bestMatch = p;
+            matchType = 'client+name';
+            break;
+          }
+          if (!bestMatch) { bestMatch = p; matchType = 'client'; }
+        }
+
+        // Match par nom de plant contenu dans project_name
+        if (!bestMatch && auditProject && plantName) {
+          const plantWords = plantName.split(/[\s\-\(\)]+/).filter((w: string) => w.length > 2);
+          const matchCount = plantWords.filter((w: string) => auditProject.includes(w)).length;
+          if (matchCount >= 2 || (plantWords.length === 1 && matchCount === 1)) {
+            bestMatch = p;
+            matchType = 'name_fuzzy';
+          }
+        }
+      }
+
+      if (bestMatch) {
+        try {
+          // Mettre à jour plant_id sur el_audits
+          await env.DB.prepare(`UPDATE el_audits SET plant_id = ? WHERE id = ?`).bind(bestMatch.plant_id, a.id).run();
+
+          // Créer lien dans pv_cartography_audit_links (pour la première zone)
+          const plantZones = zonesByPlant[bestMatch.plant_id] || [];
+          if (plantZones.length > 0) {
+            try {
+              await env.DB.prepare(`
+                INSERT OR IGNORE INTO pv_cartography_audit_links (pv_plant_id, pv_zone_id, el_audit_id, el_audit_token, link_type)
+                VALUES (?, ?, ?, ?, 'auto')
+              `).bind(bestMatch.plant_id, plantZones[0], a.id, a.audit_token).run();
+            } catch (e) { /* link may already exist */ }
+          }
+
+          results.linked.push({
+            audit_id: a.id, audit_token: a.audit_token, project_name: a.project_name,
+            plant_id: bestMatch.plant_id, plant_name: bestMatch.plant_name, match_type: matchType
+          });
+        } catch (e: any) {
+          results.errors.push(`Audit ${a.id}: ${e.message}`);
+        }
+      } else {
+        results.no_match.push({ audit_id: a.id, audit_token: a.audit_token, project_name: a.project_name, client_name: a.client_name });
+      }
+    }
+
+    return c.json({
+      success: true,
+      summary: {
+        total_audits: (audits.results || []).length,
+        linked: results.linked.length,
+        already_linked: results.already_linked.length,
+        no_match: results.no_match.length,
+        errors: results.errors.length
+      },
+      details: results
+    });
+
+  } catch (error: any) {
+    return c.json({ error: 'Erreur auto-link', details: error.message }, 500);
+  }
+});
+
+// ============================================================================
+// GET /status - Rapport d'interconnexion globale
+// ============================================================================
+interconnectModule.get('/status', async (c) => {
+  const { env } = c;
+  try {
+    const audits = await env.DB.prepare(`SELECT COUNT(*) as total, SUM(CASE WHEN plant_id IS NOT NULL THEN 1 ELSE 0 END) as linked FROM el_audits`).first<any>();
+    const links = await env.DB.prepare(`SELECT COUNT(*) as total FROM pv_cartography_audit_links`).first<any>();
+    const plants = await env.DB.prepare(`SELECT COUNT(*) as total FROM pv_plants`).first<any>();
+    const clients = await env.DB.prepare(`SELECT COUNT(*) as total FROM crm_clients`).first<any>();
+    
+    return c.json({
+      success: true,
+      interconnection: {
+        el_audits: { total: audits?.total || 0, linked_to_plant: audits?.linked || 0, unlinked: (audits?.total || 0) - (audits?.linked || 0) },
+        pv_cartography_links: links?.total || 0,
+        pv_plants: plants?.total || 0,
+        crm_clients: clients?.total || 0
+      }
+    });
+  } catch (error: any) {
+    return c.json({ error: 'Erreur status', details: error.message }, 500);
+  }
+});
+
 export default interconnectModule
