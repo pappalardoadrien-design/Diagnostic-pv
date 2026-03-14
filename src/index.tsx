@@ -38,6 +38,8 @@ import pvservDarkRoutes from './modules/iv-curves/pvserv-dark-routes'
 import pipelineRoutes from './modules/crm/pipeline-routes'
 import repoweringRoutes from './modules/repowering/routes'
 import amoRoutes from './modules/amo/routes'
+import acquisitionRoutes from './modules/acquisitions/routes'
+import formationRoutes from './modules/formations/routes'
 
 // === PAGES (frontend HTML) ===
 import { getRapportsPage } from './pages/rapports.js'
@@ -73,6 +75,8 @@ import { getPipelinePage } from './pages/pipeline'
 import { getRepoweringPage } from './pages/repowering'
 import { getAmoPage } from './pages/amo'
 import { getPvservDarkPage } from './pages/pvserv-dark'
+import { getAcquisitionsPage } from './pages/acquisitions'
+import { getFormationsPage } from './pages/formations'
 
 // ============================================================================
 // APP SETUP
@@ -124,6 +128,8 @@ app.route('/api/pvserv', pvservDarkRoutes)
 app.route('/api/crm/pipeline', pipelineRoutes)
 app.route('/api/repowering', repoweringRoutes)
 app.route('/api/amo', amoRoutes)
+app.route('/api/acquisitions', acquisitionRoutes)
+app.route('/api/formations', formationRoutes)
 app.route('/admin', adminRoutes)
 app.route('/', designerModule)
 app.route('/crm/unified', crmUnifiedViewPage)
@@ -160,6 +166,12 @@ app.get('/repowering', (c) => c.html(getRepoweringPage()))
 
 // --- AMO ---
 app.get('/amo', (c) => c.html(getAmoPage()))
+
+// --- Acquisitions / Cessions ---
+app.get('/acquisitions', (c) => c.html(getAcquisitionsPage()))
+
+// --- Formations ---
+app.get('/formations', (c) => c.html(getFormationsPage()))
 
 // --- Planning ---
 app.get('/planning', (c) => c.html(getPlanningDashboardUnifiedPage()))
