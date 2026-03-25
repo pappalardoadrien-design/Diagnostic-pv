@@ -23,58 +23,120 @@ type Bindings = { DB: D1Database; KV: KVNamespace; R2: R2Bucket };
 
 const pvservDarkRoutes = new Hono<{ Bindings: Bindings }>();
 
-// Auto-create tables si manquantes en prod
+// Auto-create/migrate tables si manquantes ou obsolètes en prod (aligné sur migration 0063)
 async function ensurePvservTables(DB: D1Database): Promise<void> {
-  try {
-    await DB.prepare(`SELECT 1 FROM pvserv_import_sessions LIMIT 1`).first();
-  } catch {
-    await DB.prepare(`
-      CREATE TABLE IF NOT EXISTS pvserv_import_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_token TEXT UNIQUE NOT NULL,
-        project_id INTEGER,
-        audit_token TEXT,
-        source_filename TEXT,
-        device_name TEXT,
-        serial_number TEXT,
-        total_blocks INTEGER DEFAULT 0,
-        string_count INTEGER DEFAULT 0,
-        diode_count INTEGER DEFAULT 0,
-        technician_name TEXT,
-        import_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-        notes TEXT,
-        status TEXT DEFAULT 'imported',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `).run();
-    await DB.prepare(`
-      CREATE TABLE IF NOT EXISTS pvserv_dark_curves (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER REFERENCES pvserv_import_sessions(id),
-        session_token TEXT,
-        block_index INTEGER,
-        curve_type TEXT DEFAULT 'string',
-        label TEXT,
-        ff REAL,
-        uf REAL,
-        rds REAL,
-        status TEXT DEFAULT 'ok',
-        anomaly_type TEXT,
-        anomaly_detail TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `).run();
-    await DB.prepare(`
-      CREATE TABLE IF NOT EXISTS pvserv_curve_points (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        curve_id INTEGER REFERENCES pvserv_dark_curves(id),
-        point_index INTEGER,
-        voltage REAL,
-        current REAL
-      )
-    `).run();
+  // Helper: vérifie si une colonne existe dans une table
+  async function columnExists(table: string, column: string): Promise<boolean> {
+    try {
+      const info = await DB.prepare(`PRAGMA table_info(${table})`).all();
+      return (info.results || []).some((col: any) => col.name === column);
+    } catch { return false; }
   }
+
+  // Helper: vérifie si une table existe
+  async function tableExists(table: string): Promise<boolean> {
+    try {
+      await DB.prepare(`SELECT 1 FROM ${table} LIMIT 1`).first();
+      return true;
+    } catch { return false; }
+  }
+
+  // --- pvserv_import_sessions ---
+  const sessionsExists = await tableExists('pvserv_import_sessions');
+  if (sessionsExists) {
+    // Vérifier si le schéma est obsolète (colonnes manquantes)
+    const hasAvgFF = await columnExists('pvserv_import_sessions', 'avg_ff_strings');
+    if (!hasAvgFF) {
+      // Ancien schéma détecté → DROP et recréer (pas de données critiques)
+      console.log('[PVServ] Schema obsolète détecté pour pvserv_import_sessions, migration...');
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_dark_measurements').run();
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_dark_curves').run();
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_curve_points').run();
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_import_sessions').run();
+    }
+  }
+  
+  await DB.prepare(`
+    CREATE TABLE IF NOT EXISTS pvserv_import_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token TEXT UNIQUE NOT NULL,
+      project_id INTEGER,
+      audit_token TEXT,
+      source_filename TEXT,
+      device_name TEXT,
+      serial_number TEXT,
+      total_blocks INTEGER DEFAULT 0,
+      string_count INTEGER DEFAULT 0,
+      diode_count INTEGER DEFAULT 0,
+      avg_ff_strings REAL,
+      avg_rds_strings REAL,
+      avg_uf_strings REAL,
+      avg_ff_diodes REAL,
+      avg_rds_diodes REAL,
+      avg_uf_diodes REAL,
+      anomaly_count INTEGER DEFAULT 0,
+      critical_count INTEGER DEFAULT 0,
+      warning_count INTEGER DEFAULT 0,
+      technician_name TEXT,
+      import_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT,
+      status TEXT DEFAULT 'imported',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
+  // --- pvserv_dark_curves ---
+  const curvesExists = await tableExists('pvserv_dark_curves');
+  if (curvesExists) {
+    const hasMeasNum = await columnExists('pvserv_dark_curves', 'measurement_number');
+    if (!hasMeasNum) {
+      console.log('[PVServ] Schema obsolète détecté pour pvserv_dark_curves, migration...');
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_dark_measurements').run();
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_curve_points').run();
+      await DB.prepare('DROP TABLE IF EXISTS pvserv_dark_curves').run();
+    }
+  }
+
+  await DB.prepare(`
+    CREATE TABLE IF NOT EXISTS pvserv_dark_curves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      measurement_number INTEGER NOT NULL,
+      curve_type TEXT NOT NULL,
+      curve_mode TEXT DEFAULT 'bright',
+      fill_factor REAL NOT NULL,
+      rds REAL NOT NULL,
+      uf INTEGER NOT NULL,
+      v_max REAL,
+      i_max REAL,
+      anomaly_detected INTEGER DEFAULT 0,
+      anomaly_type TEXT,
+      anomaly_severity TEXT DEFAULT 'ok',
+      anomaly_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES pvserv_import_sessions(id) ON DELETE CASCADE
+    )
+  `).run();
+
+  // --- pvserv_dark_measurements ---
+  const measurementsExists = await tableExists('pvserv_dark_measurements');
+  if (!measurementsExists) {
+    // Aussi nettoyer l'ancienne table pvserv_curve_points si elle existe
+    await DB.prepare('DROP TABLE IF EXISTS pvserv_curve_points').run();
+  }
+
+  await DB.prepare(`
+    CREATE TABLE IF NOT EXISTS pvserv_dark_measurements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curve_id INTEGER NOT NULL,
+      point_order INTEGER NOT NULL,
+      voltage REAL NOT NULL,
+      current REAL NOT NULL,
+      power REAL,
+      FOREIGN KEY (curve_id) REFERENCES pvserv_dark_curves(id) ON DELETE CASCADE
+    )
+  `).run();
 }
 
 function generateSessionToken(): string {
